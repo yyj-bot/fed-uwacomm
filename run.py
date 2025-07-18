@@ -42,6 +42,11 @@ def setup_parser():
     optim_parser.add_argument('--model', default='models/rf_model.pkl', help='预训练模型路径')
     optim_parser.add_argument('--output', default='results', help='优化结果输出目录')
     
+    # 添加工作流组件 - 直接运行完整工作流程
+    workflow_parser = subparsers.add_parser('workflow', help='运行完整工作流程')
+    workflow_parser.add_argument('--dir', default='data/bellhop', help='输入/输出目录')
+    workflow_parser.add_argument('--num', type=int, default=15, help='生成文件数量')
+    
     return parser
 
 def run_preprocessing(args):
@@ -73,6 +78,13 @@ def run_optimization(args):
     print(f"优化结果将保存至: {args.output}")
     # TODO: 实现通信参数优化
 
+def run_workflow(args):
+    """运行完整工作流程"""
+    from preprocessing.bellhop_tools import BellhopManager
+    
+    print("开始执行完整工作流程...")
+    BellhopManager.run_complete_workflow(args.dir, args.num)
+
 def main():
     """主函数"""
     parser = setup_parser()
@@ -84,6 +96,8 @@ def main():
         run_training(args)
     elif args.component == 'optimize':
         run_optimization(args)
+    elif args.component == 'workflow':
+        run_workflow(args)
     else:
         parser.print_help()
 

@@ -13,6 +13,7 @@ import glob
 import pymysql
 import dotenv
 from pathlib import Path
+import subprocess
 
 # 加载.env文件
 dotenv_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / '.env'
@@ -199,17 +200,21 @@ class BellhopFileManager:
             # 设置最大通信范围
             meta_data['max_range'] = random.uniform(10.0, 20.0)  # km
         
-        # 格式化声速剖面
-        ssp_lines = ""
+        # 格式化声速剖面 - 确保格式完全符合Bellhop要求
+        ssp_lines = []
         for depth, speed in meta_data['ssp_data']:
-            ssp_lines += f"  {depth:.2f}  {speed:.2f} /\n"
+            # 确保深度和声速值之间有两个空格，斜杠前也有一个空格
+            ssp_lines.append(f"  {depth:.2f}  {speed:.2f} /")
+        
+        # 添加一个空行，这对Bellhop格式很重要
+        ssp_formatted = "\n".join(ssp_lines) + "\n"
         
         # 生成环境文件
         env_content = ENV_TEMPLATE.format(
             index,
             meta_data['freq'],
             meta_data['water_depth'],
-            ssp_lines,
+            ssp_formatted,
             meta_data['water_depth'],
             meta_data['bottom_speed'],
             meta_data['bottom_density'],
@@ -219,8 +224,11 @@ class BellhopFileManager:
             meta_data['max_range']
         )
         
+        # 确保所有行结束都是Windows格式的换行符（CRLF）
+        env_content = env_content.replace('\n', '\r\n')
+        
         # 写入文件
-        with open(output_path, 'w') as f:
+        with open(output_path, 'w', newline='\r\n') as f:
             f.write(env_content)
         
         print(f"已生成环境文件: {output_path}")
@@ -277,26 +285,52 @@ class BellhopFileManager:
     
     @staticmethod
     def fix_env_file(env_path, backup=True):
-        """修复环境文件中的声速剖面"""
+        """修复环境文件中的声速剖面和格式问题"""
         try:
             # 读取原始文件内容
-            with open(env_path, 'r') as file:
-                lines = file.readlines()
+            with open(env_path, 'r', errors='ignore') as file:
+                content = file.read()
+                lines = content.splitlines()
+            
+            # 如果文件内容为空或格式严重错误，则重新生成整个文件
+            if not content.strip() or len(lines) < 5:
+                print(f"警告: {env_path} 格式严重错误，将重新生成")
+                # 从文件名提取索引号
+                filename = os.path.basename(env_path)
+                match = re.search(r'B(\d+)', filename)
+                if match:
+                    index = int(match.group(1))
+                    # 重新生成文件
+                    BellhopFileManager.generate_env_file(env_path, index)
+                    return True
+                else:
+                    print(f"错误: 无法从文件名 {filename} 提取索引号")
+                    return False
             
             # 识别原文件中的声速剖面段
             ssp_start = -1
             ssp_end = -1
             water_depth = 5000.0  # 默认水深
+            freq = 1000.0  # 默认频率
+            
+            # 寻找频率信息
+            if len(lines) > 1:
+                try:
+                    freq = float(lines[1])
+                except:
+                    # 如果无法解析频率，使用默认值
+                    pass
             
             # 寻找水深信息
             for i, line in enumerate(lines):
-                if "DEPTH of bottom" in line:
+                if i > 3 and i < 10 and re.search(r'\d+\s+0\.0\s+\d+', line):
                     parts = line.split()
                     if len(parts) >= 3:
                         try:
                             water_depth = float(parts[2])
                         except:
                             pass
+                    break
             
             # 寻找声速剖面段
             for i, line in enumerate(lines):
@@ -307,31 +341,77 @@ class BellhopFileManager:
                     ssp_end = i
                     break
             
-            # 如果未找到声速剖面段，返回错误
+            # 如果未找到声速剖面段，尝试根据文件结构推断
             if ssp_start == -1 or ssp_end == -1:
-                print(f"警告: 无法在 {env_path} 中找到声速剖面段")
-                return False
+                print(f"警告: 无法在 {env_path} 中找到完整的声速剖面段，尝试推断位置")
+                # 假设声速剖面在文件的前半部分
+                for i, line in enumerate(lines):
+                    if i > 4 and i < len(lines) // 2 and "'" in line and ssp_end == -1:
+                        ssp_end = i
+                        break
+                
+                if ssp_end != -1:
+                    ssp_start = 5  # 假设声速剖面从第6行开始
+                else:
+                    # 如果仍然无法推断，则重新生成整个文件
+                    print(f"警告: 无法推断 {env_path} 中的声速剖面位置，将重新生成")
+                    filename = os.path.basename(env_path)
+                    match = re.search(r'B(\d+)', filename)
+                    if match:
+                        index = int(match.group(1))
+                        BellhopFileManager.generate_env_file(env_path, index)
+                        return True
+                    else:
+                        print(f"错误: 无法从文件名 {filename} 提取索引号")
+                        return False
             
             # 生成新的声速剖面
-            num_points = ssp_end - ssp_start
-            ssp_data, _ = OceanEnvironmentGenerator.generate_realistic_ssp(0.0, int(water_depth), num_points)
+            num_points = 25  # 使用固定数量的点
+            ssp_data, _ = OceanEnvironmentGenerator.generate_realistic_ssp(0.0, water_depth, num_points)
             
             # 创建新的行
             new_lines = lines[:ssp_start]
             
+            # 确保声速剖面格式正确
             for depth, speed in ssp_data:
-                new_lines.append(f"  {depth:.2f}  {speed:.2f} /\n")
+                new_lines.append(f"  {depth:.2f}  {speed:.2f} /")
             
-            new_lines.extend(lines[ssp_end:])
+            # 添加一个空行以确保格式正确
+            new_lines.append("")
+            
+            # 添加剩余部分
+            if ssp_end < len(lines):
+                new_lines.extend(lines[ssp_end:])
+            else:
+                # 如果文件结构不完整，添加必要的结尾部分
+                new_lines.extend([
+                    "'A' 0.0",
+                    "'A' 0.0",
+                    f"{water_depth:.1f} {1650.0:.2f} 0.0 {2.0:.1f} {0.5:.1f} /",
+                    "1",
+                    "100.0 /",
+                    "1",
+                    "100.0 /",
+                    "101",
+                    f"0.0 {15.0:.1f} /",
+                    "'R'",
+                    "101",
+                    "-20.0 20.0 /",
+                    f"0.0 {water_depth+500:.1f} 101.0"
+                ])
             
             # 备份原文件
             if backup:
                 backup_path = env_path + ".bak"
-                shutil.copy2(env_path, backup_path)
+                try:
+                    shutil.copy2(env_path, backup_path)
+                except Exception as e:
+                    print(f"备份 {env_path} 时出错: {str(e)}")
             
-            # 写入修改后的内容
-            with open(env_path, 'w') as file:
-                file.writelines(new_lines)
+            # 写入修改后的内容，确保使用Windows换行符（CRLF）
+            content = "\r\n".join(new_lines)
+            with open(env_path, 'w', newline='\r\n') as file:
+                file.write(content)
             
             print(f"已成功修复 {env_path}")
             return True
@@ -493,21 +573,63 @@ class BellhopManager:
         env_files = [f for f in os.listdir(env_dir) if f.endswith('.env')]
         current_dir = os.getcwd()
         success_count = 0
+        error_count = 0
         
         try:
             os.chdir(env_dir)
             for env_file in env_files:
                 env_name = os.path.splitext(env_file)[0]  # 获取不带扩展名的文件名
                 print(f"处理: {env_name}")
-                os.system(f"bellhopf.exe {env_name}")
+                
+                # 使用subprocess运行bellhop，便于捕获错误
+                try:
+                    result = subprocess.run(["bellhopf.exe", env_name], 
+                                           stdout=subprocess.PIPE, 
+                                           stderr=subprocess.PIPE, 
+                                           text=True,
+                                           timeout=120)
+                    
+                    if result.returncode != 0:
+                        error_count += 1
+                        print(f"处理 {env_file} 时出错:")
+                        if result.stderr:
+                            print(f"错误输出: {result.stderr}")
+                        
+                        # 尝试修复文件并重新运行
+                        print(f"尝试修复 {env_file} 并重新运行...")
+                        BellhopFileManager.fix_env_file(os.path.join(current_dir, env_dir, env_file))
+                        retry_result = subprocess.run(["bellhopf.exe", env_name], 
+                                      stdout=subprocess.PIPE, 
+                                      stderr=subprocess.PIPE,
+                                      text=True,
+                                      timeout=120)
+                        
+                        if retry_result.returncode != 0:
+                            print(f"修复后仍然失败，请检查 {env_file} 格式")
+                except subprocess.TimeoutExpired:
+                    error_count += 1
+                    print(f"处理 {env_file} 超时")
+                except Exception as e:
+                    error_count += 1
+                    print(f"运行Bellhop处理 {env_file} 时出错: {str(e)}")
                 
                 # 检查是否生成了输出文件
                 if os.path.exists(f"{env_name}.prt"):
-                    print(f"成功处理环境文件 {env_file}")
-                    success_count += 1
+                    # 检查输出文件是否包含错误信息
+                    try:
+                        with open(f"{env_name}.prt", 'r', encoding='utf-8', errors='ignore') as f:
+                            prt_content = f.read()
+                            if "FATAL ERROR" in prt_content:
+                                print(f"警告: {env_file} 处理完成但存在错误，查看 {env_name}.prt 获取详情")
+                            else:
+                                print(f"成功处理环境文件 {env_file}")
+                                success_count += 1
+                    except Exception as e:
+                        print(f"读取输出文件 {env_name}.prt 时出错: {str(e)}")
+                else:
+                    print(f"警告: 未生成输出文件 {env_name}.prt")
                 
                 # 清理旧格式的文件（如果存在）
-                # 从B01格式转换为可能的B1_strict格式
                 if env_name.startswith("B0"):
                     old_format = env_name.replace("B0", "B") + "_strict"
                     if os.path.exists(f"{old_format}.env"):
@@ -520,7 +642,7 @@ class BellhopManager:
         finally:
             os.chdir(current_dir)
         
-        print(f"共处理 {len(env_files)} 个环境文件，成功 {success_count} 个")
+        print(f"共处理 {len(env_files)} 个环境文件，成功 {success_count} 个，失败 {error_count} 个")
         return success_count
 
 def main():
