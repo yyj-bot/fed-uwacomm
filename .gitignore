@@ -1,0 +1,48 @@
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虚拟环境
+.env
+.venv
+venv/
+ENV/
+
+# 构建
+build/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/
+
+# 数据
+# *.csv
+# *.env
+# *.prt
+# data/
+# data/bellhop/bellhopf.exe
+
+# 可执行文件
+# *.exe
+*.dll
+*.so
+*.dylib
+
+# 日志
+*.log
+
+# 脚本和测试
+scripts/
+tests/
+
+# IDE配置
+.vscode/
+.idea/ 
+
+# 忽略说明和依赖文件
+README.md
+requirements.txt 
+
