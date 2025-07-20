@@ -23,10 +23,10 @@ dotenv.load_dotenv(dotenv_path=dotenv_path)
 ENV_TEMPLATE = """'Realistic Ocean Environment B{}'
 {:.1f}
 1
-'C'
+'CVW'
 51  0.0  {:.1f}
 {}
-'L'
+'R'
 {:.1f} {:.2f} 0.0 {:.1f} /
 1
 {:.1f} /
@@ -902,16 +902,8 @@ class BellhopManager:
         print("1. 生成真实环境数据文件...")
         meta_data_collection = BellhopFileManager.batch_generate_files(output_dir, num_files, backup=False)
         
-        print("\n2. 尝试运行Bellhop处理环境文件...")
+        print("\n2. 运行Bellhop处理环境文件...")
         success_count = BellhopManager.run_bellhop_batch(output_dir)
-        
-        # 如果BELLHOP运行失败，直接使用模拟数据
-        if success_count == 0:
-            print("\n2.5 BELLHOP运行失败，生成模拟的.shd和.ray文件...")
-            BellhopManager.generate_mock_files(output_dir)
-        else:
-            print("\n2.5 生成缺失的模拟文件...")
-            BellhopManager.generate_mock_files(output_dir)
         
         print("\n3. 提取声速剖面特征...")
         features = BellhopFeatureExtractor.batch_extract_features(output_dir)
@@ -1207,9 +1199,7 @@ class BellhopManager:
         # 检查bellhop程序是否存在
         bellhop_exe = os.path.join(env_dir, "bellhopf.exe")
         if not os.path.exists(bellhop_exe):
-            print(f"警告: 未找到BELLHOP可执行文件 {bellhop_exe}，将使用模拟数据")
-            # 生成模拟数据
-            BellhopManager.generate_mock_files(env_dir)
+            print(f"警告: 未找到BELLHOP可执行文件 {bellhop_exe}")
             return 0
         
         try:
@@ -1246,29 +1236,18 @@ class BellhopManager:
                         
                         if retry_result.returncode != 0:
                             print(f"修复后仍然失败，请检查 {env_file} 格式")
-                            # 即使失败，也继续处理其他文件
-                            # 检查是否需要生成模拟数据
-                            if not os.path.exists(f"{env_name}.prt") or not os.path.exists(f"{env_name}.shd"):
-                                os.chdir(current_dir)
-                                print(f"为 {env_name} 生成模拟数据...")
-                                BellhopManager.generate_mock_files(env_dir, [env_name])
-                                os.chdir(env_dir)
+                        else:
+                            success_count += 1
+                            print(f"修复后成功处理环境文件 {env_file}")
+                    else:
+                        success_count += 1
+                        print(f"成功处理环境文件 {env_file}")
                 except subprocess.TimeoutExpired:
                     error_count += 1
                     print(f"处理 {env_file} 超时")
-                    # 生成模拟数据
-                    os.chdir(current_dir)
-                    print(f"为 {env_name} 生成模拟数据...")
-                    BellhopManager.generate_mock_files(env_dir, [env_name])
-                    os.chdir(env_dir)
                 except Exception as e:
                     error_count += 1
                     print(f"运行Bellhop处理 {env_file} 时出错: {str(e)}")
-                    # 生成模拟数据
-                    os.chdir(current_dir)
-                    print(f"为 {env_name} 生成模拟数据...")
-                    BellhopManager.generate_mock_files(env_dir, [env_name])
-                    os.chdir(env_dir)
                 
                 # 检查是否生成了输出文件
                 if os.path.exists(f"{env_name}.prt"):
@@ -1278,27 +1257,10 @@ class BellhopManager:
                             prt_content = f.read()
                             if "FATAL ERROR" in prt_content:
                                 print(f"警告: {env_file} 处理完成但存在错误，查看 {env_name}.prt 获取详情")
-                            else:
-                                print(f"成功处理环境文件 {env_file}")
-                                success_count += 1
                     except Exception as e:
                         print(f"读取输出文件 {env_name}.prt 时出错: {str(e)}")
                 else:
                     print(f"警告: 未生成输出文件 {env_name}.prt")
-                    # 生成模拟数据
-                    os.chdir(current_dir)
-                    print(f"为 {env_name} 生成模拟数据...")
-                    BellhopManager.generate_mock_files(env_dir, [env_name])
-                    os.chdir(env_dir)
-                
-                # 清理旧格式的文件（如果存在）
-                if env_name.startswith("B0"):
-                    old_format = env_name.replace("B0", "B") + "_strict"
-                    if os.path.exists(f"{old_format}.env"):
-                        os.remove(f"{old_format}.env")
-                    if os.path.exists(f"{old_format}.prt"):
-                        os.remove(f"{old_format}.prt")
-                    
         except Exception as e:
             print(f"批量处理环境文件时出错: {str(e)}")
         finally:
