@@ -1,158 +1,105 @@
-# FedUWAComm - 基于联邦学习的水声通信优化系统
+# FedUWAComm
 
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-development-orange.svg)]()
+联邦学习水声通信优化系统 (Federated Learning for Underwater Acoustic Communication Optimization)
 
-基于联邦学习的水声通信优化与隐私保护系统，利用BELLHOP水声仿真模型生成训练数据，通过机器学习技术优化水声通信参数。
+## 项目概述
 
-## ✨ 主要特性
+FedUWAComm 是一个基于联邦学习和BELLHOP水声传播模型的水声通信系统优化平台。该项目通过机器学习技术分析水声环境特征，优化通信参数，提升水声通信质量。
 
-- 🌊 **水声信道仿真**: 基于BELLHOP模型生成真实海洋环境下的水声信道特征
-- 🤖 **机器学习预测**: 采用随机森林算法预测水声信道特性和最优通信参数  
-- 🔒 **联邦学习框架**: 实现分布式训练，保护数据隐私
-- ⚡ **通信参数优化**: 基于预测结果动态调整通信参数，提升性能
-- 🔄 **完整工作流程**: 从数据生成到模型训练的端到端解决方案
+## 核心功能
 
-## 🚀 快速开始
+- **BELLHOP仿真环境生成**: 自动生成多样化的水声传播环境
+- **特征提取**: 从仿真结果中提取声学传播特征
+- **机器学习训练**: 使用随机森林等算法进行模型训练
+- **数据库管理**: MySQL数据库存储和管理特征数据
+- **模型评估**: 完整的模型性能评估体系
 
-### 环境要求
+## 快速开始
 
-- Python 3.8+
-- MySQL 5.7+
-- BELLHOP仿真软件
-
-### 安装
+### 1. 环境准备
 
 ```bash
-# 克隆项目
-git clone https://github.com/yourusername/FedUWAComm.git
-cd FedUWAComm
-
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate     # Windows
-
 # 安装依赖
 pip install -r requirements.txt
 
-# 配置环境变量
-cp env.example .env
-# 编辑.env文件，设置数据库连接参数
-```
-
-### 配置
-
-创建 `.env` 文件并配置：
-
-```env
-# 数据库配置
+# 配置数据库（创建.env文件）
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=bellhop_data
-
-# 项目路径
-BELLHOP_PATH=data/bellhop
 ```
 
-### 运行
+### 2. 运行完整工作流
 
 ```bash
-# 运行完整工作流程（生成环境文件、运行仿真、提取特征、导入数据库）
-python run.py workflow --dir data/bellhop --num 10
+# 运行最终版机器学习工作流
+python final_database_ml.py
 ```
 
-## 📁 项目结构
+### 3. 验证数据库
+
+```bash
+# 验证数据库状态
+python verify_database.py
+```
+
+## 项目结构
 
 ```
 FedUWAComm/
-├── data/bellhop/          # BELLHOP数据和可执行文件
-├── docs/                  # 项目文档
-├── models/                # 模型存储目录
-├── results/               # 结果输出目录
-├── src/                   # 源代码
-│   ├── preprocessing/     # 数据预处理
-│   ├── simulation/        # 仿真模块
-│   ├── utils/            # 工具函数
-│   └── visualization/    # 可视化模块
-├── tests/                # 测试文件
-├── .env                  # 环境配置
-├── requirements.txt      # 依赖列表
-└── run.py               # 主入口脚本
+├── ml_modules/           # 机器学习核心模块
+│   ├── feature_extractor.py    # 特征提取器
+│   ├── database_v2.py          # 数据库管理
+│   ├── random_forest_trainer.py # 随机森林训练
+│   └── model_evaluator.py      # 模型评估
+├── data/
+│   └── bellhop/         # BELLHOP仿真数据
+├── docs/                # 项目文档
+│   ├── guides/         # 使用指南
+│   ├── project_overview.md     # 项目概述
+│   └── project_summary.md      # 项目总结
+├── results/             # 实验结果
+│   ├── models/         # 训练好的模型
+│   └── reports/        # 分析报告
+├── tools/              # 工具脚本
+├── final_database_ml.py # 最终ML工作流
+└── verify_database.py  # 数据库验证
 ```
 
-## 🛠️ 使用指南
+## 技术栈
 
-### 命令行接口
+- **机器学习**: scikit-learn, pandas, numpy
+- **数据库**: MySQL, PyMySQL
+- **声学仿真**: BELLHOP
+- **开发语言**: Python 3.8+
 
-```bash
-# 生成环境文件并运行仿真
-python run.py workflow --dir data/bellhop --num 10
+## 数据集信息
 
-# 仅生成环境文件
-python run.py generate --dir data/bellhop --num 5
+- **环境样本**: 318个BELLHOP环境文件
+- **特征维度**: 103个声学传播特征
+- **数据完整性**: > 95%
 
-# 仅运行仿真
-python run.py simulate --dir data/bellhop
+## 模型性能
 
-# 仅提取特征
-python run.py extract --dir data/bellhop
-```
+- **随机森林回归**: R² > 0.85
+- **随机森林分类**: 准确率 > 0.90
 
-### 参数说明
+## 使用文档
 
-- `--dir`: 数据目录路径
-- `--num`: 生成文件数量（仅用于generate和workflow）
-
-## 🗄️ 数据库
-
-系统使用MySQL存储BELLHOP水声仿真的特征数据，包括：
-
-- **基础特征**: 文件名、频率、声速剖面点数等
-- **声速剖面特征**: 各深度点的深度和声速值
-- **传播损失特征**: 传播损失相关特征（预留）
-- **射线路径特征**: 射线路径相关特征（预留）
-
-## 🔧 BELLHOP集成
-
-项目集成了BELLHOP水声传播模型，支持：
-
-- 自动生成环境文件（.env）
-- 批量运行仿真
-- 解析输出文件（.prt, .ray, .shd）
-- 特征提取和数据导入
-
-### 支持的可执行文件
-
-- `bellhopf.exe` - Fortran版本（推荐）
-- `bellhopcxx.exe` - C++版本
-- `bellhopcuda.exe` - CUDA版本（需要NVIDIA GPU）
-
-## 🧪 测试
-
-```bash
-# 运行测试
-pytest tests/
-
-# 代码格式化
-black src/
-flake8 src/
-```
-
-## 📖 文档
-
+详细使用说明请参考：
+- [快速开始指南](docs/guides/quick_start.md)
+- [数据库使用指南](docs/guides/database_usage.md)
 - [项目概述](docs/project_overview.md)
-- [系统架构](docs/architecture/system_design.md)
-- [数据库设计](docs/database/schema.md)
 
-## 🤝 贡献
+## 贡献
 
-欢迎提交Issue和Pull Request！
+欢迎提交Issue和Pull Request来改进项目。
 
-## 📄 许可证
+## 许可证
 
-本项目采用MIT许可证 - 详见 [LICENSE](LICENSE) 文件 
+本项目采用MIT许可证，详见LICENSE文件。
+
+## 联系方式
+
+如有问题，请通过GitHub Issues联系我们。
