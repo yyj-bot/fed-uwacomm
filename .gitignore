@@ -143,13 +143,22 @@ data/bellhop/*.bak
 logs/
 *.log
 
-# Results and outputs
-results/
-*.png
-*.jpg
-*.jpeg
-*.pdf
-*.svg
+# Results and outputs (keep structure but ignore output files)
+results/**/*.png
+results/**/*.jpg
+results/**/*.jpeg
+results/**/*.pdf
+results/**/*.svg
+results/**/*.pkl
+results/**/*.joblib
+results/**/*.csv
+results/**/*.txt
+results/logs/
+!results/.gitkeep
+
+# Model files (ignore all models but keep directory structure)
+models/
+!models/.gitkeep
 
 # IDE files
 .vscode/
@@ -169,5 +178,37 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Project specific
+# Environment files
+.env*
+!.env.example
+
+# Large data files
+*.h5
+*.hdf5
+*.zarr
+
+# Jupyter notebooks checkpoints
+*.ipynb_checkpoints/
+
+# IDE specific
+.claude/
+.cursor/
+
+# BELLHOP specific (additional)
+*.bty
+*.ati
+*.env.tmp
+*.shd.*
+*.arr.*
+
+# Database dumps
+*.sql
+*.dump
+
+# Configuration overrides
+config/local_*.py
+config/production_*.py
 

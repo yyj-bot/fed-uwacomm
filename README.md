@@ -16,6 +16,8 @@ FedUWAComm 是一个基于联邦学习和BELLHOP水声传播模型的水声通�
 
 ## 快速开始
 
+🚀 **新用户必读**: [合作者快速上手指南](docs/GETTING_STARTED.md)
+
 ### 1. 环境准备
 
 ```bash
@@ -30,41 +32,80 @@ DB_PASSWORD=your_password
 DB_NAME=bellhop_data
 ```
 
-### 2. 运行完整工作流
+### 2. 安装项目
+
+```bash
+# 开发模式安装
+pip install -e .
+
+# 或者直接运行脚本
+```
+
+### 3. 运行完整工作流
 
 ```bash
 # 运行最终版机器学习工作流
-python final_database_ml.py
+python scripts/complete_workflow.py
+
+# 或使用安装后的命令
+feduwacomm-ml
 ```
 
-### 3. 验证数据库
+### 4. 验证数据库
 
 ```bash
 # 验证数据库状态
-python verify_database.py
+python scripts/verify_database.py
+
+# 或使用安装后的命令
+feduwacomm-verify
+```
+
+### 5. 运行测试
+
+```bash
+# 运行所有测试
+python -m pytest tests/
+
+# 运行特定测试
+python -m unittest tests.test_database
 ```
 
 ## 项目结构
 
 ```
 FedUWAComm/
-├── ml_modules/           # 机器学习核心模块
-│   ├── feature_extractor.py    # 特征提取器
-│   ├── database_v2.py          # 数据库管理
-│   ├── random_forest_trainer.py # 随机森林训练
-│   └── model_evaluator.py      # 模型评估
-├── data/
-│   └── bellhop/         # BELLHOP仿真数据
-├── docs/                # 项目文档
-│   ├── guides/         # 使用指南
-│   ├── project_overview.md     # 项目概述
-│   └── project_summary.md      # 项目总结
-├── results/             # 实验结果
-│   ├── models/         # 训练好的模型
-│   └── reports/        # 分析报告
-├── tools/              # 工具脚本
-├── final_database_ml.py # 最终ML工作流
-└── verify_database.py  # 数据库验证
+├── src/                         # 源代码目录
+│   └── feduwacomm/             # 主包
+│       ├── __init__.py
+│       ├── core/               # 核心功能模块
+│       ├── ml/                 # 机器学习模块
+│       │   ├── feature_extractor.py    # 特征提取器
+│       │   ├── model_evaluator.py      # 模型评估
+│       │   └── random_forest_trainer.py # 随机森林训练
+│       ├── database/           # 数据库管理模块
+│       │   ├── database.py             # 数据库操作
+│       │   └── database_v2.py          # 数据库v2
+│       ├── acoustic/           # 声学模拟模块
+│       │   ├── generate_environments.py # 环境生成
+│       │   └── run_bellhop.py          # BELLHOP运行
+│       └── utils/              # 工具函数模块
+├── scripts/                    # 脚本文件
+│   ├── final_database_ml.py    # 最终ML工作流
+│   ├── verify_database.py      # 数据库验证
+│   └── run_bellhop_batch.py    # 批量运行脚本
+├── config/                     # 配置文件
+│   └── settings.py             # 项目设置
+├── tests/                      # 测试文件
+│   ├── test_database.py        # 数据库测试
+│   └── test_ml.py              # 机器学习测试
+├── data/                       # 数据文件
+│   └── bellhop/                # BELLHOP仿真数据
+├── docs/                       # 项目文档
+├── models/                     # 训练好的模型
+├── results/                    # 实验结果
+├── setup.py                    # 安装配置
+└── requirements.txt            # 依赖文件
 ```
 
 ## 技术栈
@@ -88,9 +129,9 @@ FedUWAComm/
 ## 使用文档
 
 详细使用说明请参考：
-- [快速开始指南](docs/guides/quick_start.md)
-- [数据库使用指南](docs/guides/database_usage.md)
-- [项目概述](docs/project_overview.md)
+- 🚀 [合作者快速上手指南](docs/GETTING_STARTED.md) - 新用户必读
+- 📖 [项目概述](docs/project_overview.md) - 系统架构说明
+- 📊 [项目总结](docs/project_summary.md) - 技术总结报告
 
 ## 贡献
 
