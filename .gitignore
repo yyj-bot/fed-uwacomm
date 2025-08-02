@@ -1,48 +1,214 @@
-# Python缓存
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
-# 虚拟环境
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
 .env
 .venv
+env/
 venv/
 ENV/
+env.bak/
+venv.bak/
 
-# 构建
-build/
-dist/
+# Spyder project settings
+.spyderproject
+.spyproject
 
-# Jupyter
-.ipynb_checkpoints/
-notebooks/
+# Rope project settings
+.ropeproject
 
-# 数据
-# *.csv
-# *.env
-# *.prt
-# data/
-# data/bellhop/bellhopf.exe
+# mkdocs documentation
+/site
 
-# 可执行文件
-# *.exe
-*.dll
-*.so
-*.dylib
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# 日志
+# Pyre type checker
+.pyre/
+
+# Bellhop specific files
+data/bellhop/*.prt
+data/bellhop/*.ray
+data/bellhop/*.shd
+data/bellhop/*.arr
+data/bellhop/*_bellhop_log.txt
+data/bellhop/*.bak
+
+# Bellhop executables (large files)
+# data/bellhop/*.exe
+
+# Logs
+logs/
 *.log
 
-# 脚本和测试
-scripts/
-tests/
+# Results and outputs (keep structure but ignore output files)
+results/**/*.png
+results/**/*.jpg
+results/**/*.jpeg
+results/**/*.pdf
+results/**/*.svg
+results/**/*.pkl
+results/**/*.joblib
+results/**/*.csv
+results/**/*.txt
+results/logs/
+!results/.gitkeep
 
-# IDE配置
+# Model files (ignore all models but keep directory structure)
+models/
+!models/.gitkeep
+
+# IDE files
 .vscode/
-.idea/ 
+.idea/
+*.swp
+*.swo
+*~
 
-# 忽略说明和依赖文件
-README.md
-requirements.txt 
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Project specific
+# Environment files
+.env*
+!.env.example
+
+# Large data files
+*.h5
+*.hdf5
+*.zarr
+
+# Jupyter notebooks checkpoints
+*.ipynb_checkpoints/
+
+# IDE specific
+.claude/
+.cursor/
+
+# BELLHOP specific (additional)
+*.bty
+*.ati
+*.env.tmp
+*.shd.*
+*.arr.*
+
+# Database dumps
+*.sql
+*.dump
+
+# Configuration overrides
+config/local_*.py
+config/production_*.py
 
