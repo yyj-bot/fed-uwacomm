@@ -30,12 +30,13 @@ FedUWAComm 是一个基于联邦学习和BELLHOP水声传播模型的水声通�
 
 ### ⚙️ SpringBoot后端 (`backend-springboot/`)
 - **功能**: RESTful API服务，提供数据接口和业务逻辑处理
-- **技术栈**: 待开发 (Spring Boot + Java)
+- **技术栈**: Spring Boot 3.4.4, MyBatis 3.0.3, MySQL, Spring Security
 - **主要功能**:
   - RESTful API接口
   - 用户认证授权
   - 数据持久化
   - 微服务架构
+- **项目状态**: ✅ 基础框架已完成，等待业务逻辑开发
 
 ## 核心功能
 
@@ -49,7 +50,7 @@ FedUWAComm 是一个基于联邦学习和BELLHOP水声传播模型的水声通�
 
 ## 快速开始
 
-🚀 **新用户必读**: [合作者快速上手指南](docs/python-vm/GETTING_STARTED.md)
+🚀 **新用户必读**: [合作者快速上手指南](docs/shared/GETTING_STARTED.md)
 
 ### 1. 环境准备
 
@@ -106,6 +107,17 @@ cd python-vm
 python -m pytest tests/
 ```
 
+### 7. 启动Spring Boot后端
+
+```bash
+# 启动后端服务
+cd backend-springboot
+mvn -pl feduwacomm-server spring-boot:run
+
+# 或使用启动脚本
+run.bat
+```
+
 ## 项目结构
 
 ```
@@ -147,7 +159,20 @@ FedUWAComm/                          # Monorepo根目录
 │   ├── package.json               # 前端依赖配置
 │   └── README.md                  # 前端说明文档
 ├── backend-springboot/            # SpringBoot后端模块
-│   ├── src/                       # Java源代码
+│   ├── feduwacomm-parent/         # 父级项目
+│   ├── feduwacomm-common/         # 通用模块
+│   ├── feduwacomm-pojo/           # 数据对象模块
+│   ├── feduwacomm-server/         # 服务端模块
+│   │   ├── src/main/java/com/feduwacomm/
+│   │   │   ├── FedUWACommApplication.java  # 主应用程序
+│   │   │   ├── config/            # 配置类
+│   │   │   ├── controller/        # 控制器
+│   │   │   ├── service/           # 服务层（待开发）
+│   │   │   ├── mapper/            # MyBatis Mapper（待开发）
+│   │   │   └── exception/         # 异常处理
+│   │   └── src/main/resources/
+│   │       ├── application.yml    # 配置文件
+│   │       └── mapper/            # MyBatis XML映射（待开发）
 │   ├── pom.xml                    # Maven配置
 │   └── README.md                  # 后端说明文档
 ├── docs/                          # 项目文档
@@ -175,10 +200,12 @@ FedUWAComm/                          # Monorepo根目录
 - **状态管理**: 待定
 
 ### SpringBoot后端模块
-- **框架**: Spring Boot
-- **语言**: Java 11+
-- **数据库**: MySQL/PostgreSQL
+- **框架**: Spring Boot 3.4.4
+- **语言**: Java 17
+- **数据库**: MySQL
+- **ORM**: MyBatis 3.0.3
 - **安全**: Spring Security
+- **架构**: 多模块Maven项目
 
 ## 数据集信息
 
@@ -211,8 +238,27 @@ cd frontend-admin
 ### 后端开发
 ```bash
 cd backend-springboot
-# 待开发
+# 启动开发服务器
+mvn -pl feduwacomm-server spring-boot:run
+
+# 构建项目
+mvn clean package
+
+# 运行测试
+mvn test
 ```
+
+## 模块开发状态
+
+### ✅ 已完成
+- **Python虚拟机模块**: 核心功能完整，包含BELLHOP仿真、特征提取、机器学习训练
+- **Spring Boot后端**: 基础框架搭建完成，包含多模块架构、MyBatis配置、Spring Security
+
+### 🚧 开发中
+- **Spring Boot后端**: 业务逻辑开发（实体类、服务层、控制器等）
+
+### 📋 待开发
+- **管理端前端**: 完整的前端界面开发
 
 ## 使用文档
 
@@ -224,6 +270,13 @@ cd backend-springboot
 - 🖥️ [前端模块文档](docs/frontend-admin/) - 管理端前端文档
 - ⚙️ [后端模块文档](docs/backend-springboot/) - SpringBoot后端文档
 
+## API接口
+
+### 健康检查
+- `GET /api/health` - 系统健康状态检查
+
+更多API接口待开发...
+
 ## 贡献
 
 欢迎提交Issue和Pull Request来改进项目。
@@ -232,6 +285,7 @@ cd backend-springboot
 - 每个模块独立开发和测试
 - 遵循模块化设计原则
 - 保持代码文档的完整性
+- 遵循各模块的技术栈规范
 
 ## 许可证
 
