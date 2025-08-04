@@ -1,0 +1,201 @@
+package com.feduwacomm.service;
+
+import com.feduwacomm.dto.WebSocketMessage;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * WebSocket服务类
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
+ */
+@Service
+public class WebSocketService {
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    // 在线用户统计
+    private final AtomicInteger onlineUserCount = new AtomicInteger(0);
+
+    // 在线用户列表（用户名 -> 会话ID）
+    private final ConcurrentHashMap<String, String> onlineUsers = new ConcurrentHashMap<>();
+
+    public WebSocketService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    /**
+     * 发送广播消息
+     * 
+     * @param message 消息内容
+     */
+    public void sendBroadcastMessage(String message) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("BROADCAST");
+        wsMessage.setContent(message);
+        wsMessage.setSender("System");
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/public", wsMessage);
+    }
+
+    /**
+     * 发送点对点消息
+     * 
+     * @param username 目标用户名
+     * @param message  消息内容
+     */
+    public void sendPrivateMessage(String username, String message) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("PRIVATE");
+        wsMessage.setContent(message);
+        wsMessage.setSender("System");
+        wsMessage.setReceiver(username);
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSendToUser(username, "/queue/private", wsMessage);
+    }
+
+    /**
+     * 发送系统通知
+     * 
+     * @param notification 通知内容
+     */
+    public void sendNotification(String notification) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("NOTIFICATION");
+        wsMessage.setContent(notification);
+        wsMessage.setSender("System");
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/notifications", wsMessage);
+    }
+
+    /**
+     * 发送联邦学习相关消息
+     * 
+     * @param message 联邦学习消息
+     */
+    public void sendFederatedLearningMessage(String message) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("FEDERATED_LEARNING");
+        wsMessage.setContent(message);
+        wsMessage.setSender("System");
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/federated-learning", wsMessage);
+    }
+
+    /**
+     * 用户上线
+     * 
+     * @param username  用户名
+     * @param sessionId 会话ID
+     */
+    public void userOnline(String username, String sessionId) {
+        onlineUsers.put(username, sessionId);
+        onlineUserCount.incrementAndGet();
+
+        // 发送用户上线通知
+        sendBroadcastMessage(username + " 上线了");
+
+        // 发送在线用户统计
+        sendOnlineUserCount();
+    }
+
+    /**
+     * 用户下线
+     * 
+     * @param username 用户名
+     */
+    public void userOffline(String username) {
+        onlineUsers.remove(username);
+        onlineUserCount.decrementAndGet();
+
+        // 发送用户下线通知
+        sendBroadcastMessage(username + " 下线了");
+
+        // 发送在线用户统计
+        sendOnlineUserCount();
+    }
+
+    /**
+     * 获取在线用户数量
+     * 
+     * @return 在线用户数量
+     */
+    public int getOnlineUserCount() {
+        return onlineUserCount.get();
+    }
+
+    /**
+     * 获取在线用户列表
+     * 
+     * @return 在线用户列表
+     */
+    public ConcurrentHashMap<String, String> getOnlineUsers() {
+        return new ConcurrentHashMap<>(onlineUsers);
+    }
+
+    /**
+     * 检查用户是否在线
+     * 
+     * @param username 用户名
+     * @return 是否在线
+     */
+    public boolean isUserOnline(String username) {
+        return onlineUsers.containsKey(username);
+    }
+
+    /**
+     * 发送在线用户统计
+     */
+    private void sendOnlineUserCount() {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("USER_COUNT");
+        wsMessage.setContent("当前在线用户数: " + onlineUserCount.get());
+        wsMessage.setSender("System");
+        wsMessage.setData(onlineUserCount.get());
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/user-count", wsMessage);
+    }
+
+    /**
+     * 发送联邦学习进度更新
+     * 
+     * @param progress 进度百分比
+     * @param message  进度消息
+     */
+    public void sendFederatedLearningProgress(int progress, String message) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("FL_PROGRESS");
+        wsMessage.setContent(message);
+        wsMessage.setSender("System");
+        wsMessage.setData(progress);
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/federated-learning", wsMessage);
+    }
+
+    /**
+     * 发送联邦学习结果
+     * 
+     * @param result 结果数据
+     */
+    public void sendFederatedLearningResult(Object result) {
+        WebSocketMessage wsMessage = new WebSocketMessage();
+        wsMessage.setType("FL_RESULT");
+        wsMessage.setContent("联邦学习完成");
+        wsMessage.setSender("System");
+        wsMessage.setData(result);
+        wsMessage.setTimestamp(LocalDateTime.now());
+
+        messagingTemplate.convertAndSend("/topic/federated-learning", wsMessage);
+    }
+}
