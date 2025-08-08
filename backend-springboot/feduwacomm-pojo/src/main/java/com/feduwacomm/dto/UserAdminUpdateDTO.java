@@ -18,4 +18,5 @@ public class UserAdminUpdateDTO {
     private String email;
     private String role;
     private String status;
+    private String password; // 新密码，可选，管理员可直接修改用户密码
 }

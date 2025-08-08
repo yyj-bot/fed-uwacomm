@@ -2,7 +2,6 @@ package com.feduwacomm.utils;
 
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -16,7 +15,6 @@ public class StringUtil {
 
     private static final String EMAIL_PATTERN = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
     private static final String USERNAME_PATTERN = "^[a-zA-Z0-9_]{3,50}$";
-    private static final String ACCOUNT_PATTERN = "^[a-zA-Z0-9_]{3,50}$";
     private static final String PASSWORD_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d@$!%*?&]{6,20}$";
 
     /**
@@ -31,20 +29,6 @@ public class StringUtil {
      */
     public static boolean isNotEmpty(String str) {
         return !isEmpty(str);
-    }
-
-    /**
-     * 生成UUID（去除横线）
-     */
-    public static String generateUUID() {
-        return UUID.randomUUID().toString().replace("-", "");
-    }
-
-    /**
-     * 生成带前缀的ID
-     */
-    public static String generateId(String prefix) {
-        return prefix + "_" + generateUUID();
     }
 
     /**
@@ -65,16 +49,6 @@ public class StringUtil {
             return false;
         }
         return Pattern.matches(USERNAME_PATTERN, username);
-    }
-
-    /**
-     * 验证账号格式
-     */
-    public static boolean isValidAccount(String account) {
-        if (isEmpty(account)) {
-            return false;
-        }
-        return Pattern.matches(ACCOUNT_PATTERN, account);
     }
 
     /**

@@ -29,7 +29,8 @@
 - **联邦学习任务表 (federated_tasks)**: 存储任务配置和状态信息
 - **训练数据表 (training_data)**: 存储训练数据文件信息
 - **模型版本表 (model_versions)**: 存储模型版本和性能指标
-- **系统日志表 (system_logs)**: 存储系统运行日志
+- **SpringBoot系统日志表 (system_logs)**: 存储SpringBoot应用运行日志
+- **虚拟机运行日志表 (vm_runtime_logs)**: 存储虚拟机运行日志
 
 ## 3. API接口分类
 

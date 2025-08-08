@@ -19,5 +19,7 @@ public class UserUpdateResponseVO {
     private String userId;
     private String username;
     private String email;
+    private String role;
+    private String status;
     private LocalDateTime updatedAt;
 }

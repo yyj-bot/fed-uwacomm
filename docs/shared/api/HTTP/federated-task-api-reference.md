@@ -62,12 +62,12 @@ Content-Type: application/json
   "algorithm": "FEDERATED_AVERAGING",
   "participants": [
     {
-      "vmId": "vm-001",
+      "vmId": "a1b2c3d4e5f678901234567890123456",
       "role": "PARTICIPANT",
       "dataSource": "bellhop_features_001.csv"
     },
     {
-      "vmId": "vm-002", 
+      "vmId": "b2c3d4e5f67890123456789012345678", 
       "role": "PARTICIPANT",
       "dataSource": "bellhop_features_002.csv"
     }
@@ -100,11 +100,11 @@ Content-Type: application/json
   "code": 200,
   "message": "任务创建成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "taskName": "水声传播特征分类任务",
     "status": "CREATED",
     "createdAt": "2024-01-01T09:00:00.000Z",
-    "createdBy": "admin",
+    "createdBy": "d4e5f678901234567890123456789012",
     "participantCount": 2,
     "estimatedDuration": 3600
   }
@@ -170,7 +170,7 @@ Content-Type: application/json
   "code": 200,
   "message": "任务配置成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "CONFIGURED",
     "updatedAt": "2024-01-01T09:30:00.000Z",
     "configVersion": "v1.1"
@@ -193,20 +193,20 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务启动成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "RUNNING",
     "startedAt": "2024-01-01T10:00:00.000Z",
     "currentRound": 0,
     "participants": [
       {
-        "vmId": "vm-001",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "CONNECTED",
-        "lastHeartbeat": "2024-01-01T10:00:00.000Z"
+        "dataSource": "bellhop_features_001.csv"
       },
       {
-        "vmId": "vm-002",
-        "status": "CONNECTED", 
-        "lastHeartbeat": "2024-01-01T10:00:00.000Z"
+        "vmId": "b2c3d4e5f67890123456789012345678",
+        "status": "CONNECTED",
+        "dataSource": "bellhop_features_002.csv"
       }
     ]
   }
@@ -228,7 +228,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务暂停成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "PAUSED",
     "pausedAt": "2024-01-01T12:00:00.000Z",
     "currentRound": 5,
@@ -255,7 +255,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务恢复成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "RUNNING",
     "resumedAt": "2024-01-01T13:00:00.000Z",
     "currentRound": 5
@@ -286,7 +286,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务停止成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "STOPPED",
     "stoppedAt": "2024-01-01T14:00:00.000Z",
     "finalRound": 8,
@@ -318,7 +318,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务取消成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "status": "CANCELLED",
     "cancelledAt": "2024-01-01T15:00:00.000Z",
     "reason": "任务配置错误"
@@ -341,7 +341,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "查询成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "taskName": "水声传播特征分类任务",
     "taskType": "CLASSIFICATION",
     "status": "RUNNING",
@@ -353,7 +353,7 @@ Authorization: Bearer {token}
     "progress": 33.33,
     "participants": [
       {
-        "vmId": "vm-001",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
         "role": "PARTICIPANT",
         "status": "TRAINING",
         "lastHeartbeat": "2024-01-01T12:30:00.000Z",
@@ -362,7 +362,7 @@ Authorization: Bearer {token}
         "accuracy": 0.876
       },
       {
-        "vmId": "vm-002",
+        "vmId": "b2c3d4e5f67890123456789012345678",
         "role": "PARTICIPANT", 
         "status": "TRAINING",
         "lastHeartbeat": "2024-01-01T12:30:00.000Z",
@@ -411,7 +411,7 @@ Authorization: Bearer {token}
     "size": 20,
     "tasks": [
       {
-        "taskId": "task_1234567890",
+        "taskId": "c3d4e5f6789012345678901234567890",
         "taskName": "水声传播特征分类任务",
         "taskType": "CLASSIFICATION",
         "status": "RUNNING",
@@ -423,7 +423,7 @@ Authorization: Bearer {token}
         "progress": 33.33
       },
       {
-        "taskId": "task_1234567891",
+        "taskId": "d4e5f678901234567890123456789012",
         "taskName": "声学传播回归分析",
         "taskType": "REGRESSION",
         "status": "COMPLETED",
@@ -453,51 +453,55 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "查询成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "taskName": "水声传播特征分类任务",
     "status": "COMPLETED",
-    "finalMetrics": {
+    "finalResults": {
       "accuracy": 0.892,
+      "loss": 0.098,
       "precision": 0.885,
-      "recall": 0.901,
-      "f1Score": 0.893,
-      "confusionMatrix": [
-        [45, 5],
-        [3, 47]
-      ]
+      "recall": 0.890,
+      "f1Score": 0.887,
+      "confusionMatrix": [[45, 5], [8, 42]]
     },
-    "trainingHistory": {
-      "rounds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      "loss": [0.456, 0.345, 0.289, 0.234, 0.198, 0.167, 0.145, 0.123, 0.108, 0.098],
-      "accuracy": [0.654, 0.723, 0.789, 0.834, 0.867, 0.889, 0.901, 0.912, 0.918, 0.925]
-    },
-    "participantResults": [
+    "roundResults": [
       {
-        "vmId": "vm-001",
-        "finalAccuracy": 0.889,
-        "finalLoss": 0.102,
-        "dataProcessed": 8000,
-        "trainingTime": 1800
+        "round": 1,
+        "accuracy": 0.750,
+        "loss": 0.250,
+        "participants": ["a1b2c3d4e5f678901234567890123456", "b2c3d4e5f67890123456789012345678"]
       },
       {
-        "vmId": "vm-002",
-        "finalAccuracy": 0.895,
-        "finalLoss": 0.094,
-        "dataProcessed": 7000,
-        "trainingTime": 1650
+        "round": 2,
+        "accuracy": 0.800,
+        "loss": 0.200,
+        "participants": ["a1b2c3d4e5f678901234567890123456", "b2c3d4e5f67890123456789012345678"]
       }
     ],
-    "modelArtifacts": {
-      "modelPath": "/models/task_1234567890_final.pkl",
-      "modelSize": "2.5MB",
-      "featureImportance": [
-        {"feature": "feature_1", "importance": 0.234},
-        {"feature": "feature_2", "importance": 0.189},
-        {"feature": "feature_3", "importance": 0.156}
-      ]
-    },
-    "completedAt": "2024-01-01T16:00:00.000Z",
-    "totalDuration": 3600
+    "participantResults": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "finalAccuracy": 0.889,
+        "finalLoss": 0.102,
+        "trainingTime": 14400,
+        "dataSize": 1000,
+        "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl"
+      },
+      {
+        "vmId": "b2c3d4e5f67890123456789012345678",
+        "finalAccuracy": 0.895,
+        "finalLoss": 0.094,
+        "trainingTime": 14400,
+        "dataSize": 1000,
+        "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl"
+      }
+    ],
+    "modelInfo": {
+      "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl",
+      "modelSize": 1048576,
+      "modelType": "RANDOM_FOREST",
+      "version": "1.0.0"
+    }
   }
 }
 ```
@@ -512,11 +516,9 @@ Authorization: Bearer {token}
 ```
 
 **查询参数**:
-- `level`: 日志级别 (INFO, WARN, ERROR)
-- `startTime`: 开始时间
-- `endTime`: 结束时间
-- `page`: 页码
-- `size`: 每页大小
+```
+?level=INFO&startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00&keyword=string&page=1&size=10
+```
 
 **响应示例**:
 ```json
@@ -524,9 +526,10 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "查询成功",
   "data": {
-    "total": 150,
+    "taskId": "c3d4e5f6789012345678901234567890",
+    "total": 100,
     "page": 1,
-    "size": 50,
+    "size": 10,
     "logs": [
       {
         "timestamp": "2024-01-01T10:00:00.000Z",
@@ -534,27 +537,16 @@ Authorization: Bearer {token}
         "message": "任务启动成功",
         "source": "TASK_MANAGER",
         "details": {
-          "participants": 2,
-          "algorithm": "FEDERATED_AVERAGING"
+          "participants": ["a1b2c3d4e5f678901234567890123456", "b2c3d4e5f67890123456789012345678"]
         }
       },
       {
-        "timestamp": "2024-01-01T10:05:00.000Z",
-        "level": "INFO",
-        "message": "第1轮训练开始",
-        "source": "ROUND_MANAGER",
-        "details": {
-          "round": 1,
-          "participants": ["vm-001", "vm-002"]
-        }
-      },
-      {
-        "timestamp": "2024-01-01T10:15:00.000Z",
+        "timestamp": "2024-01-01T10:30:00.000Z",
         "level": "WARN",
-        "message": "虚拟机vm-001响应超时",
-        "source": "PARTICIPANT_MANAGER",
+        "message": "虚拟机a1b2c3d4e5f678901234567890123456响应超时",
+        "source": "TASK_MANAGER",
         "details": {
-          "vmId": "vm-001",
+          "vmId": "a1b2c3d4e5f678901234567890123456",
           "timeout": 300
         }
       }
@@ -586,7 +578,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "任务删除成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "c3d4e5f6789012345678901234567890",
     "deletedAt": "2024-01-01T17:00:00.000Z",
     "dataDeleted": true,
     "modelPreserved": true

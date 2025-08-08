@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserLoginDTO {
 
-    private String account;
+    private String loginIdentifier; // 登录标识符（用户名或邮箱）
     private String password;
     private String captcha;
     private String captchaKey;

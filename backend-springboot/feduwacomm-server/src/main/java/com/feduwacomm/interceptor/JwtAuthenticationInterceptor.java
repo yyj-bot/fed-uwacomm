@@ -64,7 +64,7 @@ public class JwtAuthenticationInterceptor implements HandlerInterceptor {
             }
 
             // 设置用户上下文
-            BaseContext.setUserInfo(userId, username, role, null);
+            BaseContext.setUserInfo(userId, username, role);
 
             log.debug("JWT认证成功 - 用户ID: {}, 用户名: {}, 角色: {}", userId, username, role);
             return true;

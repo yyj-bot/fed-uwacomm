@@ -1,8 +1,12 @@
-# 水声联邦学习系统 系统日志管理 API 接口文档
+# 水声联邦学习系统 日志管理 API 接口文档
 
 ## 1. 概述
 
-本文档定义了水声联邦学习系统的系统日志管理相关HTTP REST API接口，包括日志查询、日志导出、日志清理、系统监控等功能。
+本文档定义了水声联邦学习系统的日志管理相关HTTP REST API接口，包括SpringBoot系统日志和虚拟机运行日志的查询、导出、清理、系统监控等功能。
+
+系统包含两种日志类型：
+1. **SpringBoot系统日志** (system_logs): 记录应用运行日志，包括请求日志、错误日志等
+2. **虚拟机运行日志** (vm_runtime_logs): 记录虚拟机运行日志，包括任务执行、状态变更等
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/log`
@@ -49,15 +53,15 @@
 
 **请求参数**:
 ```
-?level=INFO&category=SYSTEM&vmId=string&taskId=string&startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00&keyword=string&page=1&size=10&sort=createdAt&order=desc
+?level=INFO&category=SYSTEM&vmId=a1b2c3d4e5f678901234567890123456&taskId=b2c3d4e5f67890123456789012345678&startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00&keyword=string&page=1&size=10&sort=createdAt&order=desc
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | level | string | 否 | 日志级别过滤，DEBUG/INFO/WARN/ERROR |
 | category | string | 否 | 日志类别过滤 |
-| vmId | string | 否 | 虚拟机ID过滤 |
-| taskId | string | 否 | 任务ID过滤 |
+| vmId | string | 否 | 虚拟机ID过滤，32位UUID格式 |
+| taskId | string | 否 | 任务ID过滤，32位UUID格式 |
 | startTime | string | 否 | 开始时间，ISO 8601格式 |
 | endTime | string | 否 | 结束时间，ISO 8601格式 |
 | keyword | string | 否 | 关键词搜索（消息内容） |
@@ -78,11 +82,11 @@
     "size": 10,
     "records": [
       {
-        "logId": "log_1234567890",
+        "logId": "c3d4e5f6789012345678901234567890",
         "level": "INFO",
         "category": "SYSTEM",
-        "vmId": "vm_1234567890",
-        "taskId": "task_1234567890",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "taskId": "b2c3d4e5f67890123456789012345678",
         "message": "系统启动成功",
         "details": {
           "version": "1.0.0",
@@ -108,11 +112,11 @@
   "code": 200,
   "message": "查询成功",
   "data": {
-    "logId": "log_1234567890",
+    "logId": "c3d4e5f6789012345678901234567890",
     "level": "ERROR",
     "category": "TASK",
-    "vmId": "vm_1234567890",
-    "taskId": "task_1234567890",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
+    "taskId": "b2c3d4e5f67890123456789012345678",
     "message": "联邦学习任务执行失败",
     "details": {
       "errorCode": "TASK_EXECUTION_FAILED",
@@ -135,15 +139,15 @@
 
 **请求参数**:
 ```
-?level=INFO&category=SYSTEM&vmId=string&taskId=string&tail=100
+?level=INFO&category=SYSTEM&vmId=a1b2c3d4e5f678901234567890123456&taskId=b2c3d4e5f67890123456789012345678&tail=100
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | level | string | 否 | 日志级别过滤 |
 | category | string | 否 | 日志类别过滤 |
-| vmId | string | 否 | 虚拟机ID过滤 |
-| taskId | string | 否 | 任务ID过滤 |
+| vmId | string | 否 | 虚拟机ID过滤，32位UUID格式 |
+| taskId | string | 否 | 任务ID过滤，32位UUID格式 |
 | tail | int | 否 | 返回最近N条日志，默认100 |
 
 **响应示例**:
@@ -154,7 +158,7 @@
   "data": {
     "logs": [
       {
-        "logId": "log_1234567890",
+        "logId": "c3d4e5f6789012345678901234567890",
         "level": "INFO",
         "category": "SYSTEM",
         "message": "系统运行正常",
@@ -173,7 +177,7 @@
 
 **请求参数**:
 ```
-?startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00&category=SYSTEM&vmId=string&taskId=string
+?startTime=2024-01-01T00:00:00&endTime=2024-01-02T00:00:00&category=SYSTEM&vmId=a1b2c3d4e5f678901234567890123456&taskId=b2c3d4e5f67890123456789012345678
 ```
 
 **响应示例**:
@@ -234,8 +238,8 @@
 {
   "level": "INFO",                    // 日志级别过滤，可选
   "category": "SYSTEM",               // 日志类别过滤，可选
-  "vmId": "vm_1234567890",           // 虚拟机ID过滤，可选
-  "taskId": "task_1234567890",       // 任务ID过滤，可选
+  "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
+  "taskId": "b2c3d4e5f67890123456789012345678",       // 任务ID过滤，可选
   "startTime": "2024-01-01T00:00:00", // 开始时间，可选
   "endTime": "2024-01-02T00:00:00",   // 结束时间，可选
   "keyword": "string",                // 关键词搜索，可选
@@ -342,8 +346,8 @@
   "level": "DEBUG",                   // 清理级别（级别策略），可选
   "maxSizeGB": 10,                    // 最大大小GB（大小策略），可选
   "category": "SYSTEM",               // 日志类别过滤，可选
-  "vmId": "vm_1234567890",           // 虚拟机ID过滤，可选
-  "taskId": "task_1234567890",       // 任务ID过滤，可选
+  "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
+  "taskId": "b2c3d4e5f67890123456789012345678",       // 任务ID过滤，可选
   "dryRun": false                     // 试运行模式，可选，默认false
 }
 ```
@@ -511,7 +515,7 @@
     ],
     "recentErrors": [
       {
-        "logId": "log_1234567890",
+        "logId": "c3d4e5f6789012345678901234567890",
         "level": "ERROR",
         "category": "TASK",
         "message": "任务执行失败",

@@ -12,9 +12,8 @@
 
 ```sql
 CREATE TABLE users (
-    id VARCHAR(64) PRIMARY KEY COMMENT '用户唯一标识',
+    id VARCHAR(32) PRIMARY KEY COMMENT '用户唯一标识(32位UUID)',
     username VARCHAR(50) UNIQUE NOT NULL COMMENT '用户名',
-    account VARCHAR(50) UNIQUE NOT NULL COMMENT '登录账号',
     email VARCHAR(100) UNIQUE NOT NULL COMMENT '邮箱地址',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希值',
     role ENUM('ADMIN', 'RESEARCHER', 'OPERATOR', 'VIEWER') NOT NULL DEFAULT 'VIEWER' COMMENT '用户角色',
@@ -25,10 +24,8 @@ CREATE TABLE users (
     locked_until TIMESTAMP NULL COMMENT '锁定截止时间',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_by VARCHAR(64) NULL COMMENT '创建者ID',
-    updated_by VARCHAR(64) NULL COMMENT '更新者ID',
-    FOREIGN KEY (created_by) REFERENCES users(id),
-    FOREIGN KEY (updated_by) REFERENCES users(id)
+    created_by VARCHAR(32) NULL COMMENT '创建者ID(32位UUID)',
+    updated_by VARCHAR(32) NULL COMMENT '更新者ID(32位UUID)'
 );
 ```
 
@@ -38,16 +35,14 @@ CREATE TABLE users (
 
 ```sql
 CREATE TABLE user_permissions (
-    id VARCHAR(64) PRIMARY KEY COMMENT '权限唯一标识',
-    user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
+    id VARCHAR(32) PRIMARY KEY COMMENT '权限唯一标识(32位UUID)',
+    user_id VARCHAR(32) NOT NULL COMMENT '用户ID(32位UUID)',
     resource_type ENUM('VM', 'TASK', 'DATA', 'MODEL', 'SYSTEM', 'USER') NOT NULL COMMENT '资源类型',
-    resource_id VARCHAR(64) NULL COMMENT '资源ID（NULL表示所有资源）',
+    resource_id VARCHAR(32) NULL COMMENT '资源ID(32位UUID，NULL表示所有资源)',
     permission ENUM('READ', 'WRITE', 'DELETE', 'EXECUTE', 'ADMIN') NOT NULL COMMENT '权限类型',
     granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    granted_by VARCHAR(64) NOT NULL COMMENT '授权者ID',
-    expires_at TIMESTAMP NULL COMMENT '权限过期时间',
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (granted_by) REFERENCES users(id)
+    granted_by VARCHAR(32) NOT NULL COMMENT '授权者ID(32位UUID)',
+    expires_at TIMESTAMP NULL COMMENT '权限过期时间'
 );
 ```
 
@@ -57,7 +52,7 @@ CREATE TABLE user_permissions (
 
 ```sql
 CREATE TABLE vm_instances (
-    id VARCHAR(64) PRIMARY KEY COMMENT '虚拟机唯一标识',
+    id VARCHAR(32) PRIMARY KEY COMMENT '虚拟机唯一标识(32位UUID)',
     name VARCHAR(100) NOT NULL COMMENT '虚拟机名称',
     ip_address VARCHAR(45) COMMENT 'IP地址',
     port INT DEFAULT 22 COMMENT 'SSH端口',
@@ -81,7 +76,7 @@ CREATE TABLE vm_instances (
 
 ```sql
 CREATE TABLE federated_tasks (
-    id VARCHAR(64) PRIMARY KEY COMMENT '任务唯一标识',
+    id VARCHAR(32) PRIMARY KEY COMMENT '任务唯一标识(32位UUID)',
     name VARCHAR(100) NOT NULL COMMENT '任务名称',
     algorithm ENUM('FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD') NOT NULL COMMENT '联邦学习算法',
     status ENUM('PENDING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'STOPPED') DEFAULT 'PENDING',
@@ -104,16 +99,15 @@ CREATE TABLE federated_tasks (
 
 ```sql
 CREATE TABLE training_data (
-    id VARCHAR(64) PRIMARY KEY COMMENT '数据唯一标识',
-    vm_id VARCHAR(64) NOT NULL COMMENT '虚拟机ID',
+    id VARCHAR(32) PRIMARY KEY COMMENT '数据唯一标识(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
     filename VARCHAR(255) NOT NULL COMMENT '文件名',
     file_path VARCHAR(500) NOT NULL COMMENT '文件路径',
     file_size BIGINT COMMENT '文件大小(字节)',
     data_type ENUM('ACOUSTIC', 'ENVIRONMENT', 'MODEL', 'OTHER') NOT NULL COMMENT '数据类型',
     upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status ENUM('UPLOADING', 'PROCESSING', 'READY', 'ERROR') DEFAULT 'UPLOADING',
-    metadata JSON COMMENT '数据元信息',
-    FOREIGN KEY (vm_id) REFERENCES vm_instances(id)
+    metadata JSON COMMENT '数据元信息'
 );
 ```
 
@@ -123,9 +117,9 @@ CREATE TABLE training_data (
 
 ```sql
 CREATE TABLE model_versions (
-    id VARCHAR(64) PRIMARY KEY COMMENT '版本唯一标识',
-    task_id VARCHAR(64) NOT NULL COMMENT '关联任务ID',
-    vm_id VARCHAR(64) NULL COMMENT '虚拟机ID(本地模型)',
+    id VARCHAR(32) PRIMARY KEY COMMENT '版本唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    vm_id VARCHAR(32) NULL COMMENT '虚拟机ID(32位UUID，本地模型)',
     round_number INT NOT NULL COMMENT '训练轮数',
     model_type ENUM('GLOBAL', 'LOCAL') NOT NULL COMMENT '模型类型',
     model_path VARCHAR(500) NOT NULL COMMENT '模型文件路径',
@@ -133,50 +127,82 @@ CREATE TABLE model_versions (
     accuracy DECIMAL(5,4) COMMENT '准确率',
     loss DECIMAL(10,6) COMMENT '损失值',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    parameters JSON COMMENT '模型参数',
-    FOREIGN KEY (task_id) REFERENCES federated_tasks(id),
-    FOREIGN KEY (vm_id) REFERENCES vm_instances(id)
+    parameters JSON COMMENT '模型参数'
 );
 ```
 
-### 7. 系统日志表 (system_logs)
+### 7. SpringBoot系统日志表 (system_logs)
 
-存储系统运行过程中的日志信息。
+存储SpringBoot应用运行过程中的日志信息。
 
 ```sql
 CREATE TABLE system_logs (
-    id VARCHAR(64) PRIMARY KEY COMMENT '日志唯一标识',
+    id VARCHAR(32) PRIMARY KEY COMMENT '日志唯一标识(32位UUID)',
+    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '日志时间',
+    level VARCHAR(10) NOT NULL COMMENT '日志级别',
+    logger VARCHAR(100) NOT NULL COMMENT '日志记录器',
+    message TEXT NOT NULL COMMENT '日志消息',
+    thread VARCHAR(100) COMMENT '线程名',
+    user_id VARCHAR(50) COMMENT '用户ID',
+    username VARCHAR(100) COMMENT '用户名',
+    request_uri VARCHAR(500) COMMENT '请求URI',
+    client_ip VARCHAR(50) COMMENT '客户端IP',
+    environment VARCHAR(20) COMMENT '环境',
+    exception TEXT COMMENT '异常信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_level (level),
+    INDEX idx_user_id (user_id),
+    INDEX idx_request_uri (request_uri)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'SpringBoot系统日志表';
+```
+
+### 8. 虚拟机运行日志表 (vm_runtime_logs)
+
+存储虚拟机运行过程中的日志信息。
+
+```sql
+CREATE TABLE vm_runtime_logs (
+    id VARCHAR(32) PRIMARY KEY COMMENT '日志唯一标识(32位UUID)',
     level ENUM('INFO', 'WARN', 'ERROR', 'DEBUG') NOT NULL,
     category VARCHAR(50) NOT NULL COMMENT '日志类别',
-    vm_id VARCHAR(64) NULL COMMENT '虚拟机ID',
-    task_id VARCHAR(64) NULL COMMENT '任务ID',
+    vm_id VARCHAR(32) NULL COMMENT '虚拟机ID(32位UUID)',
+    task_id VARCHAR(32) NULL COMMENT '任务ID(32位UUID)',
     message TEXT NOT NULL COMMENT '日志消息',
     details JSON COMMENT '详细信息',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (vm_id) REFERENCES vm_instances(id),
-    FOREIGN KEY (task_id) REFERENCES federated_tasks(id)
+
 );
 ```
 
 ## 表关系说明
 
 ### 外键关系
-- `users.created_by` → `users(id)`
-- `users.updated_by` → `users(id)`
-- `user_permissions.user_id` → `users(id)`
-- `user_permissions.granted_by` → `users(id)`
+以下外键约束在表创建后单独添加，以确保MySQL 8.0+兼容性：
 
-- `training_data.vm_id` → `vm_instances.id`
-- `model_versions.task_id` → `federated_tasks.id`
-- `model_versions.vm_id` → `vm_instances.id`
-- `system_logs.vm_id` → `vm_instances.id`
-- `system_logs.task_id` → `federated_tasks.id`
+#### 用户表自引用约束
+- `users.created_by` → `users(id)` (ON DELETE SET NULL)
+- `users.updated_by` → `users(id)` (ON DELETE SET NULL)
+
+#### 用户权限表约束
+- `user_permissions.user_id` → `users(id)` (ON DELETE CASCADE)
+- `user_permissions.granted_by` → `users(id)` (ON DELETE RESTRICT)
+
+#### 训练数据表约束
+- `training_data.vm_id` → `vm_instances.id` (ON DELETE CASCADE)
+
+#### 模型版本表约束
+- `model_versions.task_id` → `federated_tasks.id` (ON DELETE CASCADE)
+- `model_versions.vm_id` → `vm_instances.id` (ON DELETE SET NULL)
+
+#### 虚拟机运行日志表约束
+- `vm_runtime_logs.vm_id` → `vm_instances.id` (ON DELETE SET NULL)
+- `vm_runtime_logs.task_id` → `federated_tasks.id` (ON DELETE SET NULL)
 
 ### 索引建议
 ```sql
 -- 用户表索引
 CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_account ON users(account);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_status ON users(status);
@@ -207,12 +233,18 @@ CREATE INDEX idx_model_versions_vm_id ON model_versions(vm_id);
 CREATE INDEX idx_model_versions_model_type ON model_versions(model_type);
 CREATE INDEX idx_model_versions_round_number ON model_versions(round_number);
 
--- 系统日志表索引
+-- SpringBoot系统日志表索引
+CREATE INDEX idx_system_logs_timestamp ON system_logs(timestamp);
 CREATE INDEX idx_system_logs_level ON system_logs(level);
-CREATE INDEX idx_system_logs_category ON system_logs(category);
-CREATE INDEX idx_system_logs_vm_id ON system_logs(vm_id);
-CREATE INDEX idx_system_logs_task_id ON system_logs(task_id);
-CREATE INDEX idx_system_logs_created_at ON system_logs(created_at);
+CREATE INDEX idx_system_logs_user_id ON system_logs(user_id);
+CREATE INDEX idx_system_logs_request_uri ON system_logs(request_uri);
+
+-- 虚拟机运行日志表索引
+CREATE INDEX idx_vm_runtime_logs_level ON vm_runtime_logs(level);
+CREATE INDEX idx_vm_runtime_logs_category ON vm_runtime_logs(category);
+CREATE INDEX idx_vm_runtime_logs_vm_id ON vm_runtime_logs(vm_id);
+CREATE INDEX idx_vm_runtime_logs_task_id ON vm_runtime_logs(task_id);
+CREATE INDEX idx_vm_runtime_logs_created_at ON vm_runtime_logs(created_at);
 ```
 
 ## 数据字典
@@ -303,8 +335,11 @@ USE feduwacomm;
 -- (上述所有CREATE INDEX语句)
 
 -- 插入初始数据（可选）
-INSERT INTO system_logs (id, level, category, message) 
-VALUES ('init-001', 'INFO', 'SYSTEM', '数据库初始化完成');
+INSERT INTO system_logs (id, level, logger, message) 
+VALUES ('log_init_001', 'INFO', 'com.feduwacomm', 'SpringBoot系统日志表初始化完成');
+
+INSERT INTO vm_runtime_logs (id, level, category, message) 
+VALUES ('vm_log_init_001', 'INFO', 'SYSTEM', '虚拟机运行日志表初始化完成');
 ```
 
 ## 注意事项
@@ -315,4 +350,4 @@ VALUES ('init-001', 'INFO', 'SYSTEM', '数据库初始化完成');
 4. **外键约束**: 确保数据完整性，建议启用外键约束
 5. **索引优化**: 根据查询模式优化索引设计
 6. **备份策略**: 定期备份数据库，建议使用增量备份
-7. **UUID生成**: 所有主键ID使用UUID格式，确保全局唯一性 
+7. **UUID生成**: 所有主键ID使用32位UUID格式，确保全局唯一性 

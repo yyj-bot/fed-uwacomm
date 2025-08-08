@@ -205,7 +205,6 @@ Thumbs.db
 *.arr.*
 
 # Database dumps
-*.sql
 *.dump
 
 # Configuration overrides

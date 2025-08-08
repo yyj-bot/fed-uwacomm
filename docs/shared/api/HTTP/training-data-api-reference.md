@@ -54,7 +54,7 @@ Content-Type: multipart/form-data
 
 **请求参数**:
 ```
-vmId: vm-001 (必需) - 虚拟机ID
+vmId: a1b2c3d4e5f678901234567890123456 (必需) - 虚拟机ID
 dataType: ACOUSTIC (必需) - 数据类型
 description: 水声传播特征数据 (可选) - 数据描述
 tags: ["feature", "acoustic"] (可选) - 数据标签
@@ -68,15 +68,15 @@ file: [文件] (必需) - 上传的文件
   "code": 200,
   "message": "文件上传成功",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "filename": "bellhop_features_001.csv",
     "filePath": "/data/acoustic/bellhop_features_001.csv",
     "fileSize": 2048576,
     "dataType": "ACOUSTIC",
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "UPLOADING",
     "uploadTime": "2024-01-01T10:00:00.000Z",
-    "uploadedBy": "admin",
+    "uploadedBy": "f6789012345678901234567890123456",
     "progress": 0
   }
 }
@@ -95,20 +95,16 @@ Content-Type: application/json
 **请求参数**:
 ```json
 {
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "dataType": "ENVIRONMENT",
   "title": "声学传播环境配置",
-  "content": "声学传播环境参数配置信息...",
-  "description": "声学传播环境参数配置",
+  "content": "声学传播环境配置文件内容...",
+  "description": "声学传播环境配置描述",
   "tags": ["environment", "acoustic"],
   "metadata": {
-    "source": "manual",
+    "source": "bellhop",
     "version": "1.0",
-    "parameters": {
-      "depth": 100,
-      "temperature": 15.5,
-      "salinity": 35.0
-    }
+    "author": "张三"
   }
 }
 ```
@@ -119,15 +115,14 @@ Content-Type: application/json
   "code": 200,
   "message": "文本信息上传成功",
   "data": {
-    "dataId": "data_1234567891",
+    "dataId": "f6789012345678901234567890123456",
     "title": "声学传播环境配置",
-    "content": "声学传播环境参数配置信息...",
+    "content": "声学传播环境配置文件内容...",
     "dataType": "ENVIRONMENT",
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
-    "createdAt": "2024-01-01T10:30:00.000Z",
-    "createdBy": "admin",
-    "contentLength": 256
+    "uploadTime": "2024-01-01T10:00:00.000Z",
+    "uploadedBy": "f6789012345678901234567890123456"
   }
 }
 ```
@@ -163,25 +158,25 @@ Authorization: Bearer {token}
     "size": 20,
     "dataList": [
       {
-        "dataId": "data_1234567890",
+        "dataId": "e5f67890123456789012345678901234",
         "filename": "bellhop_features_001.csv",
         "dataType": "ACOUSTIC",
-        "vmId": "vm-001",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
         "fileSize": 2048576,
         "uploadTime": "2024-01-01T10:00:00.000Z",
-        "uploadedBy": "admin",
+        "uploadedBy": "f6789012345678901234567890123456",
         "description": "水声传播特征数据",
         "tags": ["feature", "acoustic"]
       },
       {
-        "dataId": "data_1234567891",
+        "dataId": "f6789012345678901234567890123456",
         "title": "声学传播环境配置",
         "dataType": "ENVIRONMENT",
-        "vmId": "vm-001",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
-        "createdAt": "2024-01-01T10:30:00.000Z",
-        "createdBy": "admin",
+        "uploadTime": "2024-01-01T10:00:00.000Z",
+        "uploadedBy": "f6789012345678901234567890123456",
         "description": "声学传播环境参数配置",
         "tags": ["environment", "acoustic"]
       }
@@ -205,15 +200,15 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "查询成功",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "filename": "bellhop_features_001.csv",
     "filePath": "/data/acoustic/bellhop_features_001.csv",
     "dataType": "ACOUSTIC",
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
     "fileSize": 2048576,
     "uploadTime": "2024-01-01T10:00:00.000Z",
-    "uploadedBy": "admin",
+    "uploadedBy": "f6789012345678901234567890123456",
     "description": "水声传播特征数据",
     "tags": ["feature", "acoustic"],
     "metadata": {
@@ -291,7 +286,7 @@ Content-Type: application/json
   "code": 200,
   "message": "预处理任务已启动",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "taskId": "preprocess_1234567890",
     "status": "PROCESSING",
     "methods": ["normalization", "feature_selection", "outlier_removal"],
@@ -345,7 +340,7 @@ Content-Type: application/json
   "code": 200,
   "message": "验证完成",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "isValid": true,
     "validationTime": "2024-01-01T11:30:00.000Z",
     "results": {
@@ -404,7 +399,7 @@ Content-Type: application/json
   "code": 200,
   "message": "数据更新成功",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "updatedAt": "2024-01-01T12:00:00.000Z",
     "updatedBy": "researcher"
   }
@@ -435,7 +430,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "数据删除成功",
   "data": {
-    "dataId": "data_1234567890",
+    "dataId": "e5f67890123456789012345678901234",
     "deletedAt": "2024-01-01T12:30:00.000Z",
     "deletedBy": "admin",
     "fileDeleted": true,
@@ -458,7 +453,7 @@ Content-Type: application/json
 ```json
 {
   "operation": "DELETE",
-  "dataIds": ["data_1234567890", "data_1234567891"],
+  "dataIds": ["e5f67890123456789012345678901234", "f6789012345678901234567890123456"],
   "parameters": {
     "reason": "批量清理过期数据",
     "deleteFile": true
@@ -478,12 +473,12 @@ Content-Type: application/json
     "failed": 0,
     "results": [
       {
-        "dataId": "data_1234567890",
+        "dataId": "e5f67890123456789012345678901234",
         "status": "SUCCESS",
         "message": "删除成功"
       },
       {
-        "dataId": "data_1234567891",
+        "dataId": "f6789012345678901234567890123456",
         "status": "SUCCESS",
         "message": "删除成功"
       }
@@ -511,52 +506,51 @@ Authorization: Bearer {token}
 ```json
 {
   "code": 200,
-  "message": "查询成功",
+  "message": "统计查询成功",
   "data": {
-    "totalCount": 150,
+    "totalCount": 1000,
     "totalSize": 1073741824,
-    "byType": {
-      "ACOUSTIC": {
-        "count": 80,
-        "size": 536870912,
-        "percentage": 53.33
+    "dataTypeDistribution": {
+      "ACOUSTIC": 500,
+      "ENVIRONMENT": 300,
+      "MODEL": 150,
+      "OTHER": 50
+    },
+    "statusDistribution": {
+      "READY": 800,
+      "PROCESSING": 150,
+      "ERROR": 50
+    },
+    "vmDistribution": {
+      "a1b2c3d4e5f678901234567890123456": {
+        "count": 300,
+        "size": 322122547
       },
-      "ENVIRONMENT": {
-        "count": 40,
-        "size": 268435456,
-        "percentage": 26.67
+      "b2c3d4e5f67890123456789012345678": {
+        "count": 400,
+        "size": 429496730
       },
-      "MODEL": {
-        "count": 20,
-        "size": 209715200,
-        "percentage": 13.33
-      },
-      "OTHER": {
-        "count": 10,
-        "size": 58720256,
-        "percentage": 6.67
+      "c3d4e5f6789012345678901234567890": {
+        "count": 300,
+        "size": 322122547
       }
     },
-    "byStatus": {
-      "READY": 120,
-      "PROCESSING": 15,
-      "ERROR": 10,
-      "UPLOADING": 5
+    "uploadTrend": {
+      "last7Days": [100, 120, 80, 150, 200, 180, 160],
+      "last30Days": [3000, 3200, 2800, 3500, 4000, 3800, 3600]
     },
-    "byVm": {
-      "vm-001": {
-        "count": 60,
-        "size": 402653184
+    "topDataTypes": [
+      {
+        "dataType": "ACOUSTIC",
+        "count": 500,
+        "percentage": 50.0
       },
-      "vm-002": {
-        "count": 50,
-        "size": 335544320
-      },
-      "vm-003": {
-        "count": 40,
-        "size": 335544320
+      {
+        "dataType": "ENVIRONMENT",
+        "count": 300,
+        "percentage": 30.0
       }
-    }
+    ]
   }
 }
 ```
@@ -574,15 +568,16 @@ Content-Type: application/json
 **请求参数**:
 ```json
 {
-  "format": "CSV",
+  "exportType": "CSV",                    // 导出类型，CSV/JSON/EXCEL
   "filters": {
-    "vmId": "vm-001",
-    "dataType": "ACOUSTIC",
-    "status": "READY",
-    "startDate": "2024-01-01T00:00:00",
-    "endDate": "2024-01-31T23:59:59"
+    "dataType": "ACOUSTIC",               // 数据类型过滤，可选
+    "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
+    "status": "READY",                    // 状态过滤，可选
+    "startTime": "2024-01-01T00:00:00",  // 开始时间，可选
+    "endTime": "2024-01-31T23:59:59"     // 结束时间，可选
   },
-  "fields": ["dataId", "filename", "dataType", "status", "uploadTime", "description"]
+  "fields": ["dataId", "filename", "dataType", "vmId", "status", "uploadTime"],  // 导出字段，可选
+  "format": "ZIP"                         // 导出格式，ZIP/TAR，可选
 }
 ```
 

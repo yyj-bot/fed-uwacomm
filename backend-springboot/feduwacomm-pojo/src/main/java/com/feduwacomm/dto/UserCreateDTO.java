@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 public class UserCreateDTO {
 
     private String username;
-    private String account;
     private String email;
     private String password;
     private String role;

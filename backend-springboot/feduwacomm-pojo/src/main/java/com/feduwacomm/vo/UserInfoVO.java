@@ -18,7 +18,6 @@ public class UserInfoVO {
 
     private String userId;
     private String username;
-    private String account;
     private String email;
     private String role;
     private String status;

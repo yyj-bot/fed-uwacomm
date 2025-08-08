@@ -1,177 +1,96 @@
 package com.feduwacomm.controller;
 
-import com.feduwacomm.dto.UserDTO;
-import com.feduwacomm.entity.User;
+import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.common.Result;
+import com.feduwacomm.dto.*;
 import com.feduwacomm.service.UserService;
+import com.feduwacomm.vo.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 用户管理控制器
  */
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/user")
 @CrossOrigin(origins = "*")
 public class UserController {
 
     @Autowired
     private UserService userService;
 
+    // 认证相关接口
     /**
-     * 获取所有用户
+     * 用户注册
      */
-    @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllUsers() {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            List<User> users = userService.findAll();
-            response.put("success", true);
-            response.put("data", users);
-            response.put("message", "获取用户列表成功");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "获取用户列表失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PostMapping("/register")
+    public Result<UserRegisterResponseVO> register(@RequestBody UserRegisterDTO registerDTO) {
+        UserRegisterResponseVO response = userService.register(registerDTO);
+        return Result.success("注册成功", response);
     }
 
     /**
-     * 根据ID获取用户
+     * 用户登录
      */
-    @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long id) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            User user = userService.findById(id);
-            if (user != null) {
-                response.put("success", true);
-                response.put("data", user);
-                response.put("message", "获取用户成功");
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "用户不存在");
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "获取用户失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PostMapping("/login")
+    public Result<LoginResponseVO> login(@RequestBody UserLoginDTO loginDTO) {
+        LoginResponseVO response = userService.login(loginDTO);
+        return Result.success("登录成功", response);
     }
 
     /**
-     * 创建用户
+     * 刷新Token
      */
-    @PostMapping
-    public ResponseEntity<Map<String, Object>> createUser(@RequestBody UserDTO userDTO) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            User createdUser = userService.createUser(userDTO);
-            response.put("success", true);
-            response.put("data", createdUser);
-            response.put("message", "创建用户成功");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "创建用户失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PostMapping("/refresh")
+    public Result<TokenRefreshResponseVO> refreshToken(@RequestHeader("Authorization") String authorization) {
+        String refreshToken = authorization.replace("Bearer ", "");
+        TokenRefreshResponseVO response = userService.refreshToken(refreshToken);
+        return Result.success("Token刷新成功", response);
     }
 
     /**
-     * 更新用户
+     * 用户登出
      */
-    @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> updateUser(@PathVariable Long id, @RequestBody UserDTO userDTO) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            User updatedUser = userService.updateUser(id, userDTO);
-            if (updatedUser != null) {
-                response.put("success", true);
-                response.put("data", updatedUser);
-                response.put("message", "更新用户成功");
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "用户不存在");
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "更新用户失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PostMapping("/logout")
+    public Result<String> logout(@RequestHeader("Authorization") String authorization) {
+        String token = authorization.replace("Bearer ", "");
+        userService.logout(token);
+        return Result.success("登出成功", null);
+    }
+
+    // 用户信息相关接口
+    /**
+     * 获取当前用户信息
+     */
+    @GetMapping("/profile")
+    public Result<UserInfoVO> getCurrentUserInfo() {
+        String userId = BaseContext.getCurrentUserId();
+        UserInfoVO response = userService.getCurrentUserInfo(userId);
+        return Result.success("获取成功", response);
     }
 
     /**
-     * 删除用户
+     * 更新用户信息
      */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Long id) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            boolean deleted = userService.deleteUser(id);
-            if (deleted) {
-                response.put("success", true);
-                response.put("message", "删除用户成功");
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "用户不存在");
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "删除用户失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PutMapping("/profile")
+    public Result<UserUpdateResponseVO> updateUserInfo(@RequestBody UserUpdateDTO updateDTO) {
+        String userId = BaseContext.getCurrentUserId();
+        UserUpdateResponseVO response = userService.updateUserInfo(userId, updateDTO);
+        return Result.success("更新成功", response);
     }
 
     /**
-     * 获取用户统计信息
+     * 修改密码
      */
-    @GetMapping("/count")
-    public ResponseEntity<Map<String, Object>> getUserCount() {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            int count = userService.count();
-            response.put("success", true);
-            response.put("data", count);
-            response.put("message", "获取用户数量成功");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "获取用户数量失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    @PutMapping("/password")
+    public Result<String> changePassword(@RequestBody PasswordChangeDTO passwordDTO) {
+        String userId = BaseContext.getCurrentUserId();
+        userService.changePassword(userId, passwordDTO);
+        return Result.success("密码修改成功", null);
     }
 
-    /**
-     * 根据条件查询用户
-     */
-    @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchUsers(
-            @RequestParam(required = false) String username,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String phone) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            List<User> users = userService.findByCondition(username, email, phone);
-            response.put("success", true);
-            response.put("data", users);
-            response.put("message", "查询用户成功");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "查询用户失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
 }

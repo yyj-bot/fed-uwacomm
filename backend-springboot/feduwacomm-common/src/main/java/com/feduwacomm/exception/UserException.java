@@ -30,10 +30,6 @@ public class UserException extends RuntimeException {
         return new UserException(409, "用户已存在");
     }
 
-    public static UserException accountExists() {
-        return new UserException(409, "账号已存在");
-    }
-
     public static UserException emailExists() {
         return new UserException(409, "邮箱已存在");
     }
@@ -98,15 +94,15 @@ public class UserException extends RuntimeException {
         return new UserException(400, "密码不匹配");
     }
 
+    public static UserException passwordModificationDenied() {
+        return new UserException(403, "只有管理员或用户本人可以修改密码");
+    }
+
     public static UserException emailFormatError() {
         return new UserException(400, "邮箱格式错误");
     }
 
     public static UserException usernameFormatError() {
         return new UserException(400, "用户名格式错误");
-    }
-
-    public static UserException accountFormatError() {
-        return new UserException(400, "账号格式错误");
     }
 }
