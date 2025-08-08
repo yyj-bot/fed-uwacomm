@@ -1,28 +1,72 @@
-# 水声联邦学习系统 WebSocket 通信协议
+# 水声联邦学习系统 WebSocket 通信协议 - 中心化实现
+
+## 0. 架构设计
+
+### 0.1 中心化架构模式
+
+本系统采用中心化WebSocket架构模式：
+
+```
+可视化客户端 ←→ WebSocket ←→ 后端服务器 ←→ WebSocket ←→ 虚拟机
+```
+
+**特点**:
+- 后端服务器作为WebSocket代理
+- 统一的连接管理和认证
+- 更好的安全控制和负载均衡
+- 支持NAT穿透和防火墙
+- 推荐用于生产环境
+
+### 0.2 网络配置要求
+
+#### 0.2.1 服务器端配置
+- 开放WebSocket端口（默认8080）
+- 配置防火墙规则
+- 检查端口监听状态
+
+#### 0.2.2 客户端网络要求
+- 能够访问服务器的IP地址和端口
+- 支持WebSocket协议
+- 网络延迟 < 100ms（推荐）
+
+### 0.3 安全考虑
+
+#### 0.3.1 认证机制
+- 使用JWT Token进行身份验证
+- 服务器端验证虚拟机身份和权限
+- 支持Token过期和刷新机制
+
+#### 0.3.2 网络安全
+- 使用WSS协议（TLS加密）
+- 实现IP白名单
+- 限制连接频率
+- 监控异常连接
 
 ## 1. 概述
 
-本文档定义了水声联邦学习系统的WebSocket通信协议，用于实现服务器与虚拟机之间的实时双向通信，支持虚拟机控制、学习控制、状态监控等功能。
+本文档定义了水声联邦学习系统的中心化WebSocket通信协议，用于实现服务器与虚拟机之间的实时双向通信，支持虚拟机控制、学习控制、状态监控等功能。
 
 ### 1.1 基础信息
-- **WebSocket URL**: `ws://localhost:8080/ws/vm/{vmId}`
+- **WebSocket URL**: `ws://localhost:8080/ws/vm/{vmId}` (开发环境)
+- **WebSocket Secure URL**: `wss://localhost:8080/ws/vm/{vmId}` (生产环境)
 - **协议版本**: v1.0
-- **认证方式**: JWT Token（可选）
+- **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
+- **TLS版本**: TLS 1.2及以上（WSS连接）
 
 ### 1.2 连接参数
 - `vmId`: 虚拟机唯一标识（必需）
-- `token`: JWT认证令牌（可选）
+- `token`: JWT认证令牌（必需）
 - `version`: 客户端版本号（可选）
 
 ### 1.3 连接示例
 ```javascript
-// 基础连接
-const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001');
-
-// 带认证的连接
+// 开发环境 - 带认证的连接
 const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+
+// 生产环境 - WSS连接
+const ws = new WebSocket('wss://your-domain.com/ws/vm/vm-001?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
 ```
 
 ## 2. 消息格式
@@ -104,22 +148,6 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
     "heartbeatInterval": 30,
     "maxMessageSize": 10485760,
     "supportedFeatures": ["ENCRYPTION", "COMPRESSION", "BATCH_OPERATIONS"]
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.1.3 连接断开通知 (DISCONNECT)
-```json
-{
-  "type": "DISCONNECT",
-  "id": "client-1704067200000-123457",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "reason": "SHUTDOWN",
-    "duration": 3600,
-    "lastActivity": "2024-01-01T00:00:00.000Z"
   },
   "signature": "base64_encoded_signature"
 }
@@ -216,57 +244,6 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
 }
 ```
 
-#### 3.3.3 重启虚拟机命令 (VM_RESTART)
-```json
-{
-  "type": "VM_RESTART",
-  "id": "cmd-1704067200000-123461",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "timeout": 300,
-    "graceful": true,
-    "config": {
-      "memory": "4GB",
-      "cpu": "4cores"
-    }
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.3.4 虚拟机状态更新 (VM_STATUS_UPDATE)
-```json
-{
-  "type": "VM_STATUS_UPDATE",
-  "id": "client-1704067200000-123462",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "status": "RUNNING",
-    "uptime": 3600,
-    "resourceUsage": {
-      "cpu": 25.5,
-      "memory": 60.2,
-      "disk": 45.8,
-      "gpu": 15.3
-    },
-    "network": {
-      "ipAddress": "192.168.1.100",
-      "macAddress": "00:11:22:33:44:55",
-      "port": 22
-    },
-    "processes": {
-      "total": 150,
-      "active": 25,
-      "system": 10,
-      "user": 15
-    }
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
 ### 3.4 学习控制消息
 
 #### 3.4.1 开始训练命令 (TRAINING_START)
@@ -326,61 +303,6 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
 }
 ```
 
-#### 3.4.3 暂停训练命令 (TRAINING_PAUSE)
-```json
-{
-  "type": "TRAINING_PAUSE",
-  "id": "cmd-1704067200000-123465",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "taskId": "task-123456",
-    "saveState": true,
-    "reason": "PAUSE_REQUESTED"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.4.4 恢复训练命令 (TRAINING_RESUME)
-```json
-{
-  "type": "TRAINING_RESUME",
-  "id": "cmd-1704067200000-123466",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "taskId": "task-123456",
-    "checkpointPath": "/checkpoints/task-123456/round-25.pth",
-    "resumeFrom": 25
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.4.5 算法切换命令 (ALGORITHM_SWITCH)
-```json
-{
-  "type": "ALGORITHM_SWITCH",
-  "id": "cmd-1704067200000-123467",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "taskId": "task-123456",
-    "newAlgorithm": "FEDPROX",
-    "config": {
-      "mu": 0.001,
-      "batchSize": 32,
-      "learningRate": 0.001,
-      "epochsPerRound": 5
-    },
-    "reason": "PERFORMANCE_OPTIMIZATION",
-    "restartTraining": false
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
 ### 3.5 训练进度消息
 
 #### 3.5.1 训练进度报告 (TRAINING_PROGRESS)
@@ -413,34 +335,6 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
       "memory": 75.2,
       "gpu": 95.8
     }
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.5.2 训练完成报告 (TRAINING_COMPLETE)
-```json
-{
-  "type": "TRAINING_COMPLETE",
-  "id": "client-1704067200000-123469",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "taskId": "task-123456",
-    "round": 25,
-    "finalMetrics": {
-      "accuracy": 0.88,
-      "loss": 0.12,
-      "valAccuracy": 0.85,
-      "valLoss": 0.15,
-      "precision": 0.89,
-      "recall": 0.86,
-      "f1Score": 0.87
-    },
-    "modelPath": "/models/local_model_round_25.pth",
-    "modelSize": 1024000,
-    "trainingTime": 1800,
-    "checkpointPath": "/checkpoints/task-123456/round-25.pth"
   },
   "signature": "base64_encoded_signature"
 }
@@ -511,9 +405,71 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
 }
 ```
 
-### 3.7 错误和状态消息
+### 3.7 状态查询消息
 
-#### 3.7.1 错误报告 (ERROR)
+#### 3.7.1 状态查询请求 (STATUS_QUERY)
+```json
+{
+  "type": "STATUS_QUERY",
+  "id": "cmd-1704067200000-123476",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "vm-001",
+  "data": {
+    "queryType": "FULL",
+    "includeResources": true,
+    "includeProcesses": true,
+    "includeNetwork": true,
+    "timeout": 10
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.7.2 状态查询响应 (STATUS_RESPONSE)
+```json
+{
+  "type": "STATUS_RESPONSE",
+  "id": "client-1704067200000-123477",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "vm-001",
+  "data": {
+    "status": "RUNNING",
+    "uptime": 3600,
+    "resourceUsage": {
+      "cpu": 25.5,
+      "memory": 60.2,
+      "disk": 45.8,
+      "gpu": 15.3
+    },
+    "network": {
+      "ipAddress": "192.168.1.100",
+      "macAddress": "00:11:22:33:44:55",
+      "port": 22,
+      "uploadSpeed": 1024,
+      "downloadSpeed": 2048,
+      "latency": 50
+    },
+    "processes": {
+      "total": 150,
+      "active": 25,
+      "system": 10,
+      "user": 15,
+      "training": 1
+    },
+    "systemInfo": {
+      "os": "Ubuntu 20.04 LTS",
+      "kernel": "5.4.0-42-generic",
+      "loadAverage": [1.2, 1.5, 1.8],
+      "lastBoot": "2024-01-01T00:00:00.000Z"
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.8 错误和状态消息
+
+#### 3.8.1 错误报告 (ERROR)
 ```json
 {
   "type": "ERROR",
@@ -537,78 +493,6 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
       "automatic": false,
       "suggestions": ["检查数据格式", "验证模型输入维度"]
     }
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.7.2 状态更新 (STATUS_UPDATE)
-```json
-{
-  "type": "STATUS_UPDATE",
-  "id": "client-1704067200000-123473",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "status": "TRAINING",
-    "currentTask": "task-123456",
-    "currentRound": 25,
-    "resourceUsage": {
-      "cpu": 85.5,
-      "memory": 75.2,
-      "disk": 45.8,
-      "gpu": 95.8
-    },
-    "network": {
-      "uploadSpeed": 1024,
-      "downloadSpeed": 2048,
-      "latency": 50
-    },
-    "processes": {
-      "total": 150,
-      "active": 25,
-      "training": 1
-    },
-    "lastActivity": "2024-01-01T00:00:00.000Z"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-### 3.8 系统控制消息
-
-#### 3.8.1 系统重启命令 (SYSTEM_RESTART)
-```json
-{
-  "type": "SYSTEM_RESTART",
-  "id": "cmd-1704067200000-123474",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "timeout": 300,
-    "saveState": true,
-    "reason": "MAINTENANCE"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-#### 3.8.2 配置更新命令 (CONFIG_UPDATE)
-```json
-{
-  "type": "CONFIG_UPDATE",
-  "id": "cmd-1704067200000-123475",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "configType": "TRAINING",
-    "config": {
-      "maxMemory": "8GB",
-      "maxCpu": "8cores",
-      "heartbeatInterval": 30,
-      "logLevel": "INFO"
-    },
-    "restartRequired": false
   },
   "signature": "base64_encoded_signature"
 }
@@ -646,69 +530,34 @@ const ws = new WebSocket('ws://localhost:8080/ws/vm/vm-001?token=eyJhbGciOiJIUzI
 6. **模型聚合**: 服务器聚合所有客户端模型
 7. **新模型分发**: 服务器向所有客户端发送新的全局模型
 
-## 5. 安全机制
+### 4.5 状态查询流程
+1. **查询请求**: 服务器发送STATUS_QUERY消息到目标虚拟机
+2. **状态收集**: 虚拟机收集当前状态信息（CPU、内存、磁盘、网络等）
+3. **状态响应**: 虚拟机发送STATUS_RESPONSE包含完整状态信息
+4. **状态处理**: 服务器处理状态信息并更新缓存
+5. **状态分发**: 服务器将状态信息分发给订阅的客户端
+6. **监控通知**: 如果配置了监控，发送状态变更通知
 
-### 5.1 消息签名
-所有消息都包含数字签名，使用RSA算法：
-```json
-{
-  "signature": "base64_encoded_signature"
-}
-```
+### 4.6 批量状态查询流程
+1. **批量查询**: 服务器发送BATCH_STATUS_QUERY到多个虚拟机
+2. **并行收集**: 多个虚拟机并行收集状态信息
+3. **汇总响应**: 服务器汇总所有虚拟机的状态信息
+4. **批量响应**: 发送BATCH_STATUS_RESPONSE包含汇总结果
+5. **统计分析**: 生成状态统计摘要信息
 
-#### 5.1.1 签名生成
-```python
-import hashlib
-import hmac
-import base64
+## 5. 负载均衡和扩展性
 
-def generate_signature(message, private_key):
-    # 创建消息摘要
-    message_str = json.dumps(message, sort_keys=True)
-    digest = hashlib.sha256(message_str.encode()).digest()
-    
-    # 使用私钥签名
-    signature = private_key.sign(digest, padding.PKCS1v15(), hashes.SHA256())
-    
-    # 返回base64编码的签名
-    return base64.b64encode(signature).decode()
-```
+### 5.1 服务器端负载均衡
+- 最大连接数限制
+- 每秒最大消息数限制
+- 连接超时时间设置
+- 消息频率限制检查
 
-#### 5.1.2 签名验证
-```python
-def verify_signature(message, signature, public_key):
-    try:
-        # 解码签名
-        signature_bytes = base64.b64decode(signature)
-        
-        # 创建消息摘要
-        message_str = json.dumps(message, sort_keys=True)
-        digest = hashlib.sha256(message_str.encode()).digest()
-        
-        # 验证签名
-        public_key.verify(signature_bytes, digest, padding.PKCS1v15(), hashes.SHA256())
-        return True
-    except Exception:
-        return False
-```
-
-### 5.2 消息验证
-- **时间戳验证**: 验证消息时间戳，防止重放攻击
-- **签名验证**: 验证消息签名，确保消息完整性
-- **身份验证**: 验证虚拟机身份，确保权限
-- **消息大小限制**: 限制单条消息大小（默认10MB）
-
-### 5.3 加密传输
-- **WSS协议**: 使用WSS（WebSocket Secure）进行加密传输
-- **TLS版本**: 支持TLS 1.2及以上版本
-- **证书验证**: 验证服务器SSL证书
-- **密码套件**: 使用强密码套件
-
-### 5.4 访问控制
-- **虚拟机隔离**: 每个虚拟机只能访问自己的数据
-- **权限验证**: 验证虚拟机对资源的访问权限
-- **操作审计**: 记录所有操作日志
-- **异常检测**: 检测异常行为并采取相应措施
+### 5.2 客户端连接池
+- 连接池大小管理
+- 连接队列处理
+- 连接统计信息
+- 连接状态监控
 
 ## 6. 错误处理
 
@@ -744,109 +593,86 @@ def verify_signature(message, signature, public_key):
 }
 ```
 
-### 6.3 重连策略
+### 6.3 状态查询错误
+```json
+{
+  "type": "STATUS_QUERY_ERROR",
+  "id": "client-1704067200000-123484",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "vm-001",
+  "data": {
+    "errorCode": "STATUS_COLLECTION_FAILED",
+    "errorMessage": "状态信息收集失败",
+    "queryId": "cmd-1704067200000-123476",
+    "details": {
+      "failedComponents": ["cpu", "memory"],
+      "reason": "系统资源不足"
+    },
+    "suggestion": "请检查系统资源或稍后重试"
+  }
+}
+```
+
+**状态查询错误码**:
+- `QUERY_TIMEOUT`: 查询超时
+- `STATUS_COLLECTION_FAILED`: 状态收集失败
+- `INVALID_QUERY_TYPE`: 无效的查询类型
+- `RESOURCE_UNAVAILABLE`: 资源不可用
+- `PERMISSION_DENIED`: 权限不足
+- `VM_OFFLINE`: 虚拟机离线
+
+### 6.4 重连策略
 - **立即重连**: 连接意外断开时立即尝试重连
 - **指数退避**: 重连失败时使用指数退避算法
 - **最大重试**: 设置最大重试次数（默认10次）
 - **重连间隔**: 重连间隔从1秒开始，最大60秒
 
-## 7. 性能优化
+## 7. 部署和运维
 
-### 7.1 消息压缩
-- **GZIP压缩**: 对大型消息进行GZIP压缩
-- **压缩阈值**: 消息大小超过1KB时启用压缩
-- **压缩级别**: 使用平衡的压缩级别（6）
+### 7.1 Docker部署
+- 使用Java基础镜像
+- 暴露WebSocket端口
+- 配置健康检查
+- 设置环境变量
 
-### 7.2 批量操作
-- **批量消息**: 支持批量发送多个消息
-- **消息队列**: 使用消息队列缓冲消息
-- **异步处理**: 异步处理非关键消息
+### 7.2 系统服务配置
+- 配置systemd服务
+- 设置自动重启
+- 配置日志输出
+- 设置工作目录
 
-### 7.3 连接池
-- **连接复用**: 复用WebSocket连接
-- **连接限制**: 限制每个虚拟机的连接数
-- **负载均衡**: 在多服务器环境下进行负载均衡
+### 7.3 日志配置
+- 配置日志级别
+- 设置日志文件路径
+- 配置日志轮转
+- 设置日志格式
 
-## 8. 监控和日志
+## 8. 监控和日志系统
 
-### 8.1 连接监控
-```json
-{
-  "type": "CONNECTION_STATS",
-  "id": "server-1704067200000-123478",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
-  "data": {
-    "totalConnections": 100,
-    "activeConnections": 85,
-    "failedConnections": 5,
-    "averageLatency": 50,
-    "messageThroughput": 1000
-  }
-}
-```
+### 8.1 服务器端监控
+- 连接数监控
+- 消息统计
+- 性能指标收集
+- 告警机制
 
-### 8.2 性能指标
-- **连接数**: 当前活跃连接数
-- **消息延迟**: 消息处理延迟
-- **吞吐量**: 消息处理吞吐量
-- **错误率**: 消息处理错误率
-- **资源使用**: CPU、内存、网络使用情况
+### 8.2 客户端监控面板
+- 连接状态监控
+- 性能指标展示
+- 实时数据更新
+- 告警处理
 
-### 8.3 日志格式
-```json
-{
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "level": "INFO",
-  "category": "WEBSOCKET",
-  "vmId": "vm-001",
-  "message": "WebSocket连接建立",
-  "details": {
-    "sessionId": "session-123456",
-    "ipAddress": "192.168.1.100",
-    "userAgent": "Python-WebSocket-Client/1.0.0"
-  }
-}
-```
+这个中心化实现文档提供了：
 
-## 9. 部署配置
+1. **完整的中心化WebSocket架构设计**
+2. **详细的消息类型定义和处理流程**
+3. **负载均衡和连接池管理**
+4. **错误处理和重连策略**
+5. **Docker部署和系统服务配置**
+6. **监控和日志系统**
 
-### 9.1 服务器配置
-```yaml
-websocket:
-  path: /ws
-  maxConnections: 10000
-  heartbeatInterval: 30
-  connectionTimeout: 60
-  maxMessageSize: 10485760
-  compression:
-    enabled: true
-    threshold: 1024
-    level: 6
-  security:
-    enabled: true
-    requireAuth: false
-    keyPath: /path/to/keys
-    algorithm: RSA
-    keySize: 2048
-```
-
-### 9.2 客户端配置
-```python
-# WebSocket客户端配置
-WEBSOCKET_CONFIG = {
-    'url': 'ws://localhost:8080/ws/vm/{vm_id}',
-    'heartbeat_interval': 30,
-    'reconnect_interval': 5,
-    'max_reconnect_attempts': 10,
-    'connection_timeout': 60,
-    'max_message_size': 10485760,
-    'compression': {
-        'enabled': True,
-        'threshold': 1024,
-        'level': 6
-    }
-}
-```
-
-这个WebSocket协议文档提供了完整的实时通信协议定义，支持虚拟机控制、学习控制、状态监控等功能，完全符合您的大创项目需求。 
+中心化架构的优势在于：
+- 统一的连接管理和认证
+- 更好的安全控制
+- 支持负载均衡
+- 便于监控和维护
+- 适合生产环境部署 
