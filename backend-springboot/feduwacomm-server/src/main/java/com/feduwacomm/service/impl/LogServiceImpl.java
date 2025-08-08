@@ -98,7 +98,7 @@ public class LogServiceImpl implements LogService {
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
             jdbcTemplate.update(sql,
-                    uuidUtil.generateLogId(),
+                    uuidUtil.generateUuid(),
                     LocalDateTime.now(),
                     level,
                     "com.feduwacomm",

@@ -334,28 +334,6 @@ VALUES (
 -- 可选配置
 -- =====================================================
 
--- 创建默认管理员用户（必选，设置32位UUID与BCrypt密码哈希）
-INSERT INTO
-    users (
-        id,
-        username,
-        email,
-        password_hash,
-        role,
-        status,
-        created_at,
-        updated_at
-    )
-VALUES (
-        '0000000000000000000000000000000A',
-        'admin',
-        'admin@feduwacomm.com',
-        '$2a$10$KIX1bR0lG1uobHx5iY8jle8n2vXkqV2w2v2w2v2w2v2w2v2w2v2w2',
-        'ADMIN',
-        'ACTIVE',
-        NOW(),
-        NOW()
-    );
 -- 注意：上面的password_hash需替换为实际由BCrypt生成的"password"的哈希
 
 -- =====================================================

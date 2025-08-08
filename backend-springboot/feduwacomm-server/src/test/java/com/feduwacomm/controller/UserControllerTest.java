@@ -3,6 +3,7 @@ package com.feduwacomm.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
+import com.feduwacomm.handler.GlobalExceptionHandler;
 import com.feduwacomm.service.UserService;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.LocalDateTime;
 
@@ -23,8 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * UserController单元测试类
- * 根据最新的user-api-reference.md文档更新
+ * 用户控制器测试类
  */
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
@@ -40,8 +41,19 @@ class UserControllerTest {
 
         @BeforeEach
         void setUp() {
-                mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
+                // 创建验证器
+                LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+                validator.afterPropertiesSet();
+
+                // 配置MockMvc，包含全局异常处理器和验证支持
+                mockMvc = MockMvcBuilders.standaloneSetup(userController)
+                                .setControllerAdvice(new GlobalExceptionHandler())
+                                .setValidator(validator)
+                                .build();
+
+                // 配置ObjectMapper以支持LocalDateTime
                 objectMapper = new ObjectMapper();
+                objectMapper.findAndRegisterModules(); // 自动注册JSR310模块
         }
 
         // 认证相关接口测试
@@ -67,15 +79,22 @@ class UserControllerTest {
 
                 when(userService.register(any(UserRegisterDTO.class))).thenReturn(responseVO);
 
-                // 执行测试
-                mockMvc.perform(post("/api/user/register")
+                // 执行测试并打印响应
+                String response = mockMvc.perform(post("/api/user/register")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(registerDTO)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200))
                                 .andExpect(jsonPath("$.message").value("注册成功"))
                                 .andExpect(jsonPath("$.data.userId").value("a1b2c3d4e5f678901234567890123456"))
-                                .andExpect(jsonPath("$.data.username").value("testuser"));
+                                .andExpect(jsonPath("$.data.username").value("testuser"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
+
+                System.out.println("=== 注册成功测试响应 ===");
+                System.out.println(response);
+                System.out.println("=========================");
 
                 verify(userService, times(1)).register(any(UserRegisterDTO.class));
         }
@@ -270,11 +289,20 @@ class UserControllerTest {
                                 .confirmPassword("456")
                                 .build();
 
-                // 执行测试
-                mockMvc.perform(post("/api/user/register")
+                // 执行测试并打印响应
+                String response = mockMvc.perform(post("/api/user/register")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(registerDTO)))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
+                                .andExpect(jsonPath("$.code").value(400)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("验证失败"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
+
+                System.out.println("=== 验证错误测试响应 ===");
+                System.out.println(response);
+                System.out.println("=========================");
         }
 
         @Test
@@ -285,12 +313,54 @@ class UserControllerTest {
                                 .password("wrongpassword")
                                 .build();
 
-                when(userService.login(any(UserLoginDTO.class))).thenThrow(new RuntimeException("账号或密码错误"));
+                // 使用UserException.passwordError()方法
+                when(userService.login(any(UserLoginDTO.class)))
+                                .thenThrow(com.feduwacomm.exception.UserException.passwordError());
 
-                // 执行测试
-                mockMvc.perform(post("/api/user/login")
+                // 执行测试并打印响应
+                String response = mockMvc.perform(post("/api/user/login")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(loginDTO)))
-                                .andExpect(status().isInternalServerError());
+                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
+                                .andExpect(jsonPath("$.code").value(401)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("密码错误"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
+
+                System.out.println("=== 登录失败测试响应 ===");
+                System.out.println(response);
+                System.out.println("=========================");
+        }
+
+        @Test
+        void testExceptionHandling() throws Exception {
+                // 测试UserException异常处理
+                UserLoginDTO loginDTO = UserLoginDTO.builder()
+                                .loginIdentifier("test")
+                                .password("test")
+                                .build();
+
+                // 模拟抛出UserException
+                when(userService.login(any(UserLoginDTO.class)))
+                                .thenThrow(com.feduwacomm.exception.UserException.userNotFound());
+
+                // 执行测试并打印响应
+                String response = mockMvc.perform(post("/api/user/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginDTO)))
+                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
+                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("用户不存在"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
+
+                System.out.println("=== 异常处理测试响应 ===");
+                System.out.println(response);
+                System.out.println("=========================");
+
+                // 验证mock被调用
+                verify(userService, times(1)).login(any(UserLoginDTO.class));
         }
 }

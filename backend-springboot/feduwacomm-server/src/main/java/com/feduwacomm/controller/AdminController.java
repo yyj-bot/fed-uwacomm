@@ -4,6 +4,7 @@ import com.feduwacomm.common.Result;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.AdminService;
 import com.feduwacomm.vo.*;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +48,7 @@ public class AdminController {
      * 创建用户
      */
     @PostMapping("/user/create")
-    public Result<UserCreateResponseVO> createUser(@RequestBody UserCreateDTO createDTO) {
+    public Result<UserCreateResponseVO> createUser(@Valid @RequestBody UserCreateDTO createDTO) {
         UserCreateResponseVO response = adminService.createUser(createDTO);
         return Result.success("创建成功", response);
     }
@@ -57,7 +58,7 @@ public class AdminController {
      */
     @PutMapping("/user/{userId}")
     public Result<UserUpdateResponseVO> updateUser(@PathVariable String userId,
-            @RequestBody UserAdminUpdateDTO updateDTO) {
+            @Valid @RequestBody UserAdminUpdateDTO updateDTO) {
         UserUpdateResponseVO response = adminService.updateUser(userId, updateDTO);
         return Result.success("更新成功", response);
     }

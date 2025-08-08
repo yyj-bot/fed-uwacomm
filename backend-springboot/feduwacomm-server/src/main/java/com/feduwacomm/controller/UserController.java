@@ -5,6 +5,7 @@ import com.feduwacomm.common.Result;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.UserService;
 import com.feduwacomm.vo.*;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ public class UserController {
      * 用户注册
      */
     @PostMapping("/register")
-    public Result<UserRegisterResponseVO> register(@RequestBody UserRegisterDTO registerDTO) {
+    public Result<UserRegisterResponseVO> register(@Valid @RequestBody UserRegisterDTO registerDTO) {
         UserRegisterResponseVO response = userService.register(registerDTO);
         return Result.success("注册成功", response);
     }
@@ -37,7 +38,7 @@ public class UserController {
      * 用户登录
      */
     @PostMapping("/login")
-    public Result<LoginResponseVO> login(@RequestBody UserLoginDTO loginDTO) {
+    public Result<LoginResponseVO> login(@Valid @RequestBody UserLoginDTO loginDTO) {
         LoginResponseVO response = userService.login(loginDTO);
         return Result.success("登录成功", response);
     }

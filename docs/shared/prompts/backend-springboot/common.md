@@ -15,3 +15,4 @@
 4.所有entity数据库实体类,dto数据传输类,vo数据返回类都应该定义在pojo模块下
 5.所有config类都应该存储于server软件包下
 6.所有serverice/controller/mapper在修改或重构完都应该更新相应的单元测试，然后运行测试
+7.不要自己生成测试用的 bat或sh脚本 

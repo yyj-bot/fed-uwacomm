@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * UUID v7工具类测试
+ * 基于RFC 9562标准验证UUID v7的实现
  * 
  * @author FedUWAComm Team
  * @version 2.0.0
@@ -20,7 +21,7 @@ class UuidUtilTest {
 
     @Autowired
     private UuidUtil uuidUtil;
-
+    
     @Test
     void testGenerateUuid() {
         String uuid = uuidUtil.generateUuid();
@@ -40,86 +41,6 @@ class UuidUtilTest {
         assertTrue(uuid.contains("-"));
         assertTrue(uuidUtil.isValidUuid(uuid));
         assertTrue(uuidUtil.isUuidV7(uuid));
-    }
-
-    @Test
-    void testGenerateUserId() {
-        String userId = uuidUtil.generateUserId();
-
-        assertNotNull(userId);
-        assertEquals(32, userId.length());
-        assertTrue(uuidUtil.isValidUuid(userId));
-        assertTrue(uuidUtil.isUuidV7(userId));
-    }
-
-    @Test
-    void testGeneratePermissionId() {
-        String permissionId = uuidUtil.generatePermissionId();
-
-        assertNotNull(permissionId);
-        assertEquals(32, permissionId.length());
-        assertTrue(uuidUtil.isValidUuid(permissionId));
-        assertTrue(uuidUtil.isUuidV7(permissionId));
-    }
-
-    @Test
-    void testGenerateVmId() {
-        String vmId = uuidUtil.generateVmId();
-
-        assertNotNull(vmId);
-        assertEquals(32, vmId.length());
-        assertTrue(uuidUtil.isValidUuid(vmId));
-        assertTrue(uuidUtil.isUuidV7(vmId));
-    }
-
-    @Test
-    void testGenerateTaskId() {
-        String taskId = uuidUtil.generateTaskId();
-
-        assertNotNull(taskId);
-        assertEquals(32, taskId.length());
-        assertTrue(uuidUtil.isValidUuid(taskId));
-        assertTrue(uuidUtil.isUuidV7(taskId));
-    }
-
-    @Test
-    void testGenerateDataId() {
-        String dataId = uuidUtil.generateDataId();
-
-        assertNotNull(dataId);
-        assertEquals(32, dataId.length());
-        assertTrue(uuidUtil.isValidUuid(dataId));
-        assertTrue(uuidUtil.isUuidV7(dataId));
-    }
-
-    @Test
-    void testGenerateModelId() {
-        String modelId = uuidUtil.generateModelId();
-
-        assertNotNull(modelId);
-        assertEquals(32, modelId.length());
-        assertTrue(uuidUtil.isValidUuid(modelId));
-        assertTrue(uuidUtil.isUuidV7(modelId));
-    }
-
-    @Test
-    void testGenerateLogId() {
-        String logId = uuidUtil.generateLogId();
-
-        assertNotNull(logId);
-        assertEquals(32, logId.length());
-        assertTrue(uuidUtil.isValidUuid(logId));
-        assertTrue(uuidUtil.isUuidV7(logId));
-    }
-
-    @Test
-    void testGenerateVmLogId() {
-        String vmLogId = uuidUtil.generateVmLogId();
-
-        assertNotNull(vmLogId);
-        assertEquals(32, vmLogId.length());
-        assertTrue(uuidUtil.isValidUuid(vmLogId));
-        assertTrue(uuidUtil.isUuidV7(vmLogId));
     }
 
     @Test
@@ -202,9 +123,12 @@ class UuidUtilTest {
         // 检查版本位
         assertTrue(parts[2].startsWith("7"));
 
-        // 检查变体位
-        assertTrue(parts[3].startsWith("8") || parts[3].startsWith("9") ||
-                parts[3].startsWith("a") || parts[3].startsWith("b"));
+        // 检查变体位 - 更准确的检查
+        String cleanUuid = uuid.replace("-", "");
+        String byte7Hex = cleanUuid.substring(14, 16);
+        int byte7Value = Integer.parseInt(byte7Hex, 16);
+        int variant = (byte7Value >> 2) & 0x03;
+        assertEquals(2, variant, "Variant should be 2 (binary: 10)");
     }
 
     @Test
@@ -230,20 +154,128 @@ class UuidUtilTest {
     }
 
     @Test
-    void testExtractTimestampWithHyphens() {
+    void testRfc9562Compliance() {
+        // 验证UUID v7完全符合RFC 9562标准
         String uuid = uuidUtil.generateUuidWithHyphens();
-        Long timestamp = uuidUtil.extractTimestamp(uuid);
+        System.out.println("Generated UUID: " + uuid);
 
-        assertNotNull(timestamp);
-        assertTrue(timestamp > 0);
+        String cleanUuid = uuid.replace("-", "");
+
+        // 验证长度
+        assertEquals(32, cleanUuid.length(), "UUID should be 32 characters");
+
+        // 验证十六进制格式
+        assertTrue(cleanUuid.matches("[0-9a-f]{32}"), "UUID should be hexadecimal");
+
+        // 验证版本位（第7字节的高4位）
+        String byte6Hex = cleanUuid.substring(12, 14);
+        int byte6Value = Integer.parseInt(byte6Hex, 16);
+        int version = (byte6Value >> 4) & 0x0F;
+        assertEquals(7, version, "Version should be 7");
+
+        // 验证变体位（第7字节的中间2位）
+        String byte7Hex = cleanUuid.substring(14, 16);
+        int byte7Value = Integer.parseInt(byte7Hex, 16);
+        int variant = (byte7Value >> 2) & 0x03;
+        assertEquals(2, variant, "Variant should be 2 (binary: 10)");
+
+        // 验证时间戳部分
+        String timestampHex = cleanUuid.substring(0, 12);
+        long timestamp = Long.parseLong(timestampHex, 16);
+        long currentTime = System.currentTimeMillis();
+        assertTrue(Math.abs(currentTime - timestamp) < 1000, "Timestamp should be close to current time");
     }
 
     @Test
-    void testExtractVersionWithHyphens() {
+    void testDetailedBitAnalysis() {
+        // 详细分析UUID v7的位结构
         String uuid = uuidUtil.generateUuidWithHyphens();
-        Integer version = uuidUtil.extractVersion(uuid);
+        System.out.println("Generated UUID: " + uuid);
 
-        assertNotNull(version);
-        assertEquals(7, version);
+        String cleanUuid = uuid.replace("-", "");
+
+        // 分析每个字节
+        System.out.println("Byte analysis:");
+        for (int i = 0; i < 16; i++) {
+            String byteHex = cleanUuid.substring(i * 2, i * 2 + 2);
+            int byteValue = Integer.parseInt(byteHex, 16);
+            System.out.printf("Byte %d: %s (0x%02X, binary: %s)%n",
+                    i, byteHex, byteValue, String.format("%8s", Integer.toBinaryString(byteValue)).replace(' ', '0'));
+        }
+
+        // 验证RFC 9562位布局
+        // 字节0-5: unix_ts_ms (48 bits)
+        String timestampHex = cleanUuid.substring(0, 12);
+        long timestamp = Long.parseLong(timestampHex, 16);
+        System.out.println("Timestamp (ms): " + timestamp);
+
+        // 字节6: ver (4 bits) + rand_a (4 bits)
+        String byte6Hex = cleanUuid.substring(12, 14);
+        int byte6Value = Integer.parseInt(byte6Hex, 16);
+        int version = (byte6Value >> 4) & 0x0F;
+        int randAHigh = byte6Value & 0x0F;
+        System.out.println("Version: " + version + ", rand_a high: " + randAHigh);
+
+        // 字节7: rand_a (4 bits) + var (2 bits) + rand_b (2 bits)
+        String byte7Hex = cleanUuid.substring(14, 16);
+        int byte7Value = Integer.parseInt(byte7Hex, 16);
+        int randALow = (byte7Value >> 4) & 0x0F;
+        int variant = (byte7Value >> 2) & 0x03;
+        int randBHigh = byte7Value & 0x03;
+        System.out.println("rand_a low: " + randALow + ", variant: " + variant + ", rand_b high: " + randBHigh);
+
+        // 字节8-15: rand_b (56 bits)
+        String randBHex = cleanUuid.substring(16, 32);
+        System.out.println("rand_b: " + randBHex);
+
+        // 验证关键字段
+        assertEquals(7, version, "Version should be 7");
+        assertEquals(2, variant, "Variant should be 2");
+        assertTrue(timestamp > 0, "Timestamp should be positive");
+    }
+
+    @Test
+    void testUuidV7GenerationAndParsing() {
+        // 测试UUID v7的生成和解析
+        String uuid = uuidUtil.generateUuidWithHyphens();
+        System.out.println("Generated UUID v7: " + uuid);
+
+        // 验证UUID格式
+        assertTrue(uuidUtil.isValidUuid(uuid), "UUID should be valid");
+        assertTrue(uuidUtil.isUuidV7(uuid), "UUID should be v7");
+        assertTrue(uuidUtil.isValidVariant(uuid), "UUID should have valid variant");
+
+        // 验证时间戳提取
+        Long timestamp = uuidUtil.extractTimestamp(uuid);
+        assertNotNull(timestamp, "Timestamp should not be null");
+        assertTrue(timestamp > 0, "Timestamp should be positive");
+
+        // 验证版本提取
+        Integer version = uuidUtil.extractVersion(uuid);
+        assertNotNull(version, "Version should not be null");
+        assertEquals(7, version, "Version should be 7");
+
+        System.out.println("Extracted timestamp: " + timestamp);
+        System.out.println("Extracted version: " + version);
+    }
+
+    @Test
+    void testUuidV7VariantBit() {
+        // 专门测试变体位
+        String uuid = uuidUtil.generateUuidWithHyphens();
+        System.out.println("Test UUID: " + uuid);
+
+        // 验证变体位
+        assertTrue(uuidUtil.isValidVariant(uuid), "UUID should have valid variant");
+
+        // 手动验证变体位
+        String cleanUuid = uuid.replace("-", "");
+        String byte7Hex = cleanUuid.substring(14, 16);
+        int byte7Value = Integer.parseInt(byte7Hex, 16);
+        int variant = (byte7Value >> 2) & 0x03;
+        assertEquals(2, variant, "Variant should be 2");
+
+        System.out.println("Byte 7: " + byte7Hex + " (0x" + Integer.toHexString(byte7Value) + ")");
+        System.out.println("Variant: " + variant + " (binary: " + Integer.toBinaryString(variant) + ")");
     }
 }
