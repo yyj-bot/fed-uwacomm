@@ -7,31 +7,38 @@ import java.time.LocalDateTime;
  */
 public class UserDTO {
 
-    private Long id;
+    private String id;
     private String username;
+    private String account;
     private String email;
-    private String phone;
-    private Integer status;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
+    private String role;
+    private String status;
+
+    private LocalDateTime lastLoginTime;
+    private String lastLoginIp;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String createdBy;
+    private String updatedBy;
 
     // 构造函数
     public UserDTO() {
     }
 
-    public UserDTO(String username, String email, String phone) {
+    public UserDTO(String username, String account, String email) {
         this.username = username;
+        this.account = account;
         this.email = email;
-        this.phone = phone;
-        this.status = 1;
+        this.role = "VIEWER";
+        this.status = "ACTIVE";
     }
 
     // Getter和Setter方法
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -43,6 +50,14 @@ public class UserDTO {
         this.username = username;
     }
 
+    public String getAccount() {
+        return account;
+    }
+
+    public void setAccount(String account) {
+        this.account = account;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -51,48 +66,82 @@ public class UserDTO {
         this.email = email;
     }
 
-    public String getPhone() {
-        return phone;
+    public String getRole() {
+        return role;
     }
 
-    public void setPhone(String phone) {
-        this.phone = phone;
+    public void setRole(String role) {
+        this.role = role;
     }
 
-    public Integer getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(Integer status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 
-    public LocalDateTime getCreateTime() {
-        return createTime;
+    public LocalDateTime getLastLoginTime() {
+        return lastLoginTime;
     }
 
-    public void setCreateTime(LocalDateTime createTime) {
-        this.createTime = createTime;
+    public void setLastLoginTime(LocalDateTime lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
     }
 
-    public LocalDateTime getUpdateTime() {
-        return updateTime;
+    public String getLastLoginIp() {
+        return lastLoginIp;
     }
 
-    public void setUpdateTime(LocalDateTime updateTime) {
-        this.updateTime = updateTime;
+    public void setLastLoginIp(String lastLoginIp) {
+        this.lastLoginIp = lastLoginIp;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+        this.updatedBy = updatedBy;
     }
 
     @Override
     public String toString() {
         return "UserDTO{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", username='" + username + '\'' +
+                ", account='" + account + '\'' +
                 ", email='" + email + '\'' +
-                ", phone='" + phone + '\'' +
-                ", status=" + status +
-                ", createTime=" + createTime +
-                ", updateTime=" + updateTime +
+                ", role='" + role + '\'' +
+                ", status='" + status + '\'' +
+                ", lastLoginTime=" + lastLoginTime +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
                 '}';
     }
 }

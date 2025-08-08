@@ -267,6 +267,7 @@ mvn test
 
 详细使用说明请参考：
 - 🚀 [合作者快速上手指南](docs/shared/GETTING_STARTED.md) - 新用户必读
+- 🗺️ [开发阶段规划](docs/shared/stages/开发阶段规划.md) - 阶段性里程碑与优先级安排
 - 📖 [项目概述](docs/shared/project_overview.md) - 系统架构说明
 - 📊 [项目总结](docs/shared/project_summary.md) - 技术总结报告
 - 🐍 [Python模块文档](docs/python-vm/) - Python虚拟机模块详细文档

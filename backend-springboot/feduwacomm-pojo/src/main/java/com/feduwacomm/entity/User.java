@@ -3,37 +3,49 @@ package com.feduwacomm.entity;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类 - 用于测试
+ * 用户实体类
  */
 public class User {
 
-    private Long id;
+    private String id;
     private String username;
+    private String account;
     private String email;
-    private String phone;
-    private Integer status; // 0-禁用 1-启用
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
+    private String passwordHash;
+    private String role;
+    private String status;
+
+    private LocalDateTime lastLoginTime;
+    private String lastLoginIp;
+    private Integer loginAttempts;
+    private LocalDateTime lockedUntil;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String createdBy;
+    private String updatedBy;
 
     // 构造函数
     public User() {
     }
 
-    public User(String username, String email, String phone) {
+    public User(String username, String account, String email, String passwordHash) {
         this.username = username;
+        this.account = account;
         this.email = email;
-        this.phone = phone;
-        this.status = 1;
-        this.createTime = LocalDateTime.now();
-        this.updateTime = LocalDateTime.now();
+        this.passwordHash = passwordHash;
+        this.role = "VIEWER";
+        this.status = "ACTIVE";
+        this.loginAttempts = 0;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     // Getter和Setter方法
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -45,6 +57,14 @@ public class User {
         this.username = username;
     }
 
+    public String getAccount() {
+        return account;
+    }
+
+    public void setAccount(String account) {
+        this.account = account;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -53,48 +73,106 @@ public class User {
         this.email = email;
     }
 
-    public String getPhone() {
-        return phone;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
-    public void setPhone(String phone) {
-        this.phone = phone;
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
-    public Integer getStatus() {
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(Integer status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 
-    public LocalDateTime getCreateTime() {
-        return createTime;
+    public LocalDateTime getLastLoginTime() {
+        return lastLoginTime;
     }
 
-    public void setCreateTime(LocalDateTime createTime) {
-        this.createTime = createTime;
+    public void setLastLoginTime(LocalDateTime lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
     }
 
-    public LocalDateTime getUpdateTime() {
-        return updateTime;
+    public String getLastLoginIp() {
+        return lastLoginIp;
     }
 
-    public void setUpdateTime(LocalDateTime updateTime) {
-        this.updateTime = updateTime;
+    public void setLastLoginIp(String lastLoginIp) {
+        this.lastLoginIp = lastLoginIp;
+    }
+
+    public Integer getLoginAttempts() {
+        return loginAttempts;
+    }
+
+    public void setLoginAttempts(Integer loginAttempts) {
+        this.loginAttempts = loginAttempts;
+    }
+
+    public LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(LocalDateTime lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(String updatedBy) {
+        this.updatedBy = updatedBy;
     }
 
     @Override
     public String toString() {
         return "User{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", username='" + username + '\'' +
+                ", account='" + account + '\'' +
                 ", email='" + email + '\'' +
-                ", phone='" + phone + '\'' +
-                ", status=" + status +
-                ", createTime=" + createTime +
-                ", updateTime=" + updateTime +
+                ", role='" + role + '\'' +
+                ", status='" + status + '\'' +
+                ", lastLoginTime=" + lastLoginTime +
+                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
                 '}';
     }
 }

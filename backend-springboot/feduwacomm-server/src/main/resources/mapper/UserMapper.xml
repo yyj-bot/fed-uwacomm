@@ -1,109 +1,177 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feduwacomm.mapper.UserMapper">
-    
+
     <!-- 结果映射 -->
     <resultMap id="UserResultMap" type="com.feduwacomm.entity.User">
-        <id column="id" property="id" jdbcType="BIGINT"/>
-        <result column="username" property="username" jdbcType="VARCHAR"/>
-        <result column="email" property="email" jdbcType="VARCHAR"/>
-        <result column="phone" property="phone" jdbcType="VARCHAR"/>
-        <result column="status" property="status" jdbcType="TINYINT"/>
-        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
-        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="account" property="account"/>
+        <result column="email" property="email"/>
+        <result column="password_hash" property="passwordHash"/>
+        <result column="role" property="role"/>
+        <result column="status" property="status"/>
+        <result column="last_login_time" property="lastLoginTime"/>
+        <result column="last_login_ip" property="lastLoginIp"/>
+        <result column="login_attempts" property="loginAttempts"/>
+        <result column="locked_until" property="lockedUntil"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
     </resultMap>
-    
+
     <!-- 基础字段 -->
     <sql id="Base_Column_List">
-        id, username, email, phone, status, create_time, update_time
+        id, username, account, email, password_hash, role, status,
+        last_login_time, last_login_ip, login_attempts, locked_until,
+        created_at, updated_at, created_by, updated_by
     </sql>
-    
-    <!-- 查询所有用户 -->
-    <select id="findAll" resultMap="UserResultMap">
-        SELECT 
-        <include refid="Base_Column_List"/>
-        FROM users 
-        WHERE status = 1
-        ORDER BY create_time DESC
-    </select>
-    
+
     <!-- 根据ID查询用户 -->
-    <select id="findById" parameterType="java.lang.Long" resultMap="UserResultMap">
-        SELECT 
-        <include refid="Base_Column_List"/>
-        FROM users 
+    <select id="selectById" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
         WHERE id = #{id}
     </select>
-    
+
+    <!-- 根据账号查询用户 -->
+    <select id="selectByAccount" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        WHERE account = #{account}
+    </select>
+
+    <!-- 根据邮箱查询用户 -->
+    <select id="selectByEmail" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        WHERE email = #{email}
+    </select>
+
     <!-- 根据用户名查询用户 -->
-    <select id="findByUsername" parameterType="java.lang.String" resultMap="UserResultMap">
-        SELECT 
-        <include refid="Base_Column_List"/>
-        FROM users 
+    <select id="selectByUsername" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
         WHERE username = #{username}
     </select>
-    
+
+    <!-- 查询所有用户 -->
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 根据角色查询用户 -->
+    <select id="selectByRole" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        WHERE role = #{role}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 根据状态查询用户 -->
+    <select id="selectByStatus" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 分页查询用户 -->
+    <select id="selectByPage" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
     <!-- 插入用户 -->
-    <insert id="insert" parameterType="com.feduwacomm.entity.User" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.feduwacomm.entity.User">
         INSERT INTO users (
-            username, 
-            email, 
-            phone, 
-            status, 
-            create_time, 
-            update_time
+            id, username, account, email, password_hash, role, status,
+            last_login_time, last_login_ip, login_attempts, locked_until,
+            created_at, updated_at, created_by, updated_by
         ) VALUES (
-            #{username}, 
-            #{email}, 
-            #{phone}, 
-            #{status}, 
-            #{createTime}, 
-            #{updateTime}
+            #{id}, #{username}, #{account}, #{email}, #{passwordHash}, #{role}, #{status},
+            #{lastLoginTime}, #{lastLoginIp}, #{loginAttempts}, #{lockedUntil},
+            #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
         )
     </insert>
-    
+
     <!-- 更新用户 -->
     <update id="update" parameterType="com.feduwacomm.entity.User">
-        UPDATE users 
-        SET 
-            username = #{username},
+        UPDATE users
+        SET username = #{username},
+            account = #{account},
             email = #{email},
-            phone = #{phone},
+            role = #{role},
             status = #{status},
-            update_time = #{updateTime}
+            last_login_time = #{lastLoginTime},
+            last_login_ip = #{lastLoginIp},
+            login_attempts = #{loginAttempts},
+            locked_until = #{lockedUntil},
+            updated_at = #{updatedAt},
+            updated_by = #{updatedBy}
         WHERE id = #{id}
     </update>
-    
-    <!-- 删除用户（软删除） -->
-    <update id="deleteById" parameterType="java.lang.Long">
-        UPDATE users 
-        SET status = 0, update_time = NOW() 
+
+    <!-- 根据ID删除用户 -->
+    <delete id="deleteById">
+        DELETE FROM users WHERE id = #{id}
+    </delete>
+
+    <!-- 更新用户最后登录信息 -->
+    <update id="updateLastLogin">
+        UPDATE users
+        SET last_login_time = #{lastLoginTime},
+            last_login_ip = #{lastLoginIp},
+            login_attempts = 0,
+            updated_at = NOW()
         WHERE id = #{id}
     </update>
-    
+
+    <!-- 更新登录失败次数 -->
+    <update id="updateLoginAttempts">
+        UPDATE users
+        SET login_attempts = #{loginAttempts},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 锁定用户 -->
+    <update id="lockUser">
+        UPDATE users
+        SET status = 'LOCKED',
+            locked_until = #{lockedUntil},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 解锁用户 -->
+    <update id="unlockUser">
+        UPDATE users
+        SET status = 'ACTIVE',
+            locked_until = NULL,
+            login_attempts = 0,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
     <!-- 统计用户总数 -->
-    <select id="count" resultType="java.lang.Integer">
-        SELECT COUNT(*) 
-        FROM users 
-        WHERE status = 1
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM users
     </select>
-    
-    <!-- 根据条件查询用户（可选，用于扩展） -->
-    <select id="findByCondition" parameterType="map" resultMap="UserResultMap">
-        SELECT 
-        <include refid="Base_Column_List"/>
-        FROM users 
-        WHERE status = 1
-        <if test="username != null and username != ''">
-            AND username LIKE CONCAT('%', #{username}, '%')
-        </if>
-        <if test="email != null and email != ''">
-            AND email LIKE CONCAT('%', #{email}, '%')
-        </if>
-        <if test="phone != null and phone != ''">
-            AND phone LIKE CONCAT('%', #{phone}, '%')
-        </if>
-        ORDER BY create_time DESC
+
+    <!-- 根据角色统计用户数量 -->
+    <select id="countByRole" resultType="int">
+        SELECT COUNT(*) FROM users WHERE role = #{role}
     </select>
-    
+
+    <!-- 根据状态统计用户数量 -->
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM users WHERE status = #{status}
+    </select>
+
 </mapper> 
