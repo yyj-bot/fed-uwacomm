@@ -1,4 +1,4 @@
-package com.feduwacomm.dto;
+package com.feduwacomm.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,14 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 用户信息更新数据传输对象
+ * 验证错误视图对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateDTO {
+public class ValidationErrorVO {
 
-    private String username;
-    private String email;
+    private String field;
+    private String error;
 }

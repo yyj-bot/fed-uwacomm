@@ -1,4 +1,4 @@
-package com.feduwacomm.entity;
+package com.feduwacomm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,16 +8,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 用户权限实体类
+ * 用户权限数据传输对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserPermission {
+public class UserPermissionDTO {
 
-    private String id;
-    private String userId;
+    private String permissionId;
     private String resourceType;
     private String resourceId;
     private String permission;

@@ -1,4 +1,4 @@
-package com.feduwacomm.entity;
+package com.feduwacomm.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,28 +8,19 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类
+ * 用户注册响应视图对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class UserRegisterResponseVO {
 
-    private String id;
+    private String userId;
     private String username;
     private String account;
     private String email;
-    private String passwordHash;
     private String role;
     private String status;
-
-    private LocalDateTime lastLoginTime;
-    private String lastLoginIp;
-    private Integer loginAttempts;
-    private LocalDateTime lockedUntil;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private String createdBy;
-    private String updatedBy;
 }

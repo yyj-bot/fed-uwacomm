@@ -6,14 +6,17 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 用户信息更新数据传输对象
+ * 用户创建数据传输对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateDTO {
+public class UserCreateDTO {
 
     private String username;
+    private String account;
     private String email;
+    private String password;
+    private String role;
 }

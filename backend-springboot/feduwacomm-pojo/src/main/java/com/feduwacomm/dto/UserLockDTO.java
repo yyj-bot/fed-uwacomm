@@ -6,14 +6,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 用户信息更新数据传输对象
+ * 用户锁定数据传输对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateDTO {
+public class UserLockDTO {
 
-    private String username;
-    private String email;
+    private Integer duration; // 锁定时长（秒）
 }

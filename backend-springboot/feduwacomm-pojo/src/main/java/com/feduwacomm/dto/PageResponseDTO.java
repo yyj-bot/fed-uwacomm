@@ -5,15 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
- * 用户信息更新数据传输对象
+ * 分页响应数据传输对象
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateDTO {
+public class PageResponseDTO<T> {
 
-    private String username;
-    private String email;
+    private Long total;
+    private Integer page;
+    private Integer size;
+    private List<T> list;
 }
