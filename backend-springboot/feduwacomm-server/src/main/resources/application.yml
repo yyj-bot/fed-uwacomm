@@ -11,7 +11,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/feduwacomm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
-    password: password
+    password: NBNB
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   # Jackson配置

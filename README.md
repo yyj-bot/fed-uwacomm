@@ -75,6 +75,8 @@ DB_PASSWORD=your_password
 DB_NAME=bellhop_data
 ```
 
+**数据库设计参考**: 详细的数据库表结构设计请参考 [数据库设计文档](docs/shared/database/database_schema.md)
+
 ### 3. 安装Python模块
 
 ```bash
@@ -180,7 +182,8 @@ FedUWAComm/                          # Monorepo根目录
 │   ├── frontend-admin/            # 前端模块文档
 │   ├── backend-springboot/        # 后端模块文档
 │   └── shared/                    # 共享文档
-│       └── api/                   # API文档
+│       ├── api/                   # API文档
+│       └── database/              # 数据库设计文档
 ├── README.md                      # 项目主文档
 └── .gitignore                     # Git忽略文件
 ```
@@ -264,13 +267,18 @@ mvn test
 
 详细使用说明请参考：
 - 🚀 [合作者快速上手指南](docs/shared/GETTING_STARTED.md) - 新用户必读
+- 🗺️ [开发阶段规划](docs/shared/stages/开发阶段规划.md) - 阶段性里程碑与优先级安排
 - 📖 [项目概述](docs/shared/project_overview.md) - 系统架构说明
 - 📊 [项目总结](docs/shared/project_summary.md) - 技术总结报告
 - 🐍 [Python模块文档](docs/python-vm/) - Python虚拟机模块详细文档
 - 🖥️ [前端模块文档](docs/frontend-admin/) - 管理端前端文档
 - ⚙️ [后端模块文档](docs/backend-springboot/) - SpringBoot后端文档
+- 🗄️ [数据库设计文档](docs/shared/database/database_schema.md) - 数据库表结构设计
 
 ## API接口
+
+详细的API接口文档请参考：
+- 🔌 [API接口文档](docs/shared/api/README.md) - HTTP和WebSocket接口完整文档
 
 ### 健康检查
 - `GET /api/health` - 系统健康状态检查
