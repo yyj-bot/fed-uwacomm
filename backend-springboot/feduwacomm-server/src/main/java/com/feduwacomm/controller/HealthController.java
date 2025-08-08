@@ -1,6 +1,6 @@
 package com.feduwacomm.controller;
 
-import org.springframework.http.ResponseEntity;
+import com.feduwacomm.common.Result;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,21 +18,21 @@ import java.util.Map;
 @RestController
 @RequestMapping("/health")
 public class HealthController {
-    
+
     /**
      * 健康检查接口
      * 
      * @return 健康状态信息
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> healthCheck() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("timestamp", LocalDateTime.now());
-        response.put("service", "FedUWAComm Backend");
-        response.put("version", "1.0.0");
-        response.put("message", "水声联邦学习后端服务运行正常");
-        
-        return ResponseEntity.ok(response);
+    public Result<Map<String, Object>> healthCheck() {
+        Map<String, Object> healthInfo = new HashMap<>();
+        healthInfo.put("status", "UP");
+        healthInfo.put("timestamp", LocalDateTime.now());
+        healthInfo.put("service", "FedUWAComm Backend");
+        healthInfo.put("version", "1.0.0");
+        healthInfo.put("message", "水声联邦学习后端服务运行正常");
+
+        return Result.success("健康检查通过", healthInfo);
     }
-} 
+}

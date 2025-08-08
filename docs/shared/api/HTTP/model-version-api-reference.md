@@ -56,8 +56,8 @@
 
 ```json
 {
-  "taskId": "string",           // 关联任务ID，必填
-  "vmId": "string",             // 虚拟机ID（本地模型），可选
+  "taskId": "a1b2c3d4e5f678901234567890123456",           // 关联任务ID，必填
+  "vmId": "b2c3d4e5f67890123456789012345678",             // 虚拟机ID（本地模型），可选
   "roundNumber": 1,             // 训练轮数，必填
   "modelType": "GLOBAL",        // 模型类型，必填，GLOBAL/LOCAL
   "description": "string",      // 模型描述，可选
@@ -72,12 +72,12 @@
   "code": 200,
   "message": "模型上传成功",
   "data": {
-    "modelId": "model_1234567890",
-    "taskId": "task_1234567890",
-    "vmId": "vm_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
+    "taskId": "a1b2c3d4e5f678901234567890123456",
+    "vmId": "b2c3d4e5f67890123456789012345678",
     "roundNumber": 1,
     "modelType": "GLOBAL",
-    "modelPath": "/models/task_1234567890/global_round_1.pth",
+    "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
     "modelSize": 1048576,
     "status": "UPLOADED",
     "description": "第1轮全局模型",
@@ -111,15 +111,15 @@
 
 ```json
 {
-  "taskId": "string",           // 关联任务ID，必填
+  "taskId": "a1b2c3d4e5f678901234567890123456",           // 关联任务ID，必填
   "models": [                   // 模型列表，必填
     {
-      "vmId": "string",         // 虚拟机ID，可选
-      "roundNumber": 1,         // 训练轮数，必填
-      "modelType": "LOCAL",     // 模型类型，必填
-      "description": "string",  // 模型描述，可选
-      "parameters": {},         // 模型参数，可选
-      "file": "binary"          // 模型文件，必填
+      "vmId": "b2c3d4e5f67890123456789012345678",         // 虚拟机ID，可选
+      "roundNumber": 1,             // 训练轮数，必填
+      "modelType": "LOCAL",         // 模型类型，必填
+      "description": "string",      // 模型描述，可选
+      "parameters": {},             // 模型参数，可选
+      "file": "binary"              // 模型文件，必填
     }
   ]
 }
@@ -135,7 +135,7 @@
     "failedCount": 0,
     "models": [
       {
-        "modelId": "model_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
         "status": "UPLOADED",
         "message": "上传成功"
       }
@@ -152,13 +152,13 @@
 
 **请求参数**:
 ```
-?taskId=string&vmId=string&modelType=GLOBAL&roundNumber=1&status=UPLOADED&page=1&size=10&sort=createdAt&order=desc
+?taskId=a1b2c3d4e5f678901234567890123456&vmId=b2c3d4e5f67890123456789012345678&modelType=GLOBAL&roundNumber=1&status=UPLOADED&page=1&size=10&sort=createdAt&order=desc
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| taskId | string | 否 | 任务ID过滤 |
-| vmId | string | 否 | 虚拟机ID过滤 |
+| taskId | string | 否 | 任务ID过滤，32位UUID格式 |
+| vmId | string | 否 | 虚拟机ID过滤，32位UUID格式 |
 | modelType | string | 否 | 模型类型过滤 |
 | roundNumber | int | 否 | 训练轮数过滤 |
 | status | string | 否 | 状态过滤 |
@@ -179,12 +179,12 @@
     "size": 10,
     "records": [
       {
-        "modelId": "model_1234567890",
-        "taskId": "task_1234567890",
-        "vmId": "vm_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
+        "taskId": "a1b2c3d4e5f678901234567890123456",
+        "vmId": "b2c3d4e5f67890123456789012345678",
         "roundNumber": 1,
         "modelType": "GLOBAL",
-        "modelPath": "/models/task_1234567890/global_round_1.pth",
+        "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
         "modelSize": 1048576,
         "accuracy": 0.8500,
         "loss": 0.123456,
@@ -206,7 +206,7 @@
 **接口地址**: `GET /api/model/versions/{modelId}`
 
 **路径参数**:
-- modelId: 模型版本ID
+- modelId: 模型版本ID，32位UUID格式
 
 **响应示例**:
 ```json
@@ -214,12 +214,12 @@
   "code": 200,
   "message": "查询成功",
   "data": {
-    "modelId": "model_1234567890",
-    "taskId": "task_1234567890",
-    "vmId": "vm_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
+    "taskId": "a1b2c3d4e5f678901234567890123456",
+    "vmId": "b2c3d4e5f67890123456789012345678",
     "roundNumber": 1,
     "modelType": "GLOBAL",
-    "modelPath": "/models/task_1234567890/global_round_1.pth",
+    "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
     "modelSize": 1048576,
     "accuracy": 0.8500,
     "loss": 0.123456,
@@ -229,8 +229,7 @@
       "learning_rate": 0.001,
       "batch_size": 32
     },
-    "createdAt": "2024-01-01T10:00:00",
-    "updatedAt": "2024-01-01T10:00:00"
+    "createdAt": "2024-01-01T10:00:00"
   }
 }
 ```
@@ -253,14 +252,14 @@
   "code": 200,
   "message": "查询成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "a1b2c3d4e5f678901234567890123456",
     "taskName": "水声分类任务",
     "totalModels": 50,
     "globalModels": 10,
     "localModels": 40,
     "versions": [
       {
-        "modelId": "model_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
         "roundNumber": 1,
         "modelType": "GLOBAL",
         "accuracy": 0.8500,
@@ -282,7 +281,7 @@
 **请求参数**:
 ```json
 {
-  "modelId": "string",          // 模型ID，必填
+  "modelId": "c3d4e5f6789012345678901234567890",          // 模型ID，必填，32位UUID格式
   "testDataPath": "string",     // 测试数据路径，必填
   "metrics": ["accuracy", "loss", "precision", "recall", "f1"], // 评估指标，可选
   "batchSize": 32,              // 批次大小，可选，默认32
@@ -296,7 +295,7 @@
   "code": 200,
   "message": "评估完成",
   "data": {
-    "modelId": "model_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
     "evaluationId": "eval_1234567890",
     "metrics": {
       "accuracy": 0.8500,
@@ -320,7 +319,7 @@
 **请求参数**:
 ```json
 {
-  "taskId": "string",           // 任务ID，必填
+  "taskId": "a1b2c3d4e5f678901234567890123456",           // 任务ID，必填，32位UUID格式
   "testDataPath": "string",     // 测试数据路径，必填
   "modelType": "GLOBAL",        // 模型类型，可选
   "roundNumbers": [1, 5, 10],   // 评估轮数，可选
@@ -335,11 +334,11 @@
   "code": 200,
   "message": "批量评估完成",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "a1b2c3d4e5f678901234567890123456",
     "evaluatedCount": 3,
     "results": [
       {
-        "modelId": "model_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
         "roundNumber": 1,
         "modelType": "GLOBAL",
         "accuracy": 0.8500,
@@ -357,7 +356,7 @@
 
 **请求参数**:
 ```
-?modelId=string&taskId=string&evaluationId=string&page=1&size=10
+?modelId=c3d4e5f6789012345678901234567890&taskId=a1b2c3d4e5f678901234567890123456&evaluationId=eval_1234567890&page=1&size=10
 ```
 
 **响应示例**:
@@ -373,8 +372,8 @@
     "records": [
       {
         "evaluationId": "eval_1234567890",
-        "modelId": "model_1234567890",
-        "taskId": "task_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
+        "taskId": "a1b2c3d4e5f678901234567890123456",
         "metrics": {
           "accuracy": 0.8500,
           "loss": 0.123456
@@ -398,7 +397,7 @@
 **请求参数**:
 ```json
 {
-  "modelId": "string",          // 模型ID，必填
+  "modelId": "c3d4e5f6789012345678901234567890",          // 模型ID，必填，32位UUID格式
   "deploymentName": "string",   // 部署名称，必填
   "targetVms": ["vm_1", "vm_2"], // 目标虚拟机列表，可选
   "deploymentConfig": {         // 部署配置，可选
@@ -423,7 +422,7 @@
   "message": "部署成功",
   "data": {
     "deploymentId": "deploy_1234567890",
-    "modelId": "model_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
     "deploymentName": "水声分类模型_v1.0",
     "targetVms": ["vm_1", "vm_2"],
     "status": "DEPLOYED",
@@ -457,7 +456,7 @@
   "message": "查询成功",
   "data": {
     "deploymentId": "deploy_1234567890",
-    "modelId": "model_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
     "deploymentName": "水声分类模型_v1.0",
     "status": "RUNNING",
     "replicas": {
@@ -486,7 +485,7 @@
 
 **请求参数**:
 ```
-?modelId=string&status=RUNNING&page=1&size=10
+?modelId=c3d4e5f6789012345678901234567890&status=RUNNING&page=1&size=10
 ```
 
 **响应示例**:
@@ -502,7 +501,7 @@
     "records": [
       {
         "deploymentId": "deploy_1234567890",
-        "modelId": "model_1234567890",
+        "modelId": "c3d4e5f6789012345678901234567890",
         "deploymentName": "水声分类模型_v1.0",
         "status": "RUNNING",
         "replicas": {
@@ -525,8 +524,8 @@
 **请求参数**:
 ```json
 {
-  "deploymentId": "string",     // 部署ID，必填
-  "targetModelId": "string",    // 目标模型ID，必填
+  "deploymentId": "deploy_1234567890",     // 部署ID，必填
+  "targetModelId": "c3d4e5f6789012345678901234567891",    // 目标模型ID，必填
   "rollbackReason": "string",   // 回滚原因，可选
   "force": false                // 强制回滚，可选，默认false
 }
@@ -540,8 +539,8 @@
   "data": {
     "rollbackId": "rollback_1234567890",
     "deploymentId": "deploy_1234567890",
-    "fromModelId": "model_1234567890",
-    "toModelId": "model_1234567891",
+    "fromModelId": "c3d4e5f6789012345678901234567890",
+    "toModelId": "c3d4e5f6789012345678901234567891",
     "status": "COMPLETED",
     "rollbackReason": "性能下降",
     "rollbackTime": 30.5,
@@ -556,7 +555,7 @@
 
 **请求参数**:
 ```
-?deploymentId=string&page=1&size=10
+?deploymentId=deploy_1234567890&page=1&size=10
 ```
 
 **响应示例**:
@@ -573,8 +572,8 @@
       {
         "rollbackId": "rollback_1234567890",
         "deploymentId": "deploy_1234567890",
-        "fromModelId": "model_1234567890",
-        "toModelId": "model_1234567891",
+        "fromModelId": "c3d4e5f6789012345678901234567890",
+        "toModelId": "c3d4e5f6789012345678901234567891",
         "status": "COMPLETED",
         "rollbackReason": "性能下降",
         "rollbackTime": 30.5,
@@ -613,7 +612,7 @@
 **请求参数**:
 ```json
 {
-  "modelIds": ["model_1", "model_2"], // 模型ID列表，必填
+  "modelIds": ["c3d4e5f6789012345678901234567890", "d4e5f678901234567890123456789012"], // 模型ID列表，必填
   "format": "original",               // 下载格式，可选
   "compressed": true                  // 是否压缩，可选
 }
@@ -628,7 +627,7 @@
 **接口地址**: `DELETE /api/model/versions/{modelId}`
 
 **路径参数**:
-- modelId: 模型ID
+- modelId: 模型ID，32位UUID格式
 
 **请求参数**:
 ```json
@@ -644,7 +643,7 @@
   "code": 200,
   "message": "删除成功",
   "data": {
-    "modelId": "model_1234567890",
+    "modelId": "c3d4e5f6789012345678901234567890",
     "deletedAt": "2024-01-01T10:00:00"
   }
 }
@@ -657,7 +656,7 @@
 **请求参数**:
 ```json
 {
-  "modelIds": ["model_1", "model_2"], // 模型ID列表，必填
+  "modelIds": ["c3d4e5f6789012345678901234567890", "d4e5f678901234567890123456789012"], // 模型ID列表，必填
   "force": false,                     // 强制删除，可选
   "deleteFile": true                  // 是否删除文件，可选
 }
@@ -673,7 +672,7 @@
     "failedCount": 0,
     "results": [
       {
-        "modelId": "model_1",
+        "modelId": "c3d4e5f6789012345678901234567890",
         "status": "DELETED",
         "message": "删除成功"
       }
@@ -690,12 +689,12 @@
 
 **请求参数**:
 ```
-?taskId=string&timeRange=7d
+?taskId=a1b2c3d4e5f678901234567890123456&timeRange=7d
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| taskId | string | 否 | 任务ID过滤 |
+| taskId | string | 否 | 任务ID过滤，32位UUID格式 |
 | timeRange | string | 否 | 时间范围，7d/30d/90d |
 
 **响应示例**:
@@ -741,7 +740,7 @@
   "code": 200,
   "message": "查询成功",
   "data": {
-    "taskId": "task_1234567890",
+    "taskId": "a1b2c3d4e5f678901234567890123456",
     "taskName": "水声分类任务",
     "totalRounds": 100,
     "completedRounds": 50,

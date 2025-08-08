@@ -50,7 +50,7 @@
 **请求参数**:
 ```json
 {
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "name": "水声联邦学习节点-001",
   "ipAddress": "192.168.1.100",
   "port": 22,
@@ -98,7 +98,7 @@
 **请求字段说明**:
 | 字段名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| vmId | String | 是 | 虚拟机唯一标识，格式：vm-{数字} |
+| vmId | String | 是 | 虚拟机唯一标识，32位UUID格式 |
 | name | String | 是 | 虚拟机名称，最大100字符 |
 | ipAddress | String | 是 | IP地址，IPv4或IPv6格式 |
 | port | Integer | 否 | SSH端口，默认22 |
@@ -162,16 +162,16 @@
   "code": 200,
   "message": "虚拟机注册成功",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "name": "水声联邦学习节点-001",
     "status": "OFFLINE",
     "connectionStatus": "DISCONNECTED",
     "createdAt": "2024-01-01T00:00:00.000Z",
     "sessionId": "session-123456",
-    "websocketUrl": "ws://localhost:8080/ws/vm/vm-001",
+    "websocketUrl": "ws://localhost:8080/ws/vm/a1b2c3d4e5f678901234567890123456",
     "apiEndpoints": {
-      "status": "/api/v1/vm/vm-001/status",
-      "control": "/api/v1/vm/vm-001/control"
+      "status": "/api/v1/vm/a1b2c3d4e5f678901234567890123456/status",
+      "control": "/api/v1/vm/a1b2c3d4e5f678901234567890123456/control"
     }
   }
 }
@@ -186,7 +186,7 @@
     "errors": [
       {
         "field": "vmId",
-        "message": "虚拟机ID格式不正确，应为vm-{数字}格式"
+        "message": "虚拟机ID格式不正确，应为32位UUID格式"
       },
       {
         "field": "cpuCores",
@@ -203,9 +203,8 @@
   "code": 409,
   "message": "虚拟机已存在",
   "data": {
-    "vmId": "vm-001",
-    "existingName": "水声联邦学习节点-001",
-    "createdAt": "2024-01-01T00:00:00.000Z"
+    "vmId": "a1b2c3d4e5f678901234567890123456",
+    "existingName": "水声联邦学习节点-001"
   }
 }
 ```
@@ -224,7 +223,7 @@
 
 **业务规则**:
 1. **虚拟机ID唯一性**: vmId必须在系统中唯一，不能重复注册
-2. **格式验证**: vmId必须符合`vm-{数字}`格式，如vm-001、vm-002等
+2. **格式验证**: vmId必须符合32位UUID格式，如a1b2c3d4e5f678901234567890123456
 3. **资源限制**: CPU核心数≥1，内存≥1024MB，磁盘≥20GB
 4. **IP地址验证**: 必须是有效的IPv4或IPv6地址格式
 5. **端口范围**: SSH端口必须在1-65535范围内
@@ -238,7 +237,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "name": "水声联邦学习节点-001",
     "ipAddress": "192.168.1.100",
     "port": 22,
@@ -318,7 +317,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
     "pages": 1,
     "list": [
       {
-        "vmId": "vm-001",
+        "vmId": "a1b2c3d4e5f678901234567890123456",
         "name": "水声联邦学习节点-001",
         "ipAddress": "192.168.1.100",
         "port": 22,
@@ -361,7 +360,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "查询成功",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "name": "水声联邦学习节点-001",
     "ipAddress": "192.168.1.100",
     "port": 22,
@@ -471,7 +470,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "虚拟机更新成功",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "name": "水声联邦学习节点-001-更新",
     "updatedAt": "2024-01-01T00:00:00.000Z"
   }
@@ -505,7 +504,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "虚拟机删除成功",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "deletedAt": "2024-01-01T00:00:00.000Z"
   }
 }
@@ -557,7 +556,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "虚拟机启动命令已发送",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "STARTING",
     "commandId": "cmd-123456",
     "estimatedTime": 60
@@ -599,7 +598,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "虚拟机停止命令已发送",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "STOPPING",
     "commandId": "cmd-123457",
     "estimatedTime": 30
@@ -644,7 +643,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "虚拟机重启命令已发送",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "STARTING",
     "commandId": "cmd-123458",
     "estimatedTime": 120
@@ -678,7 +677,7 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
   "code": 200,
   "message": "查询成功",
   "data": {
-    "vmId": "vm-001",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "RUNNING",
     "connectionStatus": "CONNECTED",
     "uptime": 3600,

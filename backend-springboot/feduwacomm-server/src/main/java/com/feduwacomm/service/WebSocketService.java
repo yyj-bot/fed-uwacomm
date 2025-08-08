@@ -1,8 +1,10 @@
 package com.feduwacomm.service;
 
 import com.feduwacomm.dto.WebSocketMessage;
+import com.feduwacomm.exception.UserException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +53,10 @@ public class WebSocketService {
      * @param message  消息内容
      */
     public void sendPrivateMessage(String username, String message) {
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(message)) {
+            throw UserException.paramValidationError("参数", "用户名和消息不能为空");
+        }
+
         WebSocketMessage wsMessage = new WebSocketMessage();
         wsMessage.setType("PRIVATE");
         wsMessage.setContent(message);
@@ -172,7 +178,11 @@ public class WebSocketService {
      * @param progress 进度百分比
      * @param message  进度消息
      */
-    public void sendFederatedLearningProgress(int progress, String message) {
+    public void sendFederatedLearningProgress(Integer progress, String message) {
+        if (progress == null || !StringUtils.hasText(message)) {
+            throw UserException.paramValidationError("参数", "进度和消息不能为空");
+        }
+
         WebSocketMessage wsMessage = new WebSocketMessage();
         wsMessage.setType("FL_PROGRESS");
         wsMessage.setContent(message);

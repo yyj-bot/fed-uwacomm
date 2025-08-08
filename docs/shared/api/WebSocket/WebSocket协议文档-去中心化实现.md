@@ -64,23 +64,23 @@
 - **TLS版本**: TLS 1.2及以上（WSS连接）
 
 ### 1.2 连接参数
-- `vmId`: 虚拟机唯一标识（必需）
+- `vmId`: 虚拟机唯一标识，32位UUID格式（必需）
 - `token`: JWT认证令牌（可选）
 - `version`: 客户端版本号（可选）
 
 ### 1.3 连接示例
 ```javascript
 // 开发环境 - 基础连接
-const ws = new WebSocket('ws://192.168.1.100:8081/ws/vm/vm-001');
+const ws = new WebSocket('ws://192.168.1.100:8081/ws/vm/a1b2c3d4e5f678901234567890123456');
 
 // 开发环境 - 带认证的连接
-const ws = new WebSocket('ws://192.168.1.100:8081/ws/vm/vm-001?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+const ws = new WebSocket('ws://192.168.1.100:8081/ws/vm/a1b2c3d4e5f678901234567890123456?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
 
 // 生产环境 - WSS连接
-const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001');
+const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/a1b2c3d4e5f678901234567890123456');
 
 // 生产环境 - 带认证的WSS连接
-const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/a1b2c3d4e5f678901234567890123456?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
 ```
 
 ## 2. 消息格式
@@ -93,7 +93,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "MESSAGE_TYPE",
   "id": "unique_message_id",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {},
   "signature": "base64_encoded_signature"
 }
@@ -122,7 +122,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "CONNECT",
   "id": "client-1704067200000-123456",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "version": "1.0.0",
     "capabilities": ["STATUS_QUERY", "VM_CONTROL", "TRAINING_CONTROL"],
@@ -142,7 +142,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "CONNECT_ACK",
   "id": "vm-1704067200000-123456",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "sessionId": "session-123456",
     "serverTime": "2024-01-01T00:00:00.000Z",
@@ -169,7 +169,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "HEARTBEAT",
   "id": "client-1704067200000-123458",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "clientTime": "2024-01-01T00:00:00.000Z",
     "latency": 50
@@ -184,7 +184,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "HEARTBEAT_ACK",
   "id": "vm-1704067200000-123458",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "serverTime": "2024-01-01T00:00:00.000Z",
     "nextHeartbeat": 30,
@@ -208,7 +208,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "VM_START",
   "id": "cmd-1704067200000-123459",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "timeout": 300,
     "config": {
@@ -234,7 +234,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "VM_STOP",
   "id": "cmd-1704067200000-123460",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "force": false,
     "timeout": 60,
@@ -252,7 +252,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "TRAINING_START",
   "id": "cmd-1704067200000-123463",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "task-123456",
     "algorithm": "FEDAVG",
@@ -292,7 +292,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "TRAINING_STOP",
   "id": "cmd-1704067200000-123464",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "task-123456",
     "reason": "MANUAL_STOP",
@@ -311,7 +311,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "TRAINING_PROGRESS",
   "id": "vm-1704067200000-123468",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "task-123456",
     "currentRound": 25,
@@ -348,7 +348,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "STATUS_QUERY",
   "id": "cmd-1704067200000-123476",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "queryType": "FULL",
     "includeResources": true,
@@ -366,7 +366,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "STATUS_RESPONSE",
   "id": "vm-1704067200000-123477",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "status": "RUNNING",
     "uptime": 3600,
@@ -410,7 +410,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "ERROR",
   "id": "vm-1704067200000-123472",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "errorCode": "TRAINING_FAILED",
     "errorMessage": "模型训练过程中发生错误",
@@ -507,7 +507,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "CONNECTION_ERROR",
   "id": "client-1704067200000-123476",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "errorCode": "CONNECTION_TIMEOUT",
     "errorMessage": "连接超时",
@@ -523,7 +523,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "MESSAGE_ERROR",
   "id": "vm-1704067200000-123477",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "errorCode": "INVALID_SIGNATURE",
     "errorMessage": "消息签名验证失败",
@@ -539,7 +539,7 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/vm-001?token=eyJhb
   "type": "STATUS_QUERY_ERROR",
   "id": "vm-1704067200000-123484",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "vm-001",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "errorCode": "STATUS_COLLECTION_FAILED",
     "errorMessage": "状态信息收集失败",

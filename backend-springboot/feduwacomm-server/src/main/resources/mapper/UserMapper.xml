@@ -6,7 +6,6 @@
     <resultMap id="UserResultMap" type="com.feduwacomm.entity.User">
         <id column="id" property="id"/>
         <result column="username" property="username"/>
-        <result column="account" property="account"/>
         <result column="email" property="email"/>
         <result column="password_hash" property="passwordHash"/>
         <result column="role" property="role"/>
@@ -23,7 +22,7 @@
 
     <!-- 基础字段 -->
     <sql id="Base_Column_List">
-        id, username, account, email, password_hash, role, status,
+        id, username, email, password_hash, role, status,
         last_login_time, last_login_ip, login_attempts, locked_until,
         created_at, updated_at, created_by, updated_by
     </sql>
@@ -33,13 +32,6 @@
         SELECT <include refid="Base_Column_List"/>
         FROM users
         WHERE id = #{id}
-    </select>
-
-    <!-- 根据账号查询用户 -->
-    <select id="selectByAccount" resultMap="UserResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM users
-        WHERE account = #{account}
     </select>
 
     <!-- 根据邮箱查询用户 -->
@@ -56,71 +48,38 @@
         WHERE username = #{username}
     </select>
 
-    <!-- 查询所有用户 -->
-    <select id="selectAll" resultMap="UserResultMap">
+    <!-- 根据登录标识符查询用户 -->
+    <select id="selectByLoginIdentifier" resultMap="UserResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM users
-        ORDER BY created_at DESC
-    </select>
-
-    <!-- 根据角色查询用户 -->
-    <select id="selectByRole" resultMap="UserResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM users
-        WHERE role = #{role}
-        ORDER BY created_at DESC
-    </select>
-
-    <!-- 根据状态查询用户 -->
-    <select id="selectByStatus" resultMap="UserResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM users
-        WHERE status = #{status}
-        ORDER BY created_at DESC
-    </select>
-
-    <!-- 分页查询用户 -->
-    <select id="selectByPage" resultMap="UserResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM users
-        ORDER BY created_at DESC
-        LIMIT #{offset}, #{limit}
+        WHERE username = #{loginIdentifier} OR email = #{loginIdentifier}
     </select>
 
     <!-- 插入用户 -->
     <insert id="insert" parameterType="com.feduwacomm.entity.User">
         INSERT INTO users (
-            id, username, account, email, password_hash, role, status,
+            id, username, email, password_hash, role, status,
             last_login_time, last_login_ip, login_attempts, locked_until,
             created_at, updated_at, created_by, updated_by
         ) VALUES (
-            #{id}, #{username}, #{account}, #{email}, #{passwordHash}, #{role}, #{status},
+            #{id}, #{username}, #{email}, #{passwordHash}, #{role}, #{status},
             #{lastLoginTime}, #{lastLoginIp}, #{loginAttempts}, #{lockedUntil},
             #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
         )
     </insert>
 
-    <!-- 更新用户 -->
+    <!-- 更新用户基本信息 -->
     <update id="update" parameterType="com.feduwacomm.entity.User">
         UPDATE users
         SET username = #{username},
-            account = #{account},
             email = #{email},
-            role = #{role},
-            status = #{status},
             last_login_time = #{lastLoginTime},
             last_login_ip = #{lastLoginIp},
             login_attempts = #{loginAttempts},
-            locked_until = #{lockedUntil},
             updated_at = #{updatedAt},
             updated_by = #{updatedBy}
         WHERE id = #{id}
     </update>
-
-    <!-- 根据ID删除用户 -->
-    <delete id="deleteById">
-        DELETE FROM users WHERE id = #{id}
-    </delete>
 
     <!-- 更新用户最后登录信息 -->
     <update id="updateLastLogin">
@@ -140,21 +99,10 @@
         WHERE id = #{id}
     </update>
 
-    <!-- 锁定用户 -->
-    <update id="lockUser">
+    <!-- 更新用户密码 -->
+    <update id="updatePassword">
         UPDATE users
-        SET status = 'LOCKED',
-            locked_until = #{lockedUntil},
-            updated_at = NOW()
-        WHERE id = #{id}
-    </update>
-
-    <!-- 解锁用户 -->
-    <update id="unlockUser">
-        UPDATE users
-        SET status = 'ACTIVE',
-            locked_until = NULL,
-            login_attempts = 0,
+        SET password_hash = #{passwordHash},
             updated_at = NOW()
         WHERE id = #{id}
     </update>

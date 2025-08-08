@@ -7,6 +7,9 @@ spring:
   application:
     name: feduwacomm-backend
 
+  profiles:
+    active: dev # 默认开发环境
+
   # 数据库配置
   datasource:
     url: jdbc:mysql://localhost:3306/feduwacomm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
@@ -32,3 +35,11 @@ logging:
     com.feduwacomm: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  # 数据库日志配置
+  db:
+    enabled: false # 默认不启用数据库日志，可通过环境变量覆盖
+
+# FedUWAComm模块配置
+feduwacomm:
+  module:
+    name: feduwacomm # 模块名称，用于UUID前缀
