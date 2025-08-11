@@ -1,6 +1,7 @@
 package com.feduwacomm.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -15,6 +16,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+    private final WebSocketHandshakeAuthInterceptor handshakeAuthInterceptor;
+
+    public WebSocketConfig(StompAuthChannelInterceptor stompAuthChannelInterceptor,
+            WebSocketHandshakeAuthInterceptor handshakeAuthInterceptor) {
+        this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+        this.handshakeAuthInterceptor = handshakeAuthInterceptor;
+    }
 
     /**
      * 配置消息代理
@@ -44,11 +54,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 注册STOMP端点，客户端通过这个端点进行WebSocket连接
         registry.addEndpoint("/ws")
+                .addInterceptors(handshakeAuthInterceptor)
                 .setAllowedOriginPatterns("*") // 允许跨域访问
                 .withSockJS(); // 启用SockJS支持
 
         // 也可以不使用SockJS，直接使用原生WebSocket
         registry.addEndpoint("/ws-native")
+                .addInterceptors(handshakeAuthInterceptor)
                 .setAllowedOriginPatterns("*");
+    }
+
+    /**
+     * 配置入站通道拦截器（认证）
+     */
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(stompAuthChannelInterceptor);
     }
 }

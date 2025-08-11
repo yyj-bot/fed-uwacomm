@@ -156,6 +156,17 @@
 - 分散式错误日志
 - 本地恢复机制
 
+### 4.4 模型传输一致性
+
+无论采用中心化或去中心化架构，模型传输与版本记录遵循统一规范：
+- 仅通过 `parameters`(JSON) 承载模型元信息与必要的校验信息（如格式、校验和、形状、精度等）
+- 不再传递 `modelPath`、`modelSize`、`modelType` 等字段
+- 服务端落库仅保存 JSON；二进制权重的传输应使用独立的文件传输通道或分片机制
+- 该规范确保协议与数据库 `model_versions` 表结构一致（`id, task_id, round_number, accuracy, loss, created_at, parameters`）
+
+### 4.5 训练数据存储一致性
+自v1.1起，训练数据采用宽表+JSON存储，所有数据行以JSON格式存储于training_dataset_row表，datasetId为归属主键。所有训练数据集元信息存储于training_dataset表，便于灵活扩展和高效查询。
+
 ## 5. 部署建议
 
 ### 5.1 开发环境

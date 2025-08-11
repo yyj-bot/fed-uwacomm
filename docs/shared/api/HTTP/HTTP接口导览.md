@@ -27,7 +27,8 @@
 - **用户表 (users)**: 存储用户基本信息和身份认证
 - **用户权限表 (user_permissions)**: 存储用户细粒度权限配置
 - **联邦学习任务表 (federated_tasks)**: 存储任务配置和状态信息
-- **训练数据表 (training_data)**: 存储训练数据文件信息
+- **训练数据集元信息表 (training_dataset)**: 存储训练数据集的元信息（如名称、描述、类型、状态等）
+- **训练数据明细表 (training_dataset_row)**: 存储每个数据集的明细数据，每行为一条JSON格式记录，实现宽表+JSON灵活存储
 - **模型版本表 (model_versions)**: 存储模型版本和性能指标
 - **SpringBoot系统日志表 (system_logs)**: 存储SpringBoot应用运行日志
 - **虚拟机运行日志表 (vm_runtime_logs)**: 存储虚拟机运行日志
@@ -93,6 +94,8 @@
 ### 3.5 模型版本管理接口
 
 模型版本管理相关的API接口已独立拆分到：[模型版本管理API参考文档](./model-version-api-reference.md)
+
+> 提示：自当前版本起，模型版本仅以`parameters`(JSON)记录所有模型相关信息，不再包含`modelPath`、`modelSize`、`modelType`等字段；如需二进制传输，请使用专门的文件通道。
 
 该文档包含以下接口：
 - 模型上传接口（单文件/批量）

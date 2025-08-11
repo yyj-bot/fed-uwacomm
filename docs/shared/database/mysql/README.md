@@ -53,6 +53,18 @@
 | details | JSON | 详细信息 |
 | created_at | TIMESTAMP | 创建时间 |
 
+### 模型版本表 (model_versions)
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | VARCHAR(32) | 版本唯一标识(32位UUID) |
+| task_id | VARCHAR(32) | 关联任务ID(32位UUID) |
+| round_number | INT | 训练轮数 |
+| accuracy | DECIMAL(5,4) | 准确率 |
+| loss | DECIMAL(10,6) | 损失值 |
+| created_at | TIMESTAMP | 创建时间 |
+| parameters | JSON | 模型参数(JSON，记录所有模型相关信息) |
+
 ## 代码变更
 
 ### LogService更新

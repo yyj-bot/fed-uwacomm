@@ -28,8 +28,8 @@ backend-springboot/
 ## 2. WebSocket端点
 
 ### 2.1 连接端点
-- **SockJS端点**: `/api/ws` - 支持SockJS的WebSocket连接
-- **原生WebSocket端点**: `/api/ws-native` - 原生WebSocket连接
+- **SockJS端点**: `/ws` - 支持SockJS的WebSocket连接
+- **原生WebSocket端点**: `/ws-native` - 原生WebSocket连接
 
 ### 2.2 消息目标
 
@@ -78,7 +78,7 @@ backend-springboot/
 ### 4.1 JavaScript客户端
 ```javascript
 // 连接WebSocket
-const socket = new SockJS('/api/ws');
+const socket = new SockJS('/ws');
 const stompClient = Stomp.over(socket);
 
 stompClient.connect({}, function (frame) {
@@ -231,7 +231,7 @@ import json
 import threading
 
 class WebSocketClient:
-    def __init__(self, url="ws://localhost:8080/api/ws-native"):
+    def __init__(self, url="ws://localhost:8080/ws-native"):
         self.url = url
         self.ws = None
         
