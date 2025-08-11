@@ -135,13 +135,12 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
     config JSON COMMENT '算法配置参数'
 );
 
--- 5. 训练数据表 (training_data)
-CREATE TABLE IF NOT EXISTS training_data (
-    id VARCHAR(32) PRIMARY KEY COMMENT '数据唯一标识(32位UUID)',
+-- 5. 训练数据集元信息表 (training_dataset，原training_data)
+CREATE TABLE IF NOT EXISTS training_dataset (
+    id VARCHAR(32) PRIMARY KEY COMMENT '数据集唯一标识(32位UUID)',
     vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
-    filename VARCHAR(255) NOT NULL COMMENT '文件名',
-    file_path VARCHAR(500) NOT NULL COMMENT '文件路径',
-    file_size BIGINT COMMENT '文件大小(字节)',
+    name VARCHAR(255) NOT NULL COMMENT '数据集名称',
+    description TEXT COMMENT '数据集描述',
     data_type ENUM(
         'ACOUSTIC',
         'ENVIRONMENT',
@@ -155,34 +154,37 @@ CREATE TABLE IF NOT EXISTS training_data (
         'READY',
         'ERROR'
     ) DEFAULT 'UPLOADING',
-    metadata JSON COMMENT '数据元信息'
+    metadata JSON COMMENT '数据集元信息'
 );
 
--- 添加训练数据表外键约束（在表创建后单独添加）
-ALTER TABLE training_data
-ADD CONSTRAINT fk_training_data_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
+-- 添加训练数据集表外键约束（在表创建后单独添加）
+ALTER TABLE training_dataset
+ADD CONSTRAINT fk_training_dataset_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
+
+-- 6. 训练数据明细表 (training_dataset_row，宽表+JSON)
+CREATE TABLE IF NOT EXISTS training_dataset_row (
+    id VARCHAR(32) PRIMARY KEY COMMENT '数据行唯一标识(32位UUID)',
+    dataset_id VARCHAR(32) NOT NULL COMMENT '所属数据集ID',
+    row_data JSON NOT NULL COMMENT '原始CSV行数据（JSON格式）',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '插入时间',
+    FOREIGN KEY (dataset_id) REFERENCES training_dataset (id) ON DELETE CASCADE,
+    INDEX idx_dataset_id (dataset_id)
+);
 
 -- 6. 模型版本表 (model_versions)
 CREATE TABLE IF NOT EXISTS model_versions (
     id VARCHAR(32) PRIMARY KEY COMMENT '版本唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
-    vm_id VARCHAR(32) NULL COMMENT '虚拟机ID(32位UUID，本地模型)',
     round_number INT NOT NULL COMMENT '训练轮数',
-    model_type ENUM('GLOBAL', 'LOCAL') NOT NULL COMMENT '模型类型',
-    model_path VARCHAR(500) NOT NULL COMMENT '模型文件路径',
-    model_size BIGINT COMMENT '模型大小(字节)',
     accuracy DECIMAL(5, 4) COMMENT '准确率',
     loss DECIMAL(10, 6) COMMENT '损失值',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    parameters JSON COMMENT '模型参数'
+    parameters JSON COMMENT '模型参数(JSON记录所有模型相关信息)'
 );
 
 -- 添加外键约束（在表创建后单独添加，避免NULL约束问题）
 ALTER TABLE model_versions
 ADD CONSTRAINT fk_model_versions_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE;
-
-ALTER TABLE model_versions
-ADD CONSTRAINT fk_model_versions_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE SET NULL;
 
 -- 7. SpringBoot系统日志表 (system_logs)
 CREATE TABLE IF NOT EXISTS system_logs (
@@ -234,6 +236,48 @@ ADD CONSTRAINT fk_vm_runtime_logs_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instan
 ALTER TABLE vm_runtime_logs
 ADD CONSTRAINT fk_vm_runtime_logs_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE SET NULL;
 
+-- 9. 虚拟机轮次模型结果表 (vm_round_models)
+CREATE TABLE IF NOT EXISTS vm_round_models (
+    id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    round_number INT NOT NULL COMMENT '训练轮数',
+    accuracy DECIMAL(5, 4) NULL COMMENT '准确率',
+    loss DECIMAL(10, 6) NULL COMMENT '损失值',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    parameters JSON COMMENT '本地模型参数/元信息(JSON，仅记录，不存文件路径)'
+);
+
+-- 添加外键约束（在表创建后单独添加，避免NULL约束问题）
+ALTER TABLE vm_round_models
+ADD CONSTRAINT fk_vm_round_models_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE;
+
+ALTER TABLE vm_round_models
+ADD CONSTRAINT fk_vm_round_models_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
+
+-- 10. 虚拟机刷新凭证表 (vm_secrets)
+CREATE TABLE IF NOT EXISTS vm_secrets (
+    id VARCHAR(32) PRIMARY KEY COMMENT '凭证唯一标识(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    secret_hash VARCHAR(128) NOT NULL COMMENT 'secretId 哈希(如SHA-256)',
+    salt VARCHAR(32) NULL COMMENT '哈希盐值',
+    status ENUM(
+        'ACTIVE',
+        'REVOKED',
+        'EXPIRED'
+    ) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    expires_at TIMESTAMP NULL COMMENT '过期时间',
+    last_used_at TIMESTAMP NULL COMMENT '最后使用时间',
+    rotated_at TIMESTAMP NULL COMMENT '最近旋转时间',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_vm_secrets_active (vm_id, status),
+    INDEX idx_vm_secrets_vm_id (vm_id),
+    INDEX idx_vm_secrets_status (status)
+);
+
+ALTER TABLE vm_secrets
+ADD CONSTRAINT fk_vm_secrets_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
+
 -- =====================================================
 -- 索引创建
 -- =====================================================
@@ -268,21 +312,29 @@ CREATE INDEX idx_federated_tasks_status ON federated_tasks (status);
 
 CREATE INDEX idx_federated_tasks_algorithm ON federated_tasks (algorithm);
 
--- 训练数据表索引
-CREATE INDEX idx_training_data_vm_id ON training_data (vm_id);
+-- 训练数据集元信息表索引
+CREATE INDEX idx_training_dataset_vm_id ON training_dataset (vm_id);
 
-CREATE INDEX idx_training_data_data_type ON training_data (data_type);
+CREATE INDEX idx_training_dataset_data_type ON training_dataset (data_type);
 
-CREATE INDEX idx_training_data_status ON training_data (status);
+CREATE INDEX idx_training_dataset_status ON training_dataset (status);
+
+-- 训练数据明细表索引
+CREATE INDEX idx_training_dataset_row_dataset_id ON training_dataset_row (dataset_id);
 
 -- 模型版本表索引
 CREATE INDEX idx_model_versions_task_id ON model_versions (task_id);
 
-CREATE INDEX idx_model_versions_vm_id ON model_versions (vm_id);
-
-CREATE INDEX idx_model_versions_model_type ON model_versions (model_type);
-
 CREATE INDEX idx_model_versions_round_number ON model_versions (round_number);
+
+-- 虚拟机轮次模型结果表索引
+CREATE UNIQUE INDEX uq_vm_round_models_task_vm_round ON vm_round_models (task_id, vm_id, round_number);
+
+CREATE INDEX idx_vm_round_models_task_id ON vm_round_models (task_id);
+
+CREATE INDEX idx_vm_round_models_vm_id ON vm_round_models (vm_id);
+
+CREATE INDEX idx_vm_round_models_round_number ON vm_round_models (round_number);
 
 -- SpringBoot系统日志表索引（已在表定义中包含）
 -- CREATE INDEX idx_system_logs_timestamp ON system_logs (timestamp);
@@ -301,13 +353,16 @@ CREATE INDEX idx_model_versions_round_number ON model_versions (round_number);
 -- 初始化完成
 -- =====================================================
 -- 数据库初始化脚本执行完成
--- 共创建了 8 个表:
+-- 共创建了 11 个表:
 -- 1. users - 用户表
 -- 2. user_permissions - 用户权限表
 -- 3. vm_instances - 虚拟机表
 -- 4. federated_tasks - 联邦学习任务表
--- 5. training_data - 训练数据表
--- 6. model_versions - 模型版本表
--- 7. system_logs - SpringBoot系统日志表
--- 8. vm_runtime_logs - 虚拟机运行日志表
+-- 5. training_dataset - 训练数据集元信息表
+-- 6. training_dataset_row - 训练数据明细表
+-- 7. model_versions - 模型版本表
+-- 8. system_logs - SpringBoot系统日志表
+-- 9. vm_runtime_logs - 虚拟机运行日志表
+-- 10. vm_round_models - 虚拟机轮次模型结果表
+-- 11. vm_secrets - 虚拟机刷新凭证表
 -- =====================================================

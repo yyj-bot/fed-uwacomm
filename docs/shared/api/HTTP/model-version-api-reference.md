@@ -2,7 +2,8 @@
 
 ## 1. 概述
 
-本文档定义了水声联邦学习系统的模型版本管理相关HTTP REST API接口，包括模型上传、版本查询、性能评估、模型部署、模型回滚等功能。
+本文档定义了水声联邦学习系统的“全局模型（model_versions）”管理相关HTTP REST API接口，包括模型上传、聚合版本查询、性能评估、模型部署、模型回滚等功能。
+> ⚠️ 本文档所有接口仅适用于“全局模型”，不涉及本地模型（vm_round_models）。
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/model`
@@ -21,13 +22,7 @@
 
 ## 2. 模型版本说明
 
-### 2.1 模型类型
-| 类型 | 说明 |
-|------|------|
-| GLOBAL | 全局模型，联邦学习聚合后的模型 |
-| LOCAL | 本地模型，各参与方的本地训练模型 |
-
-### 2.2 模型状态
+### 2.1 模型状态
 | 状态 | 说明 |
 |------|------|
 | UPLOADING | 上传中 |
@@ -38,7 +33,19 @@
 | DEPRECATED | 已废弃 |
 | FAILED | 上传失败 |
 
-### 2.3 支持的模型格式
+### 2.2 全局模型字段说明
+- modelId: 全局模型ID
+- taskId: 关联任务ID
+- roundNumber: 聚合轮次
+- aggregationMethod: 聚合方式（如FEDAVG、FEDPROX等）
+- clientCount: 参与客户端数量
+- modelJson: 聚合后模型参数
+- metrics: 聚合后评估指标
+- createdAt: 创建时间
+- aggregatedAt: 聚合完成时间
+- status: 状态
+
+### 2.2 支持的模型格式
 - **PyTorch**: `.pth`, `.pt`
 - **TensorFlow**: `.h5`, `.pb`, `.savedmodel`
 - **ONNX**: `.onnx`
@@ -57,9 +64,7 @@
 ```json
 {
   "taskId": "a1b2c3d4e5f678901234567890123456",           // 关联任务ID，必填
-  "vmId": "b2c3d4e5f67890123456789012345678",             // 虚拟机ID（本地模型），可选
   "roundNumber": 1,             // 训练轮数，必填
-  "modelType": "GLOBAL",        // 模型类型，必填，GLOBAL/LOCAL
   "description": "string",      // 模型描述，可选
   "parameters": {},             // 模型参数，可选，JSON格式
   "file": "binary"              // 模型文件，必填
@@ -74,13 +79,9 @@
   "data": {
     "modelId": "c3d4e5f6789012345678901234567890",
     "taskId": "a1b2c3d4e5f678901234567890123456",
-    "vmId": "b2c3d4e5f67890123456789012345678",
     "roundNumber": 1,
-    "modelType": "GLOBAL",
-    "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
-    "modelSize": 1048576,
     "status": "UPLOADED",
-    "description": "第1轮全局模型",
+    "description": "第1轮模型",
     "parameters": {
       "learning_rate": 0.001,
       "batch_size": 32
@@ -114,9 +115,7 @@
   "taskId": "a1b2c3d4e5f678901234567890123456",           // 关联任务ID，必填
   "models": [                   // 模型列表，必填
     {
-      "vmId": "b2c3d4e5f67890123456789012345678",         // 虚拟机ID，可选
       "roundNumber": 1,             // 训练轮数，必填
-      "modelType": "LOCAL",         // 模型类型，必填
       "description": "string",      // 模型描述，可选
       "parameters": {},             // 模型参数，可选
       "file": "binary"              // 模型文件，必填
@@ -152,14 +151,12 @@
 
 **请求参数**:
 ```
-?taskId=a1b2c3d4e5f678901234567890123456&vmId=b2c3d4e5f67890123456789012345678&modelType=GLOBAL&roundNumber=1&status=UPLOADED&page=1&size=10&sort=createdAt&order=desc
+?taskId=a1b2c3d4e5f678901234567890123456&roundNumber=1&status=UPLOADED&page=1&size=10&sort=createdAt&order=desc
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | taskId | string | 否 | 任务ID过滤，32位UUID格式 |
-| vmId | string | 否 | 虚拟机ID过滤，32位UUID格式 |
-| modelType | string | 否 | 模型类型过滤 |
 | roundNumber | int | 否 | 训练轮数过滤 |
 | status | string | 否 | 状态过滤 |
 | page | int | 否 | 页码，默认1 |
@@ -181,15 +178,11 @@
       {
         "modelId": "c3d4e5f6789012345678901234567890",
         "taskId": "a1b2c3d4e5f678901234567890123456",
-        "vmId": "b2c3d4e5f67890123456789012345678",
         "roundNumber": 1,
-        "modelType": "GLOBAL",
-        "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
-        "modelSize": 1048576,
         "accuracy": 0.8500,
         "loss": 0.123456,
         "status": "UPLOADED",
-        "description": "第1轮全局模型",
+        "description": "第1轮模型",
         "parameters": {
           "learning_rate": 0.001,
           "batch_size": 32
@@ -216,20 +209,17 @@
   "data": {
     "modelId": "c3d4e5f6789012345678901234567890",
     "taskId": "a1b2c3d4e5f678901234567890123456",
-    "vmId": "b2c3d4e5f67890123456789012345678",
-    "roundNumber": 1,
-    "modelType": "GLOBAL",
-    "modelPath": "/models/a1b2c3d4e5f678901234567890123456/global_round_1.pth",
-    "modelSize": 1048576,
-    "accuracy": 0.8500,
-    "loss": 0.123456,
-    "status": "UPLOADED",
-    "description": "第1轮全局模型",
-    "parameters": {
-      "learning_rate": 0.001,
-      "batch_size": 32
+    "roundNumber": 10,
+    "aggregationMethod": "FEDAVG",
+    "clientCount": 8,
+    "modelJson": { /* ... */ },
+    "metrics": {
+      "accuracy": 0.89,
+      "loss": 0.11
     },
-    "createdAt": "2024-01-01T10:00:00"
+    "createdAt": "2024-01-01T10:00:00",
+    "aggregatedAt": "2024-01-01T10:05:00",
+    "status": "UPLOADED"
   }
 }
 ```
@@ -243,7 +233,7 @@
 
 **请求参数**:
 ```
-?modelType=GLOBAL&roundNumber=1&status=UPLOADED&sort=roundNumber&order=asc
+?roundNumber=1&status=UPLOADED&sort=roundNumber&order=asc
 ```
 
 **响应示例**:
@@ -255,13 +245,10 @@
     "taskId": "a1b2c3d4e5f678901234567890123456",
     "taskName": "水声分类任务",
     "totalModels": 50,
-    "globalModels": 10,
-    "localModels": 40,
     "versions": [
       {
         "modelId": "c3d4e5f6789012345678901234567890",
         "roundNumber": 1,
-        "modelType": "GLOBAL",
         "accuracy": 0.8500,
         "loss": 0.123456,
         "status": "UPLOADED",
@@ -321,7 +308,6 @@
 {
   "taskId": "a1b2c3d4e5f678901234567890123456",           // 任务ID，必填，32位UUID格式
   "testDataPath": "string",     // 测试数据路径，必填
-  "modelType": "GLOBAL",        // 模型类型，可选
   "roundNumbers": [1, 5, 10],   // 评估轮数，可选
   "metrics": ["accuracy", "loss"], // 评估指标，可选
   "batchSize": 32               // 批次大小，可选
@@ -340,7 +326,6 @@
       {
         "modelId": "c3d4e5f6789012345678901234567890",
         "roundNumber": 1,
-        "modelType": "GLOBAL",
         "accuracy": 0.8500,
         "loss": 0.123456,
         "status": "COMPLETED"
@@ -703,25 +688,19 @@
   "code": 200,
   "message": "查询成功",
   "data": {
-    "totalModels": 150,
-    "globalModels": 30,
-    "localModels": 120,
-    "totalSize": 1073741824,
-    "averageAccuracy": 0.8500,
+    "totalModels": 50,
+    "averageAccuracy": 0.85,
     "averageLoss": 0.123456,
     "uploadTrend": [
       {
         "date": "2024-01-01",
-        "count": 5,
-        "size": 10485760
+        "count": 5
       }
     ],
     "accuracyTrend": [
-      {
-        "round": 1,
-        "accuracy": 0.8000,
-        "loss": 0.150000
-      }
+      {"roundNumber": 1, "accuracy": 0.75},
+      {"roundNumber": 2, "accuracy": 0.80},
+      {"roundNumber": 3, "accuracy": 0.85}
     ]
   }
 }
@@ -744,19 +723,11 @@
     "taskName": "水声分类任务",
     "totalRounds": 100,
     "completedRounds": 50,
-    "modelCounts": {
-      "global": 10,
-      "local": 40
-    },
     "performanceMetrics": {
       "bestAccuracy": 0.9000,
       "bestRound": 45,
       "averageAccuracy": 0.8500,
       "accuracyImprovement": 0.0500
-    },
-    "sizeMetrics": {
-      "totalSize": 1073741824,
-      "averageSize": 20971520
     }
   }
 }
@@ -823,3 +794,7 @@
 - [训练数据管理API参考文档](./training-data-api-reference.md) - 训练数据管理相关接口
 - [数据库表结构文档](../../database/database_schema.md) - 数据库设计
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议 
+
+## 15. 说明
+- 本文档所有接口仅适用于“全局模型（model_versions）”。
+- 如需本地模型相关接口，请参考 vm-round-models-api-reference.md。 

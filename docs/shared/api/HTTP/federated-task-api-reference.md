@@ -485,7 +485,12 @@ Authorization: Bearer {token}
         "finalLoss": 0.102,
         "trainingTime": 14400,
         "dataSize": 1000,
-        "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl"
+        "parameters": {
+          "artifact": {
+            "format": "pickle",
+            "checksum": "sha256:..."
+          }
+        }
       },
       {
         "vmId": "b2c3d4e5f67890123456789012345678",
@@ -493,14 +498,25 @@ Authorization: Bearer {token}
         "finalLoss": 0.094,
         "trainingTime": 14400,
         "dataSize": 1000,
-        "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl"
+        "parameters": {
+          "artifact": {
+            "format": "pickle",
+            "checksum": "sha256:..."
+          }
+        }
       }
     ],
     "modelInfo": {
-      "modelPath": "/models/c3d4e5f6789012345678901234567890_final.pkl",
-      "modelSize": 1048576,
-      "modelType": "RANDOM_FOREST",
-      "version": "1.0.0"
+      "parameters": {
+        "artifact": {
+          "format": "pickle",
+          "checksum": "sha256:..."
+        },
+        "meta": {
+          "version": "1.0.0",
+          "modelType": "RANDOM_FOREST"
+        }
+      }
     }
   }
 }

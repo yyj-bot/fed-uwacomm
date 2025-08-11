@@ -4,7 +4,7 @@
 -- 作者: FedUWAComm Team
 -- 版本: 1.0.0
 -- 描述: 验证数据库初始化是否成功
--- 使用说明: 在 init_database.sql 执行后运行此脚本进行验证
+-- 使用说明: 在 init_mysql.sql 执行后运行此脚本进行验证
 -- =====================================================
 
 USE feduwacomm;
@@ -23,9 +23,9 @@ SELECT
 SELECT
     '表结构验证' AS '验证项目',
     COUNT(*) AS '表数量',
-    8 AS '期望表数量',
+    11 AS '期望表数量',
     CASE
-        WHEN COUNT(*) = 8 THEN '✓ 通过'
+        WHEN COUNT(*) = 11 THEN '✓ 通过'
         ELSE '✗ 失败'
     END AS '结果'
 FROM information_schema.tables
@@ -61,9 +61,9 @@ WHERE
 SELECT
     '外键验证' AS '验证项目',
     COUNT(*) AS '外键数量',
-    '= 9' AS '期望外键数量',
+    '= 12' AS '期望外键数量',
     CASE
-        WHEN COUNT(*) = 9 THEN '✓ 通过'
+        WHEN COUNT(*) = 12 THEN '✓ 通过'
         ELSE '✗ 失败'
     END AS '结果'
 FROM information_schema.key_column_usage
@@ -102,19 +102,6 @@ WHERE
     CONSTRAINT_SCHEMA = 'feduwacomm'
 ORDER BY TABLE_NAME, CONSTRAINT_NAME;
 
--- 验证初始数据是否存在
-SELECT
-    '初始数据验证' AS '验证项目',
-    COUNT(*) AS 'system_logs记录数',
-    1 AS '期望记录数',
-    CASE
-        WHEN COUNT(*) >= 1 THEN '✓ 通过'
-        ELSE '✗ 失败'
-    END AS '结果'
-FROM system_logs
-WHERE
-    id = 'log_init_001';
-
 -- 验证system_logs表的timestamp字段默认值
 SELECT
     'timestamp默认值验证' AS '验证项目',
@@ -129,18 +116,6 @@ WHERE
     TABLE_SCHEMA = 'feduwacomm'
     AND TABLE_NAME = 'system_logs'
     AND COLUMN_NAME = 'timestamp';
-
-SELECT
-    '初始数据验证' AS '验证项目',
-    COUNT(*) AS 'vm_runtime_logs记录数',
-    1 AS '期望记录数',
-    CASE
-        WHEN COUNT(*) >= 1 THEN '✓ 通过'
-        ELSE '✗ 失败'
-    END AS '结果'
-FROM vm_runtime_logs
-WHERE
-    id = 'vm_log_init_001';
 
 -- 验证字符集
 SELECT
@@ -168,30 +143,21 @@ FROM information_schema.schemata
 WHERE
     schema_name = 'feduwacomm';
 
--- 验证UUID格式
+-- 验证UUID格式（检查表结构中的ID字段类型）
 SELECT
-    'UUID格式验证' AS '验证项目',
-    COUNT(*) AS 'system_logs UUID记录数',
-    '>= 1' AS '期望记录数',
+    'UUID字段类型验证' AS '验证项目',
+    COUNT(*) AS 'VARCHAR(32)字段数',
+    '= 11' AS '期望字段数',
     CASE
-        WHEN COUNT(*) >= 1 THEN '✓ 通过'
+        WHEN COUNT(*) = 11 THEN '✓ 通过'
         ELSE '✗ 失败'
     END AS '结果'
-FROM system_logs
+FROM information_schema.COLUMNS
 WHERE
-    id REGEXP '^[a-zA-Z0-9]{32}$';
-
-SELECT
-    'UUID格式验证' AS '验证项目',
-    COUNT(*) AS 'vm_runtime_logs UUID记录数',
-    '>= 1' AS '期望记录数',
-    CASE
-        WHEN COUNT(*) >= 1 THEN '✓ 通过'
-        ELSE '✗ 失败'
-    END AS '结果'
-FROM vm_runtime_logs
-WHERE
-    id REGEXP '^[a-zA-Z0-9]{32}$';
+    TABLE_SCHEMA = 'feduwacomm'
+    AND COLUMN_NAME = 'id'
+    AND DATA_TYPE = 'varchar'
+    AND CHARACTER_MAXIMUM_LENGTH = 32;
 
 -- =====================================================
 -- 验证完成
@@ -210,26 +176,23 @@ SELECT
             WHERE
                 table_schema = 'feduwacomm'
                 AND table_type = 'BASE TABLE'
-        ) = 8
+        ) = 11
         AND (
             SELECT COUNT(*)
             FROM information_schema.key_column_usage
             WHERE
                 table_schema = 'feduwacomm'
                 AND referenced_table_name IS NOT NULL
-        ) = 9
+        ) = 12
         AND (
             SELECT COUNT(*)
-            FROM system_logs
+            FROM information_schema.COLUMNS
             WHERE
-                id = 'log_init_001'
-        ) >= 1
-        AND (
-            SELECT COUNT(*)
-            FROM vm_runtime_logs
-            WHERE
-                id = 'vm_log_init_001'
-        ) >= 1 THEN '✓ 所有验证通过'
+                TABLE_SCHEMA = 'feduwacomm'
+                AND COLUMN_NAME = 'id'
+                AND DATA_TYPE = 'varchar'
+                AND CHARACTER_MAXIMUM_LENGTH = 32
+        ) = 11 THEN '✓ 所有验证通过'
         ELSE '✗ 部分验证失败'
     END AS '结果';
 

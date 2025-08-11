@@ -26,10 +26,13 @@ USE feduwacomm;
 
 /*
 -- 删除所有表数据（按依赖关系顺序）
+DELETE FROM vm_secrets;
+DELETE FROM vm_round_models;
 DELETE FROM vm_runtime_logs;
 DELETE FROM system_logs;
 DELETE FROM model_versions;
-DELETE FROM training_data;
+DELETE FROM training_dataset_row;
+DELETE FROM training_dataset;
 DELETE FROM federated_tasks;
 DELETE FROM vm_instances;
 DELETE FROM user_permissions;
@@ -51,17 +54,18 @@ ALTER TABLE user_permissions DROP FOREIGN KEY IF EXISTS fk_user_permissions_user
 ALTER TABLE user_permissions DROP FOREIGN KEY IF EXISTS fk_user_permissions_granted_by;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_created_by;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_updated_by;
-ALTER TABLE training_data DROP FOREIGN KEY IF EXISTS fk_training_data_vm_id;
+ALTER TABLE training_dataset DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
+-- 删除模型版本表外键约束
 ALTER TABLE model_versions DROP FOREIGN KEY IF EXISTS fk_model_versions_task_id;
-ALTER TABLE model_versions DROP FOREIGN KEY IF EXISTS fk_model_versions_vm_id;
-ALTER TABLE vm_runtime_logs DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_vm_id;
-ALTER TABLE vm_runtime_logs DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_task_id;
 
 -- 删除表（按依赖关系顺序）
+DROP TABLE IF EXISTS vm_secrets;
+DROP TABLE IF EXISTS vm_round_models;
 DROP TABLE IF EXISTS vm_runtime_logs;
 DROP TABLE IF EXISTS system_logs;
 DROP TABLE IF EXISTS model_versions;
-DROP TABLE IF EXISTS training_data;
+DROP TABLE IF EXISTS training_dataset_row;
+DROP TABLE IF EXISTS training_dataset;
 DROP TABLE IF EXISTS federated_tasks;
 DROP TABLE IF EXISTS vm_instances;
 DROP TABLE IF EXISTS user_permissions;
@@ -130,4 +134,72 @@ ORDER BY table_name;
 -- 2. 删除表结构: 取消注释级别2的代码块
 -- 3. 完全删除: 取消注释级别3的代码块
 -- 4. 验证结果: 执行验证脚本检查结果
+
 -- =====================================================
+-- 表结构说明
+-- =====================================================
+-- 本系统共包含 11 个核心数据表:
+-- 1. users - 用户表
+-- 2. user_permissions - 用户权限表
+-- 3. vm_instances - 虚拟机表
+-- 4. federated_tasks - 联邦学习任务表
+-- 5. training_dataset - 训练数据集元信息表
+-- 6. training_dataset_row - 训练数据明细表
+-- 7. model_versions - 模型版本表
+-- 8. system_logs - SpringBoot系统日志表
+-- 9. vm_runtime_logs - 虚拟机运行日志表
+-- 10. vm_round_models - 虚拟机轮次模型结果表
+-- 11. vm_secrets - 虚拟机刷新凭证表
+--
+-- 外键约束: 共 12 个，确保数据完整性和关联性
+-- =====================================================
+
+-- 删除外键约束
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
+
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
+
+-- 删除表结构
+DROP TABLE IF EXISTS vm_round_models;
+
+-- 删除 vm_secrets 表
+ALTER TABLE vm_secrets
+DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
+
+DROP TABLE IF EXISTS vm_secrets;
+
+-- 删除所有表数据（保留表结构）
+DELETE FROM vm_secrets;
+
+DELETE FROM vm_round_models;
+
+DELETE FROM training_dataset_row;
+
+DELETE FROM training_dataset;
+
+-- 删除外键约束
+ALTER TABLE vm_secrets
+DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
+
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
+
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
+
+ALTER TABLE training_dataset_row
+DROP FOREIGN KEY IF EXISTS fk_training_dataset_row_dataset_id;
+
+ALTER TABLE training_dataset
+DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
+
+-- 删除表结构
+DROP TABLE IF EXISTS vm_secrets;
+
+DROP TABLE IF EXISTS vm_round_models;
+
+DROP TABLE IF EXISTS training_dataset_row;
+
+DROP TABLE IF EXISTS training_dataset;

@@ -68,11 +68,9 @@ file: [文件] (必需) - 上传的文件
   "code": 200,
   "message": "文件上传成功",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
-    "filename": "bellhop_features_001.csv",
-    "filePath": "/data/acoustic/bellhop_features_001.csv",
-    "fileSize": 2048576,
-    "dataType": "ACOUSTIC",
+    "datasetId": "e5f67890123456789012345678901234",
+    "datasetDescription": "水声传播特征数据",
+    "datasetType": "ACOUSTIC",
     "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "UPLOADING",
     "uploadTime": "2024-01-01T10:00:00.000Z",
@@ -115,10 +113,9 @@ Content-Type: application/json
   "code": 200,
   "message": "文本信息上传成功",
   "data": {
-    "dataId": "f6789012345678901234567890123456",
-    "title": "声学传播环境配置",
-    "content": "声学传播环境配置文件内容...",
-    "dataType": "ENVIRONMENT",
+    "datasetId": "f6789012345678901234567890123456",
+    "datasetDescription": "声学传播环境配置描述",
+    "datasetType": "ENVIRONMENT",
     "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
     "uploadTime": "2024-01-01T10:00:00.000Z",
@@ -158,26 +155,19 @@ Authorization: Bearer {token}
     "size": 20,
     "dataList": [
       {
-        "dataId": "e5f67890123456789012345678901234",
-        "filename": "bellhop_features_001.csv",
-        "dataType": "ACOUSTIC",
+        "datasetId": "e5f67890123456789012345678901234",
+        "datasetDescription": "水声传播特征数据",
+        "datasetType": "ACOUSTIC",
         "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
-        "fileSize": 2048576,
-        "uploadTime": "2024-01-01T10:00:00.000Z",
-        "uploadedBy": "f6789012345678901234567890123456",
-        "description": "水声传播特征数据",
         "tags": ["feature", "acoustic"]
       },
       {
-        "dataId": "f6789012345678901234567890123456",
-        "title": "声学传播环境配置",
-        "dataType": "ENVIRONMENT",
+        "datasetId": "f6789012345678901234567890123456",
+        "datasetDescription": "声学传播环境参数配置",
+        "datasetType": "ENVIRONMENT",
         "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
-        "uploadTime": "2024-01-01T10:00:00.000Z",
-        "uploadedBy": "f6789012345678901234567890123456",
-        "description": "声学传播环境参数配置",
         "tags": ["environment", "acoustic"]
       }
     ]
@@ -187,7 +177,7 @@ Authorization: Bearer {token}
 
 ### 3.4 数据详情查询接口
 
-**接口地址**: `GET /api/training-data/{dataId}`
+**接口地址**: `GET /api/training-data/{datasetId}`
 
 **请求头**:
 ```
@@ -200,16 +190,14 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "查询成功",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
-    "filename": "bellhop_features_001.csv",
-    "filePath": "/data/acoustic/bellhop_features_001.csv",
-    "dataType": "ACOUSTIC",
+    "datasetId": "e5f67890123456789012345678901234",
+    "datasetDescription": "水声传播特征数据",
+    "datasetType": "ACOUSTIC",
     "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
-    "fileSize": 2048576,
     "uploadTime": "2024-01-01T10:00:00.000Z",
     "uploadedBy": "f6789012345678901234567890123456",
-    "description": "水声传播特征数据",
+    "datasetDescription": "水声传播特征数据",
     "tags": ["feature", "acoustic"],
     "metadata": {
       "source": "bellhop",
@@ -239,7 +227,7 @@ Authorization: Bearer {token}
 
 ### 3.5 数据下载接口
 
-**接口地址**: `GET /api/training-data/{dataId}/download`
+**接口地址**: `GET /api/training-data/{datasetId}/download`
 
 **请求头**:
 ```
@@ -250,7 +238,7 @@ Authorization: Bearer {token}
 
 ### 3.6 数据预处理接口
 
-**接口地址**: `POST /api/training-data/{dataId}/preprocess`
+**接口地址**: `POST /api/training-data/{datasetId}/preprocess`
 
 **请求头**:
 ```
@@ -286,7 +274,7 @@ Content-Type: application/json
   "code": 200,
   "message": "预处理任务已启动",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
+    "datasetId": "e5f67890123456789012345678901234",
     "taskId": "preprocess_1234567890",
     "status": "PROCESSING",
     "methods": ["normalization", "feature_selection", "outlier_removal"],
@@ -298,7 +286,7 @@ Content-Type: application/json
 
 ### 3.7 数据验证接口
 
-**接口地址**: `POST /api/training-data/{dataId}/validate`
+**接口地址**: `POST /api/training-data/{datasetId}/validate`
 
 **请求头**:
 ```
@@ -340,7 +328,7 @@ Content-Type: application/json
   "code": 200,
   "message": "验证完成",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
+    "datasetId": "e5f67890123456789012345678901234",
     "isValid": true,
     "validationTime": "2024-01-01T11:30:00.000Z",
     "results": {
@@ -372,7 +360,7 @@ Content-Type: application/json
 
 ### 3.8 数据更新接口
 
-**接口地址**: `PUT /api/training-data/{dataId}`
+**接口地址**: `PUT /api/training-data/{datasetId}`
 
 **请求头**:
 ```
@@ -383,7 +371,7 @@ Content-Type: application/json
 **请求参数**:
 ```json
 {
-  "description": "更新后的数据描述",
+  "datasetDescription": "更新后的数据描述",
   "tags": ["feature", "acoustic", "updated"],
   "metadata": {
     "source": "bellhop",
@@ -399,7 +387,7 @@ Content-Type: application/json
   "code": 200,
   "message": "数据更新成功",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
+    "datasetId": "e5f67890123456789012345678901234",
     "updatedAt": "2024-01-01T12:00:00.000Z",
     "updatedBy": "researcher"
   }
@@ -408,7 +396,7 @@ Content-Type: application/json
 
 ### 3.9 数据删除接口
 
-**接口地址**: `DELETE /api/training-data/{dataId}`
+**接口地址**: `DELETE /api/training-data/{datasetId}`
 
 **请求头**:
 ```
@@ -430,7 +418,7 @@ Authorization: Bearer {token}
   "code": 200,
   "message": "数据删除成功",
   "data": {
-    "dataId": "e5f67890123456789012345678901234",
+    "datasetId": "e5f67890123456789012345678901234",
     "deletedAt": "2024-01-01T12:30:00.000Z",
     "deletedBy": "admin",
     "fileDeleted": true,
@@ -453,7 +441,7 @@ Content-Type: application/json
 ```json
 {
   "operation": "DELETE",
-  "dataIds": ["e5f67890123456789012345678901234", "f6789012345678901234567890123456"],
+  "datasetIds": ["e5f67890123456789012345678901234", "f6789012345678901234567890123456"],
   "parameters": {
     "reason": "批量清理过期数据",
     "deleteFile": true
@@ -473,12 +461,12 @@ Content-Type: application/json
     "failed": 0,
     "results": [
       {
-        "dataId": "e5f67890123456789012345678901234",
+        "datasetId": "e5f67890123456789012345678901234",
         "status": "SUCCESS",
         "message": "删除成功"
       },
       {
-        "dataId": "f6789012345678901234567890123456",
+        "datasetId": "f6789012345678901234567890123456",
         "status": "SUCCESS",
         "message": "删除成功"
       }
@@ -576,7 +564,7 @@ Content-Type: application/json
     "startTime": "2024-01-01T00:00:00",  // 开始时间，可选
     "endTime": "2024-01-31T23:59:59"     // 结束时间，可选
   },
-  "fields": ["dataId", "filename", "dataType", "vmId", "status", "uploadTime"],  // 导出字段，可选
+  "fields": ["datasetId", "datasetName", "datasetType", "vmId", "status", "uploadTime"],  // 导出字段，可选
   "format": "ZIP"                         // 导出格式，ZIP/TAR，可选
 }
 ```

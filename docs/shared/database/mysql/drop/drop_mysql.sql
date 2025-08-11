@@ -30,18 +30,16 @@ ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_created_by;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_updated_by;
 -- updated_by -> users(id)
 
--- 删除训练数据表的外键约束
-ALTER TABLE training_data
-DROP FOREIGN KEY IF EXISTS fk_training_data_vm_id;
--- vm_id -> vm_instances(id)
+-- 删除训练数据集元信息表和明细表的外键约束
+ALTER TABLE training_dataset_row
+DROP FOREIGN KEY IF EXISTS fk_training_dataset_row_dataset_id;
 
--- 删除模型版本表的外键约束
+ALTER TABLE training_dataset
+DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
+
+-- 删除模型版本表外键约束
 ALTER TABLE model_versions
 DROP FOREIGN KEY IF EXISTS fk_model_versions_task_id;
--- task_id -> federated_tasks(id)
-ALTER TABLE model_versions
-DROP FOREIGN KEY IF EXISTS fk_model_versions_vm_id;
--- vm_id -> vm_instances(id)
 
 -- 删除虚拟机运行日志表的外键约束
 ALTER TABLE vm_runtime_logs
@@ -88,21 +86,52 @@ DROP INDEX IF EXISTS idx_federated_tasks_status ON federated_tasks;
 
 DROP INDEX IF EXISTS idx_federated_tasks_algorithm ON federated_tasks;
 
--- 删除训练数据表索引
-DROP INDEX IF EXISTS idx_training_data_vm_id ON training_data;
+-- 删除训练数据集元信息表和明细表的索引
+DROP INDEX IF EXISTS idx_training_dataset_vm_id ON training_dataset;
 
-DROP INDEX IF EXISTS idx_training_data_data_type ON training_data;
+DROP INDEX IF EXISTS idx_training_dataset_data_type ON training_dataset;
 
-DROP INDEX IF EXISTS idx_training_data_status ON training_data;
+DROP INDEX IF EXISTS idx_training_dataset_status ON training_dataset;
+
+DROP INDEX IF EXISTS idx_training_dataset_row_dataset_id ON training_dataset_row;
 
 -- 删除模型版本表索引
 DROP INDEX IF EXISTS idx_model_versions_task_id ON model_versions;
 
-DROP INDEX IF EXISTS idx_model_versions_vm_id ON model_versions;
-
-DROP INDEX IF EXISTS idx_model_versions_model_type ON model_versions;
-
 DROP INDEX IF EXISTS idx_model_versions_round_number ON model_versions;
+
+-- 虚拟机轮次模型结果表索引
+DROP INDEX IF EXISTS uq_vm_round_models_task_vm_round ON vm_round_models;
+
+DROP INDEX IF EXISTS idx_vm_round_models_task_id ON vm_round_models;
+
+DROP INDEX IF EXISTS idx_vm_round_models_vm_id ON vm_round_models;
+
+DROP INDEX IF EXISTS idx_vm_round_models_round_number ON vm_round_models;
+
+-- 虚拟机刷新凭证表索引
+DROP INDEX IF EXISTS uq_vm_secrets_active ON vm_secrets;
+
+DROP INDEX IF EXISTS idx_vm_secrets_vm_id ON vm_secrets;
+
+DROP INDEX IF EXISTS idx_vm_secrets_status ON vm_secrets;
+
+-- 删除虚拟机轮次模型结果表外键
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
+
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
+
+-- 删除虚拟机刷新凭证表外键
+ALTER TABLE vm_secrets
+DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
+
+-- 删除虚拟机轮次模型结果表
+DROP TABLE IF EXISTS vm_round_models;
+
+-- 删除虚拟机刷新凭证表
+DROP TABLE IF EXISTS vm_secrets;
 
 -- 删除SpringBoot系统日志表索引
 DROP INDEX IF EXISTS idx_timestamp ON system_logs;
@@ -138,8 +167,10 @@ DROP TABLE IF EXISTS system_logs;
 -- 删除模型版本表（依赖federated_tasks和vm_instances）
 DROP TABLE IF EXISTS model_versions;
 
--- 删除训练数据表（依赖vm_instances）
-DROP TABLE IF EXISTS training_data;
+-- 删除训练数据集明细表
+DROP TABLE IF EXISTS training_dataset_row;
+-- 删除训练数据集元信息表
+DROP TABLE IF EXISTS training_dataset;
 
 -- 删除联邦学习任务表
 DROP TABLE IF EXISTS federated_tasks;
@@ -185,13 +216,16 @@ WHERE
 -- =====================================================
 -- 数据库卸载脚本执行完成
 -- 已删除以下对象:
--- 1. 所有外键约束
+-- 1. 所有外键约束 (共12个)
 -- 2. 所有索引
--- 3. 所有表:
+-- 3. 所有表 (共11个):
+--    - vm_secrets (虚拟机刷新凭证表)
+--    - vm_round_models (虚拟机轮次模型结果表)
 --    - vm_runtime_logs (虚拟机运行日志表)
 --    - system_logs (SpringBoot系统日志表)
 --    - model_versions (模型版本表)
---    - training_data (训练数据表)
+--    - training_dataset_row (训练数据明细表)
+--    - training_dataset (训练数据集元信息表)
 --    - federated_tasks (联邦学习任务表)
 --    - vm_instances (虚拟机表)
 --    - user_permissions (用户权限表)
