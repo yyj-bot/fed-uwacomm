@@ -12,9 +12,19 @@ from pathlib import Path
 import logging
 
 class BellhopProcessor:
-    def __init__(self, bellhop_dir="data/bellhop"):
+    def __init__(self, bellhop_dir=None):
+        # 使用相对于python-vm的路径
+        if bellhop_dir is None:
+            # 获取当前脚本的路径
+            script_dir = Path(__file__).resolve().parent
+            # 计算python-vm的路径
+            python_vm_dir = script_dir.parent.parent.parent
+            # 设置BELLHOP目录为python-vm/data/bellhop
+            bellhop_dir = python_vm_dir / "data" / "bellhop"
+        
         self.bellhop_dir = Path(bellhop_dir).resolve()
         self.setup_logging()
+        self.logger.info(f"使用BELLHOP目录: {self.bellhop_dir}")
         self.bellhop_exe = self.find_bellhop_executable()
         
     def setup_logging(self):
