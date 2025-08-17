@@ -1,5 +1,7 @@
 """
 联邦学习客户端
+
+注意：本文件仅用于 HTTP API 交互，不包含 WebSocket 连接支持。WebSocket 连接应在其他模块中实现。
 """
 
 from dataclasses import dataclass, field, asdict
@@ -190,6 +192,13 @@ class VMApiClient:
     def get_vm_status(self, vmId: str):
         url = f"{self.base_url}/api/v1/vm/{vmId}/status"
         resp = requests.get(url, headers=self._headers())
+        return parse_vm_api_response(resp.json())
+
+    # 刷新 Token
+    def refresh_token(self, vm_id: str, secret_id: str):
+        url = f"{self.base_url}/api/v1/vm/token/refresh"
+        data = {"vmId": vm_id, "secretId": secret_id}
+        resp = requests.post(url, json=data, headers=self._headers())
         return parse_vm_api_response(resp.json())
 
 # ===================== 示例用法 =====================

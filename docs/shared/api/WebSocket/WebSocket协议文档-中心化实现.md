@@ -42,13 +42,21 @@
 - 限制连接频率
 - 监控异常连接
 
+### 0.4 前置注册与认证流程
+- 第一步（HTTP）: 虚拟机向后端发起注册请求，注册成功后返回 `accessToken`、`secretId` 和建议的 WebSocket 连接信息
+- 第二步（WebSocket/STOMP）: 虚拟机使用 `accessToken` 建立 WebSocket 连接，并在 STOMP CONNECT 帧或 URL 查询参数中携带 Token
+- 第三步（应用层）: 连接建立后发送应用层 `CONNECT` 消息，进行能力与环境上报
+
+> 说明：后端目前提供 STOMP 端点（`/ws` 带 SockJS、`/ws-native` 原生 WebSocket）。推荐通过 STOMP CONNECT 头部携带 `Authorization: Bearer <token>`，避免在 URL 里暴露 Token。
+
 ## 1. 概述
 
 本文档定义了水声联邦学习系统的中心化WebSocket通信协议，用于实现服务器与虚拟机之间的实时双向通信，支持虚拟机控制、学习控制、状态监控等功能。
 
 ### 1.1 基础信息
-- **WebSocket URL**: `ws://localhost:8080/ws/vm/{vmId}` (开发环境)
-- **WebSocket Secure URL**: `wss://localhost:8080/ws/vm/{vmId}` (生产环境)
+- **WebSocket (SockJS) URL**: `http://localhost:8080/ws` (开发环境)
+- **WebSocket (原生) URL**: `ws://localhost:8080/ws-native` (开发环境)
+- **WebSocket Secure URL**: `wss://your-domain.com/ws-native` (生产环境)
 - **协议版本**: v1.0
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
@@ -57,16 +65,67 @@
 
 ### 1.2 连接参数
 - `vmId`: 虚拟机唯一标识，32位UUID格式（必需）
-- `token`: JWT认证令牌（必需）
+- `token`: JWT认证令牌（必需，优先通过 STOMP CONNECT 头 `Authorization: Bearer <token>` 传递；如使用原生 WebSocket 也可用查询参数）
 - `version`: 客户端版本号（可选）
 
 ### 1.3 连接示例
-```javascript
-// 开发环境 - 带认证的连接
-const ws = new WebSocket('ws://localhost:8080/ws/vm/a1b2c3d4e5f678901234567890123456?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+```python
+# pip install websocket-client
+import websocket
+import threading
+import time
 
-// 生产环境 - WSS连接
-const ws = new WebSocket('wss://your-domain.com/ws/vm/a1b2c3d4e5f678901234567890123456?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...');
+ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+VM_ID = "a1b2c3d4e5f678901234567890123456"
+
+WS_URL = "ws://localhost:8080/ws-native"  # 开发环境
+# 生产环境：WS_URL = "wss://your-domain.com/ws-native"
+
+
+def build_stomp_connect_frame(host: str, token: str, vm_id: str) -> str:
+    # 在 STOMP CONNECT 帧中携带 Authorization 与 vmId
+    headers = [
+        "accept-version:1.2",
+        f"host:{host}",
+        f"Authorization: Bearer {token}",
+        f"vmId:{vm_id}",
+    ]
+    return "CONNECT\n" + "\n".join(headers) + "\n\n\0"
+
+
+def on_open(ws):
+    frame = build_stomp_connect_frame(host="localhost", token=ACCESS_TOKEN, vm_id=VM_ID)
+    ws.send(frame)
+
+
+def on_message(ws, message):
+    # 预期先收到 STOMP 的 CONNECTED 帧
+    print("<-", message)
+
+
+def on_error(ws, error):
+    print("[error]", error)
+
+
+def on_close(ws, close_status_code, close_msg):
+    print("[closed]", close_status_code, close_msg)
+
+
+ws = websocket.WebSocketApp(
+    WS_URL,
+    on_open=on_open,
+    on_message=on_message,
+    on_error=on_error,
+    on_close=on_close,
+)
+
+# 心跳：可按需设置（示例）
+th = threading.Thread(target=ws.run_forever, kwargs={"ping_interval": 25, "ping_timeout": 10})
+th.daemon = True
+th.start()
+
+# 简单等待，观察握手与服务器响应
+time.sleep(10)
 ```
 
 ## 2. 消息格式
@@ -352,15 +411,22 @@ const ws = new WebSocket('wss://your-domain.com/ws/vm/a1b2c3d4e5f678901234567890
   "data": {
     "taskId": "task-123456",
     "round": 25,
-    "modelType": "LOCAL",
-    "modelPath": "/models/local_model_round_25.pth",
-    "modelSize": 1024000,
     "parameters": {
-      "layers": 3,
-      "neurons": [784, 256, 128, 10],
-      "activation": "relu",
-      "optimizer": "adam",
-      "learningRate": 0.001
+      "model": {
+        "framework": "pytorch",
+        "format": "state_dict",
+        "weights": {
+          "shape": [784, 256, 128, 10],
+          "dtype": "float32",
+          "checksum": "sha256:abc123..."
+        }
+      },
+      "training": {
+        "epochs": 5,
+        "batchSize": 32,
+        "optimizer": "adam",
+        "learningRate": 0.001
+      }
     },
     "metrics": {
       "accuracy": 0.88,
@@ -368,15 +434,17 @@ const ws = new WebSocket('wss://your-domain.com/ws/vm/a1b2c3d4e5f678901234567890
       "valAccuracy": 0.85,
       "valLoss": 0.15
     },
-    "uploadUrl": "/api/v1/model/upload",
-    "checksum": "sha256:abc123...",
     "compression": "gzip"
   },
   "signature": "base64_encoded_signature"
 }
 ```
 
-#### 3.6.2 全局模型下载 (MODEL_DOWNLOAD)
+> 说明：从本版本起，上传消息不再包含`modelType`、`modelPath`、`modelSize`字段，模型相关元信息统一归入`parameters`(JSON)中；服务端落库仅保存JSON，不保存二进制路径。
+
+> 补充：收到 VM 端 MODEL_UPLOAD 后，服务端可将本地轮次结果存入 `vm_round_models`（仅JSON+度量），聚合完成后将全局结果存入 `model_versions`。
+
+#### 3.6.2 全局模型下发 (MODEL_DOWNLOAD)
 ```json
 {
   "type": "MODEL_DOWNLOAD",
@@ -386,24 +454,28 @@ const ws = new WebSocket('wss://your-domain.com/ws/vm/a1b2c3d4e5f678901234567890
   "data": {
     "taskId": "task-123456",
     "round": 26,
-    "modelType": "GLOBAL",
-    "modelPath": "/models/global_model_round_26.pth",
-    "modelSize": 1024000,
     "parameters": {
-      "layers": 3,
-      "neurons": [784, 256, 128, 10],
-      "activation": "relu",
-      "optimizer": "adam",
-      "learningRate": 0.001
+      "model": {
+        "framework": "pytorch",
+        "format": "state_dict",
+        "weights": {
+          "shape": [784, 256, 128, 10],
+          "dtype": "float32",
+          "checksum": "sha256:def456..."
+        }
+      },
+      "aggregation": {
+        "method": "FEDAVG",
+        "participation": 10
+      }
     },
-    "aggregationMethod": "FEDAVG",
-    "downloadUrl": "/api/v1/model/download/model-123457",
-    "checksum": "sha256:def456...",
     "compression": "gzip"
   },
   "signature": "base64_encoded_signature"
 }
 ```
+
+> 说明：服务端不再通过`modelPath`提供下载，而是通过`parameters`内的结构化参数下发必要信息；如需二进制传输，请使用单独的文件传输通道或分片机制。
 
 ### 3.7 状态查询消息
 
@@ -498,14 +570,178 @@ const ws = new WebSocket('wss://your-domain.com/ws/vm/a1b2c3d4e5f678901234567890
 }
 ```
 
+### 3.9 训练数据同步消息
+
+> 自v1.1起，训练数据采用宽表+JSON存储：数据集元信息写入 `training_dataset`，数据行写入 `training_dataset_row`（`row_data` JSON，`dataset_id` 外键）。以下消息用于通过WebSocket进行数据集创建与增量同步。
+
+#### 3.9.1 创建数据集 (DATASET_CREATE)
+```json
+{
+  "type": "DATASET_CREATE",
+  "id": "client-1704067200000-200001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "datasetDescription": "水声传播特征数据集",
+    "datasetType": "ACOUSTIC",
+    "metadata": { "source": "bellhop", "version": "1.0" }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+服务器处理：在 `training_dataset` 新建或幂等创建记录（主键为 `datasetId`）。
+
+服务器确认 (DATASET_CREATE_ACK)：
+```json
+{
+  "type": "DATASET_CREATE_ACK",
+  "id": "server-1704067200000-200001",
+  "timestamp": "2024-01-01T00:00:00.100Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "status": "READY"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.2 追加数据行（批量）(DATASET_APPEND_ROWS)
+```json
+{
+  "type": "DATASET_APPEND_ROWS",
+  "id": "client-1704067200000-200002",
+  "timestamp": "2024-01-01T00:00:01.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "rows": [
+      { "rowData": { "f1": 0.12, "f2": 3.4, "label": 1 } },
+      { "rowData": { "f1": 0.37, "f2": 2.1, "label": 0 } }
+    ]
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+服务器处理：批量写入 `training_dataset_row`，每条记录的 `dataset_id` = `datasetId`，`row_data` = `rowData`。
+
+服务器确认 (DATASET_APPEND_ROWS_ACK)：
+```json
+{
+  "type": "DATASET_APPEND_ROWS_ACK",
+  "id": "server-1704067200000-200002",
+  "timestamp": "2024-01-01T00:00:01.120Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "accepted": 2,
+    "rejected": 0
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.3 完成数据集上传 (DATASET_COMPLETE)
+```json
+{
+  "type": "DATASET_COMPLETE",
+  "id": "client-1704067200000-200003",
+  "timestamp": "2024-01-01T00:00:10.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+服务器确认 (DATASET_COMPLETE_ACK)：
+```json
+{
+  "type": "DATASET_COMPLETE_ACK",
+  "id": "server-1704067200000-200003",
+  "timestamp": "2024-01-01T00:00:10.050Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "rowCount": 2,
+    "status": "READY"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.4 数据集状态查询 (DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE)
+请求：
+```json
+{
+  "type": "DATASET_STATUS_QUERY",
+  "id": "cmd-1704067200000-200004",
+  "timestamp": "2024-01-01T00:00:20.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": { "datasetId": "dset-1234567890abcdef1234567890abcd" },
+  "signature": "base64_encoded_signature"
+}
+```
+响应：
+```json
+{
+  "type": "DATASET_STATUS_RESPONSE",
+  "id": "server-1704067200000-200004",
+  "timestamp": "2024-01-01T00:00:20.020Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "datasetDescription": "水声传播特征数据集",
+    "datasetType": "ACOUSTIC",
+    "rowCount": 2,
+    "status": "READY",
+    "metadata": { "source": "bellhop", "version": "1.0" }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.5 删除数据集 (DATASET_DELETE)
+```json
+{
+  "type": "DATASET_DELETE",
+  "id": "client-1704067200000-200005",
+  "timestamp": "2024-01-01T00:00:30.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": { "datasetId": "dset-1234567890abcdef1234567890abcd" },
+  "signature": "base64_encoded_signature"
+}
+```
+
+服务器处理：删除 `training_dataset_row` 中所属行并级联删除 `training_dataset`（或按策略标记为已删除）。
+
+服务器确认 (DATASET_DELETE_ACK)：
+```json
+{
+  "type": "DATASET_DELETE_ACK",
+  "id": "server-1704067200000-200005",
+  "timestamp": "2024-01-01T00:00:30.030Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "deleted": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
 ## 4. 消息处理流程
 
 ### 4.1 连接建立流程
-1. **客户端连接**: 客户端连接到WebSocket URL
-2. **发送连接请求**: 客户端发送CONNECT消息
-3. **身份验证**: 服务器验证虚拟机身份和权限
-4. **连接确认**: 服务器发送CONNECT_ACK确认连接
-5. **开始心跳**: 启动心跳机制保持连接活跃
+1. 前置注册：虚拟机通过 HTTP 注册接口获取 `accessToken`、`secretId`、`vmId`
+2. STOMP 握手：使用 `Authorization: Bearer <accessToken>` 与可选 `vmId` 头发起 STOMP CONNECT
+3. 身份验证：服务器验证 Token 与 `vmId` 关联关系
+4. 应用层连接：客户端发送应用层 CONNECT 消息
+5. 开始心跳：启动心跳机制保持连接活跃
 
 ### 4.2 心跳机制
 - **心跳间隔**: 客户端每30秒发送一次HEARTBEAT消息

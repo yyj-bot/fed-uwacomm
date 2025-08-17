@@ -136,6 +136,15 @@ data/bellhop/*.arr
 data/bellhop/*_bellhop_log.txt
 data/bellhop/*.bak
 
+# Python-VM Bellhop files
+python-vm/data/bellhop/*.prt
+python-vm/data/bellhop/*.ray
+python-vm/data/bellhop/*.shd
+python-vm/data/bellhop/*.arr
+python-vm/data/bellhop/*.env
+python-vm/data/bellhop/*_bellhop_log.txt
+python-vm/data/bellhop/*.bak
+
 # Bellhop executables (large files)
 # data/bellhop/*.exe
 

@@ -7,7 +7,7 @@
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api`
 - **API版本**: v1.0
-- **认证方式**: JWT Token
+- **认证方式**: JWT Token（注册成功后返回，用于后续 WebSocket 与受保护接口）
 - **数据格式**: JSON
 
 ### 1.2 响应格式
@@ -37,7 +37,7 @@
 
 ### 3.1 虚拟机注册接口
 
-**接口描述**: 注册新的虚拟机到系统中，提交虚拟机的所有基本信息
+**接口描述**: 注册新的虚拟机到系统中，提交虚拟机的所有基本信息。注册成功后，返回 `accessToken` 与 `secretId`（长期刷新凭证）。虚拟机应使用 `accessToken` 通过 WebSocket/STOMP 建立连接；到期前使用 `secretId` 通过 HTTP 刷新。
 
 **实现方**: 虚拟机端
 
@@ -45,7 +45,7 @@
 - **URL**: `POST /api/v1/vm/register`
 - **方法**: POST
 - **Content-Type**: application/json
-- **认证**: 需要JWT Token
+- **认证**: 不需要预先JWT（注册成功后由服务端签发 Token）
 
 **请求参数**:
 ```json
@@ -57,104 +57,11 @@
   "osType": "Ubuntu 20.04",
   "cpuCores": 4,
   "memoryMb": 8192,
-  "diskGb": 100, 
-  "systemInfo": {
-    "os": "Ubuntu 20.04 LTS",
-    "kernel": "5.4.0-42-generic",
-    "python": "3.8.10",
-    "gpu": "NVIDIA Tesla V100",
-    "cuda": "11.0",
-    "cudnn": "8.0.5"
-  },
-  "capabilities": {
-    "supportedAlgorithms": ["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"],
-    "maxBatchSize": 128,
-    "maxMemoryUsage": 6144,
-    "gpuMemory": 16384,
-    "networkSpeed": 1000
-  },
-  "networkConfig": {
-    "uploadSpeed": 100,
-    "downloadSpeed": 200,
-    "latency": 50,
-    "bandwidth": 1000
-  },
-  "securityConfig": {
-    "sshKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...",
-    "certificate": "-----BEGIN CERTIFICATE-----\nMIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw\nTzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh\ncmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgQ0EwHhcNMTUwNjA0MTEwNDM4\nWhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu\nZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCB\nDQTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rV\n-----END CERTIFICATE-----",
-    "encryptionEnabled": true,
-    "signatureAlgorithm": "RSA-SHA256"
-  },
-  "metadata": {
-    "description": "水声联邦学习专用虚拟机节点",
-    "location": "实验室A-机架01",
-    "owner": "张三",
-    "department": "水声工程学院",
-    "tags": ["水声", "联邦学习", "GPU节点"]
-  }
+  "diskGb": 100,
+  "systemInfo": {"os": "Ubuntu 20.04 LTS"},
+  "capabilities": {"supportedAlgorithms": ["FEDAVG"]}
 }
 ```
-
-**请求字段说明**:
-| 字段名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| vmId | String | 是 | 虚拟机唯一标识，32位UUID格式 |
-| name | String | 是 | 虚拟机名称，最大100字符 |
-| ipAddress | String | 是 | IP地址，IPv4或IPv6格式 |
-| port | Integer | 否 | SSH端口，默认22 |
-| osType | String | 是 | 操作系统类型和版本 |
-| cpuCores | Integer | 是 | CPU核心数，最小1 |
-| memoryMb | Integer | 是 | 内存大小(MB)，最小1024 |
-| diskGb | Integer | 是 | 磁盘大小(GB)，最小20 |
-| systemInfo | Object | 否 | 系统详细信息 |
-| capabilities | Object | 否 | 虚拟机能力配置 |
-| networkConfig | Object | 否 | 网络配置信息 |
-| securityConfig | Object | 否 | 安全配置信息 |
-| metadata | Object | 否 | 元数据信息 |
-
-**systemInfo字段说明**:
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| os | String | 操作系统名称和版本 |
-| kernel | String | 内核版本 |
-| python | String | Python版本 |
-| gpu | String | GPU型号 |
-| cuda | String | CUDA版本 |
-| cudnn | String | cuDNN版本 |
-
-**capabilities字段说明**:
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| supportedAlgorithms | Array | 支持的联邦学习算法 |
-| maxBatchSize | Integer | 最大批次大小 |
-| maxMemoryUsage | Integer | 最大内存使用量(MB) |
-| gpuMemory | Integer | GPU内存大小(MB) |
-| networkSpeed | Integer | 网络速度(Mbps) |
-
-**networkConfig字段说明**:
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| uploadSpeed | Integer | 上传速度(Mbps) |
-| downloadSpeed | Integer | 下载速度(Mbps) |
-| latency | Integer | 网络延迟(ms) |
-| bandwidth | Integer | 带宽(Mbps) |
-
-**securityConfig字段说明**:
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| sshKey | String | SSH公钥 |
-| certificate | String | SSL证书 |
-| encryptionEnabled | Boolean | 是否启用加密 |
-| signatureAlgorithm | String | 签名算法 |
-
-**metadata字段说明**:
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| description | String | 虚拟机描述 |
-| location | String | 物理位置 |
-| owner | String | 负责人 |
-| department | String | 所属部门 |
-| tags | Array | 标签列表 |
 
 **成功响应** (200):
 ```json
@@ -168,7 +75,13 @@
     "connectionStatus": "DISCONNECTED",
     "createdAt": "2024-01-01T00:00:00.000Z",
     "sessionId": "session-123456",
-    "websocketUrl": "ws://localhost:8080/ws/vm/a1b2c3d4e5f678901234567890123456",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "secretId": "s3cr3t_8f14e45fceea167a5a36dedd4bea2543",
+    "tokenExpireSeconds": 86400,
+    "websocket": {
+      "sockjs": "http://localhost:8080/ws",
+      "native": "ws://localhost:8080/ws-native"
+    },
     "apiEndpoints": {
       "status": "/api/v1/vm/a1b2c3d4e5f678901234567890123456/status",
       "control": "/api/v1/vm/a1b2c3d4e5f678901234567890123456/control"
@@ -235,7 +148,6 @@
 ```bash
 curl -X POST http://localhost:8080/api/v1/vm/register \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "vmId": "a1b2c3d4e5f678901234567890123456",
     "name": "水声联邦学习节点-001",
@@ -245,41 +157,71 @@ curl -X POST http://localhost:8080/api/v1/vm/register \
     "cpuCores": 4,
     "memoryMb": 8192,
     "diskGb": 100,
-    "systemInfo": {
-      "os": "Ubuntu 20.04 LTS",
-      "kernel": "5.4.0-42-generic",
-      "python": "3.8.10",
-      "gpu": "NVIDIA Tesla V100",
-      "cuda": "11.0",
-      "cudnn": "8.0.5"
-    },
-    "capabilities": {
-      "supportedAlgorithms": ["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"],
-      "maxBatchSize": 128,
-      "maxMemoryUsage": 6144,
-      "gpuMemory": 16384,
-      "networkSpeed": 1000
-    },
-    "networkConfig": {
-      "uploadSpeed": 100,
-      "downloadSpeed": 200,
-      "latency": 50,
-      "bandwidth": 1000
-    },
-    "securityConfig": {
-      "sshKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...",
-      "encryptionEnabled": true,
-      "signatureAlgorithm": "RSA-SHA256"
-    },
-    "metadata": {
-      "description": "水声联邦学习专用虚拟机节点",
-      "location": "实验室A-机架01",
-      "owner": "张三",
-      "department": "水声工程学院",
-      "tags": ["水声", "联邦学习", "GPU节点"]
-    }
+    "systemInfo": {"os": "Ubuntu 20.04 LTS"},
+    "capabilities": {"supportedAlgorithms": ["FEDAVG"]}
   }'
 ```
+
+### 3.2 WebSocket 建连指引（配合注册返回的 accessToken）
+- SockJS + STOMP（推荐）：在 STOMP CONNECT 头携带 `Authorization: Bearer <accessToken>` 与 `vmId`
+- 原生 WS + STOMP（可选）：将 token、vmId 置于查询参数，但不如 CONNECT 头安全
+- 生产环境请使用 `wss://.../ws-native`
+
+```javascript
+import SockJS from 'sockjs-client';
+import Stomp from 'stompjs';
+
+const socket = new SockJS('http://localhost:8080/ws');
+const client = Stomp.over(socket);
+client.connect(
+  { Authorization: 'Bearer <accessToken>', vmId: '<vmId>' },
+  () => {/* onConnected */},
+  (err) => {/* onError */}
+);
+```
+
+### 3.2 Token 刷新接口
+
+**接口描述**: 使用长期刷新凭证 `secretId` 刷新 `accessToken`。支持凭证旋转：每次刷新可返回新的 `secretId`，旧凭证立即失效或在短暂宽限窗口后失效。
+
+**请求信息**:
+- **URL**: `POST /api/v1/vm/token/refresh`
+- **方法**: POST
+- **Content-Type**: application/json
+- **认证**: 无需 accessToken；使用 `vmId + secretId` 进行认证（可选挑战应答方式见说明）
+
+**请求参数**:
+```json
+{
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "secretId": "s3cr3t_8f14e45fceea167a5a36dedd4bea2543"
+}
+```
+
+> 可选强化：先 `GET /api/v1/vm/token/refresh/nonce?vmId=...` 获取 `nonce`，客户端提交 `hmac = HMAC_SHA256(secretId, nonce)`，避免明文 secretId 直接传输。
+
+**成功响应** (200):
+```json
+{
+  "code": 200,
+  "message": "刷新成功",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenExpireSeconds": 86400,
+    "secretId": "s3cr3t_new_7c222fb2927d828af22f592134e8932480637c0d" 
+  }
+}
+```
+
+**错误响应**:
+- 400: 参数错误
+- 401: 凭证无效/过期/被撤销
+- 429: 刷新频率过高
+
+**客户端流程建议**:
+1. 记录 `tokenExpireSeconds`，在到期前 60s 刷新
+2. 刷新成功后，断开并使用新 `accessToken` 重连 WebSocket（在 STOMP CONNECT 头携带 `Authorization` 与 `vmId`）
+3. 若启用凭证旋转，更新本地存储的 `secretId`
 
 ## 4. 客户端可视化接口
 

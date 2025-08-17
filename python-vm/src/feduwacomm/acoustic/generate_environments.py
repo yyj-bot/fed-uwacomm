@@ -10,9 +10,19 @@ import random
 from pathlib import Path
 
 class BellhopEnvGenerator:
-    def __init__(self, output_dir="data/bellhop"):
+    def __init__(self, output_dir=None):
+        # 使用相对于python-vm的路径
+        if output_dir is None:
+            # 获取当前脚本的路径
+            script_dir = Path(__file__).resolve().parent
+            # 计算python-vm的路径
+            python_vm_dir = script_dir.parent.parent.parent
+            # 设置输出目录为python-vm/data/bellhop
+            output_dir = python_vm_dir / "data" / "bellhop"
+        
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"环境文件将生成在: {self.output_dir}")
     
     def generate_sound_speed_profile(self, profile_type="standard", variation_percent=5):
         """Generate randomized sound speed profile data with variations"""

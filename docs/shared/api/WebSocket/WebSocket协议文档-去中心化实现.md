@@ -340,9 +340,87 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/a1b2c3d4e5f6789012
 }
 ```
 
-### 3.6 状态查询消息
+### 3.6 模型传输消息
 
-#### 3.6.1 状态查询请求 (STATUS_QUERY)
+#### 3.6.1 本地模型上传 (MODEL_UPLOAD)
+```json
+{
+  "type": "MODEL_UPLOAD",
+  "id": "vm-1704067200000-123470",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "round": 25,
+    "parameters": {
+      "model": {
+        "framework": "pytorch",
+        "format": "state_dict",
+        "weights": {
+          "shape": [784, 256, 128, 10],
+          "dtype": "float32",
+          "checksum": "sha256:abc123..."
+        }
+      },
+      "training": {
+        "epochs": 5,
+        "batchSize": 32,
+        "optimizer": "adam",
+        "learningRate": 0.001
+      }
+    },
+    "metrics": {
+      "accuracy": 0.88,
+      "loss": 0.12,
+      "valAccuracy": 0.85,
+      "valLoss": 0.15
+    },
+    "compression": "gzip"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+> 说明：从本版本起，上传消息不再包含`modelType`、`modelPath`、`modelSize`字段，模型相关元信息统一归入`parameters`(JSON)中；后端仅保存JSON，不保存二进制路径。
+
+> 补充：VM 侧可在本地持久化训练产物，客户端/中台接收 MODEL_UPLOAD 后，在中心数据库将本地轮次结果存入 `vm_round_models`（仅JSON+度量），聚合结果存入 `model_versions`。
+
+#### 3.6.2 全局模型下发 (MODEL_DOWNLOAD)
+```json
+{
+  "type": "MODEL_DOWNLOAD",
+  "id": "client-1704067200000-123471",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "round": 26,
+    "parameters": {
+      "model": {
+        "framework": "pytorch",
+        "format": "state_dict",
+        "weights": {
+          "shape": [784, 256, 128, 10],
+          "dtype": "float32",
+          "checksum": "sha256:def456..."
+        }
+      },
+      "aggregation": {
+        "method": "FEDAVG",
+        "participation": 10
+      }
+    },
+    "compression": "gzip"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+> 说明：不再通过`modelPath`提供下载地址，如需二进制分发请使用独立的文件传输通道或分片机制。参数仅用于描述与验证模型。
+
+### 3.7 状态查询消息
+
+#### 3.7.1 状态查询请求 (STATUS_QUERY)
 ```json
 {
   "type": "STATUS_QUERY",
@@ -432,6 +510,101 @@ const ws = new WebSocket('wss://vm-001.example.com:8081/ws/vm/a1b2c3d4e5f6789012
   "signature": "base64_encoded_signature"
 }
 ```
+
+### 3.8 训练数据同步消息
+
+> 自v1.1起，训练数据采用宽表+JSON存储：数据集元信息写入 `training_dataset`，数据行写入 `training_dataset_row`（`row_data` JSON，`dataset_id` 外键）。以下消息用于通过WebSocket进行数据集创建与增量同步。
+
+#### 3.8.1 创建数据集 (DATASET_CREATE)
+```json
+{
+  "type": "DATASET_CREATE",
+  "id": "client-1704067200000-300001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-abcdef1234567890abcdef12345678",
+    "datasetDescription": "水声传播特征数据集",
+    "datasetType": "ACOUSTIC",
+    "metadata": { "source": "bellhop", "version": "1.0" }
+  }
+}
+```
+
+#### 3.8.2 追加数据行（批量）(DATASET_APPEND_ROWS)
+```json
+{
+  "type": "DATASET_APPEND_ROWS",
+  "id": "client-1704067200000-300002",
+  "timestamp": "2024-01-01T00:00:01.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-abcdef1234567890abcdef12345678",
+    "rows": [
+      { "rowData": { "f1": 0.12, "f2": 3.4, "label": 1 } },
+      { "rowData": { "f1": 0.37, "f2": 2.1, "label": 0 } }
+    ]
+  }
+}
+```
+
+#### 3.8.3 完成数据集上传 (DATASET_COMPLETE)
+```json
+{
+  "type": "DATASET_COMPLETE",
+  "id": "client-1704067200000-300003",
+  "timestamp": "2024-01-01T00:00:10.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": { "datasetId": "dset-abcdef1234567890abcdef12345678" }
+}
+```
+
+#### 3.8.4 数据集状态查询 (DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE)
+请求：
+```json
+{
+  "type": "DATASET_STATUS_QUERY",
+  "id": "cmd-1704067200000-300004",
+  "timestamp": "2024-01-01T00:00:20.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": { "datasetId": "dset-abcdef1234567890abcdef12345678" }
+}
+```
+响应：
+```json
+{
+  "type": "DATASET_STATUS_RESPONSE",
+  "id": "vm-1704067200000-300004",
+  "timestamp": "2024-01-01T00:00:20.020Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-abcdef1234567890abcdef12345678",
+    "datasetDescription": "水声传播特征数据集",
+    "datasetType": "ACOUSTIC",
+    "rowCount": 2,
+    "status": "READY",
+    "metadata": { "source": "bellhop", "version": "1.0" }
+  }
+}
+```
+
+#### 3.8.5 删除数据集 (DATASET_DELETE)
+```json
+{
+  "type": "DATASET_DELETE",
+  "id": "client-1704067200000-300005",
+  "timestamp": "2024-01-01T00:00:30.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": { "datasetId": "dset-abcdef1234567890abcdef12345678" }
+}
+```
+
+> 说明：以上消息与中心数据库映射如下：
+> - DATASET_CREATE → `training_dataset`（新增/幂等创建）
+> - DATASET_APPEND_ROWS → `training_dataset_row`（批量插入，`dataset_id` 对应 `datasetId`）
+> - DATASET_COMPLETE → 标记 `training_dataset.status = READY`（或保持幂等）
+> - DATASET_STATUS_QUERY/RESPONSE → 聚合 `training_dataset` 与 `training_dataset_row` 行数
+> - DATASET_DELETE → 级联删除 `training_dataset_row` 行并删除 `training_dataset`
 
 ## 4. 消息处理流程
 

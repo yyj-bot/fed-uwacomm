@@ -49,7 +49,14 @@ def run_bellhop_simulation(env_file_path):
        - SHD模式：计算传输损失场
     3. 输出对应的结果文件
     """
-    bellhop_dir = Path("data/bellhop")  # BELLHOP工作目录
+    # 获取脚本的路径
+    script_dir = Path(__file__).resolve().parent
+    # 计算python-vm的路径
+    python_vm_dir = script_dir.parent
+    # 设置BELLHOP工作目录为python-vm/data/bellhop
+    bellhop_dir = python_vm_dir / "data" / "bellhop"
+    
+    logger.info(f"使用BELLHOP目录: {bellhop_dir}")
     env_file = Path(env_file_path)
     
     # 切换到BELLHOP工作目录
