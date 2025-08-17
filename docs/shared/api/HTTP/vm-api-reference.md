@@ -57,7 +57,7 @@
   "osType": "Ubuntu 20.04",
   "cpuCores": 4,
   "memoryMb": 8192,
-  "diskGb": 100,
+  "diskGb": 100, 
   "systemInfo": {
     "os": "Ubuntu 20.04 LTS",
     "kernel": "5.4.0-42-generic",
