@@ -1,3 +1,7 @@
+"""
+federated_learning_vm的ws服务器实现
+"""
+
 import socket
 import threading
 import json
