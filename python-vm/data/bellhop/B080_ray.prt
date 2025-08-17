@@ -1,0 +1,138 @@
+ BELLHOP/BELLHOP3D
+
+ BELLHOP- Shallow Water Environment RAY Mode                                     
+ frequency =   1941.     Hz
+
+ Dummy parameter NMedia =            1
+
+     Spline approximation to SSP
+     Attenuation units: dB/mkHz
+     VACUUM
+
+ Depth =     556.80 m
+
+ Sound speed profile:
+   z (m)     alphaR (m/s)   betaR  rho (g/cm^3)  alphaI     betaI
+
+      0.00      1502.34      0.00     1.00       0.0000    0.0000
+     19.90      1502.60      0.00     1.00       0.0000    0.0000
+     39.80      1500.43      0.00     1.00       0.0000    0.0000
+     59.70      1500.63      0.00     1.00       0.0000    0.0000
+     79.50      1499.51      0.00     1.00       0.0000    0.0000
+     99.40      1500.41      0.00     1.00       0.0000    0.0000
+    119.30      1503.60      0.00     1.00       0.0000    0.0000
+    139.20      1506.60      0.00     1.00       0.0000    0.0000
+    159.10      1499.05      0.00     1.00       0.0000    0.0000
+    179.00      1501.83      0.00     1.00       0.0000    0.0000
+    198.90      1499.98      0.00     1.00       0.0000    0.0000
+    218.70      1498.52      0.00     1.00       0.0000    0.0000
+    238.60      1499.22      0.00     1.00       0.0000    0.0000
+    258.50      1498.42      0.00     1.00       0.0000    0.0000
+    278.40      1499.51      0.00     1.00       0.0000    0.0000
+    298.30      1497.36      0.00     1.00       0.0000    0.0000
+    318.20      1495.51      0.00     1.00       0.0000    0.0000
+    338.00      1496.40      0.00     1.00       0.0000    0.0000
+    357.90      1494.90      0.00     1.00       0.0000    0.0000
+    377.80      1492.92      0.00     1.00       0.0000    0.0000
+    397.70      1493.61      0.00     1.00       0.0000    0.0000
+    417.60      1493.71      0.00     1.00       0.0000    0.0000
+    437.50      1492.88      0.00     1.00       0.0000    0.0000
+    457.40      1492.67      0.00     1.00       0.0000    0.0000
+    477.20      1490.81      0.00     1.00       0.0000    0.0000
+    497.10      1491.52      0.00     1.00       0.0000    0.0000
+    517.00      1490.68      0.00     1.00       0.0000    0.0000
+    536.90      1490.17      0.00     1.00       0.0000    0.0000
+    556.80      1489.51      0.00     1.00       0.0000    0.0000
+
+                                 ( RMS roughness =   0.00     )
+     ACOUSTO-ELASTIC half-space
+    756.80      1600.00      0.00     1.80       0.0000    0.0000
+
+ __________________________________________________________________________
+
+ Number of Source   depths, Sz =            1
+ Source   depths, Sz (m)
+   95.5000    
+
+
+ __________________________________________________________________________
+
+ Number of Receiver depths, Rz =           32
+ Receiver depths, Rz (m)
+   0.00000       45.3806       90.7613       136.142       181.523    
+   226.903       272.284       317.665       363.045       408.426    
+          ... 
+   1406.80    
+
+ Warning in ReadSzRz : Receiver below or too near the bottom bdry has been moved up
+
+ __________________________________________________________________________
+
+ Number of Receiver ranges, Rr =          201
+ Receiver ranges, Rr (km)
+   0.00000      0.293000      0.586000      0.879000       1.17200    
+   1.46500       1.75800       2.05100       2.34400       2.63700    
+          ... 
+   58.6000    
+
+
+ Ray trace run
+ Geometric hat beams in Cartesian coordinates
+ Point source (cylindrical coordinates)
+ Rectilinear receiver grid: Receivers at Rr( : ) x Rz( : )
+ __________________________________________________________________________
+
+ Number of beams in elevation   =           33
+ Beam take-off angles (degrees)
+  -23.0000      -21.5625      -20.1250      -18.6875      -17.2500    
+  -15.8125      -14.3750      -12.9375      -11.5000      -10.0625    
+          ... 
+   23.0000    
+
+ __________________________________________________________________________
+
+
+ Step length,       deltas =   0.000     m
+
+ Maximum ray depth, Box%z  =   1407.     m
+ Maximum ray range, Box%r  =   50.00    km
+ No beam shift in effect
+
+
+ Step length,       deltas =   55.68     m (automatically selected)
+
+Tracing beam       1    -23.00
+Tracing beam       2    -21.56
+Tracing beam       3    -20.12
+Tracing beam       4    -18.69
+Tracing beam       5    -17.25
+Tracing beam       6    -15.81
+Tracing beam       7    -14.38
+Tracing beam       8    -12.94
+Tracing beam       9    -11.50
+Tracing beam      10    -10.06
+Tracing beam      11     -8.62
+Tracing beam      12     -7.19
+Tracing beam      13     -5.75
+Tracing beam      14     -4.31
+Tracing beam      15     -2.88
+Tracing beam      16     -1.44
+Tracing beam      17      0.00
+Tracing beam      18      1.44
+Tracing beam      19      2.88
+Tracing beam      20      4.31
+Tracing beam      21      5.75
+Tracing beam      22      7.19
+Tracing beam      23      8.62
+Tracing beam      24     10.06
+Tracing beam      25     11.50
+Tracing beam      26     12.94
+Tracing beam      27     14.38
+Tracing beam      28     15.81
+Tracing beam      29     17.25
+Tracing beam      30     18.69
+Tracing beam      31     20.12
+Tracing beam      32     21.56
+Tracing beam      33     23.00
+
+ CPU Time =       0.109    s

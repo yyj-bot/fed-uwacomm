@@ -1,0 +1,173 @@
+ BELLHOP/BELLHOP3D
+
+ BELLHOP- Tropical Ocean Environment SHD Mode                                    
+ frequency =   1497.     Hz
+
+ Dummy parameter NMedia =            1
+
+     Spline approximation to SSP
+     Attenuation units: dB/mkHz
+     VACUUM
+
+ Depth =    3089.20 m
+
+ Sound speed profile:
+   z (m)     alphaR (m/s)   betaR  rho (g/cm^3)  alphaI     betaI
+
+      0.00      1516.22      0.00     1.00       0.0000    0.0000
+     79.20      1510.42      0.00     1.00       0.0000    0.0000
+    158.40      1514.74      0.00     1.00       0.0000    0.0000
+    237.60      1511.58      0.00     1.00       0.0000    0.0000
+    316.80      1507.73      0.00     1.00       0.0000    0.0000
+    396.00      1504.88      0.00     1.00       0.0000    0.0000
+    475.30      1503.68      0.00     1.00       0.0000    0.0000
+    554.50      1500.44      0.00     1.00       0.0000    0.0000
+    633.70      1496.74      0.00     1.00       0.0000    0.0000
+    712.90      1495.70      0.00     1.00       0.0000    0.0000
+    792.10      1495.37      0.00     1.00       0.0000    0.0000
+    871.30      1490.38      0.00     1.00       0.0000    0.0000
+    950.50      1491.30      0.00     1.00       0.0000    0.0000
+   1029.70      1484.79      0.00     1.00       0.0000    0.0000
+   1108.90      1486.38      0.00     1.00       0.0000    0.0000
+   1188.10      1486.89      0.00     1.00       0.0000    0.0000
+   1267.40      1487.49      0.00     1.00       0.0000    0.0000
+   1346.60      1487.14      0.00     1.00       0.0000    0.0000
+   1425.80      1486.20      0.00     1.00       0.0000    0.0000
+   1505.00      1488.24      0.00     1.00       0.0000    0.0000
+   1584.20      1486.34      0.00     1.00       0.0000    0.0000
+   1663.40      1492.07      0.00     1.00       0.0000    0.0000
+   1742.60      1489.69      0.00     1.00       0.0000    0.0000
+   1821.80      1490.91      0.00     1.00       0.0000    0.0000
+   1901.00      1494.09      0.00     1.00       0.0000    0.0000
+   1980.20      1490.88      0.00     1.00       0.0000    0.0000
+   2059.40      1492.31      0.00     1.00       0.0000    0.0000
+   2138.70      1495.29      0.00     1.00       0.0000    0.0000
+   2217.90      1496.46      0.00     1.00       0.0000    0.0000
+   2297.10      1496.37      0.00     1.00       0.0000    0.0000
+   2376.30      1497.21      0.00     1.00       0.0000    0.0000
+   2455.50      1499.96      0.00     1.00       0.0000    0.0000
+   2534.70      1499.81      0.00     1.00       0.0000    0.0000
+   2613.90      1500.40      0.00     1.00       0.0000    0.0000
+   2693.10      1501.61      0.00     1.00       0.0000    0.0000
+   2772.30      1500.79      0.00     1.00       0.0000    0.0000
+   2851.50      1505.29      0.00     1.00       0.0000    0.0000
+   2930.80      1499.36      0.00     1.00       0.0000    0.0000
+   3010.00      1505.81      0.00     1.00       0.0000    0.0000
+   3089.20      1505.77      0.00     1.00       0.0000    0.0000
+
+                                 ( RMS roughness =   0.00     )
+     ACOUSTO-ELASTIC half-space
+   3289.20      1600.00      0.00     1.80       0.0000    0.0000
+
+ __________________________________________________________________________
+
+ Number of Source   depths, Sz =            1
+ Source   depths, Sz (m)
+   138.500    
+
+
+ __________________________________________________________________________
+
+ Number of Receiver depths, Rz =           83
+ Receiver depths, Rz (m)
+   0.00000       48.0390       96.0780       144.117       192.156    
+   240.195       288.234       336.273       384.312       432.351    
+          ... 
+   3939.20    
+
+ Warning in ReadSzRz : Receiver below or too near the bottom bdry has been moved up
+
+ __________________________________________________________________________
+
+ Number of Receiver ranges, Rr =          201
+ Receiver ranges, Rr (km)
+   0.00000      0.296000      0.592000      0.888000       1.18400    
+   1.48000       1.77600       2.07200       2.36800       2.66400    
+          ... 
+   59.2000    
+
+
+ Coherent TL calculation
+ Geometric hat beams in Cartesian coordinates
+ Point source (cylindrical coordinates)
+ Rectilinear receiver grid: Receivers at Rr( : ) x Rz( : )
+ __________________________________________________________________________
+
+ Number of beams in elevation   =        17723
+ Beam take-off angles (degrees)
+  -81.0000      -80.9905      -80.9810      -80.9715      -80.9620    
+  -80.9525      -80.9431      -80.9336      -80.9241      -80.9146    
+          ... 
+   87.2000    
+
+ __________________________________________________________________________
+
+
+ Step length,       deltas =   0.000     m
+
+ Maximum ray depth, Box%z  =   3939.     m
+ Maximum ray range, Box%r  =   50.00    km
+ No beam shift in effect
+
+
+ Step length,       deltas =   308.9     m (automatically selected)
+
+Tracing beam       1    -81.00
+
+ Geometric hat beams                     
+ halfwidth  =    1943.5957446686361     
+ epsilonOpt =  (  0.0000000000000000     ,  17764563476.605766     )
+ EpsMult    =    1.0000000000000000     
+
+Tracing beam     355    -77.64
+Tracing beam     709    -74.28
+Tracing beam    1063    -70.92
+Tracing beam    1417    -67.56
+Tracing beam    1771    -64.20
+Tracing beam    2125    -60.84
+Tracing beam    2479    -57.48
+Tracing beam    2833    -54.12
+Tracing beam    3187    -50.76
+Tracing beam    3541    -47.40
+Tracing beam    3895    -44.04
+Tracing beam    4249    -40.68
+Tracing beam    4603    -37.32
+Tracing beam    4957    -33.96
+Tracing beam    5311    -30.60
+Tracing beam    5665    -27.24
+Tracing beam    6019    -23.88
+Tracing beam    6373    -20.52
+Tracing beam    6727    -17.16
+Tracing beam    7081    -13.80
+Tracing beam    7435    -10.44
+Tracing beam    7789     -7.08
+Tracing beam    8143     -3.72
+Tracing beam    8497     -0.36
+Tracing beam    8851      3.00
+Tracing beam    9205      6.36
+Tracing beam    9559      9.72
+Tracing beam    9913     13.08
+Tracing beam   10267     16.43
+Tracing beam   10621     19.79
+Tracing beam   10975     23.15
+Tracing beam   11329     26.51
+Tracing beam   11683     29.87
+Tracing beam   12037     33.23
+Tracing beam   12391     36.59
+Tracing beam   12745     39.95
+Tracing beam   13099     43.31
+Tracing beam   13453     46.67
+Tracing beam   13807     50.03
+Tracing beam   14161     53.39
+Tracing beam   14515     56.75
+Tracing beam   14869     60.11
+Tracing beam   15223     63.47
+Tracing beam   15577     66.83
+Tracing beam   15931     70.19
+Tracing beam   16285     73.55
+Tracing beam   16639     76.91
+Tracing beam   16993     80.27
+Tracing beam   17347     83.63
+Tracing beam   17701     86.99
+
+ CPU Time =        2.09    s
