@@ -14,8 +14,23 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables - 智能查找.env文件
+def find_env_file():
+    """智能查找.env文件"""
+    env_paths = [
+        Path('.env'),                    # 当前目录
+        Path('python-vm/.env'),          # 从根目录运行时
+        Path('../.env'),                 # 从子目录运行时
+        Path('../../.env'),              # 从更深的子目录运行时
+    ]
+    
+    for path in env_paths:
+        if path.exists():
+            return str(path)
+    return '.env'  # 默认
+
+env_file = find_env_file()
+load_dotenv(env_file)
 
 class DatabaseManagerV2:
     """Enhanced database manager with automatic table structure matching"""
