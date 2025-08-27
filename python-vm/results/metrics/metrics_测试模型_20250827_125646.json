@@ -1,0 +1,111 @@
+{
+  "r2": 0.9722053512556825,
+  "mse": 2.3803228197233306,
+  "rmse": 1.5428294849798958,
+  "mae": 1.2246338509184125,
+  "median_ae": 0.986417846973275,
+  "explained_variance": 0.9725139630839751,
+  "mape": 1.6318313229826729,
+  "max_error": 4.344383067290536,
+  "mean_residual": -0.1625712027487854,
+  "std_residual": 1.5342403409375416,
+  "residual_skewness": 0.04578994519974503,
+  "residual_kurtosis": -0.09690609195756084,
+  "pearson_correlation": 0.9863539608614107,
+  "pearson_p_value": 1.57332777481915e-235,
+  "spearman_correlation": 0.982897587750975,
+  "spearman_p_value": 4.956774312325365e-221,
+  "prediction_std": 9.308322320324969,
+  "prediction_range": 48.33463154389108,
+  "true_range": 47.294540499541405,
+  "range_ratio": 1.021991777975723,
+  "accuracy": 0.9066666666666666,
+  "n_classes": 3,
+  "n_samples": 300,
+  "precision_macro": 0.9070924386127933,
+  "recall_macro": 0.906714200831848,
+  "f1_macro": 0.9067938294767562,
+  "precision_weighted": 0.9069535530616167,
+  "recall_weighted": 0.9066666666666666,
+  "f1_weighted": 0.9067015009380861,
+  "precision_micro": 0.9066666666666666,
+  "recall_micro": 0.9066666666666666,
+  "f1_micro": 0.9066666666666666,
+  "per_class_metrics": {
+    "良好": {
+      "precision": 0.900990099009901,
+      "recall": 0.9191919191919192,
+      "f1": 0.91,
+      "support": "99"
+    },
+    "一般": {
+      "precision": 0.8932038834951457,
+      "recall": 0.9019607843137255,
+      "f1": 0.8975609756097561,
+      "support": "102"
+    },
+    "差": {
+      "precision": 0.9270833333333334,
+      "recall": 0.898989898989899,
+      "f1": 0.9128205128205128,
+      "support": "99"
+    }
+  },
+  "confusion_matrix": [
+    [
+      91,
+      6,
+      2
+    ],
+    [
+      5,
+      92,
+      5
+    ],
+    [
+      5,
+      5,
+      89
+    ]
+  ],
+  "roc_auc_ovr": 0.9031067676077918,
+  "roc_auc_ovo": 0.9031066257744808,
+  "classification_report": {
+    "良好": {
+      "precision": 0.900990099009901,
+      "recall": 0.9191919191919192,
+      "f1-score": 0.91,
+      "support": 99.0
+    },
+    "一般": {
+      "precision": 0.8932038834951457,
+      "recall": 0.9019607843137255,
+      "f1-score": 0.8975609756097561,
+      "support": 102.0
+    },
+    "差": {
+      "precision": 0.9270833333333334,
+      "recall": 0.898989898989899,
+      "f1-score": 0.9128205128205128,
+      "support": 99.0
+    },
+    "accuracy": 0.9066666666666666,
+    "macro avg": {
+      "precision": 0.9070924386127933,
+      "recall": 0.906714200831848,
+      "f1-score": 0.9067938294767562,
+      "support": 300.0
+    },
+    "weighted avg": {
+      "precision": 0.9069535530616167,
+      "recall": 0.9066666666666666,
+      "f1-score": 0.9067015009380861,
+      "support": 300.0
+    }
+  },
+  "avg_confidence": 0.5140121768747079,
+  "correct_avg_confidence": 0.5170038743896466,
+  "incorrect_avg_confidence": 0.4849499724438759,
+  "confidence_std": 0.09478078114139182,
+  "calibration_error": 0.3521172456811558
+}
