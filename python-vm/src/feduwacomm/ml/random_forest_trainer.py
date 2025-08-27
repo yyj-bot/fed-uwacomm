@@ -32,13 +32,16 @@ class RandomForestTrainer:
         self.scaler = StandardScaler()
         self.label_encoder = LabelEncoder()
         
-        # Model parameters
+        # Model parameters - 使用动态随机种子
+        import time as time_module
+        random_seed = int(time_module.time() * 1000) % 10000
+        
         self.regressor_params = {
             'n_estimators': 100,
             'max_depth': 10,
             'min_samples_split': 5,
             'min_samples_leaf': 2,
-            'random_state': 42,
+            'random_state': random_seed,
             'n_jobs': -1
         }
         
@@ -47,7 +50,7 @@ class RandomForestTrainer:
             'max_depth': 8,
             'min_samples_split': 5,
             'min_samples_leaf': 2,
-            'random_state': 42,
+            'random_state': random_seed + 1,  # 稍微不同的种子
             'n_jobs': -1
         }
         
@@ -100,7 +103,7 @@ class RandomForestTrainer:
     
     def create_synthetic_targets(self, X: pd.DataFrame) -> pd.DataFrame:
         """Create synthetic target variables for demonstration"""
-        np.random.seed(42)
+        # 不设置固定种子，使用真随机
         n_samples = len(X)
         
         # Synthetic targets based on feature combinations
@@ -155,9 +158,11 @@ class RandomForestTrainer:
         """Train random forest regressor"""
         self.logger.info(f"Training regressor with {X.shape[1]} features")
         
-        # Split data
+        # Split data - 使用动态随机种子
+        import time as time_module
+        split_seed = int(time_module.time() * 1000) % 10000
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
+            X, y, test_size=0.2, random_state=split_seed
         )
         
         # Scale features
@@ -174,7 +179,7 @@ class RandomForestTrainer:
                 'min_samples_leaf': [1, 2, 4]
             }
             
-            rf = RandomForestRegressor(random_state=42, n_jobs=-1)
+            rf = RandomForestRegressor(random_state=split_seed + 10, n_jobs=-1)
             grid_search = GridSearchCV(
                 rf, param_grid, cv=5, scoring='r2', n_jobs=1, verbose=1
             )
@@ -230,9 +235,11 @@ class RandomForestTrainer:
         # Encode labels
         y_encoded = self.label_encoder.fit_transform(y)
         
-        # Split data
+        # Split data - 使用动态随机种子
+        import time as time_module
+        split_seed = int(time_module.time() * 1000) % 10000
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+            X, y_encoded, test_size=0.2, random_state=split_seed, stratify=y_encoded
         )
         
         # Scale features
@@ -249,7 +256,7 @@ class RandomForestTrainer:
                 'min_samples_leaf': [1, 2, 4]
             }
             
-            rf = RandomForestClassifier(random_state=42, n_jobs=-1)
+            rf = RandomForestClassifier(random_state=split_seed + 10, n_jobs=-1)
             grid_search = GridSearchCV(
                 rf, param_grid, cv=5, scoring='accuracy', n_jobs=1, verbose=1
             )
