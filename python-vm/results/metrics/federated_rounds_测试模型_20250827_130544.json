@@ -1,0 +1,92 @@
+{
+  "1": {
+    "round_number": 1,
+    "timestamp": "2025-08-27T13:05:44.632666",
+    "global_metrics": {
+      "global_loss": 0.5777702565183578,
+      "global_accuracy": 0.8802614285920402,
+      "r2": 0.8779391393868554
+    },
+    "client_count": 3,
+    "client_metrics": {
+      "avg_loss": 1.2867366647038208,
+      "std_loss": 0.4865452662457275,
+      "min_loss": 0.615211161603922,
+      "max_loss": 1.7524208085416055,
+      "avg_accuracy": 0.8510111929624858,
+      "std_accuracy": 0.07549546612043914,
+      "total_samples": 411,
+      "avg_samples_per_client": 137.0
+    },
+    "client_contribution": {
+      "contribution_weights": [
+        0.35766423357664234,
+        0.3260340632603406,
+        0.31630170316301703
+      ],
+      "contribution_entropy": 1.0972218900701474,
+      "max_contribution": 0.35766423357664234,
+      "min_contribution": 0.31630170316301703
+    }
+  },
+  "2": {
+    "round_number": 2,
+    "timestamp": "2025-08-27T13:05:44.633663",
+    "global_metrics": {
+      "global_loss": 1.2379385750356788,
+      "global_accuracy": 0.7970559768078098,
+      "r2": 0.674362007618527
+    },
+    "client_count": 3,
+    "client_metrics": {
+      "avg_loss": 0.9341419422329348,
+      "std_loss": 0.2765943187838251,
+      "min_loss": 0.5429786413664818,
+      "max_loss": 1.1300061111221074,
+      "avg_accuracy": 0.7536301456102166,
+      "std_accuracy": 0.06531694883761753,
+      "total_samples": 327,
+      "avg_samples_per_client": 109.0
+    },
+    "client_contribution": {
+      "contribution_weights": [
+        0.37920489296636084,
+        0.4525993883792049,
+        0.16819571865443425
+      ],
+      "contribution_entropy": 1.0263342820596408,
+      "max_contribution": 0.4525993883792049,
+      "min_contribution": 0.16819571865443425
+    }
+  },
+  "3": {
+    "round_number": 3,
+    "timestamp": "2025-08-27T13:05:44.633663",
+    "global_metrics": {
+      "global_loss": 1.3850919496890781,
+      "global_accuracy": 0.8062082955761065,
+      "r2": 0.7649605688328616
+    },
+    "client_count": 3,
+    "client_metrics": {
+      "avg_loss": 1.6034423310460468,
+      "std_loss": 0.271478571069143,
+      "min_loss": 1.3030519117724768,
+      "max_loss": 1.9607006200357242,
+      "avg_accuracy": 0.822865256996864,
+      "std_accuracy": 0.02262261958828562,
+      "total_samples": 282,
+      "avg_samples_per_client": 94.0
+    },
+    "client_contribution": {
+      "contribution_weights": [
+        0.1879432624113475,
+        0.3829787234042553,
+        0.42907801418439717
+      ],
+      "contribution_entropy": 1.0447925020555473,
+      "max_contribution": 0.42907801418439717,
+      "min_contribution": 0.1879432624113475
+    }
+  }
+}

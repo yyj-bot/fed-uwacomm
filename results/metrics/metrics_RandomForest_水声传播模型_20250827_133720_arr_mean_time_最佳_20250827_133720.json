@@ -1,0 +1,22 @@
+{
+  "r2": -0.010509190619880204,
+  "mse": 0.9432415716684254,
+  "rmse": 0.9712062456905975,
+  "mae": 0.45526246459832137,
+  "median_ae": 2.1316282072803006e-14,
+  "explained_variance": 2.220446049250313e-16,
+  "mape": 2.3148917223736962,
+  "max_error": 3.4644767205673084,
+  "mean_residual": -0.09904349736321857,
+  "std_residual": 0.966142824482223,
+  "residual_skewness": -0.406383172023561,
+  "residual_kurtosis": 4.173816780057562,
+  "pearson_correlation": NaN,
+  "pearson_p_value": NaN,
+  "spearman_correlation": NaN,
+  "spearman_p_value": NaN,
+  "prediction_std": 3.552713678800501e-15,
+  "prediction_range": 0.0,
+  "true_range": 6.148848023706112,
+  "range_ratio": 0.0
+}

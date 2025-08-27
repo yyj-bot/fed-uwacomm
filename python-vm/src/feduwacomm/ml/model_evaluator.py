@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Model Evaluation and Prediction Module
-Evaluate trained models and make predictions for underwater acoustic communication
+增强版模型评估器
+符合FedUWAComm项目要求的完整模型评估系统
+
+根据API文档要求，支持以下评估指标：
+- 回归任务：R²、RMSE、MAE、MAPE、最大误差等
+- 分类任务：准确率、精确率、召回率、F1分数、ROC AUC等
+- 联邦学习专用：轮次性能跟踪、聚合效果评估、客户端贡献度分析
 """
 
 import os
@@ -11,12 +16,14 @@ from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score,
     accuracy_score, precision_recall_fscore_support,
     confusion_matrix, classification_report,
-    roc_auc_score, roc_curve
+    roc_auc_score, roc_curve, auc,
+    explained_variance_score, median_absolute_error
 )
-from sklearn.model_selection import cross_val_score, learning_curve
+from sklearn.model_selection import cross_val_score, learning_curve, validation_curve
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any, Union
@@ -24,451 +31,664 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
+# 水声通信特定评估指标
+from scipy.stats import pearsonr, spearmanr
+from scipy import stats
+
 class ModelEvaluator:
-    """Evaluate and analyze trained models"""
+    """增强版模型评估器，符合水声联邦学习系统要求"""
     
     def __init__(self, models_dir: str = "models", results_dir: str = "results"):
         self.models_dir = Path(models_dir)
         self.results_dir = Path(results_dir)
-        self.results_dir.mkdir(exist_ok=True)
+        self.results_dir.mkdir(parents=True, exist_ok=True)
         
-        # Set up logging
+        # 创建子目录
+        self.reports_dir = self.results_dir / "reports"
+        self.plots_dir = self.results_dir / "plots"
+        self.metrics_dir = self.results_dir / "metrics"
+        
+        for dir_path in [self.reports_dir, self.plots_dir, self.metrics_dir]:
+            dir_path.mkdir(exist_ok=True)
+        
+        # 设置日志
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
-        # Evaluation results storage
+        # 评估结果存储
         self.evaluation_results = {}
+        self.round_metrics = {}  # 联邦学习轮次指标
         
-    def evaluate_regression_model(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                 model_name: str = "model") -> Dict[str, float]:
-        """Evaluate regression model performance"""
+        # 水声通信任务的标准评估指标
+        self.underwater_metrics = {
+            'signal_quality': ['snr_improvement', 'ber_reduction', 'channel_estimation_accuracy'],
+            'communication_performance': ['throughput', 'latency', 'packet_loss_rate'],
+            'environmental_adaptation': ['depth_variance_tolerance', 'salinity_adaptation', 'temperature_robustness']
+        }
+    
+    def evaluate_regression_comprehensive(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                                        model_name: str = "model") -> Dict[str, float]:
+        """
+        全面的回归模型评估，包含水声通信特定指标
         
+        参数:
+            y_true: 真实值
+            y_pred: 预测值
+            model_name: 模型名称
+            
+        返回:
+            包含所有评估指标的字典
+        """
+        
+        # 基础回归指标
         metrics = {
+            'r2': r2_score(y_true, y_pred),
             'mse': mean_squared_error(y_true, y_pred),
             'rmse': np.sqrt(mean_squared_error(y_true, y_pred)),
             'mae': mean_absolute_error(y_true, y_pred),
-            'r2': r2_score(y_true, y_pred),
-            'mape': np.mean(np.abs((y_true - y_pred) / (y_true + 1e-8))) * 100,
-            'max_error': np.max(np.abs(y_true - y_pred)),
-            'std_error': np.std(y_true - y_pred)
+            'median_ae': median_absolute_error(y_true, y_pred),
+            'explained_variance': explained_variance_score(y_true, y_pred),
         }
         
-        # Calculate additional metrics
+        # 防止除零错误的MAPE计算
+        mape_mask = np.abs(y_true) > 1e-8
+        if np.any(mape_mask):
+            metrics['mape'] = np.mean(np.abs((y_true[mape_mask] - y_pred[mape_mask]) / y_true[mape_mask])) * 100
+        else:
+            metrics['mape'] = float('inf')
+        
+        # 残差分析
         residuals = y_true - y_pred
-        metrics['mean_residual'] = np.mean(residuals)
-        metrics['residual_std'] = np.std(residuals)
+        metrics.update({
+            'max_error': np.max(np.abs(residuals)),
+            'mean_residual': np.mean(residuals),
+            'std_residual': np.std(residuals),
+            'residual_skewness': stats.skew(residuals),
+            'residual_kurtosis': stats.kurtosis(residuals)
+        })
         
-        # Explained variance
-        metrics['explained_variance'] = 1 - np.var(residuals) / np.var(y_true)
+        # 相关性分析
+        if len(y_true) > 1:
+            pearson_corr, pearson_p = pearsonr(y_true, y_pred)
+            spearman_corr, spearman_p = spearmanr(y_true, y_pred)
+            
+            metrics.update({
+                'pearson_correlation': pearson_corr,
+                'pearson_p_value': pearson_p,
+                'spearman_correlation': spearman_corr,
+                'spearman_p_value': spearman_p
+            })
         
-        self.logger.info(f"Regression evaluation for {model_name}:")
-        self.logger.info(f"  R²: {metrics['r2']:.4f}")
-        self.logger.info(f"  RMSE: {metrics['rmse']:.4f}")
-        self.logger.info(f"  MAE: {metrics['mae']:.4f}")
+        # 预测区间分析
+        metrics.update({
+            'prediction_std': np.std(y_pred),
+            'prediction_range': np.max(y_pred) - np.min(y_pred),
+            'true_range': np.max(y_true) - np.min(y_true),
+            'range_ratio': (np.max(y_pred) - np.min(y_pred)) / (np.max(y_true) - np.min(y_true) + 1e-8)
+        })
+        
+        # 水声通信特定指标（基于预测误差的信号质量评估）
+        if 'transmission_loss' in model_name.lower() or 'signal' in model_name.lower():
+            metrics.update(self._calculate_acoustic_metrics(y_true, y_pred))
+        
+        self.logger.info(f"回归评估完成 - {model_name}")
+        self.logger.info(f"  R²: {metrics['r2']:.4f}, RMSE: {metrics['rmse']:.4f}, MAE: {metrics['mae']:.4f}")
         
         return metrics
     
-    def evaluate_classification_model(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                    y_prob: Optional[np.ndarray] = None,
-                                    model_name: str = "model") -> Dict[str, Any]:
-        """Evaluate classification model performance"""
+    def evaluate_classification_comprehensive(self, y_true: np.ndarray, y_pred: np.ndarray,
+                                            y_prob: Optional[np.ndarray] = None,
+                                            class_names: Optional[List[str]] = None,
+                                            model_name: str = "model") -> Dict[str, Any]:
+        """
+        全面的分类模型评估
         
-        # Basic metrics
-        accuracy = accuracy_score(y_true, y_pred)
-        precision, recall, f1, support = precision_recall_fscore_support(
-            y_true, y_pred, average='weighted'
-        )
-        
-        metrics = {
-            'accuracy': accuracy,
-            'precision': precision,
-            'recall': recall,
-            'f1_score': f1,
-            'support': support.sum()
-        }
-        
-        # Per-class metrics
-        precision_per_class, recall_per_class, f1_per_class, support_per_class = \
-            precision_recall_fscore_support(y_true, y_pred, average=None)
+        参数:
+            y_true: 真实标签
+            y_pred: 预测标签
+            y_prob: 预测概率（可选）
+            class_names: 类别名称
+            model_name: 模型名称
+            
+        返回:
+            包含所有评估指标的字典
+        """
         
         unique_labels = np.unique(np.concatenate([y_true, y_pred]))
+        n_classes = len(unique_labels)
         
+        # 基础分类指标
+        metrics = {
+            'accuracy': accuracy_score(y_true, y_pred),
+            'n_classes': n_classes,
+            'n_samples': len(y_true)
+        }
+        
+        # 每类别和加权平均指标
+        for average in ['macro', 'weighted', 'micro']:
+            precision, recall, f1, support = precision_recall_fscore_support(
+                y_true, y_pred, average=average, zero_division=0
+            )
+            metrics.update({
+                f'precision_{average}': precision,
+                f'recall_{average}': recall,
+                f'f1_{average}': f1
+            })
+        
+        # 每个类别的详细指标
+        precision_per_class, recall_per_class, f1_per_class, support_per_class = \
+            precision_recall_fscore_support(y_true, y_pred, average=None, zero_division=0)
+        
+        class_metrics = {}
         for i, label in enumerate(unique_labels):
-            metrics[f'precision_{label}'] = precision_per_class[i] if i < len(precision_per_class) else 0
-            metrics[f'recall_{label}'] = recall_per_class[i] if i < len(recall_per_class) else 0
-            metrics[f'f1_{label}'] = f1_per_class[i] if i < len(f1_per_class) else 0
+            class_name = class_names[i] if class_names and i < len(class_names) else f'class_{label}'
+            class_metrics[class_name] = {
+                'precision': precision_per_class[i] if i < len(precision_per_class) else 0,
+                'recall': recall_per_class[i] if i < len(recall_per_class) else 0,
+                'f1': f1_per_class[i] if i < len(f1_per_class) else 0,
+                'support': support_per_class[i] if i < len(support_per_class) else 0
+            }
         
-        # Confusion matrix
+        metrics['per_class_metrics'] = class_metrics
+        
+        # 混淆矩阵
         cm = confusion_matrix(y_true, y_pred)
         metrics['confusion_matrix'] = cm.tolist()
         
-        # ROC AUC for binary/multiclass
+        # 计算混淆矩阵衍生指标
+        if n_classes == 2:
+            tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+            metrics.update({
+                'sensitivity': tp / (tp + fn) if (tp + fn) > 0 else 0,  # 召回率
+                'specificity': tn / (tn + fp) if (tn + fp) > 0 else 0,
+                'positive_predictive_value': tp / (tp + fp) if (tp + fp) > 0 else 0,  # 精确率
+                'negative_predictive_value': tn / (tn + fn) if (tn + fn) > 0 else 0,
+                'false_positive_rate': fp / (fp + tn) if (fp + tn) > 0 else 0,
+                'false_negative_rate': fn / (fn + tp) if (fn + tp) > 0 else 0
+            })
+        
+        # ROC AUC 计算
         if y_prob is not None:
             try:
-                if len(unique_labels) == 2:
-                    metrics['roc_auc'] = roc_auc_score(y_true, y_prob[:, 1])
+                if n_classes == 2:
+                    if y_prob.ndim == 2 and y_prob.shape[1] == 2:
+                        metrics['roc_auc'] = roc_auc_score(y_true, y_prob[:, 1])
+                    else:
+                        metrics['roc_auc'] = roc_auc_score(y_true, y_prob)
+                    
+                    # ROC曲线数据
+                    fpr, tpr, thresholds = roc_curve(y_true, y_prob[:, 1] if y_prob.ndim == 2 else y_prob)
+                    metrics['roc_curve'] = {
+                        'fpr': fpr.tolist(),
+                        'tpr': tpr.tolist(),
+                        'thresholds': thresholds.tolist()
+                    }
                 else:
-                    metrics['roc_auc'] = roc_auc_score(y_true, y_prob, multi_class='ovr')
+                    # 多分类ROC AUC
+                    metrics['roc_auc_ovr'] = roc_auc_score(y_true, y_prob, multi_class='ovr')
+                    metrics['roc_auc_ovo'] = roc_auc_score(y_true, y_prob, multi_class='ovo')
             except Exception as e:
-                self.logger.warning(f"Could not calculate ROC AUC: {e}")
+                self.logger.warning(f"ROC AUC计算失败: {e}")
         
-        # Classification report
-        metrics['classification_report'] = classification_report(y_true, y_pred, output_dict=True)
+        # 分类报告
+        metrics['classification_report'] = classification_report(y_true, y_pred, 
+                                                               target_names=class_names,
+                                                               output_dict=True, 
+                                                               zero_division=0)
         
-        self.logger.info(f"Classification evaluation for {model_name}:")
-        self.logger.info(f"  Accuracy: {metrics['accuracy']:.4f}")
-        self.logger.info(f"  F1-Score: {metrics['f1_score']:.4f}")
-        self.logger.info(f"  Precision: {metrics['precision']:.4f}")
-        self.logger.info(f"  Recall: {metrics['recall']:.4f}")
+        # 预测置信度分析
+        if y_prob is not None:
+            metrics.update(self._analyze_prediction_confidence(y_true, y_pred, y_prob))
+        
+        self.logger.info(f"分类评估完成 - {model_name}")
+        self.logger.info(f"  准确率: {metrics['accuracy']:.4f}, F1: {metrics['f1_weighted']:.4f}")
         
         return metrics
     
-    def cross_validate_model(self, model, X: pd.DataFrame, y: pd.Series, 
-                           cv: int = 5, scoring: str = 'auto') -> Dict[str, Any]:
-        """Perform cross-validation evaluation"""
+    def _calculate_acoustic_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+        """计算水声通信特定指标"""
         
-        # Determine scoring method
-        if scoring == 'auto':
-            if hasattr(model, 'predict_proba') or 'Classifier' in str(type(model)):
-                scoring = 'accuracy'
-            else:
-                scoring = 'r2'
+        # 信号质量指标
+        signal_error = np.abs(y_true - y_pred)
+        relative_error = signal_error / (np.abs(y_true) + 1e-8)
         
-        # Perform cross-validation
-        cv_scores = cross_val_score(model, X, y, cv=cv, scoring=scoring)
-        
-        results = {
-            'cv_scores': cv_scores.tolist(),
-            'cv_mean': cv_scores.mean(),
-            'cv_std': cv_scores.std(),
-            'cv_min': cv_scores.min(),
-            'cv_max': cv_scores.max(),
-            'scoring': scoring
+        metrics = {
+            'signal_fidelity': 1 - np.mean(relative_error),  # 信号保真度
+            'peak_signal_accuracy': 1 - np.max(relative_error),  # 峰值信号准确度
+            'transmission_efficiency': np.mean(np.exp(-signal_error)),  # 传输效率
         }
         
-        self.logger.info(f"Cross-validation results ({scoring}):")
-        self.logger.info(f"  Mean: {results['cv_mean']:.4f} ± {results['cv_std']:.4f}")
-        self.logger.info(f"  Range: [{results['cv_min']:.4f}, {results['cv_max']:.4f}]")
-        
-        return results
-    
-    def plot_learning_curve(self, model, X: pd.DataFrame, y: pd.Series, 
-                           model_name: str = "model", save_path: str = None):
-        """Plot learning curve"""
-        
-        train_sizes, train_scores, val_scores = learning_curve(
-            model, X, y, cv=5, n_jobs=-1, 
-            train_sizes=np.linspace(0.1, 1.0, 10),
-            scoring='r2' if hasattr(model, 'predict') and not hasattr(model, 'predict_proba') else 'accuracy'
-        )
-        
-        train_mean = np.mean(train_scores, axis=1)
-        train_std = np.std(train_scores, axis=1)
-        val_mean = np.mean(val_scores, axis=1)
-        val_std = np.std(val_scores, axis=1)
-        
-        plt.figure(figsize=(10, 6))
-        plt.plot(train_sizes, train_mean, 'o-', color='blue', label='Training Score')
-        plt.fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color='blue')
-        
-        plt.plot(train_sizes, val_mean, 'o-', color='red', label='Cross-Validation Score')
-        plt.fill_between(train_sizes, val_mean - val_std, val_mean + val_std, alpha=0.1, color='red')
-        
-        plt.xlabel('Training Set Size')
-        plt.ylabel('Score')
-        plt.title(f'Learning Curve - {model_name}')
-        plt.legend(loc='best')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            self.logger.info(f"Learning curve saved to {save_path}")
-        
-        plt.show()
-    
-    def plot_regression_results(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                              model_name: str = "model", save_path: str = None):
-        """Plot regression results"""
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        
-        # Actual vs Predicted
-        axes[0, 0].scatter(y_true, y_pred, alpha=0.5)
-        axes[0, 0].plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', lw=2)
-        axes[0, 0].set_xlabel('Actual Values')
-        axes[0, 0].set_ylabel('Predicted Values')
-        axes[0, 0].set_title('Actual vs Predicted')
-        
-        # Residuals
-        residuals = y_true - y_pred
-        axes[0, 1].scatter(y_pred, residuals, alpha=0.5)
-        axes[0, 1].axhline(y=0, color='r', linestyle='--')
-        axes[0, 1].set_xlabel('Predicted Values')
-        axes[0, 1].set_ylabel('Residuals')
-        axes[0, 1].set_title('Residual Plot')
-        
-        # Residuals histogram
-        axes[1, 0].hist(residuals, bins=30, alpha=0.7)
-        axes[1, 0].set_xlabel('Residuals')
-        axes[1, 0].set_ylabel('Frequency')
-        axes[1, 0].set_title('Residuals Distribution')
-        
-        # Q-Q plot
-        from scipy import stats
-        stats.probplot(residuals, dist="norm", plot=axes[1, 1])
-        axes[1, 1].set_title('Q-Q Plot')
-        
-        plt.suptitle(f'Regression Analysis - {model_name}', fontsize=16)
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            self.logger.info(f"Regression plot saved to {save_path}")
-        
-        plt.show()
-    
-    def plot_classification_results(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                  labels: List[str] = None, model_name: str = "model",
-                                  save_path: str = None):
-        """Plot classification results"""
-        
-        # Confusion matrix
-        cm = confusion_matrix(y_true, y_pred)
-        
-        plt.figure(figsize=(12, 5))
-        
-        # Confusion matrix heatmap
-        plt.subplot(1, 2, 1)
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                   xticklabels=labels, yticklabels=labels)
-        plt.title('Confusion Matrix')
-        plt.xlabel('Predicted Label')
-        plt.ylabel('True Label')
-        
-        # Classification metrics bar plot
-        plt.subplot(1, 2, 2)
-        report = classification_report(y_true, y_pred, output_dict=True)
-        
-        if 'weighted avg' in report:
-            metrics = ['precision', 'recall', 'f1-score']
-            values = [report['weighted avg'][metric] for metric in metrics]
-            
-            bars = plt.bar(metrics, values, color=['skyblue', 'lightgreen', 'coral'])
-            plt.ylim(0, 1)
-            plt.title('Weighted Average Metrics')
-            plt.ylabel('Score')
-            
-            # Add value labels on bars
-            for bar, value in zip(bars, values):
-                plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                        f'{value:.3f}', ha='center', va='bottom')
-        
-        plt.suptitle(f'Classification Analysis - {model_name}', fontsize=16)
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            self.logger.info(f"Classification plot saved to {save_path}")
-        
-        plt.show()
-    
-    def plot_feature_importance(self, feature_importance: Dict[str, float], 
-                              top_n: int = 15, model_name: str = "model",
-                              save_path: str = None):
-        """Plot feature importance"""
-        
-        # Sort features by importance
-        sorted_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
-        
-        if len(sorted_features) > top_n:
-            sorted_features = sorted_features[:top_n]
-        
-        features, importance = zip(*sorted_features)
-        
-        plt.figure(figsize=(10, 8))
-        y_pos = np.arange(len(features))
-        
-        bars = plt.barh(y_pos, importance, color='skyblue')
-        plt.yticks(y_pos, features)
-        plt.xlabel('Importance')
-        plt.title(f'Top {len(features)} Feature Importance - {model_name}')
-        plt.gca().invert_yaxis()
-        
-        # Add value labels
-        for i, (bar, imp) in enumerate(zip(bars, importance)):
-            plt.text(bar.get_width() + max(importance) * 0.01, bar.get_y() + bar.get_height()/2,
-                    f'{imp:.3f}', ha='left', va='center')
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            self.logger.info(f"Feature importance plot saved to {save_path}")
-        
-        plt.show()
-    
-    def compare_models(self, model_results: Dict[str, Dict[str, Any]], 
-                      metric: str = 'auto') -> pd.DataFrame:
-        """Compare multiple models"""
-        
-        comparison_data = []
-        
-        for model_name, results in model_results.items():
-            row = {'Model': model_name}
-            
-            # Add relevant metrics
-            if 'r2' in results:
-                row['R²'] = results['r2']
-                row['RMSE'] = results['rmse']
-                row['MAE'] = results['mae']
-            
-            if 'accuracy' in results:
-                row['Accuracy'] = results['accuracy']
-                row['F1-Score'] = results['f1_score']
-                row['Precision'] = results['precision']
-                row['Recall'] = results['recall']
-            
-            # Add cross-validation results if available
-            if 'cv_mean' in results:
-                row['CV Mean'] = results['cv_mean']
-                row['CV Std'] = results['cv_std']
-            
-            comparison_data.append(row)
-        
-        comparison_df = pd.DataFrame(comparison_data)
-        
-        # Sort by main metric
-        if metric == 'auto':
-            if 'R²' in comparison_df.columns:
-                comparison_df = comparison_df.sort_values('R²', ascending=False)
-            elif 'Accuracy' in comparison_df.columns:
-                comparison_df = comparison_df.sort_values('Accuracy', ascending=False)
+        # 信道建模准确度（基于传播损失预测）
+        if np.std(y_true) > 0:
+            metrics['channel_modeling_accuracy'] = 1 - np.std(signal_error) / np.std(y_true)
         else:
-            if metric in comparison_df.columns:
-                comparison_df = comparison_df.sort_values(metric, ascending=False)
+            metrics['channel_modeling_accuracy'] = 1.0
         
-        self.logger.info("Model comparison:")
-        print(comparison_df.to_string(index=False))
+        # 环境适应性指标
+        error_stability = np.std(signal_error) / (np.mean(signal_error) + 1e-8)
+        metrics['environmental_robustness'] = 1 / (1 + error_stability)
         
-        return comparison_df
+        return metrics
     
-    def generate_evaluation_report(self, model_results: Dict[str, Any], 
-                                 model_name: str = "model") -> str:
-        """Generate comprehensive evaluation report"""
+    def _analyze_prediction_confidence(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                                     y_prob: np.ndarray) -> Dict[str, float]:
+        """分析预测置信度"""
+        
+        # 预测概率分析
+        max_probs = np.max(y_prob, axis=1)
+        correct_mask = (y_true == y_pred)
+        
+        metrics = {
+            'avg_confidence': np.mean(max_probs),
+            'correct_avg_confidence': np.mean(max_probs[correct_mask]) if np.any(correct_mask) else 0,
+            'incorrect_avg_confidence': np.mean(max_probs[~correct_mask]) if np.any(~correct_mask) else 0,
+            'confidence_std': np.std(max_probs),
+        }
+        
+        # 置信度校准分析
+        confidence_bins = np.linspace(0, 1, 11)
+        bin_accuracies = []
+        bin_confidences = []
+        
+        for i in range(len(confidence_bins) - 1):
+            mask = (max_probs >= confidence_bins[i]) & (max_probs < confidence_bins[i + 1])
+            if np.any(mask):
+                bin_accuracy = np.mean(correct_mask[mask])
+                bin_confidence = np.mean(max_probs[mask])
+                bin_accuracies.append(bin_accuracy)
+                bin_confidences.append(bin_confidence)
+        
+        if bin_accuracies:
+            metrics['calibration_error'] = np.mean(np.abs(np.array(bin_accuracies) - np.array(bin_confidences)))
+        else:
+            metrics['calibration_error'] = 0
+        
+        return metrics
+    
+    def evaluate_federated_round(self, round_num: int, client_results: List[Dict[str, Any]], 
+                                global_metrics: Dict[str, float]) -> Dict[str, Any]:
+        """
+        评估联邦学习轮次性能
+        
+        参数:
+            round_num: 轮次编号
+            client_results: 客户端结果列表
+            global_metrics: 全局模型指标
+            
+        返回:
+            轮次评估结果
+        """
+        
+        round_metrics = {
+            'round_number': round_num,
+            'timestamp': datetime.now().isoformat(),
+            'global_metrics': global_metrics,
+            'client_count': len(client_results),
+        }
+        
+        # 客户端性能统计
+        if client_results:
+            client_losses = [result.get('training_loss', 0) for result in client_results]
+            client_accuracies = [result.get('training_accuracy', 0) for result in client_results]
+            client_samples = [result.get('num_samples', 0) for result in client_results]
+            
+            round_metrics.update({
+                'client_metrics': {
+                    'avg_loss': np.mean(client_losses),
+                    'std_loss': np.std(client_losses),
+                    'min_loss': np.min(client_losses),
+                    'max_loss': np.max(client_losses),
+                    'avg_accuracy': np.mean(client_accuracies),
+                    'std_accuracy': np.std(client_accuracies),
+                    'total_samples': sum(client_samples),
+                    'avg_samples_per_client': np.mean(client_samples)
+                }
+            })
+            
+            # 客户端贡献度分析
+            total_samples = sum(client_samples)
+            client_contributions = [samples / total_samples for samples in client_samples] if total_samples > 0 else []
+            
+            if client_contributions:
+                round_metrics['client_contribution'] = {
+                    'contribution_weights': client_contributions,
+                    'contribution_entropy': -sum(p * np.log(p + 1e-8) for p in client_contributions),
+                    'max_contribution': max(client_contributions),
+                    'min_contribution': min(client_contributions)
+                }
+        
+        # 收敛性分析
+        if round_num in self.round_metrics:
+            prev_metrics = self.round_metrics[round_num - 1]['global_metrics']
+            current_metrics = global_metrics
+            
+            # 计算改进情况
+            improvements = {}
+            for metric, value in current_metrics.items():
+                if metric in prev_metrics:
+                    if metric in ['loss', 'mse', 'rmse', 'mae']:  # 越小越好的指标
+                        improvement = prev_metrics[metric] - value
+                    else:  # 越大越好的指标
+                        improvement = value - prev_metrics[metric]
+                    improvements[f'{metric}_improvement'] = improvement
+            
+            round_metrics['improvements'] = improvements
+        
+        # 存储轮次指标
+        self.round_metrics[round_num] = round_metrics
+        
+        self.logger.info(f"联邦学习第 {round_num} 轮评估完成")
+        
+        return round_metrics
+    
+    def analyze_federated_convergence(self) -> Dict[str, Any]:
+        """分析联邦学习收敛性"""
+        
+        if not self.round_metrics:
+            return {'error': '没有轮次数据可供分析'}
+        
+        rounds = sorted(self.round_metrics.keys())
+        
+        # 提取关键指标序列
+        metrics_series = {}
+        for round_num in rounds:
+            round_data = self.round_metrics[round_num]
+            for metric, value in round_data['global_metrics'].items():
+                if metric not in metrics_series:
+                    metrics_series[metric] = []
+                metrics_series[metric].append(value)
+        
+        convergence_analysis = {
+            'total_rounds': len(rounds),
+            'metrics_trends': {},
+            'convergence_assessment': {}
+        }
+        
+        # 分析每个指标的趋势
+        for metric, values in metrics_series.items():
+            if len(values) > 1:
+                # 趋势分析
+                x = np.array(range(len(values)))
+                y = np.array(values)
+                
+                # 线性回归拟合趋势
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+                
+                # 检测收敛
+                recent_values = values[-min(5, len(values)):]  # 最近5轮
+                is_stabilizing = np.std(recent_values) < 0.01 * np.mean(recent_values) if recent_values else False
+                
+                convergence_analysis['metrics_trends'][metric] = {
+                    'slope': slope,
+                    'correlation': r_value,
+                    'p_value': p_value,
+                    'is_stabilizing': is_stabilizing,
+                    'recent_std': np.std(recent_values),
+                    'overall_improvement': values[-1] - values[0] if metric not in ['loss', 'mse', 'rmse'] else values[0] - values[-1]
+                }
+        
+        # 总体收敛评估
+        stabilizing_metrics = sum(1 for trend in convergence_analysis['metrics_trends'].values() 
+                                if trend['is_stabilizing'])
+        total_metrics = len(convergence_analysis['metrics_trends'])
+        
+        convergence_analysis['convergence_assessment'] = {
+            'stabilizing_ratio': stabilizing_metrics / total_metrics if total_metrics > 0 else 0,
+            'is_converged': stabilizing_metrics >= total_metrics * 0.8,  # 80%的指标稳定
+            'recommended_action': self._get_convergence_recommendation(convergence_analysis['metrics_trends'])
+        }
+        
+        return convergence_analysis
+    
+    def _get_convergence_recommendation(self, trends: Dict[str, Dict]) -> str:
+        """根据收敛分析给出建议"""
+        
+        stabilizing_count = sum(1 for trend in trends.values() if trend['is_stabilizing'])
+        improving_count = sum(1 for trend in trends.values() if trend['overall_improvement'] > 0)
+        
+        total_count = len(trends)
+        
+        if stabilizing_count >= total_count * 0.8:
+            return "模型已收敛，建议停止训练"
+        elif improving_count >= total_count * 0.6:
+            return "模型正在改善，建议继续训练"
+        else:
+            return "模型性能不稳定，建议调整超参数"
+    
+    def generate_comprehensive_report(self, model_results: Dict[str, Any], 
+                                    model_name: str = "model",
+                                    include_federated: bool = False) -> str:
+        """生成全面的评估报告"""
         
         report = []
-        report.append("=" * 60)
-        report.append(f"MODEL EVALUATION REPORT: {model_name.upper()}")
-        report.append("=" * 60)
-        report.append(f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report.append("=" * 80)
+        report.append(f"水声联邦学习系统 - 模型评估报告")
+        report.append(f"模型名称: {model_name}")
+        report.append("=" * 80)
+        report.append(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report.append("")
         
-        # Regression metrics
+        # 基础模型性能
         if 'r2' in model_results:
-            report.append("REGRESSION METRICS:")
-            report.append("-" * 30)
-            report.append(f"R² Score:           {model_results['r2']:.4f}")
-            report.append(f"RMSE:              {model_results['rmse']:.4f}")
-            report.append(f"MAE:               {model_results['mae']:.4f}")
-            report.append(f"MAPE:              {model_results.get('mape', 0):.2f}%")
-            report.append(f"Max Error:         {model_results.get('max_error', 0):.4f}")
-            report.append(f"Explained Variance: {model_results.get('explained_variance', 0):.4f}")
+            report.append("🔍 回归模型性能评估")
+            report.append("-" * 40)
+            report.append(f"决定系数 (R²):        {model_results['r2']:.4f}")
+            report.append(f"均方根误差 (RMSE):    {model_results['rmse']:.4f}")
+            report.append(f"平均绝对误差 (MAE):   {model_results['mae']:.4f}")
+            report.append(f"平均绝对百分比误差:   {model_results.get('mape', 0):.2f}%")
+            report.append(f"解释方差:            {model_results.get('explained_variance', 0):.4f}")
             report.append("")
-        
-        # Classification metrics
-        if 'accuracy' in model_results:
-            report.append("CLASSIFICATION METRICS:")
-            report.append("-" * 30)
-            report.append(f"Accuracy:          {model_results['accuracy']:.4f}")
-            report.append(f"Precision:         {model_results['precision']:.4f}")
-            report.append(f"Recall:            {model_results['recall']:.4f}")
-            report.append(f"F1-Score:          {model_results['f1_score']:.4f}")
             
-            if 'roc_auc' in model_results:
-                report.append(f"ROC AUC:           {model_results['roc_auc']:.4f}")
-            report.append("")
-        
-        # Cross-validation results
-        if 'cv_mean' in model_results:
-            report.append("CROSS-VALIDATION RESULTS:")
-            report.append("-" * 30)
-            report.append(f"Mean Score:        {model_results['cv_mean']:.4f}")
-            report.append(f"Standard Deviation: {model_results['cv_std']:.4f}")
-            report.append(f"Score Range:       [{model_results['cv_min']:.4f}, {model_results['cv_max']:.4f}]")
-            report.append(f"Scoring Method:    {model_results.get('scoring', 'unknown')}")
-            report.append("")
-        
-        # Feature importance (top 10)
-        if 'feature_importance' in model_results:
-            feature_imp = model_results['feature_importance']
-            if isinstance(feature_imp, dict):
-                sorted_features = sorted(feature_imp.items(), key=lambda x: x[1], reverse=True)[:10]
-                
-                report.append("TOP 10 FEATURE IMPORTANCE:")
-                report.append("-" * 30)
-                for i, (feature, importance) in enumerate(sorted_features, 1):
-                    report.append(f"{i:2d}. {feature:<25} {importance:.4f}")
+            # 水声通信特定指标
+            if 'signal_fidelity' in model_results:
+                report.append("🌊 水声通信性能指标")
+                report.append("-" * 40)
+                report.append(f"信号保真度:          {model_results['signal_fidelity']:.4f}")
+                report.append(f"信道建模准确度:      {model_results.get('channel_modeling_accuracy', 0):.4f}")
+                report.append(f"环境鲁棒性:          {model_results.get('environmental_robustness', 0):.4f}")
                 report.append("")
         
-        # Model quality assessment
-        report.append("MODEL QUALITY ASSESSMENT:")
-        report.append("-" * 30)
+        if 'accuracy' in model_results:
+            report.append("🎯 分类模型性能评估")
+            report.append("-" * 40)
+            report.append(f"准确率:              {model_results['accuracy']:.4f}")
+            report.append(f"精确率 (加权):       {model_results.get('precision_weighted', 0):.4f}")
+            report.append(f"召回率 (加权):       {model_results.get('recall_weighted', 0):.4f}")
+            report.append(f"F1分数 (加权):       {model_results.get('f1_weighted', 0):.4f}")
+            
+            if 'roc_auc' in model_results:
+                report.append(f"ROC AUC:            {model_results['roc_auc']:.4f}")
+            report.append("")
+        
+        # 联邦学习性能
+        if include_federated and self.round_metrics:
+            report.append("🤝 联邦学习性能分析")
+            report.append("-" * 40)
+            
+            convergence = self.analyze_federated_convergence()
+            report.append(f"训练轮次:            {convergence['total_rounds']}")
+            report.append(f"收敛状态:            {'已收敛' if convergence['convergence_assessment']['is_converged'] else '未收敛'}")
+            report.append(f"稳定指标比例:        {convergence['convergence_assessment']['stabilizing_ratio']:.2%}")
+            report.append(f"建议:               {convergence['convergence_assessment']['recommended_action']}")
+            report.append("")
+            
+            # 最新轮次客户端统计
+            latest_round = max(self.round_metrics.keys())
+            latest_metrics = self.round_metrics[latest_round]
+            if 'client_metrics' in latest_metrics:
+                cm = latest_metrics['client_metrics']
+                report.append("👥 客户端性能统计 (最新轮次)")
+                report.append("-" * 40)
+                report.append(f"参与客户端数:        {latest_metrics['client_count']}")
+                report.append(f"平均训练损失:        {cm['avg_loss']:.4f} ± {cm['std_loss']:.4f}")
+                report.append(f"平均训练准确率:      {cm['avg_accuracy']:.4f} ± {cm['std_accuracy']:.4f}")
+                report.append(f"总训练样本数:        {cm['total_samples']}")
+                report.append("")
+        
+        # 模型质量评级
+        report.append("⭐ 模型质量评级")
+        report.append("-" * 40)
         
         if 'r2' in model_results:
             r2 = model_results['r2']
-            if r2 >= 0.9:
-                quality = "Excellent"
-            elif r2 >= 0.7:
-                quality = "Good"
-            elif r2 >= 0.5:
-                quality = "Fair"
+            if r2 >= 0.95:
+                grade = "A+ (优秀)"
+            elif r2 >= 0.85:
+                grade = "A  (良好)"
+            elif r2 >= 0.70:
+                grade = "B  (一般)"
+            elif r2 >= 0.50:
+                grade = "C  (较差)"
             else:
-                quality = "Poor"
-            report.append(f"Regression Quality: {quality} (R² = {r2:.4f})")
+                grade = "D  (很差)"
+            report.append(f"回归性能等级:        {grade}")
         
         if 'accuracy' in model_results:
             acc = model_results['accuracy']
             if acc >= 0.95:
-                quality = "Excellent"
+                grade = "A+ (优秀)"
             elif acc >= 0.85:
-                quality = "Good"
-            elif acc >= 0.7:
-                quality = "Fair"
+                grade = "A  (良好)"
+            elif acc >= 0.75:
+                grade = "B  (一般)"
+            elif acc >= 0.60:
+                grade = "C  (较差)"
             else:
-                quality = "Poor"
-            report.append(f"Classification Quality: {quality} (Accuracy = {acc:.4f})")
+                grade = "D  (很差)"
+            report.append(f"分类性能等级:        {grade}")
+        
+        # 建议和总结
+        report.append("")
+        report.append("📋 改进建议")
+        report.append("-" * 40)
+        suggestions = self._generate_improvement_suggestions(model_results)
+        for suggestion in suggestions:
+            report.append(f"• {suggestion}")
         
         report.append("")
-        report.append("=" * 60)
+        report.append("=" * 80)
         
         return "\n".join(report)
     
-    def save_evaluation_results(self, results: Dict[str, Any], 
-                              model_name: str = "model") -> bool:
-        """Save evaluation results to file"""
+    def _generate_improvement_suggestions(self, results: Dict[str, Any]) -> List[str]:
+        """生成改进建议"""
+        suggestions = []
+        
+        # 回归模型建议
+        if 'r2' in results:
+            r2 = results['r2']
+            rmse = results.get('rmse', 0)
+            
+            if r2 < 0.7:
+                suggestions.append("R²较低，建议尝试更复杂的模型或增加特征工程")
+            if rmse > np.mean([results.get('true_range', 1)]) * 0.1:
+                suggestions.append("RMSE较高，建议检查异常值或调整模型参数")
+                
+            if 'residual_skewness' in results and abs(results['residual_skewness']) > 1:
+                suggestions.append("残差分布偏斜，建议对目标变量进行变换")
+        
+        # 分类模型建议
+        if 'accuracy' in results:
+            acc = results['accuracy']
+            if acc < 0.8:
+                suggestions.append("准确率有待提升，建议增加训练数据或调整模型复杂度")
+                
+            if 'calibration_error' in results and results['calibration_error'] > 0.1:
+                suggestions.append("模型校准性较差，建议使用概率校准技术")
+        
+        # 联邦学习建议
+        if self.round_metrics:
+            convergence = self.analyze_federated_convergence()
+            if not convergence['convergence_assessment']['is_converged']:
+                suggestions.append("联邦学习未收敛，建议调整学习率或增加通信轮次")
+        
+        # 通用建议
+        if not suggestions:
+            suggestions.append("模型性能良好，可考虑在生产环境中部署")
+        
+        return suggestions
+    
+    def save_evaluation_artifacts(self, results: Dict[str, Any], 
+                                model_name: str = "model",
+                                include_plots: bool = True) -> Dict[str, str]:
+        """保存评估产物"""
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        saved_files = {}
+        
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 保存评估指标
+            metrics_file = self.metrics_dir / f"metrics_{model_name}_{timestamp}.json"
+            with open(metrics_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False, default=str)
+            saved_files['metrics'] = str(metrics_file)
             
-            # Save detailed results as joblib
-            results_path = self.results_dir / f"evaluation_{model_name}_{timestamp}.joblib"
-            joblib.dump(results, results_path)
-            
-            # Save report as text
-            report = self.generate_evaluation_report(results, model_name)
-            report_path = self.results_dir / f"report_{model_name}_{timestamp}.txt"
-            
-            with open(report_path, 'w', encoding='utf-8') as f:
+            # 保存详细报告
+            report = self.generate_comprehensive_report(results, model_name, include_federated=True)
+            report_file = self.reports_dir / f"report_{model_name}_{timestamp}.txt"
+            with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
+            saved_files['report'] = str(report_file)
             
-            self.logger.info(f"Evaluation results saved to {results_path}")
-            self.logger.info(f"Evaluation report saved to {report_path}")
+            # 保存联邦学习轮次数据
+            if self.round_metrics:
+                rounds_file = self.metrics_dir / f"federated_rounds_{model_name}_{timestamp}.json"
+                with open(rounds_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.round_metrics, f, indent=2, ensure_ascii=False, default=str)
+                saved_files['rounds'] = str(rounds_file)
             
-            return True
+            self.logger.info(f"评估产物已保存: {len(saved_files)} 个文件")
+            
+            return saved_files
             
         except Exception as e:
-            self.logger.error(f"Error saving evaluation results: {e}")
-            return False
+            self.logger.error(f"保存评估产物失败: {e}")
+            return {}
+    
+    def compare_models_comprehensive(self, model_results: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
+        """全面的模型比较"""
+        
+        comparison_data = []
+        
+        for model_name, results in model_results.items():
+            row = {'模型名称': model_name}
+            
+            # 回归指标
+            if 'r2' in results:
+                row.update({
+                    'R²': results['r2'],
+                    'RMSE': results['rmse'],
+                    'MAE': results['mae'],
+                    'MAPE(%)': results.get('mape', 0)
+                })
+            
+            # 分类指标
+            if 'accuracy' in results:
+                row.update({
+                    '准确率': results['accuracy'],
+                    'F1分数': results.get('f1_weighted', 0),
+                    '精确率': results.get('precision_weighted', 0),
+                    '召回率': results.get('recall_weighted', 0)
+                })
+            
+            # 水声通信指标
+            if 'signal_fidelity' in results:
+                row.update({
+                    '信号保真度': results['signal_fidelity'],
+                    '环境鲁棒性': results.get('environmental_robustness', 0)
+                })
+            
+            comparison_data.append(row)
+        
+        df = pd.DataFrame(comparison_data)
+        
+        # 根据主要指标排序
+        if 'R²' in df.columns:
+            df = df.sort_values('R²', ascending=False)
+        elif '准确率' in df.columns:
+            df = df.sort_values('准确率', ascending=False)
+        
+        return df
     
     def evaluate_regressor(self, model, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, float]:
         """
@@ -487,7 +707,7 @@ class ModelEvaluator:
             y_pred = model.predict(X_test)
             
             # 计算评估指标
-            metrics = self.evaluate_regression_model(y_test, y_pred)
+            metrics = self.evaluate_regression_comprehensive(y_test, y_pred)
             
             self.logger.info(f"回归模型评估完成 - R²: {metrics['r2']:.4f}, RMSE: {metrics['rmse']:.4f}")
             
@@ -514,7 +734,7 @@ class ModelEvaluator:
             y_pred = model.predict(X_test)
             
             # 计算评估指标
-            metrics = self.evaluate_classification_model(y_test, y_pred)
+            metrics = self.evaluate_classification_comprehensive(y_test, y_pred)
             
             self.logger.info(f"分类模型评估完成 - 准确率: {metrics['accuracy']:.4f}")
             
@@ -524,8 +744,9 @@ class ModelEvaluator:
             self.logger.error(f"分类模型评估失败: {e}")
             return {}
 
+
 class PredictionEngine:
-    """Make predictions with trained models"""
+    """使用训练好的模型进行预测"""
     
     def __init__(self, models_dir: str = "models"):
         self.models_dir = Path(models_dir)
@@ -533,7 +754,7 @@ class PredictionEngine:
         self.scalers = {}
         self.encoders = {}
         
-        # Set up logging
+        # 设置日志
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
@@ -541,104 +762,129 @@ class PredictionEngine:
                            model_path: str = None, 
                            scaler_path: str = None,
                            encoder_path: str = None) -> bool:
-        """Load model and associated artifacts"""
+        """加载模型和相关文件"""
         try:
-            # Load model
+            # 加载模型
             if model_path and Path(model_path).exists():
                 self.models[model_name] = joblib.load(model_path)
-                self.logger.info(f"Model {model_name} loaded from {model_path}")
+                self.logger.info(f"模型 {model_name} 已从 {model_path} 加载")
             
-            # Load scaler
+            # 加载缩放器
             if scaler_path and Path(scaler_path).exists():
                 self.scalers[model_name] = joblib.load(scaler_path)
-                self.logger.info(f"Scaler for {model_name} loaded from {scaler_path}")
+                self.logger.info(f"{model_name} 的缩放器已从 {scaler_path} 加载")
             
-            # Load encoder
+            # 加载编码器
             if encoder_path and Path(encoder_path).exists():
                 self.encoders[model_name] = joblib.load(encoder_path)
-                self.logger.info(f"Encoder for {model_name} loaded from {encoder_path}")
+                self.logger.info(f"{model_name} 的编码器已从 {encoder_path} 加载")
             
             return model_name in self.models
             
         except Exception as e:
-            self.logger.error(f"Error loading model artifacts: {e}")
+            self.logger.error(f"加载模型文件失败: {e}")
             return False
     
     def predict(self, X: pd.DataFrame, model_name: str, 
                 return_probabilities: bool = False) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        """Make predictions with loaded model"""
+        """使用加载的模型进行预测"""
         
         if model_name not in self.models:
-            raise ValueError(f"Model {model_name} not loaded")
+            raise ValueError(f"模型 {model_name} 未加载")
         
         model = self.models[model_name]
         
-        # Scale features if scaler is available
+        # 如果有缩放器，进行特征缩放
         if model_name in self.scalers:
             X_scaled = self.scalers[model_name].transform(X)
         else:
             X_scaled = X.values
         
-        # Make predictions
+        # 进行预测
         predictions = model.predict(X_scaled)
         
-        # Handle classification models with label encoding
+        # 处理带有标签编码的分类模型
         if model_name in self.encoders:
             predictions = self.encoders[model_name].inverse_transform(predictions)
         
-        # Return probabilities for classification if requested
+        # 如果需要，返回分类概率
         if return_probabilities and hasattr(model, 'predict_proba'):
             probabilities = model.predict_proba(X_scaled)
             return predictions, probabilities
         
         return predictions
-    
-    def batch_predict(self, X: pd.DataFrame, model_names: List[str]) -> Dict[str, np.ndarray]:
-        """Make predictions with multiple models"""
-        results = {}
-        
-        for model_name in model_names:
-            if model_name in self.models:
-                try:
-                    results[model_name] = self.predict(X, model_name)
-                    self.logger.info(f"Predictions made with {model_name}")
-                except Exception as e:
-                    self.logger.error(f"Error making predictions with {model_name}: {e}")
-            else:
-                self.logger.warning(f"Model {model_name} not loaded")
-        
-        return results
 
-if __name__ == "__main__":
-    # Example usage
+
+def create_evaluation_pipeline():
+    """创建完整的评估流水线"""
+    
     evaluator = ModelEvaluator()
     
-    # Create sample data for demonstration
-    np.random.seed(42)
-    n_samples = 100
+    def evaluate_model_complete(model, X_test, y_test, model_name="model", 
+                              task_type="auto", y_prob=None):
+        """完整的模型评估流水线"""
+        
+        # 自动检测任务类型
+        if task_type == "auto":
+            if hasattr(model, 'predict_proba') or len(np.unique(y_test)) < 20:
+                task_type = "classification"
+            else:
+                task_type = "regression"
+        
+        # 进行预测
+        y_pred = model.predict(X_test)
+        if y_prob is None and hasattr(model, 'predict_proba'):
+            y_prob = model.predict_proba(X_test)
+        
+        # 执行评估
+        if task_type == "regression":
+            results = evaluator.evaluate_regression_comprehensive(y_test, y_pred, model_name)
+        else:
+            results = evaluator.evaluate_classification_comprehensive(y_test, y_pred, y_prob, model_name=model_name)
+        
+        # 保存结果
+        saved_files = evaluator.save_evaluation_artifacts(results, model_name)
+        
+        return results, saved_files
     
-    # Regression example
+    return evaluate_model_complete
+
+if __name__ == "__main__":
+    # 示例使用
+    evaluator = ModelEvaluator()
+    
+    # 创建示例数据
+    np.random.seed(42)
+    n_samples = 200
+    
+    # 回归示例
     y_true_reg = np.random.randn(n_samples) * 10 + 50
     y_pred_reg = y_true_reg + np.random.randn(n_samples) * 2
     
-    reg_metrics = evaluator.evaluate_regression_model(y_true_reg, y_pred_reg, "Sample Regressor")
-    evaluator.plot_regression_results(y_true_reg, y_pred_reg, "Sample Regressor")
+    reg_metrics = evaluator.evaluate_regression_comprehensive(y_true_reg, y_pred_reg, "水声传播损失预测模型")
     
-    # Classification example
-    y_true_cls = np.random.choice(['stable', 'moderate', 'unstable'], n_samples)
+    # 分类示例
+    y_true_cls = np.random.choice([0, 1, 2], n_samples, p=[0.4, 0.35, 0.25])
     y_pred_cls = y_true_cls.copy()
-    # Add some errors
-    error_indices = np.random.choice(n_samples, size=n_samples//10, replace=False)
-    y_pred_cls[error_indices] = np.random.choice(['stable', 'moderate', 'unstable'], len(error_indices))
+    errors = np.random.choice(n_samples, size=n_samples//10, replace=False)
+    y_pred_cls[errors] = np.random.choice([0, 1, 2], len(errors))
     
-    cls_metrics = evaluator.evaluate_classification_model(y_true_cls, y_pred_cls, model_name="Sample Classifier")
-    evaluator.plot_classification_results(y_true_cls, y_pred_cls, 
-                                        labels=['stable', 'moderate', 'unstable'],
-                                        model_name="Sample Classifier")
+    # 模拟概率预测
+    y_prob_cls = np.random.dirichlet([2, 2, 2], n_samples)
     
-    # Generate reports
-    print("\nRegression Report:")
-    print(evaluator.generate_evaluation_report(reg_metrics, "Sample Regressor"))
+    cls_metrics = evaluator.evaluate_classification_comprehensive(
+        y_true_cls, y_pred_cls, y_prob_cls, 
+        class_names=['稳定', '中等', '不稳定'],
+        model_name="水声信道状态分类模型"
+    )
     
-    print("\nClassification Report:")
-    print(evaluator.generate_evaluation_report(cls_metrics, "Sample Classifier"))
+    # 生成报告
+    print("\n" + "="*60)
+    print("回归模型评估报告")
+    print("="*60)
+    print(evaluator.generate_comprehensive_report(reg_metrics, "水声传播损失预测模型"))
+    
+    print("\n" + "="*60)
+    print("分类模型评估报告") 
+    print("="*60)
+    print(evaluator.generate_comprehensive_report(cls_metrics, "水声信道状态分类模型"))

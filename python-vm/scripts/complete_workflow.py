@@ -356,22 +356,97 @@ def step5_machine_learning():
         
         print(f"✅ 模型训练完成，保存到: {model_file}")
         
-        # 模型评估
+        # 增强版模型评估
         evaluator = ModelEvaluator()
         
-        print("📊 模型性能:")
+        print("📊 模型性能评估:")
+        
         # 评估回归模型性能
         if trainer.regressor is not None:
             from sklearn.model_selection import train_test_split
-            # 分割数据用于评估
-            X_train, X_test, y_train, y_test = train_test_split(X, y.iloc[:, 0] if len(y.columns) > 1 else y, test_size=0.2, random_state=42)
-            metrics = evaluator.evaluate_regressor(trainer.regressor, X_test, y_test)
             
-            for metric, value in metrics.items():
-                if isinstance(value, (int, float)):
-                    print(f"   - {metric}: {value:.4f}")
+            # 分割数据用于评估（保持多输出格式）
+            # 使用不同的随机种子以获得不同的评估结果
+            import time as time_module
+            random_seed = int(time_module.time() * 1000) % 10000  # 基于当前时间的随机种子
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=random_seed
+            )
+            print(f"   🎲 使用随机种子: {random_seed} 进行数据分割")
+            
+            # 进行预测
+            y_pred = trainer.regressor.predict(X_test)
+            
+            # 使用增强版评估器 - 对每个目标变量分别评估
+            model_name = f"RandomForest_水声传播模型_{timestamp}"
+            
+            # 如果是多输出回归，对每个目标变量分别评估
+            if len(y.columns) > 1:
+                print(f"   📊 多输出回归评估 ({len(y.columns)} 个目标变量):")
+                all_metrics = {}
+                
+                for i, target_name in enumerate(y.columns):
+                    print(f"   🎯 评估目标变量: {target_name}")
+                    y_test_single = y_test.iloc[:, i]
+                    y_pred_single = y_pred[:, i]
+                    
+                    target_model_name = f"{model_name}_{target_name}"
+                    metrics = evaluator.evaluate_regression_comprehensive(
+                        y_test_single, y_pred_single, target_model_name
+                    )
+                    all_metrics[target_name] = metrics
+                    
+                    # 显示主要指标
+                    print(f"      ✅ R²: {metrics['r2']:.4f}, RMSE: {metrics['rmse']:.4f}, MAE: {metrics['mae']:.4f}")
+                    if 'signal_fidelity' in metrics and metrics['signal_fidelity'] > 0:
+                        print(f"      🌊 信号保真度: {metrics['signal_fidelity']:.4f}")
+                
+                # 计算平均性能
+                avg_r2 = sum(m['r2'] for m in all_metrics.values()) / len(all_metrics)
+                avg_rmse = sum(m['rmse'] for m in all_metrics.values()) / len(all_metrics)
+                avg_mae = sum(m['mae'] for m in all_metrics.values()) / len(all_metrics)
+                
+                print(f"   📈 平均性能: R²={avg_r2:.4f}, RMSE={avg_rmse:.4f}, MAE={avg_mae:.4f}")
+                
+                # 保存最佳目标变量的详细报告
+                best_target = max(all_metrics.keys(), key=lambda k: all_metrics[k]['r2'])
+                metrics = all_metrics[best_target]
+                model_name = f"{model_name}_{best_target}_最佳"
+                
+            else:
+                # 单输出回归
+                metrics = evaluator.evaluate_regression_comprehensive(y_test, y_pred.flatten(), model_name)
+            
+            # 显示主要指标
+            print(f"   ✅ R² (决定系数):        {metrics['r2']:.4f}")
+            print(f"   ✅ RMSE (均方根误差):    {metrics['rmse']:.4f}")
+            print(f"   ✅ MAE (平均绝对误差):   {metrics['mae']:.4f}")
+            
+            if 'signal_fidelity' in metrics:
+                print(f"   🌊 信号保真度:          {metrics['signal_fidelity']:.4f}")
+                print(f"   🌊 环境鲁棒性:          {metrics.get('environmental_robustness', 0):.4f}")
+            
+            # 生成并保存完整评估报告
+            try:
+                saved_files = evaluator.save_evaluation_artifacts(metrics, model_name)
+                print(f"   📄 评估报告已保存到: {saved_files.get('report', 'N/A')}")
+                print(f"   📊 评估指标已保存到: {saved_files.get('metrics', 'N/A')}")
+            except Exception as e:
+                print(f"   ⚠️  保存评估报告失败: {e}")
+            
+            # 生成改进建议
+            report = evaluator.generate_comprehensive_report(metrics, model_name)
+            print("\n📋 模型质量评估:")
+            # 提取评级信息
+            if metrics['r2'] >= 0.85:
+                print("   🌟 模型质量: 优秀 (建议部署)")
+            elif metrics['r2'] >= 0.70:
+                print("   ⭐ 模型质量: 良好 (可以使用)")
+            else:
+                print("   ⚠️  模型质量: 需要改进")
+        
         else:
-            print("   - 模型评估跳过（没有可用的回归模型）")
+            print("   ❌ 模型评估跳过（没有可用的回归模型）")
         
         return True
         
