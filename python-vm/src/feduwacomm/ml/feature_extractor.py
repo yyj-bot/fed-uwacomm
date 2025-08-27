@@ -269,49 +269,98 @@ class BellhopFeatureExtractor:
                 
                 features['grid_size'] = Nrz * Nrr
                 
-                # Read ranges and depths for extent calculation
-                fid.seek(8 * 4 * recl, 0)
-                rd = np.array(struct.unpack(f'<{Nrz}f', fid.read(4 * Nrz)))
+                # Read ranges and depths for extent calculation with safety checks
+                if Nrz > 0 and Nrz < 1000:  # Safety check
+                    try:
+                        fid.seek(8 * 4 * recl, 0)
+                        rd_bytes = fid.read(4 * Nrz)
+                        if len(rd_bytes) == 4 * Nrz:
+                            rd = np.array(struct.unpack(f'<{Nrz}f', rd_bytes))
+                        else:
+                            rd = np.array([0, 100])  # Default depth range
+                    except (struct.error, OSError, IOError):
+                        rd = np.array([0, 100])  # Default depth range
+                else:
+                    rd = np.array([0, 100])  # Default depth range
                 
-                fid.seek(9 * 4 * recl, 0)
-                rr = np.array(struct.unpack(f'<{Nrr}f', fid.read(4 * Nrr)))
+                if Nrr > 0 and Nrr < 1000:  # Safety check
+                    try:
+                        fid.seek(9 * 4 * recl, 0)
+                        rr_bytes = fid.read(4 * Nrr)
+                        if len(rr_bytes) == 4 * Nrr:
+                            rr = np.array(struct.unpack(f'<{Nrr}f', rr_bytes))
+                        else:
+                            rr = np.array([0, 1000])  # Default range
+                    except (struct.error, OSError, IOError):
+                        rr = np.array([0, 1000])  # Default range
+                else:
+                    rr = np.array([0, 1000])  # Default range
                 
                 features['range_extent'] = rr[-1] - rr[0] if len(rr) > 1 else 0
                 features['depth_extent'] = rd[-1] - rd[0] if len(rd) > 1 else 0
                 
                 # Read transmission loss data (simplified sampling with bounds checking)
-                if Nsz > 0 and Nrz > 0 and Nrr > 0 and Nrr < 10000:  # Add reasonable upper bound
+                # Add more strict validation for file dimensions
+                if (Nsz > 0 and Nrz > 0 and Nrr > 0 and 
+                    Nsz < 100 and Nrz < 1000 and Nrr < 1000):  # Much stricter bounds
                     tl_values = []
                     
-                    # More conservative sampling to avoid memory issues
-                    max_samples = min(100, Nrz * Nrr)
+                    # Very conservative sampling
+                    max_samples = min(50, Nrz * Nrr)
                     
                     try:
                         for i in range(0, min(Nsz, 1)):  # Only first source
-                            for j in range(0, min(Nrz, 10), max(1, Nrz//10)):  # Fewer depth samples
+                            for j in range(0, min(Nrz, 5), max(1, max(Nrz//5, 1))):  # Even fewer samples
                                 recnum = 10 + i * Nrz + j
                                 file_pos = recnum * 4 * recl
                                 
                                 # Check if position is within reasonable bounds
-                                if file_pos > 100 * 1024 * 1024:  # Skip if > 100MB
+                                if file_pos > 10 * 1024 * 1024:  # Skip if > 10MB (much stricter)
                                     continue
+                                
+                                # Ensure we don't read beyond file size
+                                try:
+                                    fid.seek(file_pos, 0)
+                                except (OSError, IOError):
+                                    continue
+                                
+                                # Read very small chunks with extra safety
+                                chunk_size = min(Nrr, 10)  # Much smaller chunks
+                                if chunk_size <= 0 or chunk_size > 100:  # Additional safety
+                                    continue
+                                
+                                try:
+                                    data_bytes = fid.read(8 * chunk_size)
+                                    if len(data_bytes) != 8 * chunk_size:
+                                        continue  # Skip if couldn't read full chunk
                                     
-                                fid.seek(file_pos, 0)
+                                    temp = struct.unpack(f'<{2*chunk_size}f', data_bytes)
+                                    
+                                    for k in range(0, len(temp), 2):  # Process in pairs (real, imag)
+                                        if k + 1 < len(temp):
+                                            real_part = temp[k]
+                                            imag_part = temp[k + 1]
+                                            if (abs(real_part) < 1e6 and abs(imag_part) < 1e6 and  # Stricter bounds
+                                                not np.isnan(real_part) and not np.isnan(imag_part)):
+                                                magnitude = abs(complex(real_part, imag_part))
+                                                if magnitude > 1e-15:  # Avoid log(0)
+                                                    tl = -20 * np.log10(magnitude)
+                                                    if not np.isnan(tl) and not np.isinf(tl) and 0 <= tl <= 200:  # Reasonable TL range
+                                                        tl_values.append(tl)
+                                                        if len(tl_values) >= 50:  # Limit total samples
+                                                            break
+                                except (struct.error, OSError, IOError):
+                                    continue
                                 
-                                # Read smaller chunks to avoid huge buffer requirements
-                                chunk_size = min(Nrr, 100)
-                                temp = struct.unpack(f'<{2*chunk_size}f', fid.read(8 * chunk_size))
+                                if len(tl_values) >= 50:  # Stop if we have enough samples
+                                    break
+                            
+                            if len(tl_values) >= 50:
+                                break
                                 
-                                for k in range(0, len(temp), 2):  # Process in pairs (real, imag)
-                                    if k + 1 < len(temp):
-                                        real_part = temp[k]
-                                        imag_part = temp[k + 1]
-                                        if abs(real_part) < 1e10 and abs(imag_part) < 1e10:  # Sanity check
-                                            tl = -20 * np.log10(abs(complex(real_part, imag_part)) + 1e-10)
-                                            if not np.isnan(tl) and not np.isinf(tl):
-                                                tl_values.append(tl)
                     except Exception as read_error:
                         # If detailed reading fails, skip this file gracefully
+                        print(f"SHD reading error: {read_error}")
                         pass
                     
                     if tl_values:
