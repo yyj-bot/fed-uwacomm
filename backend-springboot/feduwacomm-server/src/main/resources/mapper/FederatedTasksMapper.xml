@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.FederatedTasksMapper">
+
+    <insert id="upsertTask">
+        INSERT INTO federated_tasks (id, name, algorithm, status, total_rounds, current_round, config)
+        VALUES (#{id}, #{name}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            algorithm = VALUES(algorithm),
+            status = VALUES(status),
+            total_rounds = VALUES(total_rounds),
+            current_round = VALUES(current_round),
+            config = VALUES(config)
+    </insert>
+
+    <update id="updateProgress">
+        UPDATE federated_tasks
+        SET current_round = #{currentRound}, status = #{status}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE federated_tasks SET status = #{status}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="map">
+        SELECT id, name, algorithm, status, total_rounds, current_round, config, created_at, updated_at
+        FROM federated_tasks WHERE id = #{id}
+    </select>
+
+</mapper> 

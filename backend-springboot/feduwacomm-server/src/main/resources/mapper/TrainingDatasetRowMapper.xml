@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.TrainingDatasetRowMapper">
+
+    <insert id="insertRows">
+        INSERT INTO training_dataset_row (id, dataset_id, row_data)
+        VALUES
+        <foreach collection="rowsJson" item="row" separator=",">
+            (REPLACE(UUID(), '-', ''), #{datasetId}, CAST(#{row} AS JSON))
+        </foreach>
+    </insert>
+
+    <select id="countByDataset" resultType="int">
+        SELECT COUNT(1) FROM training_dataset_row WHERE dataset_id = #{datasetId}
+    </select>
+
+    <delete id="deleteByDataset">
+        DELETE FROM training_dataset_row WHERE dataset_id = #{datasetId}
+    </delete>
+
+</mapper> 

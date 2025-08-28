@@ -13,6 +13,12 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
+import java.security.Principal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * STOMP 认证拦截器：
@@ -66,6 +72,14 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             accessor.getSessionAttributes().put("userId", userId);
             accessor.getSessionAttributes().put("username", username);
             accessor.getSessionAttributes().put("role", role);
+
+            // 设置 Principal 以支持点对点消息
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            if (StringUtils.hasText(role)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            }
+            Principal principal = new UsernamePasswordAuthenticationToken(username, null, authorities);
+            accessor.setUser(principal);
 
             // 可选 vmId 透传
             String vmId = firstNonEmpty(accessor.getFirstNativeHeader("vmId"), accessor.getFirstNativeHeader("VMID"));
