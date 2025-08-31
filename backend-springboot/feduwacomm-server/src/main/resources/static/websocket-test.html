@@ -61,6 +61,55 @@
             background-color: #0056b3;
         }
 
+        .btn-primary {
+            background-color: #007bff;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+        }
+
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+
+        .btn-info {
+            background-color: #17a2b8;
+        }
+
+        .btn-info:hover {
+            background-color: #117a8b;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
         .status {
             padding: 10px;
             margin: 10px 0;
@@ -92,6 +141,347 @@
             border-left-color: #dc3545;
         }
 
+        .message.sent {
+            border-left-color: #28a745;
+            background-color: #f8fff9;
+        }
+
+        .message.received {
+            border-left-color: #007bff;
+            background-color: #f8fbff;
+        }
+
+        .message pre {
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message-stats {
+            display: flex;
+            justify-content: space-around;
+            background-color: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .message-stats span {
+            color: #495057;
+        }
+
+        .clear-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .clear-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .message-filters {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .message-filters label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .message-filters input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .export-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: auto;
+        }
+
+        .export-btn:hover {
+            background-color: #1e7e34;
+        }
+
+        .history-btn {
+            background-color: #6f42c1;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .history-btn:hover {
+            background-color: #5a32a3;
+        }
+
+        .message-history {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .message-history h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 16px;
+        }
+
+        .history-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .history-controls input[type="date"] {
+            padding: 5px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+
+        .history-content {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-bottom: 1px solid #f1f3f4;
+            font-size: 12px;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-time {
+            color: #6c757d;
+            font-weight: bold;
+            min-width: 80px;
+        }
+
+        .history-type {
+            color: #007bff;
+            font-weight: bold;
+            min-width: 80px;
+        }
+
+        .history-content {
+            color: #495057;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chart-btn {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .chart-btn:hover {
+            background-color: #138496;
+        }
+
+        .message-chart {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .message-chart h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 16px;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .chart-controls select {
+            padding: 5px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            min-width: 100px;
+        }
+
+        .refresh-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .refresh-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .chart-container {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-placeholder {
+            color: #6c757d;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .simple-chart {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-bar {
+            display: inline-block;
+            background-color: #007bff;
+            margin: 0 2px;
+            min-width: 20px;
+            border-radius: 2px 2px 0 0;
+        }
+
+        .chart-label {
+            font-size: 10px;
+            text-align: center;
+            margin-top: 5px;
+            color: #495057;
+        }
+
+        .connection-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .connection-indicator.online {
+            background-color: #28a745;
+            box-shadow: 0 0 6px #28a745;
+        }
+
+        .connection-indicator.offline {
+            background-color: #dc3545;
+            box-shadow: 0 0 6px #dc3545;
+        }
+
+        .connection-indicator.warning {
+            background-color: #ffc107;
+            box-shadow: 0 0 6px #ffc107;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-badge.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-badge.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-badge.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .quality-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .quality-indicator.excellent {
+            background-color: #28a745;
+        }
+
+        .quality-indicator.good {
+            background-color: #20c997;
+        }
+
+        .quality-indicator.fair {
+            background-color: #ffc107;
+        }
+
+        .quality-indicator.poor {
+            background-color: #fd7e14;
+        }
+
+        .quality-indicator.very-poor {
+            background-color: #dc3545;
+        }
+
         .stats {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -103,6 +493,44 @@
             padding: 10px;
             border-radius: 4px;
             text-align: center;
+            border: 1px solid #dee2e6;
+        }
+
+        .stat-item div:first-child {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .stat-item div:last-child {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .connection-info {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+
+        .info-item span:first-child {
+            color: #6c757d;
+            font-weight: bold;
+        }
+
+        .info-item span:last-child {
+            color: #495057;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -118,121 +546,224 @@
                 未连接
             </div>
             <div class="input-group">
-                <input type="text" id="username" placeholder="用户名" value="test_user">
+                <input type="text" id="vmId" placeholder="虚拟机ID" value="vm-test-123">
+                <input type="text" id="token" placeholder="JWT Token" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLTEyMyIsInVzZXJuYW1lIjoidGVzdF91c2VyIiwicm9sZSI6InVzZXIiLCJ2bUlkIjoidm0tdGVzdC0xMjMiLCJpYXQiOjE3MzUyODgwMDAsImV4cCI6MTczNTM3NDQwMH0.test">
                 <button onclick="connect()">连接</button>
                 <button onclick="disconnect()">断开</button>
+                <button onclick="testConnection()" class="btn-info">测试连接</button>
+                <button onclick="pingServer()" class="btn-warning">Ping测试</button>
             </div>
             <div class="stats">
                 <div class="stat-item">
-                    <div>在线用户数</div>
-                    <div id="userCount">0</div>
+                    <div>虚拟机ID</div>
+                    <div id="vmIdDisplay">未设置</div>
                 </div>
                 <div class="stat-item">
                     <div>连接状态</div>
                     <div id="connectionState">未连接</div>
                 </div>
+                <div class="stat-item">
+                    <div>连接质量</div>
+                    <div id="connectionQuality">--</div>
+                </div>
+                <div class="stat-item">
+                    <div>最后心跳</div>
+                    <div id="lastHeartbeat">--</div>
+                </div>
+            </div>
+            <div class="connection-info">
+                <div class="info-item">
+                    <span>WebSocket端点:</span>
+                    <span id="wsEndpoint">/ws</span>
+                </div>
+                <div class="info-item">
+                    <span>协议端点:</span>
+                    <span id="protocolEndpoint">/app/protocol</span>
+                </div>
+                <div class="info-item">
+                    <span>消息延迟:</span>
+                    <span id="messageLatency">--</span>
+                </div>
             </div>
         </div>
 
-        <!-- 消息发送面板 -->
+        <!-- 协议消息发送面板 -->
         <div class="panel">
-            <h2>消息发送</h2>
+            <h2>协议消息发送</h2>
             <div class="input-group">
-                <input type="text" id="messageInput" placeholder="输入消息内容">
-                <button onclick="sendMessage()">发送聊天消息</button>
+                <button onclick="sendConnect()" class="btn-primary">发送连接消息</button>
+                <button onclick="sendHeartbeat()" class="btn-primary">发送心跳</button>
+                <button onclick="toggleAutoHeartbeat()" id="autoHeartbeatBtn" class="btn-warning">开启自动心跳</button>
             </div>
             <div class="input-group">
-                <input type="text" id="privateUser" placeholder="目标用户">
-                <input type="text" id="privateMessage" placeholder="私信内容">
-                <button onclick="sendPrivateMessage()">发送私信</button>
+                <button onclick="sendDatasetCreate()" class="btn-success">创建数据集</button>
+                <button onclick="sendDatasetAppendRows()" class="btn-success">追加数据行</button>
+                <button onclick="sendDatasetComplete()" class="btn-success">完成数据集</button>
             </div>
             <div class="input-group">
-                <input type="text" id="notificationInput" placeholder="系统通知内容">
-                <button onclick="sendNotification()">发送系统通知</button>
+                <button onclick="sendTrainingStart()" class="btn-info">开始训练</button>
+                <button onclick="sendTrainingProgress()" class="btn-info">训练进度</button>
+                <button onclick="sendModelUpload()" class="btn-info">上传模型</button>
             </div>
             <div class="input-group">
-                <input type="text" id="flMessageInput" placeholder="联邦学习消息">
-                <button onclick="sendFederatedLearningMessage()">发送联邦学习消息</button>
+                <button onclick="sendStatusQuery()" class="btn-secondary">状态查询</button>
+                <button onclick="sendVmStart()" class="btn-secondary">启动VM</button>
+                <button onclick="sendVmStop()" class="btn-secondary">停止VM</button>
+            </div>
+            <div class="input-group">
+                <label>自动心跳间隔(秒):</label>
+                <input type="number" id="heartbeatInterval" value="30" min="5" max="300">
+            </div>
+            <div class="input-group">
+                <button onclick="runBatchTest()" class="btn-danger">运行批量测试</button>
+                <button onclick="stopBatchTest()" class="btn-danger" id="stopBatchBtn" disabled>停止批量测试</button>
             </div>
         </div>
 
-        <!-- 消息接收面板 -->
+        <!-- 协议消息接收面板 -->
         <div class="panel">
-            <h2>公共消息</h2>
-            <div id="publicMessages" class="message-area"></div>
+            <h2>协议消息接收</h2>
+            <div class="message-stats">
+                <span>发送: <span id="sentCount">0</span></span>
+                <span>接收: <span id="receivedCount">0</span></span>
+                <span>错误: <span id="errorCount">0</span></span>
+                <button onclick="clearMessages()" class="clear-btn">清空</button>
+            </div>
+            <div class="message-filters">
+                <label><input type="checkbox" id="filterSent" checked> 发送消息</label>
+                <label><input type="checkbox" id="filterReceived" checked> 接收消息</label>
+                <label><input type="checkbox" id="filterErrors" checked> 错误消息</label>
+                <button onclick="exportMessages()" class="export-btn">导出日志</button>
+                <button onclick="toggleMessageHistory()" class="history-btn" id="historyBtn">显示历史</button>
+                <button onclick="toggleMessageChart()" class="chart-btn" id="chartBtn">显示图表</button>
+            </div>
+            <div id="protocolMessages" class="message-area"></div>
+            <div id="messageHistory" class="message-history" style="display: none;">
+                <h3>消息历史记录</h3>
+                <div class="history-controls">
+                    <input type="date" id="historyDate" onchange="loadMessageHistory()">
+                    <button onclick="clearHistory()" class="clear-btn">清空历史</button>
+                </div>
+                <div id="historyContent" class="history-content"></div>
+            </div>
+            <div id="messageChart" class="message-chart" style="display: none;">
+                <h3>消息统计图表</h3>
+                <div class="chart-controls">
+                    <select id="chartType" onchange="updateChart()">
+                        <option value="pie">饼图</option>
+                        <option value="bar">柱状图</option>
+                        <option value="line">折线图</option>
+                    </select>
+                    <button onclick="refreshChart()" class="refresh-btn">刷新图表</button>
+                </div>
+                <div id="chartContainer" class="chart-container"></div>
+            </div>
         </div>
 
-        <!-- 私信面板 -->
+        <!-- VM状态面板 -->
         <div class="panel">
-            <h2>私信消息</h2>
-            <div id="privateMessages" class="message-area"></div>
+            <h2>VM状态监控</h2>
+            <div id="vmStatus" class="message-area"></div>
         </div>
 
-        <!-- 系统通知面板 -->
+        <!-- 数据集状态面板 -->
         <div class="panel">
-            <h2>系统通知</h2>
-            <div id="notifications" class="message-area"></div>
+            <h2>数据集状态</h2>
+            <div id="datasetStatus" class="message-area"></div>
         </div>
 
-        <!-- 联邦学习消息面板 -->
+        <!-- 训练状态面板 -->
         <div class="panel">
-            <h2>联邦学习消息</h2>
-            <div id="flMessages" class="message-area"></div>
+            <h2>训练状态</h2>
+            <div id="trainingStatus" class="message-area"></div>
         </div>
     </div>
 
     <script>
         let stompClient = null;
-        let username = '';
+        let vmId = '';
+        let autoHeartbeatInterval = null;
+        let isAutoHeartbeatEnabled = false;
+        let batchTestInterval = null;
+        let isBatchTestRunning = false;
+        let lastHeartbeatTime = null;
+        let connectionStartTime = null;
+        let messageHistory = [];
+        let isHistoryVisible = false;
+        let isChartVisible = false;
+        let chartData = {
+            sent: 0,
+            received: 0,
+            errors: 0
+        };
 
         function connect() {
-            username = document.getElementById('username').value;
-            if (!username) {
-                alert('请输入用户名');
+            const vmId = document.getElementById('vmId').value;
+            const token = document.getElementById('token').value;
+            
+            if (!vmId || !token) {
+                alert('请输入虚拟机ID和JWT Token');
                 return;
             }
 
-            const socket = new SockJS('/api/ws');
+            // 显示连接中状态
+            const statusDiv = document.getElementById('connectionStatus');
+            const stateDiv = document.getElementById('connectionState');
+            statusDiv.innerHTML = '<span class="connection-indicator warning"></span><span class="status-badge connecting">连接中</span>';
+            stateDiv.innerHTML = '<span class="status-badge connecting">连接中</span>';
+
+            const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
 
-            stompClient.connect({}, function (frame) {
+            // 设置连接头
+            const headers = {
+                'Authorization': 'Bearer ' + token,
+                'vmId': vmId
+            };
+
+            stompClient.connect(headers, function (frame) {
                 console.log('Connected: ' + frame);
+                connectionStartTime = Date.now();
                 updateConnectionStatus(true);
+                document.getElementById('vmIdDisplay').textContent = vmId;
+                updateConnectionQuality();
 
-                // 订阅公共消息
-                stompClient.subscribe('/topic/public', function (message) {
-                    showPublicMessage(JSON.parse(message.body));
+                // 订阅协议消息回复
+                stompClient.subscribe('/user/queue/reply', function (message) {
+                    try {
+                        const response = JSON.parse(message.body);
+                        
+                        // 计算消息延迟（如果是ping测试响应）
+                        if (response.id && response.id.includes('ping')) {
+                            const latency = Date.now() - parseInt(response.id.split('-')[1]);
+                            document.getElementById('messageLatency').textContent = latency + 'ms';
+                        }
+                        
+                        showProtocolMessage(response);
+                    } catch (error) {
+                        showErrorMessage({ 
+                            type: 'MESSAGE_PARSE_ERROR', 
+                            errorMessage: '消息解析失败: ' + error.message,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
                 });
 
-                // 订阅私信
-                stompClient.subscribe('/user/queue/private', function (message) {
-                    showPrivateMessage(JSON.parse(message.body));
+                // 订阅VM专属topic
+                stompClient.subscribe('/topic/vm/' + vmId, function (message) {
+                    showProtocolMessage(JSON.parse(message.body));
                 });
 
-                // 订阅系统通知
-                stompClient.subscribe('/topic/notifications', function (message) {
-                    showNotification(JSON.parse(message.body));
+                // 订阅错误消息
+                stompClient.subscribe('/topic/errors', function (message) {
+                    showErrorMessage(JSON.parse(message.body));
                 });
 
-                // 订阅联邦学习消息
-                stompClient.subscribe('/topic/federated-learning', function (message) {
-                    showFLMessage(JSON.parse(message.body));
-                });
-
-                // 订阅用户统计
-                stompClient.subscribe('/topic/user-count', function (message) {
-                    updateUserCount(JSON.parse(message.body));
-                });
-
-                // 发送加入消息
-                stompClient.send("/app/join", {}, JSON.stringify({
-                    type: 'JOIN',
-                    sender: username,
-                    content: username + ' 加入了聊天室'
-                }));
-
-                // 定期获取统计信息
-                setInterval(getStats, 5000);
+                // 连接成功后发送应用层CONNECT消息
+                sendConnect();
+                
+                // 启动连接质量监控
+                startConnectionMonitoring();
             }, function (error) {
                 console.log('STOMP error: ' + error);
                 updateConnectionStatus(false);
@@ -241,126 +772,642 @@
 
         function disconnect() {
             if (stompClient !== null) {
-                // 发送离开消息
-                stompClient.send("/app/leave", {}, JSON.stringify({
-                    type: 'LEAVE',
-                    sender: username,
-                    content: username + ' 离开了聊天室'
-                }));
-
+                // 停止自动心跳
+                stopAutoHeartbeat();
+                
+                // 停止批量测试
+                stopBatchTest();
+                
                 stompClient.disconnect();
                 updateConnectionStatus(false);
+                document.getElementById('vmIdDisplay').textContent = '未设置';
             }
         }
 
-        function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value;
-
-            if (message && stompClient) {
-                stompClient.send("/app/chat", {}, JSON.stringify({
-                    type: 'CHAT',
-                    content: message,
-                    sender: username
-                }));
-                messageInput.value = '';
+        // 切换自动心跳
+        function toggleAutoHeartbeat() {
+            if (isAutoHeartbeatEnabled) {
+                stopAutoHeartbeat();
+            } else {
+                startAutoHeartbeat();
             }
         }
 
-        function sendPrivateMessage() {
-            const user = document.getElementById('privateUser').value;
-            const message = document.getElementById('privateMessage').value;
-
-            if (user && message && stompClient) {
-                stompClient.send("/app/private-message", {}, JSON.stringify({
-                    type: 'PRIVATE',
-                    content: message,
-                    sender: username,
-                    receiver: user
-                }));
-                document.getElementById('privateMessage').value = '';
+        // 启动自动心跳
+        function startAutoHeartbeat() {
+            if (!stompClient) return;
+            
+            const interval = parseInt(document.getElementById('heartbeatInterval').value);
+            if (interval < 5 || interval > 300) {
+                alert('心跳间隔必须在5-300秒之间');
+                return;
             }
+            
+            isAutoHeartbeatEnabled = true;
+            document.getElementById('autoHeartbeatBtn').textContent = '停止自动心跳';
+            document.getElementById('autoHeartbeatBtn').style.backgroundColor = '#dc3545';
+            
+            // 立即发送一次心跳
+            sendHeartbeat();
+            
+            // 设置定时器
+            autoHeartbeatInterval = setInterval(() => {
+                if (stompClient && stompClient.connected) {
+                    sendHeartbeat();
+                } else {
+                    stopAutoHeartbeat();
+                }
+            }, interval * 1000);
+            
+            showProtocolMessage({ type: 'SENT', content: `自动心跳已启动，间隔: ${interval}秒` });
         }
 
-        function sendNotification() {
-            const notification = document.getElementById('notificationInput').value;
-
-            if (notification && stompClient) {
-                stompClient.send("/app/notification", {}, JSON.stringify({
-                    type: 'NOTIFICATION',
-                    content: notification,
-                    sender: username
-                }));
-                document.getElementById('notificationInput').value = '';
+        // 停止自动心跳
+        function stopAutoHeartbeat() {
+            if (autoHeartbeatInterval) {
+                clearInterval(autoHeartbeatInterval);
+                autoHeartbeatInterval = null;
             }
+            
+            isAutoHeartbeatEnabled = false;
+            document.getElementById('autoHeartbeatBtn').textContent = '开启自动心跳';
+            document.getElementById('autoHeartbeatBtn').style.backgroundColor = '#007bff';
+            
+            showProtocolMessage({ type: 'SENT', content: '自动心跳已停止' });
         }
 
-        function sendFederatedLearningMessage() {
-            const message = document.getElementById('flMessageInput').value;
-
-            if (message && stompClient) {
-                stompClient.send("/app/federated-learning", {}, JSON.stringify({
-                    type: 'FEDERATED_LEARNING',
-                    content: message,
-                    sender: username
-                }));
-                document.getElementById('flMessageInput').value = '';
-            }
+        // 生成消息ID
+        function generateMessageId(prefix = 'client') {
+            return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
         }
 
-        function showPublicMessage(message) {
-            const messageArea = document.getElementById('publicMessages');
+        // 发送连接消息
+        function sendConnect() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'CONNECT',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    version: '1.0.0',
+                    capabilities: ['FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD'],
+                    systemInfo: {
+                        os: 'Ubuntu 20.04',
+                        python: '3.8.10',
+                        memory: '4GB',
+                        cpu: 'Intel Xeon E5-2680',
+                        gpu: 'NVIDIA Tesla V100'
+                    },
+                    supportedAlgorithms: {
+                        FEDAVG: {
+                            version: '1.0',
+                            description: '联邦平均算法'
+                        },
+                        FEDPROX: {
+                            version: '1.0',
+                            description: '联邦近端算法',
+                            parameters: ['mu']
+                        }
+                    }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送连接消息: ' + message.type });
+        }
+
+        // 发送心跳消息
+        function sendHeartbeat() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            lastHeartbeatTime = Date.now();
+            
+            const message = {
+                type: 'HEARTBEAT',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    status: 'IDLE',
+                    resourceUsage: {
+                        cpu: 25.5,
+                        memory: 60.2,
+                        disk: 45.8,
+                        gpu: 15.3
+                    },
+                    network: {
+                        uploadSpeed: 1024,
+                        downloadSpeed: 2048,
+                        latency: 50
+                    },
+                    processes: {
+                        total: 150,
+                        active: 25
+                    }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送心跳消息: ' + message.type });
+            
+            // 更新连接质量
+            updateConnectionQuality();
+        }
+
+        // 发送创建数据集消息
+        function sendDatasetCreate() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_CREATE',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+                    datasetDescription: '水声传播特征数据集',
+                    datasetType: 'ACOUSTIC',
+                    metadata: { source: 'bellhop', version: '1.0' }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送创建数据集消息: ' + message.type });
+        }
+
+        // 发送追加数据行消息
+        function sendDatasetAppendRows() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_APPEND_ROWS',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+                    rows: [
+                        { rowData: { f1: 0.12, f2: 3.4, label: 1 } },
+                        { rowData: { f1: 0.37, f2: 2.1, label: 0 } }
+                    ]
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送追加数据行消息: ' + message.type });
+        }
+
+        // 发送完成数据集消息
+        function sendDatasetComplete() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_COMPLETE',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000)
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送完成数据集消息: ' + message.type });
+        }
+
+        // 发送开始训练消息
+        function sendTrainingStart() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'TRAINING_START',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: 'task-' + Date.now(),
+                    algorithm: 'FEDAVG',
+                    config: {
+                        batchSize: 32,
+                        learningRate: 0.001,
+                        epochsPerRound: 5,
+                        totalRounds: 100,
+                        currentRound: 0,
+                        minClients: 2,
+                        timeout: 300
+                    },
+                    globalModel: {
+                        modelId: 'model-' + Date.now(),
+                        version: '1.0.0',
+                        parameters: {
+                            layers: 3,
+                            neurons: [784, 256, 128, 10],
+                            activation: 'relu',
+                            optimizer: 'adam'
+                        }
+                    },
+                    dataConfig: {
+                        dataPath: '/data/training',
+                        validationSplit: 0.2,
+                        shuffle: true
+                    }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送开始训练消息: ' + message.type });
+        }
+
+        // 发送训练进度消息
+        function sendTrainingProgress() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'TRAINING_PROGRESS',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: 'task-' + Date.now(),
+                    currentRound: 25,
+                    totalRounds: 100,
+                    currentEpoch: 3,
+                    epochsPerRound: 5,
+                    progress: 25.5,
+                    metrics: {
+                        accuracy: 0.85,
+                        loss: 0.15,
+                        valAccuracy: 0.82,
+                        valLoss: 0.18
+                    },
+                    status: 'TRAINING',
+                    estimatedTimeRemaining: 1800,
+                    resourceUsage: {
+                        cpu: 85.5,
+                        memory: 75.2,
+                        gpu: 95.8
+                    }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送训练进度消息: ' + message.type });
+        }
+
+        // 发送模型上传消息
+        function sendModelUpload() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'MODEL_UPLOAD',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: 'task-' + Date.now(),
+                    round: 25,
+                    parameters: {
+                        model: {
+                            framework: 'pytorch',
+                            format: 'state_dict',
+                            weights: {
+                                shape: [784, 256, 128, 10],
+                                dtype: 'float32',
+                                checksum: 'sha256:abc123...'
+                            }
+                        },
+                        training: {
+                            epochs: 5,
+                            batchSize: 32,
+                            optimizer: 'adam',
+                            learningRate: 0.001
+                        }
+                    },
+                    metrics: {
+                        accuracy: 0.88,
+                        loss: 0.12,
+                        valAccuracy: 0.85,
+                        valLoss: 0.15
+                    },
+                    compression: 'gzip'
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送模型上传消息: ' + message.type });
+        }
+
+        // 发送状态查询消息
+        function sendStatusQuery() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'STATUS_QUERY',
+                id: generateMessageId('cmd'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    queryType: 'FULL',
+                    includeResources: true,
+                    includeProcesses: true,
+                    includeNetwork: true,
+                    timeout: 10
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送状态查询消息: ' + message.type });
+        }
+
+        // 发送VM启动消息
+        function sendVmStart() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'VM_START',
+                id: generateMessageId('cmd'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    timeout: 300,
+                    config: {
+                        memory: '4GB',
+                        cpu: '4cores',
+                        disk: '50GB',
+                        network: 'bridge'
+                    },
+                    environment: {
+                        variables: {
+                            PYTHONPATH: '/app',
+                            CUDA_VISIBLE_DEVICES: '0'
+                        }
+                    }
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送VM启动消息: ' + message.type });
+        }
+
+        // 发送VM停止消息
+        function sendVmStop() {
+            if (!stompClient) return;
+            
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'VM_STOP',
+                id: generateMessageId('cmd'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    force: false,
+                    timeout: 60,
+                    saveState: true
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送VM停止消息: ' + message.type });
+        }
+
+                // 显示协议消息
+        function showProtocolMessage(message) {
+            const messageArea = document.getElementById('protocolMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message';
-            if (message.type === 'SYSTEM') {
-                messageDiv.className += ' system';
+            
+            if (message.type === 'SENT') {
+                messageDiv.className += ' sent';
+                messageDiv.innerHTML = `
+                    <strong>发送</strong>: ${message.content}
+                    <small>${new Date().toLocaleTimeString()}</small>
+                `;
+                updateMessageCount('sent');
+                
+                // 检查过滤器
+                if (!document.getElementById('filterSent').checked) {
+                    messageDiv.style.display = 'none';
+                }
+            } else {
+                messageDiv.className += ' received';
+                messageDiv.innerHTML = `
+                    <strong>接收</strong> (${message.type}): 
+                    <pre>${JSON.stringify(message, null, 2)}</pre>
+                    <small>${message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}</small>
+                `;
+                updateMessageCount('received');
+                
+                // 检查过滤器
+                if (!document.getElementById('filterReceived').checked) {
+                    messageDiv.style.display = 'none';
+                }
             }
-            messageDiv.innerHTML = `
-                <strong>${message.sender}</strong> (${message.type}): 
-                ${message.content} 
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
-            `;
+            
             messageArea.appendChild(messageDiv);
             messageArea.scrollTop = messageArea.scrollHeight;
+            
+            // 保存到历史记录
+            saveToHistory(message);
         }
 
-        function showPrivateMessage(message) {
-            const messageArea = document.getElementById('privateMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.innerHTML = `
-                <strong>${message.sender}</strong> -> <strong>${message.receiver}</strong>: 
-                ${message.content} 
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
-            `;
-            messageArea.appendChild(messageDiv);
-            messageArea.scrollTop = messageArea.scrollHeight;
+        // 更新消息计数
+        function updateMessageCount(type) {
+            const countElement = document.getElementById(type + 'Count');
+            if (countElement) {
+                const currentCount = parseInt(countElement.textContent) || 0;
+                countElement.textContent = currentCount + 1;
+            }
         }
 
-        function showNotification(message) {
-            const messageArea = document.getElementById('notifications');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message system';
-            messageDiv.innerHTML = `
-                <strong>系统通知</strong>: 
-                ${message.content} 
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
-            `;
-            messageArea.appendChild(messageDiv);
-            messageArea.scrollTop = messageArea.scrollHeight;
+        // 更新连接质量
+        function updateConnectionQuality() {
+            if (!connectionStartTime) return;
+            
+            const now = Date.now();
+            const uptime = Math.floor((now - connectionStartTime) / 1000);
+            
+            let quality = '优秀';
+            let qualityClass = 'excellent';
+            
+            if (uptime < 60) {
+                quality = '良好';
+                qualityClass = 'good';
+            } else if (uptime < 300) {
+                quality = '一般';
+                qualityClass = 'fair';
+            } else if (uptime < 600) {
+                quality = '较差';
+                qualityClass = 'poor';
+            } else {
+                quality = '很差';
+                qualityClass = 'very-poor';
+            }
+            
+            document.getElementById('connectionQuality').innerHTML = 
+                `<span class="quality-indicator ${qualityClass}"></span>${quality}`;
+            
+            // 更新最后心跳时间
+            if (lastHeartbeatTime) {
+                const lastHeartbeat = Math.floor((now - lastHeartbeatTime) / 1000);
+                document.getElementById('lastHeartbeat').textContent = lastHeartbeat + '秒前';
+            }
         }
 
-        function showFLMessage(message) {
-            const messageArea = document.getElementById('flMessages');
+        // 清空所有消息
+        function clearMessages() {
+            const messageArea = document.getElementById('protocolMessages');
+            messageArea.innerHTML = '';
+            
+            // 重置计数器
+            document.getElementById('sentCount').textContent = '0';
+            document.getElementById('receivedCount').textContent = '0';
+            document.getElementById('errorCount').textContent = '0';
+            
+            showProtocolMessage({ type: 'SENT', content: '消息已清空' });
+        }
+
+        // 导出消息日志
+        function exportMessages() {
+            const messageArea = document.getElementById('protocolMessages');
+            const messages = messageArea.querySelectorAll('.message');
+            
+            if (messages.length === 0) {
+                alert('没有消息可导出');
+                return;
+            }
+            
+            let logContent = 'FedUWAComm WebSocket 测试日志\n';
+            logContent += '='.repeat(50) + '\n';
+            logContent += `导出时间: ${new Date().toLocaleString()}\n`;
+            logContent += `虚拟机ID: ${document.getElementById('vmId').value}\n`;
+            logContent += `连接状态: ${document.getElementById('connectionState').textContent}\n`;
+            logContent += `消息统计: 发送=${document.getElementById('sentCount').textContent}, 接收=${document.getElementById('receivedCount').textContent}, 错误=${document.getElementById('errorCount').textContent}\n`;
+            logContent += '='.repeat(50) + '\n\n';
+            
+            messages.forEach((msg, index) => {
+                const time = msg.querySelector('small')?.textContent || '';
+                const content = msg.textContent || '';
+                logContent += `[${index + 1}] ${time}\n${content}\n\n`;
+            });
+            
+            // 创建下载链接
+            const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `websocket-test-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showProtocolMessage({ type: 'SENT', content: '日志已导出' });
+        }
+
+        // 运行批量测试
+        function runBatchTest() {
+            if (!stompClient || !stompClient.connected) {
+                alert('请先连接WebSocket');
+                return;
+            }
+
+            isBatchTestRunning = true;
+            document.getElementById('stopBatchBtn').disabled = false;
+            document.getElementById('stopBatchBtn').style.opacity = '1';
+            
+            showProtocolMessage({ type: 'SENT', content: '批量测试已启动' });
+            
+            // 立即执行一次
+            executeBatchTest();
+            
+            // 每10秒执行一次
+            batchTestInterval = setInterval(() => {
+                if (isBatchTestRunning && stompClient && stompClient.connected) {
+                    executeBatchTest();
+                } else {
+                    stopBatchTest();
+                }
+            }, 10000);
+        }
+
+        // 停止批量测试
+        function stopBatchTest() {
+            isBatchTestRunning = false;
+            if (batchTestInterval) {
+                clearInterval(batchTestInterval);
+                batchTestInterval = null;
+            }
+            
+            document.getElementById('stopBatchBtn').disabled = true;
+            document.getElementById('stopBatchBtn').style.opacity = '0.6';
+            
+            showProtocolMessage({ type: 'SENT', content: '批量测试已停止' });
+        }
+
+        // 执行批量测试
+        function executeBatchTest() {
+            if (!stompClient || !stompClient.connected) return;
+            
+            // 随机选择要发送的消息类型
+            const messageTypes = [
+                'sendHeartbeat',
+                'sendDatasetCreate',
+                'sendTrainingProgress',
+                'sendStatusQuery'
+            ];
+            
+            const randomType = messageTypes[Math.floor(Math.random() * messageTypes.length)];
+            
+            // 延迟发送，避免消息堆积
+            setTimeout(() => {
+                if (isBatchTestRunning && stompClient && stompClient.connected) {
+                    window[randomType]();
+                }
+            }, Math.random() * 2000); // 0-2秒随机延迟
+        }
+
+        // 显示错误消息
+        function showErrorMessage(message) {
+            const messageArea = document.getElementById('protocolMessages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
+            messageDiv.className = 'message error';
             messageDiv.innerHTML = `
-                <strong>联邦学习</strong> (${message.type}): 
-                ${message.content} 
-                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
+                <strong>错误</strong> (${message.type}): 
+                <pre>${JSON.stringify(message, null, 2)}</pre>
+                <small>${message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}</small>
             `;
+            
+            // 检查过滤器
+            if (!document.getElementById('filterErrors').checked) {
+                messageDiv.style.display = 'none';
+            }
+            
             messageArea.appendChild(messageDiv);
             messageArea.scrollTop = messageArea.scrollHeight;
+            updateMessageCount('error');
         }
 
         function updateConnectionStatus(connected) {
@@ -368,48 +1415,405 @@
             const stateDiv = document.getElementById('connectionState');
 
             if (connected) {
-                statusDiv.className = 'status connected';
-                statusDiv.textContent = '已连接';
-                stateDiv.textContent = '已连接';
+                statusDiv.innerHTML = '<span class="connection-indicator online"></span><span class="status-badge connected">已连接</span>';
+                stateDiv.innerHTML = '<span class="status-badge connected">已连接</span>';
             } else {
-                statusDiv.className = 'status disconnected';
-                statusDiv.textContent = '未连接';
-                stateDiv.textContent = '未连接';
+                statusDiv.innerHTML = '<span class="connection-indicator offline"></span><span class="status-badge disconnected">未连接</span>';
+                stateDiv.innerHTML = '<span class="status-badge disconnected">未连接</span>';
             }
         }
 
-        function updateUserCount(message) {
-            document.getElementById('userCount').textContent = message.data || 0;
-        }
-
-        function getStats() {
-            fetch('/api/websocket/stats')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('userCount').textContent = data.data.onlineUserCount;
-                    }
-                })
-                .catch(error => console.error('获取统计信息失败:', error));
-        }
-
-        // 回车发送消息
-        document.getElementById('messageInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        document.getElementById('privateMessage').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendPrivateMessage();
-            }
-        });
+        // 回车发送消息功能已移除
 
         // 页面卸载时断开连接
         window.addEventListener('beforeunload', function () {
             disconnect();
         });
+
+        // 添加过滤器变化监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            const filters = ['filterSent', 'filterReceived', 'filterErrors'];
+            filters.forEach(filterId => {
+                document.getElementById(filterId).addEventListener('change', function() {
+                    applyMessageFilters();
+                });
+            });
+        });
+
+        // 应用消息过滤器
+        function applyMessageFilters() {
+            const messages = document.querySelectorAll('.message');
+            const showSent = document.getElementById('filterSent').checked;
+            const showReceived = document.getElementById('filterReceived').checked;
+            const showErrors = document.getElementById('filterErrors').checked;
+            
+            messages.forEach(msg => {
+                if (msg.classList.contains('sent')) {
+                    msg.style.display = showSent ? 'block' : 'none';
+                } else if (msg.classList.contains('received')) {
+                    msg.style.display = showReceived ? 'block' : 'none';
+                } else if (msg.classList.contains('error')) {
+                    msg.style.display = showErrors ? 'block' : 'none';
+                }
+            });
+        }
+
+        // 测试连接
+        function testConnection() {
+            const vmId = document.getElementById('vmId').value;
+            const token = document.getElementById('token').value;
+            
+            if (!vmId || !token) {
+                alert('请先输入虚拟机ID和JWT Token');
+                return;
+            }
+            
+            showProtocolMessage({ type: 'SENT', content: '开始测试连接...' });
+            
+            // 创建临时连接进行测试
+            const testSocket = new SockJS('/ws');
+            const testStomp = Stomp.over(testSocket);
+            
+            const testHeaders = {
+                'Authorization': 'Bearer ' + token,
+                'vmId': vmId
+            };
+            
+            testStomp.connect(testHeaders, function (frame) {
+                showProtocolMessage({ type: 'SENT', content: '连接测试成功！STOMP版本: ' + frame.version });
+                
+                // 发送测试消息
+                const testMessage = {
+                    type: 'HEARTBEAT',
+                    id: 'test-' + Date.now(),
+                    timestamp: new Date().toISOString(),
+                    vmId: vmId,
+                    data: { status: 'TEST' },
+                    signature: 'test_signature'
+                };
+                
+                testStomp.send("/app/protocol", {}, JSON.stringify(testMessage));
+                showProtocolMessage({ type: 'SENT', content: '测试消息已发送' });
+                
+                // 断开测试连接
+                setTimeout(() => {
+                    testStomp.disconnect();
+                    showProtocolMessage({ type: 'SENT', content: '测试连接已断开' });
+                }, 2000);
+                
+            }, function (error) {
+                showErrorMessage({ 
+                    type: 'CONNECTION_TEST_FAILED', 
+                    errorMessage: '连接测试失败: ' + error,
+                    timestamp: new Date().toISOString()
+                });
+            });
+        }
+
+        // Ping测试
+        function pingServer() {
+            if (!stompClient || !stompClient.connected) {
+                showProtocolMessage({ type: 'ERROR', content: 'WebSocket未连接，无法进行ping测试' });
+                return;
+            }
+            
+            const startTime = Date.now();
+            const pingMessage = {
+                type: 'HEARTBEAT',
+                id: 'ping-' + Date.now(),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    status: 'PING_TEST',
+                    resourceUsage: {
+                        cpu: 0,
+                        memory: 0,
+                        disk: 0,
+                        gpu: 0
+                    }
+                },
+                signature: 'ping-test'
+            };
+            
+            try {
+                stompClient.send('/app/protocol', {}, JSON.stringify(pingMessage));
+                showProtocolMessage({ type: 'SENT', content: `Ping测试已发送 (ID: ${pingMessage.id})` });
+                
+                // 设置超时检测
+                setTimeout(() => {
+                    const latency = Date.now() - startTime;
+                    if (latency > 5000) { // 5秒超时
+                        showProtocolMessage({ type: 'ERROR', content: 'Ping测试超时 - 服务器响应时间过长' });
+                    }
+                }, 5000);
+                
+            } catch (error) {
+                showProtocolMessage({ type: 'ERROR', content: `Ping测试发送失败: ${error.message}` });
+            }
+        }
+
+        // 启动连接质量监控
+        function startConnectionMonitoring() {
+            // 每5秒更新一次连接质量
+            setInterval(() => {
+                if (stompClient && stompClient.connected) {
+                    updateConnectionQuality();
+                }
+            }, 5000);
+        }
+
+        // 切换消息历史显示
+        function toggleMessageHistory() {
+            isHistoryVisible = !isHistoryVisible;
+            const historyDiv = document.getElementById('messageHistory');
+            const historyBtn = document.getElementById('historyBtn');
+            
+            if (isHistoryVisible) {
+                historyDiv.style.display = 'block';
+                historyBtn.textContent = '隐藏历史';
+                historyBtn.style.backgroundColor = '#dc3545';
+                loadMessageHistory();
+            } else {
+                historyDiv.style.display = 'none';
+                historyBtn.textContent = '显示历史';
+                historyBtn.style.backgroundColor = '#6f42c1';
+            }
+        }
+
+        // 加载消息历史
+        function loadMessageHistory() {
+            const historyDate = document.getElementById('historyDate').value;
+            const historyContent = document.getElementById('historyContent');
+            
+            if (!historyDate) {
+                // 如果没有选择日期，显示今天的历史
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('historyDate').value = today;
+                displayHistoryForDate(today);
+            } else {
+                displayHistoryForDate(historyDate);
+            }
+        }
+
+        // 显示指定日期的历史记录
+        function displayHistoryForDate(date) {
+            const historyContent = document.getElementById('historyContent');
+            const dayHistory = messageHistory.filter(msg => {
+                const msgDate = new Date(msg.timestamp || Date.now()).toISOString().split('T')[0];
+                return msgDate === date;
+            });
+            
+            if (dayHistory.length === 0) {
+                historyContent.innerHTML = '<p style="color: #6c757d; text-align: center;">该日期没有消息记录</p>';
+                return;
+            }
+            
+            let html = '';
+            dayHistory.forEach((msg, index) => {
+                const time = new Date(msg.timestamp || Date.now()).toLocaleTimeString();
+                const type = msg.type || 'UNKNOWN';
+                html += `
+                    <div class="history-item">
+                        <span class="history-time">${time}</span>
+                        <span class="history-type">${type}</span>
+                        <span class="history-content">${msg.content || JSON.stringify(msg.data || {})}</span>
+                    </div>
+                `;
+            });
+            
+            historyContent.innerHTML = html;
+        }
+
+        // 清空历史记录
+        function clearHistory() {
+            messageHistory = [];
+            document.getElementById('historyContent').innerHTML = '<p style="color: #6c757d; text-align: center;">历史记录已清空</p>';
+            showProtocolMessage({ type: 'SENT', content: '消息历史已清空' });
+        }
+
+        // 切换消息图表显示
+        function toggleMessageChart() {
+            isChartVisible = !isChartVisible;
+            const chartDiv = document.getElementById('messageChart');
+            const chartBtn = document.getElementById('chartBtn');
+            
+            if (isChartVisible) {
+                chartDiv.style.display = 'block';
+                chartBtn.textContent = '隐藏图表';
+                chartBtn.style.backgroundColor = '#dc3545';
+                updateChart();
+            } else {
+                chartDiv.style.display = 'none';
+                chartBtn.textContent = '显示图表';
+                chartBtn.style.backgroundColor = '#17a2b8';
+            }
+        }
+
+        // 更新图表
+        function updateChart() {
+            const chartType = document.getElementById('chartType').value;
+            const chartContainer = document.getElementById('chartContainer');
+            
+            // 获取当前统计数据
+            chartData.sent = parseInt(document.getElementById('sentCount').textContent) || 0;
+            chartData.received = parseInt(document.getElementById('receivedCount').textContent) || 0;
+            chartData.errors = parseInt(document.getElementById('errorCount').textContent) || 0;
+            
+            if (chartData.sent === 0 && chartData.received === 0 && chartData.errors === 0) {
+                chartContainer.innerHTML = '<div class="chart-placeholder">暂无数据，请先发送或接收一些消息</div>';
+                return;
+            }
+            
+            switch (chartType) {
+                case 'pie':
+                    renderPieChart(chartContainer);
+                    break;
+                case 'bar':
+                    renderBarChart(chartContainer);
+                    break;
+                case 'line':
+                    renderLineChart(chartContainer);
+                    break;
+            }
+        }
+
+        // 渲染饼图
+        function renderPieChart(container) {
+            const total = chartData.sent + chartData.received + chartData.errors;
+            const sentAngle = (chartData.sent / total) * 360;
+            const receivedAngle = (chartData.received / total) * 360;
+            
+            let html = '<div class="simple-chart">';
+            html += '<svg width="200" height="200" viewBox="0 0 200 200">';
+            
+            // 发送消息扇形
+            if (chartData.sent > 0) {
+                html += `<path d="M100,100 L100,0 A100,100 0 0,1 ${100 + 100 * Math.cos(sentAngle * Math.PI / 180)},${100 + 100 * Math.sin(sentAngle * Math.PI / 180)} Z" fill="#28a745"/>`;
+            }
+            
+            // 接收消息扇形
+            if (chartData.received > 0) {
+                const startAngle = sentAngle;
+                const endAngle = startAngle + receivedAngle;
+                html += `<path d="M100,100 L${100 + 100 * Math.cos(startAngle * Math.PI / 180)},${100 + 100 * Math.sin(startAngle * Math.PI / 180)} A100,100 0 0,1 ${100 + 100 * Math.cos(endAngle * Math.PI / 180)},${100 + 100 * Math.sin(endAngle * Math.PI / 180)} Z" fill="#007bff"/>`;
+            }
+            
+            // 错误消息扇形
+            if (chartData.errors > 0) {
+                const startAngle = sentAngle + receivedAngle;
+                html += `<path d="M100,100 L${100 + 100 * Math.cos(startAngle * Math.PI / 180)},${100 + 100 * Math.sin(startAngle * Math.PI / 180)} A100,100 0 0,1 ${100 + 100 * Math.cos(360 * Math.PI / 180)},${100 + 100 * Math.sin(360 * Math.PI / 180)} Z" fill="#dc3545"/>`;
+            }
+            
+            html += '</svg>';
+            html += '<div style="margin-top: 20px; text-align: center;">';
+            html += `<div style="color: #28a745;">● 发送: ${chartData.sent}</div>`;
+            html += `<div style="color: #007bff;">● 接收: ${chartData.received}</div>`;
+            html += `<div style="color: #dc3545;">● 错误: ${chartData.errors}</div>`;
+            html += '</div>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // 渲染柱状图
+        function renderBarChart(container) {
+            const maxValue = Math.max(chartData.sent, chartData.received, chartData.errors);
+            const height = 200;
+            const barWidth = 60;
+            const spacing = 40;
+            
+            let html = '<div class="simple-chart">';
+            html += '<svg width="300" height="250" viewBox="0 0 300 250">';
+            
+            // 发送消息柱
+            const sentHeight = chartData.sent > 0 ? (chartData.sent / maxValue) * height : 0;
+            html += `<rect x="${spacing}" y="${height - sentHeight}" width="${barWidth}" height="${sentHeight}" fill="#28a745"/>`;
+            html += `<text x="${spacing + barWidth/2}" y="${height + 20}" text-anchor="middle" class="chart-label">发送</text>`;
+            html += `<text x="${spacing + barWidth/2}" y="${height - sentHeight - 5}" text-anchor="middle" class="chart-label">${chartData.sent}</text>`;
+            
+            // 接收消息柱
+            const receivedHeight = chartData.received > 0 ? (chartData.received / maxValue) * height : 0;
+            html += `<rect x="${spacing + barWidth + spacing}" y="${height - receivedHeight}" width="${barWidth}" height="${receivedHeight}" fill="#007bff"/>`;
+            html += `<text x="${spacing + barWidth + spacing + barWidth/2}" y="${height + 20}" text-anchor="middle" class="chart-label">接收</text>`;
+            html += `<text x="${spacing + barWidth + spacing + barWidth/2}" y="${height - receivedHeight - 5}" text-anchor="middle" class="chart-label">${chartData.received}</text>`;
+            
+            // 错误消息柱
+            const errorHeight = chartData.errors > 0 ? (chartData.errors / maxValue) * height : 0;
+            html += `<rect x="${spacing + barWidth + spacing + barWidth + spacing}" y="${height - errorHeight}" width="${barWidth}" height="${errorHeight}" fill="#dc3545"/>`;
+            html += `<text x="${spacing + barWidth + spacing + barWidth + spacing + barWidth/2}" y="${height + 20}" text-anchor="middle" class="chart-label">错误</text>`;
+            html += `<text x="${spacing + barWidth + spacing + barWidth + spacing + barWidth/2}" y="${height - errorHeight - 5}" text-anchor="middle" class="chart-label">${chartData.errors}</text>`;
+            
+            html += '</svg>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // 渲染折线图
+        function renderLineChart(container) {
+            const maxValue = Math.max(chartData.sent, chartData.received, chartData.errors);
+            const height = 200;
+            const width = 300;
+            
+            let html = '<div class="simple-chart">';
+            html += '<svg width="300" height="250" viewBox="0 0 300 250">';
+            
+            // 坐标轴
+            html += `<line x1="50" y1="50" x2="50" y2="${height + 50}" stroke="#6c757d" stroke-width="2"/>`;
+            html += `<line x1="50" y1="${height + 50}" x2="${width + 50}" y2="${height + 50}" stroke="#6c757d" stroke-width="2"/>`;
+            
+            // 发送消息线
+            if (chartData.sent > 0) {
+                const y1 = height + 50 - (chartData.sent / maxValue) * height;
+                html += `<circle cx="100" cy="${y1 + 50}" r="4" fill="#28a745"/>`;
+                html += `<text x="100" y="${height + 70}" text-anchor="middle" class="chart-label">发送</text>`;
+                html += `<text x="100" y="${y1 + 35}" text-anchor="middle" class="chart-label">${chartData.sent}</text>`;
+            }
+            
+            // 接收消息线
+            if (chartData.received > 0) {
+                const y2 = height + 50 - (chartData.received / maxValue) * height;
+                html += `<circle cx="200" cy="${y2 + 50}" r="4" fill="#007bff"/>`;
+                html += `<text x="200" y="${height + 70}" text-anchor="middle" class="chart-label">接收</text>`;
+                html += `<text x="200" y="${y2 + 35}" text-anchor="middle" class="chart-label">${chartData.received}</text>`;
+            }
+            
+            // 错误消息线
+            if (chartData.errors > 0) {
+                const y3 = height + 50 - (chartData.errors / maxValue) * height;
+                html += `<circle cx="300" cy="${y3 + 50}" r="4" fill="#dc3545"/>`;
+                html += `<text x="300" y="${height + 70}" text-anchor="middle" class="chart-label">错误</text>`;
+                html += `<text x="300" y="${y3 + 35}" text-anchor="middle" class="chart-label">${chartData.errors}</text>`;
+            }
+            
+            html += '</svg>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // 刷新图表
+        function refreshChart() {
+            updateChart();
+            showProtocolMessage({ type: 'SENT', content: '图表已刷新' });
+        }
+
+        // 保存消息到历史记录
+        function saveToHistory(message) {
+            const historyItem = {
+                timestamp: Date.now(),
+                type: message.type,
+                content: message.content || '无内容',
+                data: message.data || {}
+            };
+            
+            messageHistory.push(historyItem);
+            
+            // 限制历史记录数量，保留最近1000条
+            if (messageHistory.length > 1000) {
+                messageHistory = messageHistory.slice(-1000);
+            }
+        }
     </script>
 </body>
 

@@ -120,25 +120,6 @@
         DELETE FROM users WHERE id = #{id}
     </delete>
 
-    <!-- 锁定用户 -->
-    <update id="lockUser">
-        UPDATE users
-        SET status = 'LOCKED',
-            locked_until = #{lockedUntil},
-            updated_at = NOW()
-        WHERE id = #{id}
-    </update>
-
-    <!-- 解锁用户 -->
-    <update id="unlockUser">
-        UPDATE users
-        SET status = 'ACTIVE',
-            locked_until = NULL,
-            login_attempts = 0,
-            updated_at = NOW()
-        WHERE id = #{id}
-    </update>
-
     <!-- 更新用户密码 -->
     <update id="updatePassword">
         UPDATE users

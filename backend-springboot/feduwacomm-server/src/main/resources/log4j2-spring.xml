@@ -1,35 +1,175 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
+    <Properties>
+        <!-- 日志文件路径 -->
+        <Property name="LOG_PATH">logs</Property>
+        <!-- 日志文件大小限制 -->
+        <Property name="MAX_FILE_SIZE">100MB</Property>
+        <!-- 日志文件保留数量 -->
+        <Property name="MAX_FILES">30</Property>
+    </Properties>
+    
     <Appenders>
+        <!-- 控制台输出 -->
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
         </Console>
         
-        <RollingFile name="FileAppender" fileName="logs/feduwacomm.log"
-                     filePattern="logs/feduwacomm-%d{yyyy-MM-dd}-%i.log.gz">
+        <!-- 通用日志文件 -->
+        <RollingFile name="FileAppender" fileName="${LOG_PATH}/feduwacomm.log"
+                     filePattern="${LOG_PATH}/feduwacomm-%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
             <Policies>
                 <TimeBasedTriggeringPolicy/>
-                <SizeBasedTriggeringPolicy size="100MB"/>
+                <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
             </Policies>
-            <DefaultRolloverStrategy max="10"/>
+            <DefaultRolloverStrategy max="${MAX_FILES}"/>
         </RollingFile>
+        
+        <!-- 安全审计日志文件 -->
+        <RollingFile name="SecurityAppender" fileName="${LOG_PATH}/security.log"
+                     filePattern="${LOG_PATH}/security-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${MAX_FILES}"/>
+        </RollingFile>
+        
+        <!-- 性能监控日志文件 -->
+        <RollingFile name="PerformanceAppender" fileName="${LOG_PATH}/performance.log"
+                     filePattern="${LOG_PATH}/performance-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${MAX_FILES}"/>
+        </RollingFile>
+        
+        <!-- 访问日志文件 -->
+        <RollingFile name="AccessAppender" fileName="${LOG_PATH}/access.log"
+                     filePattern="${LOG_PATH}/access-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${MAX_FILES}"/>
+        </RollingFile>
+        
+        <!-- 错误日志文件 -->
+        <RollingFile name="ErrorAppender" fileName="${LOG_PATH}/error.log"
+                     filePattern="${LOG_PATH}/error-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${MAX_FILES}"/>
+        </RollingFile>
+        
+        <!-- 异步Appender包装器 -->
+        <Async name="AsyncFileAppender">
+            <AppenderRef ref="FileAppender"/>
+        </Async>
+        
+        <Async name="AsyncSecurityAppender">
+            <AppenderRef ref="SecurityAppender"/>
+        </Async>
+        
+        <Async name="AsyncPerformanceAppender">
+            <AppenderRef ref="PerformanceAppender"/>
+        </Async>
+        
+        <Async name="AsyncAccessAppender">
+            <AppenderRef ref="AccessAppender"/>
+        </Async>
+        
+        <Async name="AsyncErrorAppender">
+            <AppenderRef ref="ErrorAppender"/>
+        </Async>
     </Appenders>
     
     <Loggers>
-        <Logger name="com.feduwacomm" level="DEBUG" additivity="false">
+        <!-- 安全审计日志 -->
+        <Logger name="SECURITY_AUDIT" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
+            <AppenderRef ref="AsyncSecurityAppender"/>
         </Logger>
         
+        <!-- 性能监控日志 -->
+        <Logger name="PERFORMANCE" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncPerformanceAppender"/>
+        </Logger>
+        
+        <!-- 访问日志 -->
+        <Logger name="ACCESS_LOG" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncAccessAppender"/>
+        </Logger>
+        
+        <!-- 用户模块日志 -->
+        <Logger name="com.feduwacomm.service.impl.UserServiceImpl" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <Logger name="com.feduwacomm.controller.UserController" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <!-- 管理员模块日志 -->
+        <Logger name="com.feduwacomm.service.impl.AdminServiceImpl" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+            <AppenderRef ref="AsyncSecurityAppender"/>
+        </Logger>
+        
+        <Logger name="com.feduwacomm.controller.AdminController" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+            <AppenderRef ref="AsyncSecurityAppender"/>
+        </Logger>
+        
+        <!-- 管理员相关操作的安全审计日志 -->
+        <Logger name="com.feduwacomm.service.AdminService" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncSecurityAppender"/>
+        </Logger>
+        
+        <!-- 业务模块日志 -->
+        <Logger name="com.feduwacomm" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <!-- Spring框架日志 -->
         <Logger name="org.springframework" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
+            <AppenderRef ref="AsyncFileAppender"/>
         </Logger>
         
+        <!-- MyBatis日志 -->
+        <Logger name="org.mybatis" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <!-- 数据库连接池日志 -->
+        <Logger name="com.zaxxer.hikari" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <!-- 根日志器 -->
         <Root level="INFO">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+            <AppenderRef ref="AsyncErrorAppender" level="ERROR"/>
         </Root>
     </Loggers>
 </Configuration> 

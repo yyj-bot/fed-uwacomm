@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * 用户解锁响应视图对象
  */
@@ -16,4 +18,6 @@ public class UserUnlockResponseVO {
 
     private String userId;
     private String status;
+    private String unlockedBy;
+    private LocalDateTime unlockedAt;
 }

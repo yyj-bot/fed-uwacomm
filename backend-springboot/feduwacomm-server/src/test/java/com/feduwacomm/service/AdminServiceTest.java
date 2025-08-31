@@ -314,7 +314,7 @@ class AdminServiceTest {
                 .build();
 
         when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(adminMapper.lockUser(eq(userId), anyString())).thenReturn(1);
+        when(adminMapper.update(any(User.class))).thenReturn(1);
 
         // 执行测试
         UserLockResponseVO result = adminService.lockUser(userId, lockDTO);
@@ -324,7 +324,7 @@ class AdminServiceTest {
         assertEquals(userId, result.getUserId());
         assertNotNull(result.getLockedUntil());
 
-        verify(adminMapper, times(1)).lockUser(eq(userId), anyString());
+        verify(adminMapper, times(1)).update(any(User.class));
     }
 
     @Test
@@ -343,7 +343,7 @@ class AdminServiceTest {
         });
 
         assertEquals("用户不存在", exception.getMessage());
-        verify(adminMapper, never()).lockUser(anyString(), anyString());
+        verify(adminMapper, never()).update(any(User.class));
     }
 
     @Test
@@ -458,7 +458,7 @@ class AdminServiceTest {
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("perm_1234567890", result.get(0).getPermissionId());
+        assertEquals("perm_1234567890", result.get(0).getId());
         assertEquals("VM", result.get(0).getResourceType());
         assertEquals("READ", result.get(0).getPermission());
     }
