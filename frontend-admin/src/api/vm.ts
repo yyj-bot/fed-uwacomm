@@ -1,0 +1,379 @@
+import axios, { type AxiosResponse } from 'axios'
+import type { 
+  ApiResponse, 
+  PaginationParams
+} from '@/types'
+
+// 创建虚拟机API实例
+const vmApiInstance = axios.create({
+  baseURL: 'http://localhost:8080/api',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// 请求拦截器
+vmApiInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// 响应拦截器
+vmApiInstance.interceptors.response.use(
+  (response: AxiosResponse<ApiResponse<unknown>>) => {
+    if (response.data.code !== 200) {
+      throw new Error(response.data.message || '请求失败')
+    }
+    return response
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      window.location.href = '/login'
+    }
+    console.error('VM API Error:', error)
+    throw error
+  }
+)
+
+// ==================== 类型定义 ====================
+
+// 虚拟机基础信息类型
+interface VirtualMachine {
+  vmId: string
+  name: string
+  ipAddress: string
+  port: number
+  status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR' | 'OFFLINE'
+  osType: string
+  cpuCores: number
+  memoryMb: number
+  diskGb: number
+  connectionStatus: 'CONNECTED' | 'DISCONNECTED'
+  lastHeartbeat?: string
+  wsSessionId?: string
+  createdAt: string
+  updatedAt: string
+  systemInfo?: {
+    os?: string
+    kernel?: string
+    python?: string
+    gpu?: string
+    cuda?: string
+    cudnn?: string
+  }
+  capabilities?: {
+    supportedAlgorithms?: string[]
+    maxBatchSize?: number
+    maxMemoryUsage?: number
+    gpuMemory?: number
+    networkSpeed?: number
+  }
+  networkConfig?: {
+    uploadSpeed?: number
+    downloadSpeed?: number
+    latency?: number
+    bandwidth?: number
+  }
+  metadata?: {
+    description?: string
+    location?: string
+    owner?: string
+    department?: string
+    tags?: string[]
+  }
+}
+
+// 虚拟机状态类型
+interface VMStatus {
+  vmId: string
+  status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR' | 'OFFLINE'
+  connectionStatus: 'CONNECTED' | 'DISCONNECTED'
+  uptime?: number
+  resourceUsage?: {
+    cpu: number
+    memory: number
+    disk: number
+    gpu?: number
+  }
+  network?: {
+    ipAddress: string
+    macAddress?: string
+    port: number
+    uploadSpeed?: number
+    downloadSpeed?: number
+    latency?: number
+  }
+  processes?: {
+    total: number
+    active: number
+    system: number
+    user: number
+  }
+  lastHeartbeat?: string
+  wsSessionId?: string
+}
+
+// 虚拟机注册参数类型
+interface VMRegisterData {
+  vmId: string
+  name: string
+  ipAddress: string
+  port: number
+  osType: string
+  cpuCores: number
+  memoryMb: number
+  diskGb: number
+  systemInfo?: Record<string, unknown>
+  capabilities?: Record<string, unknown>
+}
+
+// Token刷新参数类型
+interface TokenRefreshData {
+  vmId: string
+  secretId: string
+}
+
+// ==================== 虚拟机管理API ====================
+export const vmApi = {
+  // ==================== 3.1 虚拟机注册接口 ====================
+  async registerVM(vmData: VMRegisterData): Promise<{
+    vmId: string
+    name: string
+    status: string
+    connectionStatus: string
+    createdAt: string
+    sessionId: string
+    accessToken: string
+    secretId: string
+    tokenExpireSeconds: number
+    websocket: {
+      sockjs: string
+      native: string
+    }
+    apiEndpoints: {
+      status: string
+      control: string
+    }
+  }> {
+    const response = await vmApiInstance.post<ApiResponse<{
+      vmId: string
+      name: string
+      status: string
+      connectionStatus: string
+      createdAt: string
+      sessionId: string
+      accessToken: string
+      secretId: string
+      tokenExpireSeconds: number
+      websocket: {
+        sockjs: string
+        native: string
+      }
+      apiEndpoints: {
+        status: string
+        control: string
+      }
+    }>>('/v1/vm/register', vmData)
+    return response.data.data
+  },
+
+  // ==================== 3.2 Token刷新接口 ====================
+  async refreshToken(refreshData: TokenRefreshData): Promise<{
+    accessToken: string
+    tokenExpireSeconds: number
+    secretId: string
+  }> {
+    const response = await vmApiInstance.post<ApiResponse<{
+      accessToken: string
+      tokenExpireSeconds: number
+      secretId: string
+    }>>('/v1/vm/token/refresh', refreshData)
+    return response.data.data
+  },
+
+  // ==================== 4.1 虚拟机列表查询接口 ====================
+  async getVMList(params: PaginationParams & {
+    status?: string
+    osType?: string
+    keyword?: string
+  } = {}): Promise<{
+    total: number
+    page: number
+    size: number
+    pages: number
+    list: VirtualMachine[]
+  }> {
+    const response = await vmApiInstance.get<ApiResponse<{
+      total: number
+      page: number
+      size: number
+      pages: number
+      list: VirtualMachine[]
+    }>>('/v1/vm/list', { params })
+    return response.data.data
+  },
+
+  // ==================== 4.2 虚拟机详情查询接口 ====================
+  async getVMDetail(vmId: string): Promise<VirtualMachine> {
+    const response = await vmApiInstance.get<ApiResponse<VirtualMachine>>(`/v1/vm/${vmId}`)
+    return response.data.data
+  },
+
+  // ==================== 4.3 虚拟机更新接口 ====================
+  async updateVM(vmId: string, vmData: Partial<{
+    name: string
+    ipAddress: string
+    port: number
+    osType: string
+    cpuCores: number
+    memoryMb: number
+    diskGb: number
+    systemInfo: {
+      os?: string
+      kernel?: string
+      python?: string
+      gpu?: string
+      cuda?: string
+      cudnn?: string
+    }
+    capabilities: {
+      supportedAlgorithms?: string[]
+      maxBatchSize?: number
+      maxMemoryUsage?: number
+      gpuMemory?: number
+      networkSpeed?: number
+    }
+    networkConfig: {
+      uploadSpeed?: number
+      downloadSpeed?: number
+      latency?: number
+      bandwidth?: number
+    }
+    metadata: {
+      description?: string
+      location?: string
+      owner?: string
+      department?: string
+      tags?: string[]
+    }
+  }>): Promise<{
+    vmId: string
+    name: string
+    updatedAt: string
+  }> {
+    const response = await vmApiInstance.put<ApiResponse<{
+      vmId: string
+      name: string
+      updatedAt: string
+    }>>(`/v1/vm/${vmId}`, vmData)
+    return response.data.data
+  },
+
+  // ==================== 4.4 虚拟机删除接口 ====================
+  async deleteVM(vmId: string, force?: boolean): Promise<{
+    vmId: string
+    deletedAt: string
+  }> {
+    const params = force ? { force: true } : {}
+    const response = await vmApiInstance.delete<ApiResponse<{
+      vmId: string
+      deletedAt: string
+    }>>(`/v1/vm/${vmId}`, { params })
+    return response.data.data
+  },
+
+  // ==================== 5.1 虚拟机启动接口 ====================
+  async startVM(vmId: string, startData?: {
+    timeout?: number
+    config?: {
+      memory?: string
+      cpu?: string
+      disk?: string
+      network?: string
+    }
+    environment?: {
+      variables?: Record<string, string>
+    }
+  }): Promise<{
+    vmId: string
+    status: string
+    commandId: string
+    estimatedTime: number
+  }> {
+    const response = await vmApiInstance.post<ApiResponse<{
+      vmId: string
+      status: string
+      commandId: string
+      estimatedTime: number
+    }>>(`/v1/vm/${vmId}/start`, startData)
+    return response.data.data
+  },
+
+  // ==================== 5.2 虚拟机停止接口 ====================
+  async stopVM(vmId: string, stopData?: {
+    force?: boolean
+    timeout?: number
+    saveState?: boolean
+  }): Promise<{
+    vmId: string
+    status: string
+    commandId: string
+    estimatedTime: number
+  }> {
+    const response = await vmApiInstance.post<ApiResponse<{
+      vmId: string
+      status: string
+      commandId: string
+      estimatedTime: number
+    }>>(`/v1/vm/${vmId}/stop`, stopData)
+    return response.data.data
+  },
+
+  // ==================== 5.3 虚拟机重启接口 ====================
+  async restartVM(vmId: string, restartData?: {
+    timeout?: number
+    graceful?: boolean
+    config?: {
+      memory?: string
+      cpu?: string
+    }
+  }): Promise<{
+    vmId: string
+    status: string
+    commandId: string
+    estimatedTime: number
+  }> {
+    const response = await vmApiInstance.post<ApiResponse<{
+      vmId: string
+      status: string
+      commandId: string
+      estimatedTime: number
+    }>>(`/v1/vm/${vmId}/restart`, restartData)
+    return response.data.data
+  },
+
+  // ==================== 6.1 虚拟机状态查询接口 ====================
+  async getVMStatus(vmId: string): Promise<VMStatus> {
+    const response = await vmApiInstance.get<ApiResponse<VMStatus>>(`/v1/vm/${vmId}/status`)
+    return response.data.data
+  },
+} as const
+
+export default vmApi
+
+// 导出类型定义
+export type {
+  VirtualMachine,
+  VMStatus,
+  VMRegisterData,
+  TokenRefreshData
+}

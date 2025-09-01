@@ -2,37 +2,26 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@/components': path.resolve(__dirname, 'src/components'),
-      '@/pages': path.resolve(__dirname, 'src/pages'),
-      '@/services': path.resolve(__dirname, 'src/services'),
-      '@/stores': path.resolve(__dirname, 'src/stores'),
-      '@/types': path.resolve(__dirname, 'src/types'),
-      '@/utils': path.resolve(__dirname, 'src/utils'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-    },
+  define: {
+    // 修复 'global is not defined' 错误
+    global: 'globalThis',
   },
   build: {
-    outDir: 'dist',
-    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          charts: ['echarts', 'echarts-for-react', 'd3', 'plotly.js'],
-          ui: ['antd'],
+          antd: ['antd'],
+          router: ['react-router-dom'],
+          websocket: ['sockjs-client', '@stomp/stompjs'],
         },
       },
     },
