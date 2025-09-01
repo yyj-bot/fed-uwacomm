@@ -91,8 +91,8 @@ export const vmRoundModels = {
     taskId?: string
     roundNumber?: number
     vmId?: string
-  } = {}): Promise<PaginatedResponse<VMRoundModel>> {
-    const response = await vmRoundModelsApi.get<ApiResponse<PaginatedResponse<VMRoundModel>>>('/vm-round-models', { params })
+  } = {}): Promise<any> {
+    const response = await vmRoundModelsApi.get<ApiResponse<any>>('/vm-round-models', { params })
     return response.data.data
   },
 

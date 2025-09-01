@@ -367,3 +367,13 @@ export const trainingData = {
 } as const
 
 export default trainingData 
+
+// 导出类型定义
+export type {
+  DataStatistics,
+  PreprocessTask,
+  ValidationResult,
+  BatchOperationResult,
+  ExportTask,
+  DatasetDetail
+}

@@ -20,8 +20,8 @@ export { default as trainingDataApi } from './training-data'
 export { default as logApi } from './system-log'
 
 // 虚拟机轮次模块API
-export { default as vmRoundModelsApi } from './vm-round-modules'
+export { default as vmRoundModelsApi } from './vm-round-models'
 
-// 重新导出现有的auth和websocket服务
-export { authService } from '../services'
-export { websocketService } from '../services' 
+// 重新导出服务层
+export { userService as authService } from '../services/user'
+export { wsService as websocketService } from '../services/websocket' 

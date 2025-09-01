@@ -1,9 +1,13 @@
 /**
  * WebSocket连接管理器
  * 负责连接建立、重连、状态管理
+ * 严格按照 WebSocket协议文档-中心化实现.md
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
  */
 
-import SockJS from 'sockjs-client'
+import * as SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
 import type { 
   ConnectionStatus, 
@@ -28,35 +32,49 @@ export class ConnectionManager {
   constructor(private config: WebSocketConfig) {}
 
   /**
-   * 建立连接
+   * 建立连接 - 严格按照协议文档连接流程
    */
-  async connect(token: string): Promise<void> {
+  async connect(token?: string): Promise<void> {
     if (this.status.connecting || this.status.connected) {
       return
+    }
+
+    // 获取token - 优先使用参数，然后配置，最后localStorage
+    const authToken = token || this.config.token || this.getCurrentToken()
+    if (!authToken) {
+      throw new Error('未找到认证Token，请先登录')
     }
 
     this.updateStatus({ connecting: true, error: null })
 
     try {
-      // 根据配置选择连接方式
-      const socket = this.config.enableSockJS 
-        ? new SockJS(this.config.url)
-        : new WebSocket(this.config.url.replace('http', 'ws'))
+      // 根据配置选择连接方式 - 按照协议文档1.3节
+      let socketFactory: () => any
+      
+      if (this.config.enableSockJS) {
+        // 使用SockJS连接（推荐用于开发）
+        socketFactory = () => new SockJS(this.config.url)
+      } else {
+        // 使用原生WebSocket连接
+        const wsUrl = this.config.url.replace(/^http/, 'ws')
+        socketFactory = () => new WebSocket(wsUrl)
+      }
 
       this.stompClient = new Client({
-        webSocketFactory: () => socket,
+        webSocketFactory: socketFactory,
         connectHeaders: {
-          'Authorization': `Bearer ${token}`,
+          // 严格按照协议文档0.4节 - 在STOMP CONNECT头部携带Authorization
+          'Authorization': `Bearer ${authToken}`,
           'vmId': this.config.vmId,
           'accept-version': '1.2',
           'host': this.getHostFromUrl(this.config.url)
         },
-        debug: (str) => {
+        debug: this.config.debug ? (str) => {
           console.log('[WebSocket Debug]', str)
-        },
-        reconnectDelay: this.config.reconnectDelay,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
+        } : undefined,
+        reconnectDelay: 0, // 禁用STOMP自动重连，使用自定义重连逻辑
+        heartbeatIncoming: 30000, // 30秒心跳间隔，按照协议文档
+        heartbeatOutgoing: 30000,
       })
 
       // 设置事件处理器
@@ -213,7 +231,7 @@ export class ConnectionManager {
   }
 
   /**
-   * 安排重连
+   * 安排重连 - 按照协议文档6.4节重连策略
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
@@ -226,21 +244,26 @@ export class ConnectionManager {
       clearTimeout(this.reconnectTimer)
     }
 
-    // 指数退避算法
+    // 指数退避算法 - 严格按照协议文档
+    // 重连间隔从1秒开始，最大60秒
+    const baseDelay = 1000 // 1秒基础延迟
     const delay = Math.min(
-      this.config.reconnectDelay * Math.pow(2, this.reconnectAttempts),
-      30000 // 最大30秒
+      baseDelay * Math.pow(2, this.reconnectAttempts),
+      60000 // 最大60秒，按照协议文档要求
     )
 
     console.log(`[WebSocket] ${delay}ms后尝试重连 (第${this.reconnectAttempts + 1}次)`)
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++
-      // 这里需要从外部传入token，实际实现中需要获取当前有效的token
-      // 为了简化，这里假设有一个方法可以获取token
+      
+      // 获取当前有效的token
       const token = this.getCurrentToken()
       if (token) {
         await this.connect(token)
+      } else {
+        console.error('[WebSocket] 重连失败：无法获取有效token')
+        this.updateStatus({ error: '重连失败：认证token无效' })
       }
     }, delay)
   }
@@ -279,12 +302,17 @@ export class ConnectionManager {
 
   /**
    * 获取当前有效的token
-   * 这个方法需要与AuthService集成
+   * 直接从localStorage获取，避免循环依赖
    */
   private getCurrentToken(): string | null {
-    // 这里应该从AuthService获取token
-    // 为了避免循环依赖，可以通过依赖注入或者事件机制来实现
     return localStorage.getItem('access_token')
+  }
+
+  /**
+   * 获取重连尝试次数
+   */
+  getReconnectAttempts(): number {
+    return this.reconnectAttempts
   }
 
   /**

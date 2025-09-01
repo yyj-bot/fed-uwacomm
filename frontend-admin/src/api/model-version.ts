@@ -2,10 +2,18 @@ import axios, { type AxiosResponse } from 'axios'
 import type { 
   ApiResponse, 
   ModelVersion,
-  PaginatedResponse,
   PaginationParams,
   SortParams
 } from '@/types'
+
+// 模型版本专用分页响应类型（符合 model-version-api-reference.md）
+interface ModelVersionPaginatedResponse<T> {
+  readonly total: number
+  readonly current: number  // 使用 current 而不是 page
+  readonly size: number
+  readonly pages: number
+  readonly records: T[]
+}
 
 // 创建模型API实例
 const modelApi = axios.create({
@@ -183,8 +191,8 @@ export const model = {
     taskId?: string
     roundNumber?: number
     status?: string
-  } = {}): Promise<PaginatedResponse<ModelVersion>> {
-    const response = await modelApi.get<ApiResponse<PaginatedResponse<ModelVersion>>>('/versions', { params })
+  } = {}): Promise<ModelVersionPaginatedResponse<ModelVersion>> {
+    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<ModelVersion>>>('/versions', { params })
     return response.data.data
   },
 
@@ -326,8 +334,8 @@ export const model = {
     evaluationId?: string
     page?: number
     size?: number
-  } = {}): Promise<PaginatedResponse<EvaluationResult>> {
-    const response = await modelApi.get<ApiResponse<PaginatedResponse<EvaluationResult>>>('/evaluate/results', { params })
+  } = {}): Promise<ModelVersionPaginatedResponse<EvaluationResult>> {
+    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<EvaluationResult>>>('/evaluate/results', { params })
     return response.data.data
   },
 
@@ -411,7 +419,7 @@ export const model = {
     status?: string
     page?: number
     size?: number
-  } = {}): Promise<PaginatedResponse<{
+  } = {}): Promise<ModelVersionPaginatedResponse<{
     deploymentId: string
     modelId: string
     deploymentName: string
@@ -422,7 +430,7 @@ export const model = {
     }
     createdAt: string
   }>> {
-    const response = await modelApi.get<ApiResponse<PaginatedResponse<{
+    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<{
       deploymentId: string
       modelId: string
       deploymentName: string
@@ -472,8 +480,8 @@ export const model = {
     deploymentId?: string
     page?: number
     size?: number
-  } = {}): Promise<PaginatedResponse<RollbackInfo>> {
-    const response = await modelApi.get<ApiResponse<PaginatedResponse<RollbackInfo>>>('/rollback/history', { params })
+  } = {}): Promise<ModelVersionPaginatedResponse<RollbackInfo>> {
+    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<RollbackInfo>>>('/rollback/history', { params })
     return response.data.data
   },
 

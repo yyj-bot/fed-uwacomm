@@ -1,23 +1,121 @@
 /**
  * 服务层统一导出
  * 提供项目中所有服务的统一访问入口
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
  */
 
-// ==================== 认证服务 ====================
-export { 
-  authService, 
-  AuthService, 
-  TokenManager,
-  type AuthState,
-  type AuthEvent,
-  type AuthEventListener,
-  type TokenInfo,
-  type PermissionCheckResult,
-  type RolePermissions
-} from './auth'
+// ==================== 业务服务 ====================
+// 管理员服务
+export { adminUserService as adminService } from './admin'
+export type {
+  AdminUserService,
+  Permission,
+  UserListParams,
+  CreateUserRequest,
+  UpdateUserRequest,
+  LockUserRequest,
+  ResetPasswordRequest,
+  GrantPermissionRequest,
+  LockUserResponse,
+  UnlockUserResponse,
+  UserStatistics,
+  AdminServiceConfig
+} from './admin'
 
-// 默认导出认证服务（兼容旧代码）
-export { default as authService } from './auth'
+// 用户服务
+export { userService } from './user'
+export type {
+  UserService,
+  RegisterUserRequest,
+  RefreshTokenResponse,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  AuthState,
+  LoginStatus,
+  UserServiceError,
+  AuthError,
+  PasswordStrength,
+  PasswordPolicy,
+  LoginSecurityPolicy,
+  UserActivityStats,
+  UserPreferences,
+  UserServiceConfig
+} from './user'
+
+// 虚拟机服务
+export { vmService } from './vm'
+export type {
+  VMService,
+  VMListParams,
+  VMUpdateRequest,
+  VMStartRequest,
+  VMStopRequest,
+  VMResourceUsage,
+  VMNetworkInfo,
+  VMServiceConfig
+} from './vm'
+
+// 联邦任务服务
+export { federatedTaskService } from './federated-task'
+export type {
+  FederatedTaskService,
+  CreateTaskRequest,
+  ConfigTaskRequest,
+  TaskListParams,
+  TaskLogsParams,
+  DeleteTaskRequest,
+  FederatedTaskServiceConfig
+} from './federated-task'
+
+// 模型版本服务
+export { modelVersionService } from './model-version'
+export type {
+  ModelVersionService,
+  UploadModelRequest,
+  ModelVersionListParams,
+  EvaluationRequest,
+  DeploymentRequest,
+  RollbackRequest,
+  ModelVersionServiceConfig
+} from './model-version'
+
+// 训练数据服务
+export { trainingDataService } from './training-data'
+export type {
+  TrainingDataService,
+  UploadFileRequest,
+  UploadTextRequest,
+  DataListParams,
+  PreprocessRequest,
+  ValidationRequest,
+  UpdateDataRequest,
+  BatchOperationRequest,
+  ExportDataRequest,
+  TrainingDataServiceConfig
+} from './training-data'
+
+// 系统日志服务
+export { systemLogService } from './system-log'
+export type {
+  SystemLogService,
+  SystemLogListParams,
+  RealtimeLogsParams,
+  LogExportData,
+  LogCleanupData,
+  SystemLogServiceError
+} from './system-log'
+
+// VM轮次模型服务
+export { vmRoundModelsService } from './vm-round-models'
+export type {
+  VMRoundModelsService,
+  VMRoundModelListParams,
+  VMModelTrendParams,
+  VMModelBestParams,
+  VMRoundModel
+} from './vm-round-models'
 
 // ==================== WebSocket服务 ====================
 export { 
@@ -26,9 +124,11 @@ export {
   WebSocketService,
   ConnectionManager,
   WSMessageHandler,
+  createWebSocketService,
+  WebSocketUtils,
+  ConnectionState,
   type WebSocketMessage,
   type ConnectionStatus,
-  type ConnectionState,
   type WebSocketConfig,
   type MessageHandler,
   type ConnectionStateHandler,
@@ -47,19 +147,35 @@ export {
   type DatasetAppendRowsMessage,
   type DatasetCompleteMessage,
   type ErrorMessage,
-  type IWebSocketService
+  type IWebSocketService,
+  type WebSocketEvent,
+  type WebSocketEventListener
 } from './websocket'
-
-// 默认导出WebSocket服务（兼容旧代码）
-export { default as websocketService } from './websocket'
 
 // ==================== 服务实例集合 ====================
 // 提供所有服务实例的集合，方便统一管理
-import { authService } from './auth'
 import { wsService } from './websocket'
+import { adminUserService } from './admin'
+import { userService } from './user'
+import { vmService } from './vm'
+import { federatedTaskService } from './federated-task'
+import { modelVersionService } from './model-version'
+import { trainingDataService } from './training-data'
+import { systemLogService } from './system-log'
+import { vmRoundModelsService } from './vm-round-models'
 
 export const services = {
-  auth: authService,
+  // 业务服务
+  admin: adminUserService,
+  user: userService,
+  vm: vmService,
+  federatedTask: federatedTaskService,
+  modelVersion: modelVersionService,
+  trainingData: trainingDataService,
+  systemLog: systemLogService,
+  vmRoundModels: vmRoundModelsService,
+  
+  // WebSocket服务
   websocket: wsService,
   ws: wsService // 别名
 } as const
@@ -72,9 +188,6 @@ export async function initializeServices(): Promise<void> {
   console.log('[Services] 开始初始化服务...')
   
   try {
-    // 认证服务会在实例化时自动初始化
-    console.log('[Services] 认证服务已初始化')
-    
     // WebSocket服务需要在用户登录后手动连接
     console.log('[Services] WebSocket服务已准备就绪')
     
@@ -96,10 +209,6 @@ export function destroyServices(): void {
     wsService.destroy()
     console.log('[Services] WebSocket服务已销毁')
     
-    // 销毁认证服务
-    authService.destroy()
-    console.log('[Services] 认证服务已销毁')
-    
     console.log('[Services] 所有服务销毁完成')
   } catch (error) {
     console.error('[Services] 服务销毁失败:', error)
@@ -111,11 +220,6 @@ export function destroyServices(): void {
  */
 export function getServicesStatus() {
   return {
-    auth: {
-      isAuthenticated: authService.isAuthenticated(),
-      user: authService.getCurrentUser(),
-      state: authService.getState()
-    },
     websocket: {
       isConnected: wsService.isConnected(),
       state: wsService.getState(),
@@ -125,39 +229,56 @@ export function getServicesStatus() {
   }
 }
 
-// ==================== 类型导出 ====================
-// 重新导出所有相关类型，方便其他模块使用
+// ==================== 基础类型导出 ====================
+// 重新导出基础类型，方便其他模块使用
 export type { User, LoginRequest, LoginResponse } from '@/types'
+
+// 服务实例类型
+export type ServicesType = typeof services
 
 // ==================== 工具函数 ====================
 /**
- * 检查服务是否就绪
+ * 检查WebSocket服务是否就绪
  */
-export function isServicesReady(): boolean {
-  return authService.isAuthenticated() && wsService.isConnected()
+export function isWebSocketReady(): boolean {
+  return wsService.isConnected()
 }
 
 /**
- * 等待服务就绪
+ * 等待WebSocket服务就绪
  */
-export function waitForServices(timeout = 10000): Promise<void> {
+export function waitForWebSocket(timeout = 10000): Promise<void> {
   return new Promise((resolve, reject) => {
     const startTime = Date.now()
     
-    const checkServices = () => {
-      if (isServicesReady()) {
+    const checkWebSocket = () => {
+      if (isWebSocketReady()) {
         resolve()
         return
       }
       
       if (Date.now() - startTime > timeout) {
-        reject(new Error('等待服务就绪超时'))
+        reject(new Error('等待WebSocket服务就绪超时'))
         return
       }
       
-      setTimeout(checkServices, 500)
+      setTimeout(checkWebSocket, 500)
     }
     
-    checkServices()
+    checkWebSocket()
   })
+}
+
+/**
+ * 连接WebSocket服务（带认证检查）
+ */
+export async function connectWebSocketService(): Promise<void> {
+  // 检查是否有认证token
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('未找到认证Token，请先登录')
+  }
+  
+  // 连接WebSocket
+  await wsService.connect()
 }

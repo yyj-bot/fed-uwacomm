@@ -42,22 +42,22 @@ const TestApp: React.FC = () => {
 
         // 检查服务层
         try {
-          await import('./services/api')
-          results.push('✅ API Services - 正常')
+          await import('./services')
+          results.push('✅ Services - 正常')
         } catch (e) {
-          results.push('❌ API Services - 失败: ' + e)
+          results.push('❌ Services - 失败: ' + e)
         }
 
         // 检查页面组件
         try {
-          await import('./pages/Login')
+          await import('./modules/login')
           results.push('✅ Login Page - 正常')
         } catch (e) {
           results.push('❌ Login Page - 失败: ' + e)
         }
 
         try {
-          await import('./pages/Dashboard')
+          await import('./modules/dashboard')
           results.push('✅ Dashboard Page - 正常')
         } catch (e) {
           results.push('❌ Dashboard Page - 失败: ' + e)

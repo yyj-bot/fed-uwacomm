@@ -1,9 +1,15 @@
 /**
  * WebSocket服务相关类型定义
  * 严格遵循 WebSocket协议文档-中心化实现.md
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
  */
 
 // ==================== 基础消息类型 ====================
+/**
+ * WebSocket标准消息格式 - 严格按照协议文档2.1节
+ */
 export interface WebSocketMessage {
   readonly type: string
   readonly id: string
@@ -35,10 +41,12 @@ export interface WebSocketConfig {
   readonly url: string
   readonly enableSockJS: boolean
   readonly vmId: string
+  readonly token?: string
   readonly heartbeatInterval: number
   readonly reconnectDelay: number
   readonly maxReconnectAttempts: number
   readonly connectTimeout: number
+  readonly debug?: boolean
 }
 
 // ==================== 消息处理器 ====================
@@ -48,12 +56,12 @@ export type ErrorHandler = (error: Error) => void
 
 // ==================== 具体消息类型 ====================
 
-// 连接消息
+// 连接消息 - 严格按照协议文档
 export interface ConnectMessage {
   readonly version: string
   readonly capabilities: string[]
-  readonly systemInfo?: {
-    readonly os?: string
+  readonly systemInfo: {
+    readonly os: string
     readonly python?: string
     readonly memory?: string
     readonly cpu?: string
@@ -74,10 +82,10 @@ export interface ConnectAckMessage {
   readonly supportedFeatures: string[]
 }
 
-// 心跳消息
+// 心跳消息 - 严格按照协议文档
 export interface HeartbeatMessage {
   readonly status: string
-  readonly resourceUsage?: {
+  readonly resourceUsage: {
     readonly cpu: number
     readonly memory: number
     readonly disk: number

@@ -122,83 +122,10 @@ interface VMStatus {
   wsSessionId?: string
 }
 
-// 虚拟机注册参数类型
-interface VMRegisterData {
-  vmId: string
-  name: string
-  ipAddress: string
-  port: number
-  osType: string
-  cpuCores: number
-  memoryMb: number
-  diskGb: number
-  systemInfo?: Record<string, unknown>
-  capabilities?: Record<string, unknown>
-}
 
-// Token刷新参数类型
-interface TokenRefreshData {
-  vmId: string
-  secretId: string
-}
 
 // ==================== 虚拟机管理API ====================
 export const vmApi = {
-  // ==================== 3.1 虚拟机注册接口 ====================
-  async registerVM(vmData: VMRegisterData): Promise<{
-    vmId: string
-    name: string
-    status: string
-    connectionStatus: string
-    createdAt: string
-    sessionId: string
-    accessToken: string
-    secretId: string
-    tokenExpireSeconds: number
-    websocket: {
-      sockjs: string
-      native: string
-    }
-    apiEndpoints: {
-      status: string
-      control: string
-    }
-  }> {
-    const response = await vmApiInstance.post<ApiResponse<{
-      vmId: string
-      name: string
-      status: string
-      connectionStatus: string
-      createdAt: string
-      sessionId: string
-      accessToken: string
-      secretId: string
-      tokenExpireSeconds: number
-      websocket: {
-        sockjs: string
-        native: string
-      }
-      apiEndpoints: {
-        status: string
-        control: string
-      }
-    }>>('/v1/vm/register', vmData)
-    return response.data.data
-  },
-
-  // ==================== 3.2 Token刷新接口 ====================
-  async refreshToken(refreshData: TokenRefreshData): Promise<{
-    accessToken: string
-    tokenExpireSeconds: number
-    secretId: string
-  }> {
-    const response = await vmApiInstance.post<ApiResponse<{
-      accessToken: string
-      tokenExpireSeconds: number
-      secretId: string
-    }>>('/v1/vm/token/refresh', refreshData)
-    return response.data.data
-  },
 
   // ==================== 4.1 虚拟机列表查询接口 ====================
   async getVMList(params: PaginationParams & {
@@ -373,7 +300,5 @@ export default vmApi
 // 导出类型定义
 export type {
   VirtualMachine,
-  VMStatus,
-  VMRegisterData,
-  TokenRefreshData
+  VMStatus
 }

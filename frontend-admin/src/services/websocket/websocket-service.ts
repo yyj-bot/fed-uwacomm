@@ -2,6 +2,9 @@
  * WebSocket服务 - 重构版本
  * 严格遵循 WebSocket协议文档-中心化实现.md
  * 职责：WebSocket连接管理、消息收发、状态监控
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
  */
 
 import { ConnectionManager } from './connection-manager'
@@ -10,7 +13,6 @@ import type {
   IWebSocketService,
   WebSocketConfig,
   ConnectionStatus,
-  ConnectionState,
   WebSocketMessage,
   MessageHandler as MessageHandlerType,
   ConnectionStateHandler,
@@ -19,6 +21,7 @@ import type {
   HeartbeatMessage,
   StatusQueryMessage
 } from './types'
+import { ConnectionState } from './types'
 
 export class WebSocketService implements IWebSocketService {
   private static instance: WebSocketService
@@ -27,15 +30,16 @@ export class WebSocketService implements IWebSocketService {
   private heartbeatTimer: NodeJS.Timeout | null = null
   private config: WebSocketConfig
 
-  // 默认配置
+  // 默认配置 - 严格按照协议文档
   private static readonly DEFAULT_CONFIG: WebSocketConfig = {
     url: 'http://localhost:8080/ws', // 开发环境，生产环境应使用 wss://
     enableSockJS: true,
     vmId: 'admin-client', // 管理员客户端标识
-    heartbeatInterval: 30000, // 30秒心跳间隔
+    heartbeatInterval: 30000, // 30秒心跳间隔，按照协议文档4.2节
     reconnectDelay: 5000, // 5秒重连延迟
-    maxReconnectAttempts: 10, // 最大重连次数
-    connectTimeout: 30000 // 30秒连接超时
+    maxReconnectAttempts: 10, // 最大重连次数，按照协议文档6.4节
+    connectTimeout: 30000, // 30秒连接超时
+    debug: false // 默认关闭调试
   }
 
   private constructor(config?: Partial<WebSocketConfig>) {
@@ -57,26 +61,26 @@ export class WebSocketService implements IWebSocketService {
   }
 
   /**
-   * 连接到WebSocket服务器
+   * 连接到WebSocket服务器 - 严格按照协议文档4.1节连接建立流程
    */
   async connect(): Promise<void> {
     try {
-      // 获取认证Token
+      // 第一步：获取认证Token（前置注册已在HTTP接口完成）
       const token = this.getAuthToken()
       if (!token) {
         throw new Error('未找到认证Token，请先登录')
       }
 
-      // 建立连接
+      // 第二步：建立WebSocket连接，在STOMP CONNECT头部携带Token
       await this.connectionManager.connect(token)
 
-      // 连接成功后发送CONNECT消息
+      // 第三步：连接建立后发送应用层CONNECT消息（能力与环境上报）
       this.sendConnectMessage()
 
-      // 启动心跳
+      // 第四步：启动心跳机制保持连接活跃
       this.startHeartbeat()
 
-      console.log('[WebSocket] 连接建立成功')
+      console.log('[WebSocket] 连接建立成功，按照协议文档流程完成')
     } catch (error) {
       console.error('[WebSocket] 连接失败:', error)
       throw error
@@ -170,6 +174,55 @@ export class WebSocketService implements IWebSocketService {
   }
 
   /**
+   * 发送数据集管理命令
+   */
+  sendDatasetCreate(datasetId: string, description: string, type: string, metadata?: any): void {
+    this.messageHandler.sendDatasetCreate({
+      datasetId,
+      datasetDescription: description,
+      datasetType: type,
+      metadata
+    })
+  }
+
+  sendDatasetAppendRows(datasetId: string, rows: any[]): void {
+    this.messageHandler.sendDatasetAppendRows({
+      datasetId,
+      rows
+    })
+  }
+
+  sendDatasetComplete(datasetId: string): void {
+    this.messageHandler.sendDatasetComplete({
+      datasetId
+    })
+  }
+
+  sendDatasetStatusQuery(datasetId: string): void {
+    this.messageHandler.sendDatasetStatusQuery({
+      datasetId
+    })
+  }
+
+  sendDatasetDelete(datasetId: string): void {
+    this.messageHandler.sendDatasetDelete({
+      datasetId
+    })
+  }
+
+  /**
+   * 发送模型上传消息
+   */
+  sendModelUpload(taskId: string, round: number, parameters: any, metrics: any): void {
+    this.messageHandler.sendModelUpload({
+      taskId,
+      round,
+      parameters,
+      metrics
+    })
+  }
+
+  /**
    * 注册消息处理器
    */
   onMessage(type: string, handler: MessageHandlerType): () => void {
@@ -230,15 +283,29 @@ export class WebSocketService implements IWebSocketService {
   }
 
   /**
-   * 发送初始连接消息
+   * 发送初始连接消息 - 严格按照协议文档3.1.1节格式
    */
   private sendConnectMessage(): void {
     const connectData: ConnectMessage = {
       version: '1.0.0',
-      capabilities: ['STATUS_QUERY', 'VM_CONTROL', 'TRAINING_CONTROL', 'DATASET_MANAGEMENT'],
+      capabilities: ['FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD'], // 按照协议文档能力列表
       systemInfo: {
-        os: navigator.platform,
-        // 其他系统信息可以根据需要添加
+        os: navigator.platform || 'Unknown',
+        python: undefined, // 管理员客户端为浏览器环境，无Python
+        memory: this.getBrowserMemoryInfo(),
+        cpu: navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} cores` : 'Unknown',
+        gpu: undefined // 浏览器环境无法直接获取GPU信息
+      },
+      supportedAlgorithms: {
+        'FEDAVG': {
+          version: '1.0',
+          description: '联邦平均算法'
+        },
+        'FEDPROX': {
+          version: '1.0',
+          description: '联邦近端算法',
+          parameters: ['mu']
+        }
       }
     }
 
@@ -246,16 +313,26 @@ export class WebSocketService implements IWebSocketService {
   }
 
   /**
-   * 启动心跳
+   * 启动心跳 - 严格按照协议文档4.2节心跳机制
    */
   private startHeartbeat(): void {
     this.stopHeartbeat()
 
     this.heartbeatTimer = setInterval(() => {
       if (this.isConnected()) {
+        // 按照协议文档3.2.1节构造心跳消息
         const heartbeatData: HeartbeatMessage = {
-          status: 'ACTIVE',
-          resourceUsage: this.getClientResourceUsage()
+          status: 'IDLE', // 管理员客户端通常为IDLE状态
+          resourceUsage: this.getClientResourceUsage(),
+          network: {
+            uploadSpeed: 0, // 浏览器环境无法获取实际网络速度
+            downloadSpeed: 0,
+            latency: 0 // 简化处理，实际可通过ping测试获取
+          },
+          processes: {
+            total: 1, // 浏览器环境简化为1个进程
+            active: 1
+          }
         }
 
         this.sendHeartbeat(heartbeatData)
@@ -277,19 +354,41 @@ export class WebSocketService implements IWebSocketService {
   }
 
   /**
-   * 获取客户端资源使用情况
+   * 获取浏览器内存信息
    */
-  private getClientResourceUsage(): any {
+  private getBrowserMemoryInfo(): string | undefined {
+    if ((performance as any).memory) {
+      const memory = (performance as any).memory
+      const usedMB = Math.round(memory.usedJSHeapSize / 1024 / 1024)
+      const totalMB = Math.round(memory.totalJSHeapSize / 1024 / 1024)
+      return `${usedMB}MB / ${totalMB}MB`
+    }
+    return undefined
+  }
+
+  /**
+   * 获取客户端资源使用情况 - 严格按照协议文档格式
+   */
+  private getClientResourceUsage(): {
+    cpu: number
+    memory: number
+    disk: number
+    gpu?: number
+  } {
     // 浏览器环境中获取资源使用情况的方法有限
-    // 这里返回一些基本信息
+    const memoryInfo = (performance as any).memory
+    let memoryUsage = 0
+    
+    if (memoryInfo) {
+      // 计算内存使用百分比
+      memoryUsage = Math.round((memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100)
+    }
+
     return {
       cpu: 0, // 浏览器无法直接获取CPU使用率
-      memory: (performance as any).memory ? {
-        used: (performance as any).memory.usedJSHeapSize,
-        total: (performance as any).memory.totalJSHeapSize,
-        limit: (performance as any).memory.jsHeapSizeLimit
-      } : undefined,
-      timestamp: Date.now()
+      memory: memoryUsage,
+      disk: 0, // 浏览器无法获取磁盘使用率
+      gpu: undefined // 浏览器无法获取GPU使用率
     }
   }
 
@@ -329,7 +428,7 @@ export class WebSocketService implements IWebSocketService {
     const status = this.getStatus()
     return {
       queueLength: this.messageHandler.getQueueLength(),
-      reconnectAttempts: 0, // TODO: 从ConnectionManager获取
+      reconnectAttempts: this.connectionManager.getReconnectAttempts(),
       lastHeartbeat: status.lastHeartbeat,
       connectionDuration: status.lastHeartbeat ? Date.now() - status.lastHeartbeat.getTime() : 0
     }

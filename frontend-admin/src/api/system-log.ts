@@ -215,8 +215,8 @@ export const log = {
     startTime?: string
     endTime?: string
     keyword?: string
-  } = {}): Promise<PaginatedResponse<SystemLog>> {
-    const response = await logApi.get<ApiResponse<PaginatedResponse<SystemLog>>>('/list', { params })
+  } = {}): Promise<any> {
+    const response = await logApi.get<ApiResponse<any>>('/list', { params })
     return response.data.data
   },
 

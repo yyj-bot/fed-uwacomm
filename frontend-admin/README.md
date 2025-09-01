@@ -36,6 +36,15 @@ Router:              React Router v6
 ```
 src/
 ├── api/                  # ✅ 新的模块化API结构
+│   ├── admin.ts
+│   ├── federated-task.ts
+│   ├── model-version.ts
+│   ├── system-logs.ts
+│   ├── training-data.ts
+│   ├── user.ts
+│   └── vm-round-modules.ts
+│   └── vm.ts
+│   └── index.ts
 ├── components/           # ✅ 通用组件 (Button等)
 ├── layouts/              # ✅ 布局组件 (MainLayout)
 ├── modules/              # ✅ 业务模块
@@ -49,7 +58,56 @@ src/
 ├── store/                # ✅ 全局状态管理
 ├── types/                # ✅ 类型定义
 ├── utils/                # ✅ 工具函数
-├── services/             # ✅ 保留WebSocket和Auth服务
+├── services/             # ✅ api与websocket服务实现
+    ├── admin/
+    │   ├── adminService.ts      # 封装 api/admin.ts
+    │   ├── types.ts             # admin 相关 TS 类型
+    │   └── index.ts             # 统一导出 adminService 和 types
+    │
+    ├── federated-task/
+    │   ├── federatedTaskService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── model-version/
+    │   ├── modelVersionService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── system-logs/
+    │   ├── systemLogsService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── training-data/
+    │   ├── trainingDataService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── user/
+    │   ├── userService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── vm/
+    │   ├── vmService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── vm-round-modules/
+    │   ├── vmRoundModulesService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    ├── websocket/                # WebSocket 服务
+    │   ├── connectionManager.ts
+    │   ├── messageHandler.ts
+    │   ├── userWebSocketService.ts
+    │   ├── vmWebSocketService.ts
+    │   ├── types.ts
+    │   └── index.ts
+    │
+    └── index.ts                  # 根服务统一导出所有模块
 ├── mocks/                # ✅ Mock数据
 └── test/                 # ✅ 测试配置
 ```

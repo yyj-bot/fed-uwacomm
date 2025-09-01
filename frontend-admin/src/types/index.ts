@@ -3,6 +3,9 @@
 // WebSocket相关类型
 export * from './websocket'
 
+// 工具类型
+export * from './utils'
+
 // ==================== 通用响应类型 ====================
 export interface ApiResponse<T> {
   readonly code: number

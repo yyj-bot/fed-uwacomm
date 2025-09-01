@@ -1,11 +1,15 @@
 /**
  * WebSocket消息处理器
  * 负责消息的发送、接收、处理和路由
+ * 严格按照 WebSocket协议文档-中心化实现.md
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
  */
 
 import type { 
   WebSocketMessage, 
-  MessageHandler,
+  MessageHandler as MessageHandlerType,
   ConnectMessage,
   HeartbeatMessage,
   StatusQueryMessage,
@@ -15,7 +19,7 @@ import type {
 import type { ConnectionManager } from './connection-manager'
 
 export class MessageHandler {
-  private messageHandlers: Map<string, Set<MessageHandler>> = new Map()
+  private messageHandlers: Map<string, Set<MessageHandlerType>> = new Map()
   private eventListeners: Map<string, Set<WebSocketEventListener>> = new Map()
   private messageQueue: WebSocketMessage[] = []
   private isProcessingQueue = false
@@ -28,7 +32,7 @@ export class MessageHandler {
   }
 
   /**
-   * 发送消息
+   * 发送消息 - 严格按照协议文档2.1节消息格式
    */
   send(message: Omit<WebSocketMessage, 'id' | 'timestamp' | 'vmId'>): void {
     if (!this.connectionManager.isConnected()) {
@@ -37,11 +41,14 @@ export class MessageHandler {
       return
     }
 
+    // 按照协议文档2.1节构造完整消息
     const fullMessage: WebSocketMessage = {
       ...message,
       id: this.generateMessageId('client'),
       timestamp: new Date().toISOString(),
-      vmId: this.vmId
+      vmId: this.vmId,
+      // 按照协议文档2.2节，signature为必需字段，这里简化处理
+      signature: this.generateSignature(message)
     }
 
     try {
@@ -50,12 +57,13 @@ export class MessageHandler {
         throw new Error('STOMP客户端未初始化')
       }
 
+      // 发送到服务器端点
       stompClient.publish({
         destination: '/app/message',
         body: JSON.stringify(fullMessage)
       })
 
-      console.log('[WebSocket] 消息已发送:', fullMessage)
+      console.log('[WebSocket] 消息已发送:', fullMessage.type, fullMessage.id)
       
       this.emitEvent({
         type: 'MESSAGE',
@@ -156,10 +164,34 @@ export class MessageHandler {
     })
   }
 
+  sendDatasetStatusQuery(data: any): void {
+    this.send({
+      type: 'DATASET_STATUS_QUERY',
+      data
+    })
+  }
+
+  sendDatasetDelete(data: any): void {
+    this.send({
+      type: 'DATASET_DELETE',
+      data
+    })
+  }
+
+  /**
+   * 发送模型上传消息
+   */
+  sendModelUpload(data: any): void {
+    this.send({
+      type: 'MODEL_UPLOAD',
+      data
+    })
+  }
+
   /**
    * 注册消息处理器
    */
-  onMessage(type: string, handler: MessageHandler): () => void {
+  onMessage(type: string, handler: MessageHandlerType): () => void {
     if (!this.messageHandlers.has(type)) {
       this.messageHandlers.set(type, new Set())
     }
@@ -174,7 +206,7 @@ export class MessageHandler {
   /**
    * 移除消息处理器
    */
-  offMessage(type: string, handler?: MessageHandler): void {
+  offMessage(type: string, handler?: MessageHandlerType): void {
     if (handler) {
       this.messageHandlers.get(type)?.delete(handler)
     } else {
@@ -280,7 +312,7 @@ export class MessageHandler {
   }
 
   /**
-   * 处理特殊消息类型
+   * 处理特殊消息类型 - 严格按照协议文档
    */
   private handleSpecialMessages(message: WebSocketMessage): void {
     switch (message.type) {
@@ -291,7 +323,28 @@ export class MessageHandler {
         this.handleHeartbeatAck(message)
         break
       case 'ERROR':
+      case 'CONNECTION_ERROR':
+      case 'MESSAGE_ERROR':
+      case 'STATUS_QUERY_ERROR':
         this.handleError(message)
+        break
+      case 'DATASET_CREATE_ACK':
+      case 'DATASET_APPEND_ROWS_ACK':
+      case 'DATASET_COMPLETE_ACK':
+      case 'DATASET_DELETE_ACK':
+        this.handleDatasetAck(message)
+        break
+      case 'STATUS_RESPONSE':
+        this.handleStatusResponse(message)
+        break
+      case 'DATASET_STATUS_RESPONSE':
+        this.handleDatasetStatusResponse(message)
+        break
+      case 'TRAINING_PROGRESS':
+        this.handleTrainingProgress(message)
+        break
+      case 'MODEL_DOWNLOAD':
+        this.handleModelDownload(message)
         break
       default:
         // 其他消息类型由注册的处理器处理
@@ -334,6 +387,41 @@ export class MessageHandler {
   }
 
   /**
+   * 处理数据集ACK消息
+   */
+  private handleDatasetAck(message: WebSocketMessage): void {
+    console.log('[WebSocket] 数据集操作确认:', message.type, message.data)
+  }
+
+  /**
+   * 处理状态响应
+   */
+  private handleStatusResponse(message: WebSocketMessage): void {
+    console.log('[WebSocket] 状态响应:', message.data)
+  }
+
+  /**
+   * 处理数据集状态响应
+   */
+  private handleDatasetStatusResponse(message: WebSocketMessage): void {
+    console.log('[WebSocket] 数据集状态响应:', message.data)
+  }
+
+  /**
+   * 处理训练进度
+   */
+  private handleTrainingProgress(message: WebSocketMessage): void {
+    console.log('[WebSocket] 训练进度:', message.data)
+  }
+
+  /**
+   * 处理模型下载
+   */
+  private handleModelDownload(message: WebSocketMessage): void {
+    console.log('[WebSocket] 模型下载:', message.data)
+  }
+
+  /**
    * 消息入队
    */
   private queueMessage(message: Omit<WebSocketMessage, 'id' | 'timestamp' | 'vmId'>): void {
@@ -351,7 +439,7 @@ export class MessageHandler {
   /**
    * 处理消息队列
    */
-  private async processMessageQueue(): void {
+  private async processMessageQueue(): Promise<void> {
     if (this.isProcessingQueue || this.messageQueue.length === 0) {
       return
     }
@@ -386,12 +474,22 @@ export class MessageHandler {
   }
 
   /**
-   * 生成消息ID
+   * 生成消息ID - 按照协议文档2.3节规则
    */
   private generateMessageId(prefix: string): string {
     const timestamp = Date.now()
-    const random = Math.random().toString(36).substr(2, 9)
+    const random = Math.random().toString(36).substr(2, 6)
     return `${prefix}-${timestamp}-${random}`
+  }
+
+  /**
+   * 生成消息签名 - 简化实现
+   * 实际生产环境中应使用加密算法生成数字签名
+   */
+  private generateSignature(message: any): string {
+    // 这里简化处理，实际应该使用HMAC-SHA256等算法
+    const content = JSON.stringify(message.data || {})
+    return btoa(content).substr(0, 32)
   }
 
   /**

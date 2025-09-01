@@ -1,74 +1,85 @@
+/**
+ * Vitest 测试环境设置
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
+ */
+
 import '@testing-library/jest-dom'
-import { beforeAll, afterAll, afterEach, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
-import { setupServer } from 'msw/node'
-import { handlers } from '../mocks/handlers'
+import { vi } from 'vitest'
 
-// 模拟 matchMedia
-Object.defineProperty(window, 'matchMedia', {
+// 全局测试配置
+global.console = {
+  ...console,
+  // 在测试中静默某些日志输出
+  log: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}
+
+// Mock atob and btoa functions for JWT token parsing
+global.atob = (str: string) => Buffer.from(str, 'base64').toString('binary')
+global.btoa = (str: string) => Buffer.from(str, 'binary').toString('base64')
+
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock
+})
+
+// Mock sessionStorage
+const sessionStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+
+Object.defineProperty(window, 'sessionStorage', {
+  value: sessionStorageMock
+})
+
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    href: 'http://localhost:3000',
+    origin: 'http://localhost:3000',
+    pathname: '/',
+    search: '',
+    hash: '',
+    replace: vi.fn(),
+    assign: vi.fn(),
+    reload: vi.fn(),
+  },
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
 })
 
-// 模拟 ResizeObserver
-class ResizeObserverMock {
-  observe = vi.fn()
-  unobserve = vi.fn()
-  disconnect = vi.fn()
-}
-
-window.ResizeObserver = ResizeObserverMock
-
-// 模拟 IntersectionObserver
-class IntersectionObserverMock {
-  observe = vi.fn()
-  unobserve = vi.fn()
-  disconnect = vi.fn()
-  root = null
-  rootMargin = ''
-  thresholds = []
-  takeRecords = vi.fn()
-}
-
-window.IntersectionObserver = IntersectionObserverMock
-
-// 模拟 getComputedStyle
-Object.defineProperty(window, 'getComputedStyle', {
-  value: () => ({
-    getPropertyValue: () => '',
-  }),
-})
-
-// 模拟 scrollTo
-window.scrollTo = vi.fn().mockImplementation((x: number, y: number) => {})
-
-// 设置MSW服务器
-export const server = setupServer(...handlers)
-
-// 在所有测试之前启动服务器
-beforeAll(() => {
-  // 设置全局超时时间
-  vi.setConfig({ testTimeout: 10000 })
-  server.listen({ onUnhandledRequest: 'error' })
-})
-
-// 每个测试后重置处理程序
-afterEach(() => {
-  server.resetHandlers()
-  cleanup()
+// 测试前的全局设置
+beforeEach(() => {
+  // 清理所有模拟
   vi.clearAllMocks()
+  
+  // 重置localStorage和sessionStorage
+  localStorageMock.getItem.mockClear()
+  localStorageMock.setItem.mockClear()
+  localStorageMock.removeItem.mockClear()
+  localStorageMock.clear.mockClear()
+  
+  sessionStorageMock.getItem.mockClear()
+  sessionStorageMock.setItem.mockClear()
+  sessionStorageMock.removeItem.mockClear()
+  sessionStorageMock.clear.mockClear()
 })
 
-// 所有测试完成后关闭服务器
-afterAll(() => {
-  server.close()
-}) 
+// 测试后的清理
+afterEach(() => {
+  vi.restoreAllMocks()
+})
