@@ -1,49 +1,12 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   PaginatedResponse,
   PaginationParams
 } from '@/types'
 
-// 创建本地模型API实例
-const vmRoundModelsApi = axios.create({
-  baseURL: 'http://localhost:8080/api/model',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-vmRoundModelsApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-vmRoundModelsApi.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('VM Round Models API Error:', error)
-    throw error
-  }
-)
+// 创建虚拟机轮次模型API实例
+const vmRoundModelsApiInstance = createApiInstance('http://localhost:8080/api/model')
 
 // 本地模型结果类型
 interface VMRoundModel {
@@ -92,13 +55,13 @@ export const vmRoundModels = {
     roundNumber?: number
     vmId?: string
   } = {}): Promise<any> {
-    const response = await vmRoundModelsApi.get<ApiResponse<any>>('/vm-round-models', { params })
+    const response = await vmRoundModelsApiInstance.get<ApiResponse<any>>('/vm-round-models', { params })
     return response.data.data
   },
 
   // ==================== 2.2 本地模型结果详情查询 ====================
   async getVMRoundModelDetail(vmRoundModelId: string): Promise<VMRoundModel> {
-    const response = await vmRoundModelsApi.get<ApiResponse<VMRoundModel>>(`/vm-round-models/${vmRoundModelId}`)
+    const response = await vmRoundModelsApiInstance.get<ApiResponse<VMRoundModel>>(`/vm-round-models/${vmRoundModelId}`)
     return response.data.data
   },
 
@@ -108,7 +71,7 @@ export const vmRoundModels = {
     vmId: string
     metric: string
   }): Promise<VMModelTrend> {
-    const response = await vmRoundModelsApi.get<ApiResponse<VMModelTrend>>('/vm-round-models/metrics/trend', { params })
+    const response = await vmRoundModelsApiInstance.get<ApiResponse<VMModelTrend>>('/vm-round-models/metrics/trend', { params })
     return response.data.data
   },
 
@@ -118,10 +81,10 @@ export const vmRoundModels = {
     metric: string
     type: 'best' | 'outlier'
   }): Promise<VMModelBest> {
-    const response = await vmRoundModelsApi.get<ApiResponse<VMModelBest>>('/vm-round-models/metrics/best', { params })
+    const response = await vmRoundModelsApiInstance.get<ApiResponse<VMModelBest>>('/vm-round-models/metrics/best', { params })
     return response.data.data
   },
 } as const
 
-export default vmRoundModels
+// 使用命名导出以保持一致性
 

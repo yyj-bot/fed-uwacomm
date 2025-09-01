@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   SystemLog,
@@ -8,44 +8,7 @@ import type {
 } from '@/types'
 
 // 创建日志API实例
-const logApi = axios.create({
-  baseURL: 'http://localhost:8080/api/log',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-logApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-logApi.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('Log API Error:', error)
-    throw error
-  }
-)
+const logApiInstance = createApiInstance('http://localhost:8080/api/log')
 
 // 导出任务类型
 interface ExportTask {
@@ -216,13 +179,13 @@ export const log = {
     endTime?: string
     keyword?: string
   } = {}): Promise<any> {
-    const response = await logApi.get<ApiResponse<any>>('/list', { params })
+    const response = await logApiInstance.get<ApiResponse<any>>('/list', { params })
     return response.data.data
   },
 
   // 3.2 日志详情查询
   async getLogDetail(logId: string): Promise<SystemLog> {
-    const response = await logApi.get<ApiResponse<SystemLog>>(`/detail/${logId}`)
+    const response = await logApiInstance.get<ApiResponse<SystemLog>>(`/detail/${logId}`)
     return response.data.data
   },
 
@@ -238,7 +201,7 @@ export const log = {
     totalCount: number
     lastUpdateTime: string
   }> {
-    const response = await logApi.get<ApiResponse<{
+    const response = await logApiInstance.get<ApiResponse<{
       logs: SystemLog[]
       totalCount: number
       lastUpdateTime: string
@@ -280,7 +243,7 @@ export const log = {
       errorCount: number
     }>
   }> {
-    const response = await logApi.get<ApiResponse<{
+    const response = await logApiInstance.get<ApiResponse<{
       totalLogs: number
       levelDistribution: {
         DEBUG: number
@@ -329,7 +292,7 @@ export const log = {
     estimatedTime: number
     downloadUrl: string
   }> {
-    const response = await logApi.post<ApiResponse<{
+    const response = await logApiInstance.post<ApiResponse<{
       exportId: string
       status: string
       estimatedTime: number
@@ -340,13 +303,13 @@ export const log = {
 
   // 4.2 导出状态查询
   async getExportStatus(exportId: string): Promise<ExportTask> {
-    const response = await logApi.get<ApiResponse<ExportTask>>(`/export/status/${exportId}`)
+    const response = await logApiInstance.get<ApiResponse<ExportTask>>(`/export/status/${exportId}`)
     return response.data.data
   },
 
   // 4.3 导出文件下载
   async downloadExportFile(exportId: string): Promise<Blob> {
-    const response = await logApi.get(`/export/download/${exportId}`, {
+    const response = await logApiInstance.get(`/export/download/${exportId}`, {
       responseType: 'blob'
     })
     return response.data
@@ -358,7 +321,7 @@ export const log = {
     page?: number
     size?: number
   } = {}): Promise<PaginatedResponse<ExportTask>> {
-    const response = await logApi.get<ApiResponse<PaginatedResponse<ExportTask>>>('/export/history', { params })
+    const response = await logApiInstance.get<ApiResponse<PaginatedResponse<ExportTask>>>('/export/history', { params })
     return response.data.data
   },
 
@@ -381,7 +344,7 @@ export const log = {
     estimatedSize: number
     dryRun: boolean
   }> {
-    const response = await logApi.post<ApiResponse<{
+    const response = await logApiInstance.post<ApiResponse<{
       cleanupId: string
       status: string
       estimatedRecords: number
@@ -393,7 +356,7 @@ export const log = {
 
   // 5.2 清理状态查询
   async getCleanupStatus(cleanupId: string): Promise<CleanupTask> {
-    const response = await logApi.get<ApiResponse<CleanupTask>>(`/cleanup/status/${cleanupId}`)
+    const response = await logApiInstance.get<ApiResponse<CleanupTask>>(`/cleanup/status/${cleanupId}`)
     return response.data.data
   },
 
@@ -403,7 +366,7 @@ export const log = {
     page?: number
     size?: number
   } = {}): Promise<PaginatedResponse<CleanupTask>> {
-    const response = await logApi.get<ApiResponse<PaginatedResponse<CleanupTask>>>('/cleanup/history', { params })
+    const response = await logApiInstance.get<ApiResponse<PaginatedResponse<CleanupTask>>>('/cleanup/history', { params })
     return response.data.data
   },
 
@@ -411,7 +374,7 @@ export const log = {
   
   // 6.1 系统状态监控
   async getSystemMonitor(): Promise<SystemMonitor> {
-    const response = await logApi.get<ApiResponse<SystemMonitor>>('/monitor/system')
+    const response = await logApiInstance.get<ApiResponse<SystemMonitor>>('/monitor/system')
     return response.data.data
   },
 
@@ -420,7 +383,7 @@ export const log = {
     timeRange?: '1h' | '6h' | '24h' | '7d'
     level?: string
   } = {}): Promise<LogMonitor> {
-    const response = await logApi.get<ApiResponse<LogMonitor>>('/monitor/logs', { params })
+    const response = await logApiInstance.get<ApiResponse<LogMonitor>>('/monitor/logs', { params })
     return response.data.data
   },
 
@@ -429,13 +392,13 @@ export const log = {
     timeRange?: '1h' | '6h' | '24h' | '7d'
     endpoint?: string
   } = {}): Promise<PerformanceMonitor> {
-    const response = await logApi.get<ApiResponse<PerformanceMonitor>>('/monitor/performance', { params })
+    const response = await logApiInstance.get<ApiResponse<PerformanceMonitor>>('/monitor/performance', { params })
     return response.data.data
   },
 
   // 6.4 告警配置
   async getAlertConfig(): Promise<AlertConfig> {
-    const response = await logApi.get<ApiResponse<AlertConfig>>('/monitor/alerts')
+    const response = await logApiInstance.get<ApiResponse<AlertConfig>>('/monitor/alerts')
     return response.data.data
   },
 
@@ -443,7 +406,7 @@ export const log = {
   
   // 7.1 日志配置查询
   async getLogConfig(): Promise<LogConfig> {
-    const response = await logApi.get<ApiResponse<LogConfig>>('/config')
+    const response = await logApiInstance.get<ApiResponse<LogConfig>>('/config')
     return response.data.data
   },
 
@@ -463,11 +426,11 @@ export const log = {
   }): Promise<{
     updatedAt: string
   }> {
-    const response = await logApi.put<ApiResponse<{
+    const response = await logApiInstance.put<ApiResponse<{
       updatedAt: string
     }>>('/config', configData)
     return response.data.data
   },
 } as const
 
-export default log 
+// 使用命名导出以保持一致性 

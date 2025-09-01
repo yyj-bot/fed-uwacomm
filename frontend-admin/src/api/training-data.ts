@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   TrainingDataset,
@@ -7,44 +7,7 @@ import type {
 } from '@/types'
 
 // 创建训练数据API实例
-const trainingDataApi = axios.create({
-  baseURL: 'http://localhost:8080/api/training-data',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-trainingDataApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-trainingDataApi.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('Training Data API Error:', error)
-    throw error
-  }
-)
+const trainingDataApiInstance = createApiInstance('http://localhost:8080/api/training-data')
 
 // 数据统计类型
 interface DataStatistics {
@@ -163,7 +126,7 @@ export const trainingData = {
     uploadedBy: string
     progress: number
   }> {
-    const response = await trainingDataApi.post<ApiResponse<{
+    const response = await trainingDataApiInstance.post<ApiResponse<{
       datasetId: string
       datasetDescription: string
       datasetType: string
@@ -196,7 +159,7 @@ export const trainingData = {
     uploadTime: string
     uploadedBy: string
   }> {
-    const response = await trainingDataApi.post<ApiResponse<{
+    const response = await trainingDataApiInstance.post<ApiResponse<{
       datasetId: string
       datasetDescription: string
       datasetType: string
@@ -230,7 +193,7 @@ export const trainingData = {
       tags?: string[]
     }>
   }> {
-    const response = await trainingDataApi.get<ApiResponse<{
+    const response = await trainingDataApiInstance.get<ApiResponse<{
       total: number
       page: number
       size: number
@@ -248,13 +211,13 @@ export const trainingData = {
 
   // ==================== 3.4 数据详情查询接口 ====================
   async getDataDetail(datasetId: string): Promise<DatasetDetail> {
-    const response = await trainingDataApi.get<ApiResponse<DatasetDetail>>(`/${datasetId}`)
+    const response = await trainingDataApiInstance.get<ApiResponse<DatasetDetail>>(`/${datasetId}`)
     return response.data.data
   },
 
   // ==================== 3.5 数据下载接口 ====================
   async downloadData(datasetId: string): Promise<Blob> {
-    const response = await trainingDataApi.get(`/${datasetId}/download`, {
+    const response = await trainingDataApiInstance.get(`/${datasetId}/download`, {
       responseType: 'blob'
     })
     return response.data
@@ -266,7 +229,7 @@ export const trainingData = {
     parameters: Record<string, unknown>
     outputFormat?: string
   }): Promise<PreprocessTask> {
-    const response = await trainingDataApi.post<ApiResponse<PreprocessTask>>(`/${datasetId}/preprocess`, preprocessData)
+    const response = await trainingDataApiInstance.post<ApiResponse<PreprocessTask>>(`/${datasetId}/preprocess`, preprocessData)
     return response.data.data
   },
 
@@ -282,7 +245,7 @@ export const trainingData = {
     }>
     qualityChecks?: string[]
   }): Promise<ValidationResult> {
-    const response = await trainingDataApi.post<ApiResponse<ValidationResult>>(`/${datasetId}/validate`, { validationRules })
+    const response = await trainingDataApiInstance.post<ApiResponse<ValidationResult>>(`/${datasetId}/validate`, { validationRules })
     return response.data.data
   },
 
@@ -296,7 +259,7 @@ export const trainingData = {
     updatedAt: string
     updatedBy: string
   }> {
-    const response = await trainingDataApi.put<ApiResponse<{
+    const response = await trainingDataApiInstance.put<ApiResponse<{
       datasetId: string
       updatedAt: string
       updatedBy: string
@@ -317,7 +280,7 @@ export const trainingData = {
     metadataPreserved: boolean
   }> {
     const config = deleteParams ? { data: deleteParams } : undefined
-    const response = await trainingDataApi.delete<ApiResponse<{
+    const response = await trainingDataApiInstance.delete<ApiResponse<{
       datasetId: string
       deletedAt: string
       deletedBy: string
@@ -333,7 +296,7 @@ export const trainingData = {
     datasetIds: string[]
     parameters?: Record<string, unknown>
   }): Promise<BatchOperationResult> {
-    const response = await trainingDataApi.post<ApiResponse<BatchOperationResult>>('/batch', batchData)
+    const response = await trainingDataApiInstance.post<ApiResponse<BatchOperationResult>>('/batch', batchData)
     return response.data.data
   },
 
@@ -344,7 +307,7 @@ export const trainingData = {
     startDate?: string
     endDate?: string
   } = {}): Promise<DataStatistics> {
-    const response = await trainingDataApi.get<ApiResponse<DataStatistics>>('/statistics', { params })
+    const response = await trainingDataApiInstance.get<ApiResponse<DataStatistics>>('/statistics', { params })
     return response.data.data
   },
 
@@ -361,12 +324,12 @@ export const trainingData = {
     fields?: string[]
     format?: 'ZIP' | 'TAR'
   }): Promise<ExportTask> {
-    const response = await trainingDataApi.post<ApiResponse<ExportTask>>('/export', exportData)
+    const response = await trainingDataApiInstance.post<ApiResponse<ExportTask>>('/export', exportData)
     return response.data.data
   },
 } as const
 
-export default trainingData 
+// 使用命名导出以保持一致性 
 
 // 导出类型定义
 export type {

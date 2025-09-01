@@ -2,25 +2,27 @@
 export { userApi } from './user'
 
 // 管理员API
-export { default as adminApi } from './admin'
+export { admin as adminApi } from './admin'
 
 // 虚拟机管理API
 export { vmApi } from './vm'
 
 // 联邦学习任务API
-export { default as federatedTaskApi } from './federated-task'
+export { federatedTask as federatedTaskApi } from './federated-task'
+// export { federatedTask as federatedApi } from './federated-task' // 向后兼容别名
 
 // 模型版本管理API
-export { default as modelApi } from './model-version'
+export { model as modelApi } from './model-version'
 
 // 训练数据API
-export { default as trainingDataApi } from './training-data'
+export { trainingData as trainingDataApi } from './training-data'
 
 // 系统日志API
-export { default as logApi } from './system-log'
+export { log as logApi } from './system-log'
+// export { log as systemApi } from './system-log' // 向后兼容别名
 
 // 虚拟机轮次模块API
-export { default as vmRoundModelsApi } from './vm-round-models'
+export { vmRoundModels as vmRoundModelsApi } from './vm-round-models'
 
 // 重新导出服务层
 export { userService as authService } from '../services/user'

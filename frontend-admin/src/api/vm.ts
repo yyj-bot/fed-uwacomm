@@ -1,48 +1,11 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   PaginationParams
 } from '@/types'
 
 // 创建虚拟机API实例
-const vmApiInstance = axios.create({
-  baseURL: 'http://localhost:8080/api',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-vmApiInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-vmApiInstance.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('VM API Error:', error)
-    throw error
-  }
-)
+const vmApiInstance = createApiInstance('http://localhost:8080/api')
 
 // ==================== 类型定义 ====================
 
@@ -295,7 +258,7 @@ export const vmApi = {
   },
 } as const
 
-export default vmApi
+// 使用命名导出以保持一致性
 
 // 导出类型定义
 export type {

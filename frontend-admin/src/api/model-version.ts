@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   ModelVersion,
@@ -16,44 +16,7 @@ interface ModelVersionPaginatedResponse<T> {
 }
 
 // 创建模型API实例
-const modelApi = axios.create({
-  baseURL: 'http://localhost:8080/api/model',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-modelApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-modelApi.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('Model API Error:', error)
-    throw error
-  }
-)
+const modelApiInstance = createApiInstance('http://localhost:8080/api/model')
 
 // 部署配置类型
 interface DeploymentConfig {
@@ -124,7 +87,7 @@ export const model = {
     parameters: Record<string, unknown>
     createdAt: string
   }> {
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       modelId: string
       taskId: string
       roundNumber: number
@@ -170,7 +133,7 @@ export const model = {
       formData.append(`models[${index}].file`, model.file)
     })
 
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       successCount: number
       failedCount: number
       models: Array<{
@@ -192,7 +155,7 @@ export const model = {
     roundNumber?: number
     status?: string
   } = {}): Promise<ModelVersionPaginatedResponse<ModelVersion>> {
-    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<ModelVersion>>>('/versions', { params })
+    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<ModelVersion>>>('/versions', { params })
     return response.data.data
   },
 
@@ -212,7 +175,7 @@ export const model = {
     aggregatedAt: string
     status: string
   }> {
-    const response = await modelApi.get<ApiResponse<{
+    const response = await modelApiInstance.get<ApiResponse<{
       modelId: string
       taskId: string
       roundNumber: number
@@ -249,7 +212,7 @@ export const model = {
       createdAt: string
     }>
   }> {
-    const response = await modelApi.get<ApiResponse<{
+    const response = await modelApiInstance.get<ApiResponse<{
       taskId: string
       taskName: string
       totalModels: number
@@ -283,7 +246,7 @@ export const model = {
     status: string
     createdAt: string
   }> {
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       modelId: string
       evaluationId: string
       metrics: Record<string, number>
@@ -313,7 +276,7 @@ export const model = {
       status: string
     }>
   }> {
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       taskId: string
       evaluatedCount: number
       results: Array<{
@@ -335,7 +298,7 @@ export const model = {
     page?: number
     size?: number
   } = {}): Promise<ModelVersionPaginatedResponse<EvaluationResult>> {
-    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<EvaluationResult>>>('/evaluate/results', { params })
+    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<EvaluationResult>>>('/evaluate/results', { params })
     return response.data.data
   },
 
@@ -358,7 +321,7 @@ export const model = {
     endpoints?: string[]
     createdAt: string
   }> {
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       deploymentId: string
       modelId: string
       deploymentName: string
@@ -391,7 +354,7 @@ export const model = {
     createdAt: string
     updatedAt: string
   }> {
-    const response = await modelApi.get<ApiResponse<{
+    const response = await modelApiInstance.get<ApiResponse<{
       deploymentId: string
       modelId: string
       deploymentName: string
@@ -430,7 +393,7 @@ export const model = {
     }
     createdAt: string
   }>> {
-    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<{
+    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<{
       deploymentId: string
       modelId: string
       deploymentName: string
@@ -462,7 +425,7 @@ export const model = {
     rollbackTime: number
     createdAt: string
   }> {
-    const response = await modelApi.post<ApiResponse<{
+    const response = await modelApiInstance.post<ApiResponse<{
       rollbackId: string
       deploymentId: string
       fromModelId: string
@@ -481,7 +444,7 @@ export const model = {
     page?: number
     size?: number
   } = {}): Promise<ModelVersionPaginatedResponse<RollbackInfo>> {
-    const response = await modelApi.get<ApiResponse<ModelVersionPaginatedResponse<RollbackInfo>>>('/rollback/history', { params })
+    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<RollbackInfo>>>('/rollback/history', { params })
     return response.data.data
   },
 
@@ -492,7 +455,7 @@ export const model = {
     format?: 'original' | 'onnx'
     compressed?: boolean
   } = {}): Promise<Blob> {
-    const response = await modelApi.get(`/download/${modelId}`, { 
+    const response = await modelApiInstance.get(`/download/${modelId}`, { 
       params,
       responseType: 'blob'
     })
@@ -505,7 +468,7 @@ export const model = {
     format?: 'original' | 'onnx'
     compressed?: boolean
   }): Promise<Blob> {
-    const response = await modelApi.post('/download/batch', downloadData, {
+    const response = await modelApiInstance.post('/download/batch', downloadData, {
       responseType: 'blob'
     })
     return response.data
@@ -521,7 +484,7 @@ export const model = {
     modelId: string
     deletedAt: string
   }> {
-    const response = await modelApi.delete<ApiResponse<{
+    const response = await modelApiInstance.delete<ApiResponse<{
       modelId: string
       deletedAt: string
     }>>(`/versions/${modelId}`, { data: deleteData })
@@ -542,7 +505,7 @@ export const model = {
       message: string
     }>
   }> {
-    const response = await modelApi.delete<ApiResponse<{
+    const response = await modelApiInstance.delete<ApiResponse<{
       successCount: number
       failedCount: number
       results: Array<{
@@ -561,7 +524,7 @@ export const model = {
     taskId?: string
     timeRange?: '7d' | '30d' | '90d'
   } = {}): Promise<ModelStatistics> {
-    const response = await modelApi.get<ApiResponse<ModelStatistics>>('/statistics', { params })
+    const response = await modelApiInstance.get<ApiResponse<ModelStatistics>>('/statistics', { params })
     return response.data.data
   },
 
@@ -578,7 +541,7 @@ export const model = {
       accuracyImprovement: number
     }
   }> {
-    const response = await modelApi.get<ApiResponse<{
+    const response = await modelApiInstance.get<ApiResponse<{
       taskId: string
       taskName: string
       totalRounds: number
@@ -594,4 +557,4 @@ export const model = {
   },
 } as const
 
-export default model 
+// 使用命名导出以保持一致性 

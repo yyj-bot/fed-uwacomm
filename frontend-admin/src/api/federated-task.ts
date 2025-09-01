@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios'
+import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   PaginatedResponse,
@@ -6,44 +6,7 @@ import type {
 } from '@/types'
 
 // 创建联邦学习任务API实例
-const federatedTaskApi = axios.create({
-  baseURL: 'http://localhost:8080/api/federated',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 请求拦截器
-federatedTaskApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器
-federatedTaskApi.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => {
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || '请求失败')
-    }
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
-    }
-    console.error('Federated Task API Error:', error)
-    throw error
-  }
-)
+const federatedTaskApiInstance = createApiInstance('http://localhost:8080/api/federated')
 
 // 联邦学习任务基础类型
 interface FederatedTask {
@@ -179,7 +142,7 @@ export const federatedTask = {
     participantCount: number
     estimatedDuration: number
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       taskName: string
       status: string
@@ -236,7 +199,7 @@ export const federatedTask = {
     updatedAt: string
     configVersion: string
   }> {
-    const response = await federatedTaskApi.put<ApiResponse<{
+    const response = await federatedTaskApiInstance.put<ApiResponse<{
       taskId: string
       status: string
       updatedAt: string
@@ -257,7 +220,7 @@ export const federatedTask = {
       dataSource: string
     }>
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       status: string
       startedAt: string
@@ -282,7 +245,7 @@ export const federatedTask = {
       step: string
     }
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       status: string
       pausedAt: string
@@ -302,7 +265,7 @@ export const federatedTask = {
     resumedAt: string
     currentRound: number
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       status: string
       resumedAt: string
@@ -323,7 +286,7 @@ export const federatedTask = {
     checkpointSaved: boolean
     checkpointPath?: string
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       status: string
       stoppedAt: string
@@ -343,7 +306,7 @@ export const federatedTask = {
     cancelledAt: string
     reason?: string
   }> {
-    const response = await federatedTaskApi.post<ApiResponse<{
+    const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
       status: string
       cancelledAt: string
@@ -354,7 +317,7 @@ export const federatedTask = {
 
   // ==================== 3.8 任务状态查询接口 ====================
   async getTaskDetail(taskId: string): Promise<FederatedTaskDetails> {
-    const response = await federatedTaskApi.get<ApiResponse<FederatedTaskDetails>>(`/tasks/${taskId}`)
+    const response = await federatedTaskApiInstance.get<ApiResponse<FederatedTaskDetails>>(`/tasks/${taskId}`)
     return response.data.data
   },
 
@@ -371,7 +334,7 @@ export const federatedTask = {
     size: number
     tasks: FederatedTask[]
   }> {
-    const response = await federatedTaskApi.get<ApiResponse<{
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
       total: number
       page: number
       size: number
@@ -382,7 +345,7 @@ export const federatedTask = {
 
   // ==================== 3.10 任务结果查询接口 ====================
   async getTaskResults(taskId: string): Promise<TaskResults> {
-    const response = await federatedTaskApi.get<ApiResponse<TaskResults>>(`/tasks/${taskId}/results`)
+    const response = await federatedTaskApiInstance.get<ApiResponse<TaskResults>>(`/tasks/${taskId}/results`)
     return response.data.data
   },
 
@@ -401,7 +364,7 @@ export const federatedTask = {
     size: number
     logs: TaskLog[]
   }> {
-    const response = await federatedTaskApi.get<ApiResponse<{
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
       taskId: string
       total: number
       page: number
@@ -422,7 +385,7 @@ export const federatedTask = {
     modelPreserved: boolean
   }> {
     const config = deleteOptions ? { data: deleteOptions } : undefined
-    const response = await federatedTaskApi.delete<ApiResponse<{
+    const response = await federatedTaskApiInstance.delete<ApiResponse<{
       taskId: string
       deletedAt: string
       dataDeleted: boolean
@@ -432,7 +395,7 @@ export const federatedTask = {
   },
 } as const
 
-export default federatedTask 
+// 使用命名导出以保持一致性 
 
 // 导出类型定义
 export type {
