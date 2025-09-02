@@ -357,7 +357,14 @@ export const useSystem = () => {
    */
   const updateLogConfig = useCallback(async (configData: LogConfigUpdateData) => {
     try {
-      await updateLogConfigAction(configData)
+      // 确保 maxFileSize 是数字类型
+      const processedConfigData = {
+        ...configData,
+        maxFileSize: typeof configData.maxFileSize === 'string' 
+          ? parseInt(configData.maxFileSize, 10) 
+          : configData.maxFileSize
+      }
+      await updateLogConfigAction(processedConfigData)
       return { success: true, error: null }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '更新日志配置失败'

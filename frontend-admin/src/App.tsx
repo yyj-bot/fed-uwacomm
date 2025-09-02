@@ -7,6 +7,7 @@ import { MainLayout } from '@/layouts'
 import {
   LoginPage,
   DashboardPage,
+  AdminPage,
   FederatedLearningPage,
   ModelManagementPage,
   SystemLogsPage,
@@ -14,13 +15,12 @@ import {
   EnvironmentAnalysisPage
 } from '@/modules'
 
-import { authService, websocketService } from '@/api'
-import useAppStore from '@/store'
+import { userService, websocketService } from '@/services'
 
 // 路由保护组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 直接检查认证服务，而不是依赖store状态
-  if (!authService.isAuthenticated()) {
+  if (!userService.isAuthenticated()) {
     return <Navigate to="/login" replace />
   }
   
@@ -28,29 +28,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 }
 
 const App: React.FC = () => {
-  const { setUser, setAuthenticated, setWsState } = useAppStore()
-
   useEffect(() => {
-    // 初始化认证状态
-    const currentUser = authService.getCurrentUser()
-    if (currentUser && authService.isAuthenticated()) {
-      setUser(currentUser)
-      setAuthenticated(true)
-      
-      // 建立WebSocket连接
-      websocketService.connect()
-    }
-
-    // 监听WebSocket状态变化
-    const unsubscribeWs = websocketService.onStateChange((state) => {
-      setWsState(state)
-    })
-
-    // 清理
-    return () => {
-      unsubscribeWs()
-    }
-  }, [setUser, setAuthenticated, setWsState])
+    // 初始化应用
+    console.log('应用初始化完成')
+  }, [])
   
   return (
     <ConfigProvider
@@ -74,7 +55,7 @@ const App: React.FC = () => {
             <Route 
               path="/" 
               element={
-                authService.isAuthenticated() ? 
+                userService.isAuthenticated() ? 
                   <Navigate to="/dashboard" replace /> : 
                   <Navigate to="/login" replace />
               } 
@@ -89,6 +70,7 @@ const App: React.FC = () => {
                     <Routes>
                       {/* 主页面路由 */}
                       <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
                       <Route path="/federated-learning" element={<FederatedLearningPage />} />
                       <Route path="/models" element={<ModelManagementPage />} />
                       <Route path="/logs" element={<SystemLogsPage />} />

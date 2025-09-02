@@ -3,6 +3,7 @@
 
 export { DashboardPage } from './dashboard'
 export { LoginPage } from './login'
+export { AdminPage } from './admin'
 export { FederatedLearningPage } from './federated-learning'
 export { ModelManagementPage } from './model-management'
 export { SystemLogsPage } from './system-logs'
