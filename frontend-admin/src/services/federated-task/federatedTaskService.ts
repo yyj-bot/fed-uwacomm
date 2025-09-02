@@ -603,7 +603,6 @@ export class FederatedTaskService {
       taskName: task.taskName,
       taskType: task.taskType,
       status: task.status,
-      algorithm: task.algorithm,
       createdAt: task.createdAt,
       startedAt: task.startedAt,
       completedAt: task.completedAt,
@@ -611,7 +610,7 @@ export class FederatedTaskService {
       currentRound: task.currentRound,
       totalRounds: task.totalRounds,
       progress: task.progress,
-      description: task.description
+      finalAccuracy: task.finalAccuracy
     }
   }
 
@@ -631,6 +630,7 @@ export class FederatedTaskService {
       currentRound: task.currentRound,
       totalRounds: task.totalRounds,
       progress: task.progress,
+      finalAccuracy: task.finalAccuracy,
       algorithm: task.algorithm,
       participants: task.participants,
       metrics: task.metrics
@@ -656,17 +656,17 @@ export class FederatedTaskService {
    * 转换任务日志数据
    */
   private transformTaskLog(log: any): {
-    readonly logId: string
+    readonly timestamp: string
     readonly level: string
     readonly message: string
-    readonly timestamp: string
+    readonly source: string
     readonly details?: Record<string, unknown>
   } {
     return {
-      logId: log.logId || log.id || `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: log.timestamp,
       level: log.level,
       message: log.message,
-      timestamp: log.timestamp,
+      source: log.source,
       details: log.details
     }
   }

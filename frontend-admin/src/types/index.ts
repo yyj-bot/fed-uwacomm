@@ -110,15 +110,14 @@ export interface FederatedTask {
   readonly taskName: string
   readonly taskType: 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION'
   readonly status: 'CREATED' | 'CONFIGURED' | 'RUNNING' | 'PAUSED' | 'STOPPED' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
-  readonly algorithm: string
   readonly createdAt: string
   readonly startedAt?: string
   readonly completedAt?: string
-  readonly currentRound: number
-  readonly totalRounds: number
-  readonly progress: number
+  readonly currentRound?: number
+  readonly totalRounds?: number
+  readonly progress?: number
   readonly participantCount: number
-  readonly description?: string
+  readonly finalAccuracy?: number
 }
 
 export interface TaskParticipant {
@@ -141,8 +140,9 @@ export interface TaskMetrics {
 }
 
 export interface FederatedTaskDetails extends FederatedTask {
+  readonly algorithm: string
   readonly participants: TaskParticipant[]
-  readonly metrics: TaskMetrics
+  readonly metrics?: TaskMetrics
   readonly hyperparameters?: Record<string, unknown>
   readonly modelConfig?: Record<string, unknown>
 }

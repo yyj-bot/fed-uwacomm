@@ -305,10 +305,10 @@ export interface TaskLogsResponse {
   readonly size: number
   /** 日志列表 */
   readonly logs: Array<{
-    readonly logId: string
+    readonly timestamp: string
     readonly level: string
     readonly message: string
-    readonly timestamp: string
+    readonly source: string
     readonly details?: Record<string, unknown>
   }>
 }

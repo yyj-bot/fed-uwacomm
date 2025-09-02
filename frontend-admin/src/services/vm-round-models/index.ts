@@ -9,14 +9,16 @@
 export { VMRoundModelsService, vmRoundModelsService } from './vmRoundModelsService'
 
 // 导出类型定义
-export type {
-  VMRoundModel,
-  VMModelTrend,
-  VMModelBest,
-  VMRoundModelListParams,
-  VMModelTrendParams,
-  VMModelBestParams,
-  VMRoundModelPaginatedResponse,
-  MetricType,
-  QueryType
-} from './type'
+// export type {
+//   VMRoundModel,
+//   VMModelTrend,
+//   VMModelBest,
+//   VMRoundModelListParams,
+//   VMModelTrendParams,
+//   VMModelBestParams,
+//   VMRoundModelPaginatedResponse,
+//   MetricType,
+//   QueryType
+// } from './type'
+
+export * from './type'

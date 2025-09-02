@@ -66,6 +66,8 @@ export type {
   TaskListParams,
   TaskLogsParams,
   DeleteTaskRequest,
+  StopTaskRequest,
+  CancelTaskRequest,
   FederatedTaskServiceConfig
 } from './federated-task'
 
@@ -78,7 +80,17 @@ export type {
   EvaluationRequest,
   DeploymentRequest,
   RollbackRequest,
-  ModelVersionServiceConfig
+  ModelVersionServiceConfig,
+  ModelVersionDetail,
+  TaskModelVersions,
+  EvaluationResult,
+  DeploymentStatus,
+  RollbackInfo,
+  ModelStatistics,
+  TaskStatistics,
+  DownloadRequest,
+  DeleteModelRequest,
+  StatisticsParams
 } from './model-version'
 
 // 训练数据服务
@@ -93,7 +105,8 @@ export type {
   UpdateDataRequest,
   BatchOperationRequest,
   ExportDataRequest,
-  TrainingDataServiceConfig
+  TrainingDataServiceConfig,
+  DataStatisticsParams
 } from './training-data'
 
 // 系统日志服务

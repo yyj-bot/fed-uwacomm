@@ -9,20 +9,22 @@
 export { AdminUserService, adminUserService } from './adminService'
 
 // 导出类型定义
-export type {
-  Permission,
-  UserListParams,
-  CreateUserRequest,
-  UpdateUserRequest,
-  LockUserRequest,
-  ResetPasswordRequest,
-  GrantPermissionRequest,
-  LockUserResponse,
-  UnlockUserResponse,
-  ServiceError,
-  ValidationError,
-  UserOperation,
-  UserOperationLog,
-  UserStatistics,
-  AdminServiceConfig
-} from './type'
+// export type {
+//   Permission,
+//   UserListParams,
+//   CreateUserRequest,
+//   UpdateUserRequest,
+//   LockUserRequest,
+//   ResetPasswordRequest,
+//   GrantPermissionRequest,
+//   LockUserResponse,
+//   UnlockUserResponse,
+//   ServiceError,
+//   ValidationError,
+//   UserOperation,
+//   UserOperationLog,
+//   UserStatistics,
+//   AdminServiceConfig
+// } from './type'
+
+export * from './type'

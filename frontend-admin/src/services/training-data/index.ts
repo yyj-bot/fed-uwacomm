@@ -9,24 +9,26 @@
 export { TrainingDataService, trainingDataService } from './trainingDataService'
 
 // 导出类型定义
-export type {
-  UploadFileRequest,
-  UploadFileResponse,
-  UploadTextRequest,
-  UploadTextResponse,
-  DataListParams,
-  DataListResponse,
-  PreprocessRequest,
-  ValidationRequest,
-  UpdateDataRequest,
-  UpdateDataResponse,
-  DeleteDataResponse,
-  BatchOperationRequest,
-  BatchOperationResultItem,
-  DataStatisticsParams,
-  ExportDataRequest,
-  TrainingDataServiceError,
-  DataOperationError,
-  FileValidationError,
-  TrainingDataServiceConfig
-} from './type'
+// export type {
+//   UploadFileRequest,
+//   UploadFileResponse,
+//   UploadTextRequest,
+//   UploadTextResponse,
+//   DataListParams,
+//   DataListResponse,
+//   PreprocessRequest,
+//   ValidationRequest,
+//   UpdateDataRequest,
+//   UpdateDataResponse,
+//   DeleteDataResponse,
+//   BatchOperationRequest,
+//   BatchOperationResultItem,
+//   DataStatisticsParams,
+//   ExportDataRequest,
+//   TrainingDataServiceError,
+//   DataOperationError,
+//   FileValidationError,
+//   TrainingDataServiceConfig
+// } from './type'
+
+export * from './type'

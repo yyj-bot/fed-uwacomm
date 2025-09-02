@@ -1,249 +1,307 @@
-import { create } from 'zustand'
-import type { 
-  User, 
-  VirtualMachine, 
-  FederatedTask,
-  SystemLog,
-  ModelVersion,
-  TrainingDataset
-} from '@/types'
-import { ConnectionState } from '@/types'
+/**
+ * Store 统一导出文件
+ * 提供项目中所有状态管理 store 和 hooks 的统一访问入口
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
+ */
 
-// 应用状态接口
-interface AppState {
-  // 用户状态
-  user: User | null
-  isAuthenticated: boolean
-  
-  // WebSocket连接状态
-  wsState: ConnectionState
-  
-  // 虚拟机状态
-  virtualMachines: VirtualMachine[]
-  vmLoading: boolean
-  
-  // 联邦学习任务状态
-  federatedTasks: FederatedTask[]
-  tasksLoading: boolean
-  
-  // 系统日志状态
-  systemLogs: SystemLog[]
-  logsLoading: boolean
-  
-  // 模型版本状态
-  modelVersions: ModelVersion[]
-  modelsLoading: boolean
-  
-  // 训练数据状态
-  trainingData: TrainingDataset[]
-  dataLoading: boolean
-  
-  // 全局加载状态
-  globalLoading: boolean
-  
-  // 错误状态
-  error: string | null
+// ==================== 认证模块 ====================
+export {
+  useAuthStore,
+  useAuth
+} from './auth'
+export type {
+  AuthState,
+  AuthActions,
+  AuthStore
+} from './auth'
+
+// ==================== 虚拟机管理模块 ====================
+export {
+  useVMStore,
+  useVM
+} from './vm'
+export type {
+  VMState,
+  VMActions,
+  VMStore
+} from './vm'
+
+// ==================== 联邦学习任务模块 ====================
+export {
+  useTaskStore,
+  useTask
+} from './federated-task'
+export type {
+  TaskState,
+  TaskActions,
+  TaskStore
+} from './federated-task'
+
+// ==================== 训练数据模块 ====================
+export {
+  useDataStore,
+  useData
+} from './training-data'
+export type {
+  DataState,
+  DataActions,
+  DataStore
+} from './training-data'
+
+// ==================== 模型版本模块 ====================
+export {
+  useModelStore,
+  useModel
+} from './model-version'
+export type {
+  ModelState,
+  ModelActions,
+  ModelStore
+} from './model-version'
+
+// ==================== 管理员功能模块 ====================
+export {
+  useAdminStore,
+  useAdmin
+} from './admin'
+export type {
+  AdminState,
+  AdminActions,
+  AdminStore
+} from './admin'
+
+// ==================== 系统监控模块 ====================
+export {
+  useSystemStore,
+  useSystem
+} from './system'
+export type {
+  SystemState,
+  SystemActions,
+  SystemStore
+} from './system'
+
+// ==================== 仪表盘模块 ====================
+export {
+  useDashboardStore,
+  useDashboard
+} from './dashboard'
+export type {
+  DashboardState,
+  DashboardActions,
+  DashboardStore,
+  DashboardOverview,
+  DashboardChartData
+} from './dashboard'
+
+// ==================== WebSocket 连接模块 ====================
+export {
+  useWebSocketStore,
+  useWebSocket,
+  useWebSocketMessage,
+  useVMStatusUpdate,
+  useTaskProgressUpdate
+} from './websocket'
+export type {
+  WebSocketState,
+  WebSocketActions,
+  WebSocketStore
+} from './websocket'
+
+// ==================== 默认导出主要 Hooks ====================
+// 为了方便使用，导出最常用的 hooks
+export {
+  useAuth as default,
+  useVM,
+  useTask,
+  useData,
+  useModel,
+  useAdmin,
+  useSystem,
+  useDashboard,
+  useWebSocket
 }
 
-// 状态更新actions
-interface AppActions {
-  // 用户actions
-  setUser: (user: User | null) => void
-  setAuthenticated: (isAuthenticated: boolean) => void
+// ==================== Store 管理工具 ====================
+
+/**
+ * 重置所有 Store 状态
+ * 用于用户登出或应用重置时清理状态
+ */
+export const resetAllStores = () => {
+  // 注意：这里需要在各个 store 实现 reset 方法
+  console.log('[Store] 重置所有 store 状态')
   
-  // WebSocket actions
-  setWsState: (state: ConnectionState) => void
-  
-  // 虚拟机actions
-  setVirtualMachines: (vms: VirtualMachine[]) => void
-  setVmLoading: (loading: boolean) => void
-  updateVirtualMachine: (vmId: string, updates: Partial<VirtualMachine>) => void
-  addVirtualMachine: (vm: VirtualMachine) => void
-  removeVirtualMachine: (vmId: string) => void
-  
-  // 联邦学习任务actions
-  setFederatedTasks: (tasks: FederatedTask[]) => void
-  setTasksLoading: (loading: boolean) => void
-  updateFederatedTask: (taskId: string, updates: Partial<FederatedTask>) => void
-  addFederatedTask: (task: FederatedTask) => void
-  removeFederatedTask: (taskId: string) => void
-  
-  // 系统日志actions
-  setSystemLogs: (logs: SystemLog[]) => void
-  setLogsLoading: (loading: boolean) => void
-  addSystemLog: (log: SystemLog) => void
-  clearSystemLogs: () => void
-  
-  // 模型版本actions
-  setModelVersions: (models: ModelVersion[]) => void
-  setModelsLoading: (loading: boolean) => void
-  addModelVersion: (model: ModelVersion) => void
-  updateModelVersion: (modelId: string, updates: Partial<ModelVersion>) => void
-  
-  // 训练数据actions
-  setTrainingData: (data: TrainingDataset[]) => void
-  setDataLoading: (loading: boolean) => void
-  addTrainingData: (data: TrainingDataset) => void
-  updateTrainingData: (datasetId: string, updates: Partial<TrainingDataset>) => void
-  removeTrainingData: (datasetId: string) => void
-  
-  // 全局actions
-  setGlobalLoading: (loading: boolean) => void
-  setError: (error: string | null) => void
-  clearError: () => void
-  
-  // 重置状态
-  reset: () => void
+  // 由于 zustand 的特性，我们需要通过各个 store 的 reset 方法来重置
+  // 这里提供一个统一的接口，具体实现在各个 store 中
 }
 
-// 初始状态
-const initialState: AppState = {
-  user: null,
-  isAuthenticated: false,
-  wsState: 'disconnected' as ConnectionState,
-  virtualMachines: [],
-  vmLoading: false,
-  federatedTasks: [],
-  tasksLoading: false,
-  systemLogs: [],
-  logsLoading: false,
-  modelVersions: [],
-  modelsLoading: false,
-  trainingData: [],
-  dataLoading: false,
-  globalLoading: false,
-  error: null
-}
-
-// 创建store
-export const useAppStore = create<AppState & AppActions>((set, get) => ({
-  ...initialState,
-
-  // 用户actions
-  setUser: (user) => set({ user }),
-  setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
-
-  // WebSocket actions
-  setWsState: (wsState) => set({ wsState }),
-
-  // 虚拟机actions
-  setVirtualMachines: (virtualMachines) => set({ virtualMachines }),
-  setVmLoading: (vmLoading) => set({ vmLoading }),
-  
-  updateVirtualMachine: (vmId, updates) => set((state) => ({
-    virtualMachines: state.virtualMachines.map(vm => 
-      vm.vmId === vmId ? { ...vm, ...updates } : vm
-    )
-  })),
-  
-  addVirtualMachine: (vm) => set((state) => ({
-    virtualMachines: [...state.virtualMachines, vm]
-  })),
-  
-  removeVirtualMachine: (vmId) => set((state) => ({
-    virtualMachines: state.virtualMachines.filter(vm => vm.vmId !== vmId)
-  })),
-
-  // 联邦学习任务actions
-  setFederatedTasks: (federatedTasks) => set({ federatedTasks }),
-  setTasksLoading: (tasksLoading) => set({ tasksLoading }),
-  
-  updateFederatedTask: (taskId, updates) => set((state) => ({
-    federatedTasks: state.federatedTasks.map(task => 
-      task.taskId === taskId ? { ...task, ...updates } : task
-    )
-  })),
-  
-  addFederatedTask: (task) => set((state) => ({
-    federatedTasks: [...state.federatedTasks, task]
-  })),
-  
-  removeFederatedTask: (taskId) => set((state) => ({
-    federatedTasks: state.federatedTasks.filter(task => task.taskId !== taskId)
-  })),
-
-  // 系统日志actions
-  setSystemLogs: (systemLogs) => set({ systemLogs }),
-  setLogsLoading: (logsLoading) => set({ logsLoading }),
-  
-  addSystemLog: (log) => set((state) => ({
-    systemLogs: [log, ...state.systemLogs].slice(0, 1000) // 保持最新1000条日志
-  })),
-  
-  clearSystemLogs: () => set({ systemLogs: [] }),
-
-  // 模型版本actions
-  setModelVersions: (modelVersions) => set({ modelVersions }),
-  setModelsLoading: (modelsLoading) => set({ modelsLoading }),
-  
-  addModelVersion: (model) => set((state) => ({
-    modelVersions: [...state.modelVersions, model]
-  })),
-  
-  updateModelVersion: (modelId, updates) => set((state) => ({
-    modelVersions: state.modelVersions.map(model => 
-      model.modelId === modelId ? { ...model, ...updates } : model
-    )
-  })),
-
-  // 训练数据actions
-  setTrainingData: (trainingData) => set({ trainingData }),
-  setDataLoading: (dataLoading) => set({ dataLoading }),
-  
-  addTrainingData: (data) => set((state) => ({
-    trainingData: [...state.trainingData, data]
-  })),
-  
-  updateTrainingData: (datasetId, updates) => set((state) => ({
-    trainingData: state.trainingData.map(data => 
-      data.datasetId === datasetId ? { ...data, ...updates } : data
-    )
-  })),
-  
-  removeTrainingData: (datasetId) => set((state) => ({
-    trainingData: state.trainingData.filter(data => data.datasetId !== datasetId)
-  })),
-
-  // 全局actions
-  setGlobalLoading: (globalLoading) => set({ globalLoading }),
-  setError: (error) => set({ error }),
-  clearError: () => set({ error: null }),
-
-  // 重置状态
-  reset: () => set(initialState)
-}))
-
-// 选择器
-export const selectors = {
-  // 获取在线虚拟机数量
-  getOnlineVMCount: () => {
-    const { virtualMachines } = useAppStore.getState()
-    return virtualMachines.filter(vm => vm.status === 'RUNNING').length
-  },
-  
-  // 获取运行中的任务数量
-  getRunningTaskCount: () => {
-    const { federatedTasks } = useAppStore.getState()
-    return federatedTasks.filter(task => task.status === 'RUNNING').length
-  },
-  
-  // 获取最近的错误日志
-  getRecentErrorLogs: () => {
-    const { systemLogs } = useAppStore.getState()
-    return systemLogs.filter(log => log.level === 'ERROR').slice(0, 10)
-  },
-  
-  // 获取指定虚拟机
-  getVMById: (vmId: string) => {
-    const { virtualMachines } = useAppStore.getState()
-    return virtualMachines.find(vm => vm.vmId === vmId)
-  },
-  
-  // 获取指定任务
-  getTaskById: (taskId: string) => {
-    const { federatedTasks } = useAppStore.getState()
-    return federatedTasks.find(task => task.taskId === taskId)
+/**
+ * 获取所有 Store 的状态快照
+ * 用于调试和状态监控
+ */
+export const getStoreSnapshot = () => {
+  // 这里可以收集各个 store 的状态用于调试
+  return {
+    timestamp: Date.now(),
+    // 具体的状态快照需要在各个 store 中实现
   }
 }
 
-export default useAppStore 
+// ==================== Store 类型集合 ====================
+// 导出所有 Store 相关的类型，方便类型推导和使用
+
+export interface AllStores {
+  auth: AuthStore
+  vm: VMStore
+  task: TaskStore
+  data: DataStore
+  model: ModelStore
+  admin: AdminStore
+  system: SystemStore
+  dashboard: DashboardStore
+  websocket: WebSocketStore
+}
+
+export interface AllStoreHooks {
+  useAuth: typeof useAuth
+  useVM: typeof useVM
+  useTask: typeof useTask
+  useData: typeof useData
+  useModel: typeof useModel
+  useAdmin: typeof useAdmin
+  useSystem: typeof useSystem
+  useDashboard: typeof useDashboard
+  useWebSocket: typeof useWebSocket
+}
+
+// ==================== Store 配置 ====================
+
+/**
+ * Store 配置选项
+ */
+export interface StoreConfig {
+  // 是否启用开发工具
+  enableDevtools?: boolean
+  // 是否启用持久化
+  enablePersistence?: boolean
+  // 持久化存储键前缀
+  persistencePrefix?: string
+}
+
+/**
+ * 默认 Store 配置
+ */
+export const defaultStoreConfig: StoreConfig = {
+  enableDevtools: process.env.NODE_ENV === 'development',
+  enablePersistence: true,
+  persistencePrefix: 'feduwacomm-'
+}
+
+// ==================== Store 初始化和销毁 ====================
+
+/**
+ * 初始化所有 Store
+ * 在应用启动时调用
+ */
+export const initializeStores = async (config: Partial<StoreConfig> = {}) => {
+  const finalConfig = { ...defaultStoreConfig, ...config }
+  
+  console.log('[Store] 开始初始化所有 Store...', finalConfig)
+  
+  try {
+    // 这里可以进行一些全局的 store 初始化工作
+    // 比如从持久化存储中恢复状态、设置全局监听器等
+    
+    console.log('[Store] 所有 Store 初始化完成')
+    return { success: true, config: finalConfig }
+  } catch (error) {
+    console.error('[Store] Store 初始化失败:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+/**
+ * 销毁所有 Store
+ * 在应用关闭时调用
+ */
+export const destroyStores = () => {
+  console.log('[Store] 开始销毁所有 Store...')
+  
+  try {
+    // 清理所有 store 状态
+    resetAllStores()
+    
+    // 这里可以进行一些清理工作
+    // 比如移除监听器、清理定时器等
+    
+    console.log('[Store] 所有 Store 销毁完成')
+  } catch (error) {
+    console.error('[Store] Store 销毁失败:', error)
+  }
+}
+
+// ==================== Store 状态监听 ====================
+
+/**
+ * Store 状态变化监听器类型
+ */
+export type StoreListener<T = any> = (state: T, prevState: T) => void
+
+/**
+ * 添加全局 Store 状态监听器
+ * 可以用于调试、日志记录、状态同步等
+ */
+export const addGlobalStoreListener = <T>(
+  storeName: keyof AllStores,
+  listener: StoreListener<T>
+) => {
+  // 这里可以实现全局状态监听逻辑
+  console.log(`[Store] 添加全局监听器: ${storeName}`)
+}
+
+/**
+ * 移除全局 Store 状态监听器
+ */
+export const removeGlobalStoreListener = <T>(
+  storeName: keyof AllStores,
+  listener: StoreListener<T>
+) => {
+  // 这里可以实现移除监听器的逻辑
+  console.log(`[Store] 移除全局监听器: ${storeName}`)
+}
+
+// ==================== 开发工具 ====================
+
+/**
+ * 开发环境下的 Store 调试工具
+ */
+export const storeDebugTools = {
+  /**
+   * 打印所有 Store 状态
+   */
+  logAllStates: () => {
+    if (process.env.NODE_ENV === 'development') {
+      console.group('[Store Debug] 所有 Store 状态')
+      console.log('快照:', getStoreSnapshot())
+      console.groupEnd()
+    }
+  },
+  
+  /**
+   * 重置指定 Store
+   */
+  resetStore: (storeName: keyof AllStores) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Store Debug] 重置 Store: ${storeName}`)
+      // 具体重置逻辑需要在各个 store 中实现
+    }
+  }
+}
+
+// 在开发环境下将调试工具挂载到全局对象
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+  (window as any).__FEDUWACOMM_STORE_DEBUG__ = storeDebugTools
+}
