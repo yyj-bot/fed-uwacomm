@@ -50,21 +50,28 @@ public class UserServiceImpl implements UserService {
             registerDTO.getUsername(), registerDTO.getEmail(), clientIp);
         
         try {
+            log.info("开始验证注册参数");
             // 验证参数
             validateRegisterParams(registerDTO);
+            log.info("注册参数验证通过");
 
+            log.info("开始检查邮箱是否已存在: {}", registerDTO.getEmail());
             // 检查邮箱是否已存在
             if (emailExists(registerDTO.getEmail())) {
                 log.warn("用户注册失败 - 邮箱已存在: email={}, ip={}", registerDTO.getEmail(), clientIp);
                 throw UserException.emailExists();
             }
+            log.info("邮箱检查通过，不存在重复");
 
+            log.info("开始检查用户名是否已存在: {}", registerDTO.getUsername());
             // 检查用户名是否已存在
             if (usernameExists(registerDTO.getUsername())) {
                 log.warn("用户注册失败 - 用户名已存在: username={}, ip={}", registerDTO.getUsername(), clientIp);
                 throw UserException.usernameExists();
             }
+            log.info("用户名检查通过，不存在重复");
 
+            log.info("开始创建用户对象");
             // 创建用户
             User user = User.builder()
                     .id(uuidUtil.generateUuid())
@@ -77,8 +84,11 @@ public class UserServiceImpl implements UserService {
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
+            log.info("用户对象创建完成，userId: {}", user.getId());
 
+            log.info("开始插入用户到数据库");
             userMapper.insert(user);
+            log.info("用户数据库插入成功");
             
             log.info("用户注册成功: userId={}, username={}, email={}, role={}, ip={}", 
                 user.getId(), user.getUsername(), user.getEmail(), user.getRole(), clientIp);
@@ -86,7 +96,8 @@ public class UserServiceImpl implements UserService {
             performanceLog.info("用户注册完成: duration={}ms, username={}", 
                 System.currentTimeMillis() - startTime, user.getUsername());
 
-            return UserRegisterResponseVO.builder()
+            log.info("开始构建响应对象");
+            UserRegisterResponseVO response = UserRegisterResponseVO.builder()
                     .userId(user.getId())
                     .username(user.getUsername())
                     .email(user.getEmail())
@@ -94,10 +105,14 @@ public class UserServiceImpl implements UserService {
                     .status(user.getStatus())
                     .createdAt(user.getCreatedAt())
                     .build();
+            log.info("响应对象构建完成，准备返回");
+            
+            return response;
                     
         } catch (Exception e) {
             log.error("用户注册异常: username={}, email={}, ip={}, error={}", 
-                registerDTO.getUsername(), registerDTO.getEmail(), clientIp, e.getMessage(), e);
+                registerDTO.getUsername(), registerDTO.getEmail(), clientIp, e.getMessage());
+            log.error("异常详情:", e);
             throw e;
         }
     }

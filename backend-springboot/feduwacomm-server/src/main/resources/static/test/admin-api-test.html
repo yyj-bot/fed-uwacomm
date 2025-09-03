@@ -130,26 +130,89 @@
         }
 
         .response {
-            margin-top: 20px;
+            margin-top: 15px;
             padding: 15px;
             border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
             font-family: 'Courier New', monospace;
-            font-size: 13px;
-            white-space: pre-wrap;
-            max-height: 300px;
+            font-size: 12px;
+            max-height: 400px;
             overflow-y: auto;
         }
 
-        .response.success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
+        .response h4 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.1em;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .response.error {
+        .response-content {
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+
+        .response-content.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .response-content.error {
             background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .response-status {
+            margin-bottom: 15px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 600;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .status-badge.success {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-badge.error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .response-data pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .request-content {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+        }
+
+        .request-content pre {
+            margin: 0;
+            white-space: pre-wrap;
         }
 
         .tabs {
@@ -684,12 +747,40 @@
             }
         }
 
-        // 显示响应结果
+        // 通用响应显示函数
         function showResponse(elementId, data) {
             const element = document.getElementById(elementId);
             if (element) {
-                element.textContent = JSON.stringify(data, null, 2);
-                element.className = `response ${data.success ? 'success' : 'error'}`;
+                element.style.display = 'block';
+                
+                const isSuccess = data.success;
+                const statusText = isSuccess ? '✅ 成功' : '❌ 错误';
+                const statusClass = isSuccess ? 'success' : 'error';
+                
+                element.innerHTML = `
+                    <h4>📥 响应结果 - ${statusText}</h4>
+                    <div class="response-content ${statusClass}">
+                        <div class="response-status">
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="response-data">
+                            <strong>响应数据:</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 显示请求数据的函数
+        function showRequest(elementId, requestData) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const requestDiv = element.querySelector('.request-content');
+                if (requestDiv) {
+                    const formattedRequest = JSON.stringify(requestData, null, 2);
+                    requestDiv.innerHTML = `<pre>${formattedRequest}</pre>`;
+                }
             }
         }
 
@@ -791,10 +882,10 @@
                     throw new Error('请至少填写一个要更新的字段');
                 }
 
-                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(updateData)
-                });
+                                                         const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
 
                 showResponse('updateUserResponse', { success: true, data: data });
                 
@@ -819,9 +910,9 @@
                     return;
                 }
 
-                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
-                    method: 'DELETE'
-                });
+                                                         const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
+                method: 'DELETE'
+            });
 
                 showResponse('deleteUserResponse', { success: true, data: data });
                 document.getElementById('deleteUserId').value = '';

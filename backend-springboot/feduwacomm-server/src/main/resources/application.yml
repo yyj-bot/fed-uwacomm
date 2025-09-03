@@ -1,7 +1,6 @@
 server:
   port: 8080
-  servlet:
-    context-path: /api
+  # 移除全局context-path，在配置类中分别配置
 
 spring:
   application:
@@ -9,6 +8,12 @@ spring:
 
   profiles:
     active: dev # 默认开发环境
+
+  # 静态资源配置
+  web:
+    resources:
+      static-locations: classpath:/static/
+      add-mappings: true
 
   # 数据库配置
   datasource:
@@ -43,3 +48,9 @@ logging:
 feduwacomm:
   module:
     name: feduwacomm # 模块名称，用于UUID前缀
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:feduwacomm_jwt_secret_key_2024_water_acoustic_federated_learning}
+  expiration: ${JWT_EXPIRATION:86400} # 24小时，单位：秒
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800} # 7天，单位：秒

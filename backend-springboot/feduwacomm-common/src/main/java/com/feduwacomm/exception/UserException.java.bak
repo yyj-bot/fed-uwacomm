@@ -21,17 +21,17 @@ public class UserException extends RuntimeException {
         return code;
     }
 
-    // é¢„å®šä¹‰å¼‚å¸?
+    // é¢„å®šä¹‰å¼‚å¸¸
     public static UserException userNotFound() {
-        return new UserException(404, "ç”¨æˆ·ä¸å­˜åœ?);
+        return new UserException(404, "ç”¨æˆ·ä¸å­˜åœ¨");
     }
 
     public static UserException userAlreadyExists() {
-        return new UserException(409, "ç”¨æˆ·å·²å­˜åœ?);
+        return new UserException(409, "ç”¨æˆ·å·²å­˜åœ¨");
     }
 
     public static UserException emailExists() {
-        return new UserException(409, "é‚®ç®±å·²å­˜åœ?);
+        return new UserException(409, "é‚®ç®±å·²å­˜åœ¨");
     }
 
     public static UserException usernameExists() {
@@ -43,11 +43,11 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException accountLocked() {
-        return new UserException(423, "è´¦å·å·²é”å®?);
+        return new UserException(423, "è´¦å·å·²é”å®š");
     }
 
     public static UserException statusInvalid() {
-        return new UserException(400, "ç”¨æˆ·çŠ¶æ€æ— æ•?);
+        return new UserException(400, "ç”¨æˆ·çŠ¶æ€æ— æ•ˆ");
     }
 
     public static UserException roleInvalid() {
@@ -59,7 +59,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException tokenExpired() {
-        return new UserException(401, "Tokenå·²è¿‡æœ?);
+        return new UserException(401, "Tokenå·²è¿‡æœŸ");
     }
 
     public static UserException tokenInvalid() {
@@ -71,7 +71,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException refreshTokenExpired() {
-        return new UserException(401, "åˆ·æ–°Tokenå·²è¿‡æœ?);
+        return new UserException(401, "åˆ·æ–°Tokenå·²è¿‡æœŸ");
     }
 
     public static UserException refreshTokenInvalid() {
@@ -91,7 +91,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException passwordMismatch() {
-        return new UserException(400, "å¯†ç ä¸åŒ¹é…?);
+        return new UserException(400, "å¯†ç ä¸åŒ¹é…");
     }
 
     public static UserException passwordModificationDenied() {
@@ -103,39 +103,18 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException usernameFormatError() {
-        return new UserException(400, "ç”¨æˆ·åæ ¼å¼é”™è¯?);
+        return new UserException(400, "ç”¨æˆ·åæ ¼å¼é”™è¯¯");
     }
 
     public static UserException permissionAlreadyGranted() {
-        return new UserException(409, "æƒé™å·²æˆäº?);
+        return new UserException(409, "æƒé™å·²æˆäºˆ");
     }
 
     public static UserException permissionNotFound() {
-        return new UserException(404, "æƒé™ä¸å­˜åœ?);
+        return new UserException(404, "æƒé™ä¸å­˜åœ¨");
     }
 
     public static UserException permissionNotOwned() {
         return new UserException(403, "æƒé™ä¸å±äºè¯¥ç”¨æˆ·");
-    }
-
-    /**
-     * ÃÜÂë¸ñÊ½´íÎó£¨Í¨ÓÃ£©
-     */
-    public static UserException passwordFormatError(String message) {
-        return new UserException(400, message);
-    }
-
-    /**
-     * ÃÜÂëÈ±ÉÙ×ÖÄ¸
-     */
-    public static UserException passwordMissingLetter() {
-        return new UserException(400, \"ÃÜÂë¸ñÊ½´íÎó£¬±ØĞë°üº¬ÖÁÉÙÒ»¸ö×ÖÄ¸\");
-    }
-
-    /**
-     * ÃÜÂëÈ±ÉÙÊı×Ö
-     */
-    public static UserException passwordMissingDigit() {
-        return new UserException(400, \"ÃÜÂë¸ñÊ½´íÎó£¬±ØĞë°üº¬ÖÁÉÙÒ»¸öÊı×Ö\");
     }
 }

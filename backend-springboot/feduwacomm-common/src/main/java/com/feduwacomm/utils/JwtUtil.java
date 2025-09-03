@@ -1,7 +1,9 @@
 package com.feduwacomm.utils;
 
+import com.feduwacomm.config.JwtConfig;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -15,14 +17,20 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    private static final String SECRET_KEY = "feduwacomm_jwt_secret_key_2024_water_acoustic_federated_learning";
-    private static final SecretKey KEY = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+    @Autowired
+    private JwtConfig jwtConfig;
+    
+    private SecretKey key;
 
-    // Token过期时间：24小时
-    private static final long TOKEN_EXPIRE_TIME = 24 * 60 * 60 * 1000L;
-
-    // 刷新Token过期时间：7天
-    private static final long REFRESH_TOKEN_EXPIRE_TIME = 7 * 24 * 60 * 60 * 1000L;
+    /**
+     * 初始化密钥
+     */
+    private SecretKey getKey() {
+        if (key == null) {
+            this.key = Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes());
+        }
+        return key;
+    }
 
     /**
      * 生成访问Token
@@ -37,8 +45,8 @@ public class JwtUtil {
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + TOKEN_EXPIRE_TIME))
-                .signWith(KEY, SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getExpiration() * 1000))
+                .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -53,8 +61,8 @@ public class JwtUtil {
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRE_TIME))
-                .signWith(KEY, SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getRefreshExpiration() * 1000))
+                .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -64,7 +72,7 @@ public class JwtUtil {
     public Claims validateToken(String token) {
         try {
             return Jwts.parserBuilder()
-                    .setSigningKey(KEY)
+                    .setSigningKey(getKey())
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -105,7 +113,7 @@ public class JwtUtil {
     public boolean isTokenExpired(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(KEY)
+                    .setSigningKey(getKey())
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -119,6 +127,6 @@ public class JwtUtil {
      * 获取Token过期时间
      */
     public long getTokenExpireTime() {
-        return TOKEN_EXPIRE_TIME / 1000; // 返回秒数
+        return jwtConfig.getExpiration(); // 返回秒数
     }
 }

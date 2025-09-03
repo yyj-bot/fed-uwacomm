@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FedUWAComm 系统测试页面</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .test-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .test-section h3 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-link {
+            display: inline-block;
+            margin: 10px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .test-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .features {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .features ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .features li {
+            margin: 5px 0;
+            color: #555;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 FedUWAComm 系统测试页面</h1>
+        <p>水声联邦学习系统 - 接口测试工具</p>
+    </div>
+
+    <div class="test-section">
+        <h3>👤 用户接口测试</h3>
+        <p class="description">
+            测试用户自助服务相关的所有接口，包括注册、登录、信息管理等基础功能。
+        </p>
+        <div class="features">
+            <strong>主要功能：</strong>
+            <ul>
+                <li>用户注册和登录</li>
+                <li>Token刷新和登出</li>
+                <li>用户信息管理</li>
+                <li>密码修改</li>
+            </ul>
+        </div>
+        <a href="user-api-test.html" class="test-link">🚪 用户接口测试</a>
+        <a href="debug-log.html" class="test-link">🔍 API调试测试</a>
+        <a href="api-test.html" class="test-link">🚀 API路径分离测试</a>
+    </div>
+
+    <div class="test-section">
+        <h3>👨‍💼 管理员接口测试</h3>
+        <p class="description">
+            测试管理员功能相关的接口，包括用户管理、权限管理、系统日志等高级功能。
+        </p>
+        <div class="features">
+            <strong>主要功能：</strong>
+            <ul>
+                <li>用户创建和管理</li>
+                <li>权限分配和撤销</li>
+                <li>系统日志查看</li>
+                <li>系统状态监控</li>
+            </ul>
+        </div>
+        <a href="admin-api-test.html" class="test-link">⚙️ 管理员接口测试</a>
+    </div>
+
+    <div class="test-section">
+        <h3>🔌 WebSocket接口测试</h3>
+        <p class="description">
+            测试WebSocket连接和消息传输功能，包括实时通信和协议处理。
+        </p>
+        <div class="features">
+            <strong>主要功能：</strong>
+            <ul>
+                <li>WebSocket连接建立</li>
+                <li>实时消息传输</li>
+                <li>协议消息处理</li>
+                <li>连接状态监控</li>
+            </ul>
+        </div>
+        <a href="websocket-test.html" class="test-link">🔌 WebSocket测试</a>
+    </div>
+
+    <div class="test-section">
+        <h3>📋 系统信息</h3>
+        <p class="description">
+            了解系统配置和路径结构，帮助开发者理解系统架构。
+        </p>
+        <div class="features">
+            <strong>路径配置说明：</strong>
+            <ul>
+                <li><strong>API路径</strong>: <code>/api/**</code> (通过PathMatchConfigurer配置)</li>
+                <li><strong>静态资源路径</strong>: <code>/pages/**</code> 和 <code>/assets/**</code></li>
+                <li><strong>当前页面</strong>: <code>/pages/index.html</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 系统状态</h3>
+        <p class="description">
+            查看系统运行状态和健康检查信息。
+        </p>
+        <a href="/api/health" class="test-link">查看系统状态</a>
+    </div>
+
+    <div class="footer">
+        <p>© 2024 FedUWAComm Team | 水声联邦学习系统</p>
+        <p>当前时间: <span id="current-time"></span></p>
+    </div>
+
+    <script>
+        // 显示当前时间
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString('zh-CN');
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // 添加页面加载动画
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.test-section');
+            sections.forEach((section, index) => {
+                setTimeout(() => {
+                    section.style.opacity = '0';
+                    section.style.transform = 'translateY(20px)';
+                    section.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        section.style.opacity = '1';
+                        section.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 200);
+            });
+        });
+    </script>
+</body>
+</html> 

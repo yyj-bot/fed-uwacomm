@@ -44,13 +44,16 @@ public class UserController {
             registerDTO.getUsername(), registerDTO.getEmail(), clientIp, userAgent);
         
         try {
+            log.info("开始调用UserService.register方法");
             UserRegisterResponseVO response = userService.register(registerDTO);
+            log.info("UserService.register方法调用成功，返回userId: {}", response.getUserId());
             log.info("用户注册请求处理成功: username={}, userId={}, ip={}", 
                 registerDTO.getUsername(), response.getUserId(), clientIp);
             return Result.success("注册成功", response);
         } catch (Exception e) {
             log.error("用户注册请求处理失败: username={}, email={}, ip={}, error={}", 
                 registerDTO.getUsername(), registerDTO.getEmail(), clientIp, e.getMessage());
+            log.error("异常详情:", e);
             throw e;
         }
     }

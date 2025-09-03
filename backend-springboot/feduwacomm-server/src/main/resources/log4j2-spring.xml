@@ -122,6 +122,22 @@
             <AppenderRef ref="AsyncFileAppender"/>
         </Logger>
         
+        <!-- 添加更详细的用户模块日志配置 -->
+        <Logger name="com.feduwacomm.service.UserService" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <Logger name="com.feduwacomm.controller" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
+        <Logger name="com.feduwacomm.service" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AsyncFileAppender"/>
+        </Logger>
+        
         <!-- 管理员模块日志 -->
         <Logger name="com.feduwacomm.service.impl.AdminServiceImpl" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>
@@ -142,7 +158,7 @@
         </Logger>
         
         <!-- 业务模块日志 -->
-        <Logger name="com.feduwacomm" level="INFO" additivity="false">
+        <Logger name="com.feduwacomm" level="DEBUG" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="AsyncFileAppender"/>
         </Logger>
