@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水声联邦学习系统 - 联邦任务API测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+        }
+
+        .auth-section h3 {
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+
+        .token-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .token-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #212529;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .api-section {
+            margin-bottom: 40px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .api-header {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .api-header h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+
+        .api-method {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .method-post { background: #28a745; color: white; }
+        .method-get { background: #007bff; color: white; }
+        .method-put { background: #ffc107; color: #212529; }
+        .method-delete { background: #dc3545; color: white; }
+
+        .api-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        textarea.form-control {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .result-container {
+            margin-top: 20px;
+        }
+
+        .result-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .result-body {
+            border: 1px solid #dee2e6;
+            border-radius: 0 0 6px 6px;
+            background: #fff;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-content {
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .success {
+            color: #28a745;
+            border-color: #28a745;
+        }
+
+        .error {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: -10px;
+        }
+
+        .col {
+            flex: 1;
+            padding: 10px;
+            min-width: 300px;
+        }
+
+        .col-half {
+            flex: 0 0 50%;
+            padding: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-running { background: #28a745; }
+        .status-paused { background: #ffc107; }
+        .status-stopped { background: #dc3545; }
+        .status-completed { background: #17a2b8; }
+        .status-created { background: #6c757d; }
+        .status-configured { background: #fd7e14; }
+
+        .task-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .task-title {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .task-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #e9ecef;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            transition: width 0.3s ease;
+        }
+
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-bottom: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .nav-tab:first-child {
+            border-radius: 6px 0 0 0;
+        }
+
+        .nav-tab:last-child {
+            border-radius: 0 6px 0 0;
+        }
+
+        .nav-tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+
+        .nav-tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 2px solid #007bff;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden { display: none; }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .content {
+                padding: 15px;
+            }
+            
+            .col {
+                min-width: 100%;
+            }
+            
+            .col-half {
+                flex: 0 0 100%;
+            }
+            
+            .row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>联邦学习任务管理API测试</h1>
+            <p>水声联邦学习系统 - 联邦任务生命周期管理接口测试工具</p>
+        </div>
+
+        <div class="content">
+            <!-- 认证区域 -->
+            <div class="auth-section">
+                <h3>🔐 认证设置</h3>
+                <div class="token-input">
+                    <input type="text" id="jwtToken" placeholder="请输入JWT Token (Bearer token)" class="form-control">
+                    <button onclick="setToken()" class="btn btn-primary">设置Token</button>
+                    <button onclick="clearToken()" class="btn btn-warning">清除Token</button>
+                </div>
+                <small>Token状态: <span id="tokenStatus">未设置</span></small>
+            </div>
+
+            <!-- 任务管理标签页 -->
+            <div class="nav-tabs">
+                <div class="nav-tab active" onclick="showTab('lifecycle')">任务生命周期</div>
+                <div class="nav-tab" onclick="showTab('query')">查询与监控</div>
+                <div class="nav-tab" onclick="showTab('management')">任务管理</div>
+            </div>
+
+            <!-- 任务生命周期管理 -->
+            <div id="lifecycle-tab" class="tab-content active">
+                <!-- 创建任务 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-post">POST</span>
+                            创建联邦学习任务
+                        </h3>
+                        <small>/api/federated/tasks</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col">
+                                <div class="form-group">
+                                    <label>任务名称 *</label>
+                                    <input type="text" id="taskName" class="form-control" value="水声传播特征分类任务" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>任务类型 *</label>
+                                    <select id="taskType" class="form-control">
+                                        <option value="CLASSIFICATION">分类任务</option>
+                                        <option value="REGRESSION">回归任务</option>
+                                        <option value="CLUSTERING">聚类任务</option>
+                                        <option value="ANOMALY_DETECTION">异常检测</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>算法类型 *</label>
+                                    <select id="algorithm" class="form-control">
+                                        <option value="FEDERATED_AVERAGING">联邦平均</option>
+                                        <option value="FEDPROX">FedProx</option>
+                                        <option value="FEDNOVA">FedNova</option>
+                                        <option value="SCAFFOLD">Scaffold</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>任务描述</label>
+                                    <textarea id="taskDescription" class="form-control">基于声学传播特征的水声目标分类任务</textarea>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-group">
+                                    <label>参与者配置 (JSON格式)</label>
+                                    <textarea id="participants" class="form-control">[
+  {
+    "vmId": "a1b2c3d4e5f678901234567890123456",
+    "role": "PARTICIPANT",
+    "dataSource": "bellhop_features_001.csv"
+  },
+  {
+    "vmId": "b2c3d4e5f67890123456789012345678",
+    "role": "PARTICIPANT",
+    "dataSource": "bellhop_features_002.csv"
+  }
+]</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>超参数配置 (JSON格式)</label>
+                                    <textarea id="hyperparameters" class="form-control">{
+  "learningRate": 0.01,
+  "batchSize": 32,
+  "epochs": 100,
+  "rounds": 10,
+  "minParticipants": 2,
+  "aggregationMethod": "WEIGHTED_AVERAGE"
+}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="createTask()" class="btn btn-success">创建任务</button>
+                        <div id="createTaskResult" class="result-container hidden">
+                            <div class="result-header">响应结果</div>
+                            <div class="result-body">
+                                <div id="createTaskContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务控制 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>任务生命周期控制</h3>
+                        <small>任务启动、暂停、恢复、停止、取消操作</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-group">
+                            <label>任务ID *</label>
+                            <input type="text" id="controlTaskId" class="form-control" placeholder="请输入任务ID">
+                        </div>
+                        <div class="row">
+                            <div class="col-half">
+                                <button onclick="startTask()" class="btn btn-success">▶️ 启动任务</button>
+                                <button onclick="pauseTask()" class="btn btn-warning">⏸️ 暂停任务</button>
+                                <button onclick="resumeTask()" class="btn btn-info">▶️ 恢复任务</button>
+                            </div>
+                            <div class="col-half">
+                                <button onclick="stopTask()" class="btn btn-danger">⏹️ 停止任务</button>
+                                <button onclick="cancelTask()" class="btn btn-danger">❌ 取消任务</button>
+                            </div>
+                        </div>
+                        <div id="controlResult" class="result-container hidden">
+                            <div class="result-header">操作结果</div>
+                            <div class="result-body">
+                                <div id="controlContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 查询与监控 -->
+            <div id="query-tab" class="tab-content">
+                <!-- 任务状态查询 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-get">GET</span>
+                            查询任务状态
+                        </h3>
+                        <small>/api/federated/tasks/{taskId}</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-group">
+                            <label>任务ID *</label>
+                            <input type="text" id="queryTaskId" class="form-control" placeholder="请输入任务ID">
+                        </div>
+                        <button onclick="getTaskDetail()" class="btn btn-info">查询任务状态</button>
+                        <div id="taskDetailResult" class="result-container hidden">
+                            <div class="result-header">任务详情</div>
+                            <div class="result-body">
+                                <div id="taskDetailContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务列表查询 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-get">GET</span>
+                            查询任务列表
+                        </h3>
+                        <small>/api/federated/tasks</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>页码</label>
+                                    <input type="number" id="page" class="form-control" value="1" min="1">
+                                </div>
+                                <div class="form-group">
+                                    <label>每页大小</label>
+                                    <input type="number" id="size" class="form-control" value="20" min="1" max="100">
+                                </div>
+                            </div>
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>状态过滤</label>
+                                    <select id="statusFilter" class="form-control">
+                                        <option value="">全部状态</option>
+                                        <option value="CREATED">已创建</option>
+                                        <option value="CONFIGURED">已配置</option>
+                                        <option value="RUNNING">运行中</option>
+                                        <option value="PAUSED">已暂停</option>
+                                        <option value="STOPPED">已停止</option>
+                                        <option value="COMPLETED">已完成</option>
+                                        <option value="FAILED">执行失败</option>
+                                        <option value="CANCELLED">已取消</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>关键词搜索</label>
+                                    <input type="text" id="keyword" class="form-control" placeholder="搜索任务名称或描述">
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="getTaskList()" class="btn btn-info">查询任务列表</button>
+                        <button onclick="refreshTaskList()" class="btn btn-primary">🔄 刷新列表</button>
+                        <div id="taskListResult" class="result-container hidden">
+                            <div class="result-header">任务列表</div>
+                            <div class="result-body">
+                                <div id="taskListContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务结果查询 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-get">GET</span>
+                            查询任务结果
+                        </h3>
+                        <small>/api/federated/tasks/{taskId}/results</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-group">
+                            <label>任务ID *</label>
+                            <input type="text" id="resultTaskId" class="form-control" placeholder="请输入已完成任务的ID">
+                        </div>
+                        <button onclick="getTaskResult()" class="btn btn-info">查询任务结果</button>
+                        <div id="taskResultResult" class="result-container hidden">
+                            <div class="result-header">任务结果</div>
+                            <div class="result-body">
+                                <div id="taskResultContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务日志查询 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-get">GET</span>
+                            查询任务日志
+                        </h3>
+                        <small>/api/federated/tasks/{taskId}/logs</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>任务ID *</label>
+                                    <input type="text" id="logTaskId" class="form-control" placeholder="请输入任务ID">
+                                </div>
+                                <div class="form-group">
+                                    <label>日志级别</label>
+                                    <select id="logLevel" class="form-control">
+                                        <option value="">全部级别</option>
+                                        <option value="INFO">信息</option>
+                                        <option value="WARN">警告</option>
+                                        <option value="ERROR">错误</option>
+                                        <option value="DEBUG">调试</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>页码</label>
+                                    <input type="number" id="logPage" class="form-control" value="1" min="1">
+                                </div>
+                                <div class="form-group">
+                                    <label>每页大小</label>
+                                    <input type="number" id="logSize" class="form-control" value="10" min="1" max="100">
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="getTaskLogs()" class="btn btn-info">查询任务日志</button>
+                        <div id="taskLogsResult" class="result-container hidden">
+                            <div class="result-header">任务日志</div>
+                            <div class="result-body">
+                                <div id="taskLogsContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 任务管理 -->
+            <div id="management-tab" class="tab-content">
+                <!-- 配置任务 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-put">PUT</span>
+                            配置任务参数
+                        </h3>
+                        <small>/api/federated/tasks/{taskId}/config</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-group">
+                            <label>任务ID *</label>
+                            <input type="text" id="configTaskId" class="form-control" placeholder="请输入任务ID">
+                        </div>
+                        <div class="form-group">
+                            <label>配置参数 (JSON格式)</label>
+                            <textarea id="taskConfig" class="form-control">{
+  "algorithm": "FEDERATED_AVERAGING",
+  "hyperparameters": {
+    "learningRate": 0.01,
+    "batchSize": 64,
+    "epochs": 150,
+    "rounds": 15,
+    "minParticipants": 2,
+    "aggregationMethod": "WEIGHTED_AVERAGE"
+  },
+  "modelConfig": {
+    "modelType": "RANDOM_FOREST",
+    "nEstimators": 100,
+    "maxDepth": 10,
+    "minSamplesSplit": 2,
+    "minSamplesLeaf": 1
+  },
+  "dataConfig": {
+    "preprocessing": {
+      "normalization": "STANDARD_SCALER",
+      "featureSelection": "VARIANCE_THRESHOLD",
+      "outlierRemoval": true
+    },
+    "validation": {
+      "crossValidation": "K_FOLD",
+      "kFolds": 5,
+      "stratified": true
+    }
+  }
+}</textarea>
+                        </div>
+                        <button onclick="configureTask()" class="btn btn-primary">配置任务</button>
+                        <div id="configTaskResult" class="result-container hidden">
+                            <div class="result-header">配置结果</div>
+                            <div class="result-body">
+                                <div id="configTaskContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 删除任务 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>
+                            <span class="api-method method-delete">DELETE</span>
+                            删除任务
+                        </h3>
+                        <small>/api/federated/tasks/{taskId}</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="form-group">
+                            <label>任务ID *</label>
+                            <input type="text" id="deleteTaskId" class="form-control" placeholder="请输入要删除的任务ID">
+                        </div>
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="deleteData" checked> 删除任务数据
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="deleteModel"> 删除模型文件
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="deleteTask()" class="btn btn-danger">🗑️ 删除任务</button>
+                        <div id="deleteTaskResult" class="result-container hidden">
+                            <div class="result-header">删除结果</div>
+                            <div class="result-body">
+                                <div id="deleteTaskContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jwtToken = '';
+        const BASE_URL = 'http://localhost:8080';
+
+        // Token管理
+        function setToken() {
+            const token = document.getElementById('jwtToken').value.trim();
+            if (token) {
+                jwtToken = token.startsWith('Bearer ') ? token : 'Bearer ' + token;
+                document.getElementById('tokenStatus').textContent = '已设置 ✅';
+                document.getElementById('tokenStatus').style.color = '#28a745';
+            }
+        }
+
+        function clearToken() {
+            jwtToken = '';
+            document.getElementById('jwtToken').value = '';
+            document.getElementById('tokenStatus').textContent = '未设置 ❌';
+            document.getElementById('tokenStatus').style.color = '#dc3545';
+        }
+
+        // 标签页切换
+        function showTab(tabName) {
+            // 隐藏所有标签页内容
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tab => tab.classList.remove('active'));
+
+            // 移除所有标签页激活状态
+            const navTabs = document.querySelectorAll('.nav-tab');
+            navTabs.forEach(tab => tab.classList.remove('active'));
+
+            // 显示选中的标签页内容
+            document.getElementById(tabName + '-tab').classList.add('active');
+
+            // 设置选中的标签页为激活状态
+            event.target.classList.add('active');
+        }
+
+        // 通用请求函数
+        async function makeRequest(url, method = 'GET', body = null) {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            if (jwtToken) {
+                headers['Authorization'] = jwtToken;
+            }
+
+            const config = {
+                method: method,
+                headers: headers
+            };
+
+            if (body && method !== 'GET') {
+                config.body = JSON.stringify(body);
+            }
+
+            try {
+                const response = await fetch(BASE_URL + url, config);
+                const result = await response.json();
+                return {
+                    status: response.status,
+                    data: result,
+                    success: response.ok
+                };
+            } catch (error) {
+                return {
+                    status: 0,
+                    data: { error: error.message },
+                    success: false
+                };
+            }
+        }
+
+        // 显示结果
+        function showResult(resultId, contentId, result) {
+            const resultContainer = document.getElementById(resultId);
+            const resultContent = document.getElementById(contentId);
+            const resultHeader = resultContainer.querySelector('.result-header');
+
+            resultContainer.classList.remove('hidden');
+            
+            if (result.success) {
+                resultHeader.className = 'result-header success';
+                resultHeader.textContent = `✅ 请求成功 (${result.status})`;
+            } else {
+                resultHeader.className = 'result-header error';
+                resultHeader.textContent = `❌ 请求失败 (${result.status})`;
+            }
+
+            resultContent.textContent = JSON.stringify(result.data, null, 2);
+        }
+
+        // 创建任务
+        async function createTask() {
+            const taskData = {
+                taskName: document.getElementById('taskName').value,
+                taskType: document.getElementById('taskType').value,
+                description: document.getElementById('taskDescription').value,
+                algorithm: document.getElementById('algorithm').value,
+                participants: JSON.parse(document.getElementById('participants').value),
+                hyperparameters: JSON.parse(document.getElementById('hyperparameters').value),
+                modelConfig: {
+                    modelType: "RANDOM_FOREST",
+                    featureColumns: ["feature_1", "feature_2", "feature_3"],
+                    targetColumn: "target_class",
+                    testSize: 0.2,
+                    randomState: 42
+                },
+                schedule: {
+                    startTime: new Date(Date.now() + 3600000).toISOString(), // 1小时后
+                    endTime: new Date(Date.now() + 28800000).toISOString(),   // 8小时后
+                    timeout: 3600
+                },
+                securityConfig: {
+                    encryption: "AES_256",
+                    differentialPrivacy: {
+                        enabled: false,
+                        epsilon: 1.0,
+                        delta: 0.0001
+                    },
+                    secureAggregation: false
+                }
+            };
+
+            const result = await makeRequest('/api/federated/tasks', 'POST', taskData);
+            showResult('createTaskResult', 'createTaskContent', result);
+            
+            // 如果创建成功，自动填入任务ID到其他表单
+            if (result.success && result.data.data && result.data.data.taskId) {
+                const taskId = result.data.data.taskId;
+                document.getElementById('controlTaskId').value = taskId;
+                document.getElementById('queryTaskId').value = taskId;
+                document.getElementById('configTaskId').value = taskId;
+            }
+        }
+
+        // 配置任务
+        async function configureTask() {
+            const taskId = document.getElementById('configTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const configData = JSON.parse(document.getElementById('taskConfig').value);
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/config`, 'PUT', configData);
+            showResult('configTaskResult', 'configTaskContent', result);
+        }
+
+        // 启动任务
+        async function startTask() {
+            const taskId = document.getElementById('controlTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/start`, 'POST');
+            showResult('controlResult', 'controlContent', result);
+        }
+
+        // 暂停任务
+        async function pauseTask() {
+            const taskId = document.getElementById('controlTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/pause`, 'POST');
+            showResult('controlResult', 'controlContent', result);
+        }
+
+        // 恢复任务
+        async function resumeTask() {
+            const taskId = document.getElementById('controlTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/resume`, 'POST');
+            showResult('controlResult', 'controlContent', result);
+        }
+
+        // 停止任务
+        async function stopTask() {
+            const taskId = document.getElementById('controlTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const stopData = {
+                reason: "用户主动停止",
+                saveCheckpoint: true
+            };
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/stop`, 'POST', stopData);
+            showResult('controlResult', 'controlContent', result);
+        }
+
+        // 取消任务
+        async function cancelTask() {
+            const taskId = document.getElementById('controlTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            if (!confirm('确认要取消此任务吗？此操作不可撤销。')) {
+                return;
+            }
+
+            const cancelData = {
+                reason: "用户主动取消"
+            };
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/cancel`, 'POST', cancelData);
+            showResult('controlResult', 'controlContent', result);
+        }
+
+        // 查询任务详情
+        async function getTaskDetail() {
+            const taskId = document.getElementById('queryTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}`);
+            showResult('taskDetailResult', 'taskDetailContent', result);
+        }
+
+        // 查询任务列表
+        async function getTaskList() {
+            const params = new URLSearchParams({
+                page: document.getElementById('page').value,
+                size: document.getElementById('size').value
+            });
+
+            const status = document.getElementById('statusFilter').value;
+            if (status) params.append('status', status);
+
+            const keyword = document.getElementById('keyword').value;
+            if (keyword) params.append('keyword', keyword);
+
+            const result = await makeRequest(`/api/federated/tasks?${params.toString()}`);
+            showResult('taskListResult', 'taskListContent', result);
+        }
+
+        // 刷新任务列表
+        function refreshTaskList() {
+            getTaskList();
+        }
+
+        // 查询任务结果
+        async function getTaskResult() {
+            const taskId = document.getElementById('resultTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/results`);
+            showResult('taskResultResult', 'taskResultContent', result);
+        }
+
+        // 查询任务日志
+        async function getTaskLogs() {
+            const taskId = document.getElementById('logTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const params = new URLSearchParams({
+                page: document.getElementById('logPage').value,
+                size: document.getElementById('logSize').value
+            });
+
+            const level = document.getElementById('logLevel').value;
+            if (level) params.append('level', level);
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}/logs?${params.toString()}`);
+            showResult('taskLogsResult', 'taskLogsContent', result);
+        }
+
+        // 删除任务
+        async function deleteTask() {
+            const taskId = document.getElementById('deleteTaskId').value;
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            if (!confirm('确认要删除此任务吗？此操作不可撤销。')) {
+                return;
+            }
+
+            const deleteData = {
+                deleteData: document.getElementById('deleteData').checked,
+                deleteModel: document.getElementById('deleteModel').checked
+            };
+
+            const result = await makeRequest(`/api/federated/tasks/${taskId}`, 'DELETE', deleteData);
+            showResult('deleteTaskResult', 'deleteTaskContent', result);
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('联邦学习任务API测试页面已加载');
+        });
+    </script>
+</body>
+</html>

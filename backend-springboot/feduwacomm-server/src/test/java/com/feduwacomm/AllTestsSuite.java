@@ -30,7 +30,8 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SuiteDisplayName("水声联邦学习系统 - 全体测试套件")
 @SelectClasses({
         UserModuleTestSuite.class,
-        AdminModuleTestSuite.class
+        AdminModuleTestSuite.class,
+        ModelVersionModuleTestSuite.class
 })
 public class AllTestsSuite {
 

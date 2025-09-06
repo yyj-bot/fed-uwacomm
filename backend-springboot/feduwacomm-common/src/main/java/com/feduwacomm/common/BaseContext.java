@@ -170,4 +170,11 @@ public class BaseContext {
     public static String getCurrentUserId() {
         return getUserId();
     }
+    
+    /**
+     * 获取当前用户ID（另一个别名方法）
+     */
+    public static String getCurrentId() {
+        return getUserId();
+    }
 }

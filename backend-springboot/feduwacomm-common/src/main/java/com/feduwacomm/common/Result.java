@@ -77,4 +77,18 @@ public class Result<T> {
         result.setData(data);
         return result;
     }
+    
+    /**
+     * 错误响应
+     */
+    public static <T> Result<T> error(String message) {
+        return failure(500, message);
+    }
+    
+    /**
+     * 错误响应
+     */
+    public static <T> Result<T> error(int code, String message) {
+        return failure(code, message);
+    }
 } 
