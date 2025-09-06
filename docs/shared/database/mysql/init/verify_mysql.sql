@@ -48,9 +48,9 @@ ORDER BY table_name;
 SELECT
     '索引验证' AS '验证项目',
     COUNT(*) AS '索引数量',
-    '>= 20' AS '期望索引数量',
+    '>= 30' AS '期望索引数量',
     CASE
-        WHEN COUNT(*) >= 20 THEN '✓ 通过'
+        WHEN COUNT(*) >= 30 THEN '✓ 通过'
         ELSE '✗ 失败'
     END AS '结果'
 FROM information_schema.statistics
@@ -192,8 +192,70 @@ SELECT
                 AND COLUMN_NAME = 'id'
                 AND DATA_TYPE = 'varchar'
                 AND CHARACTER_MAXIMUM_LENGTH = 32
-        ) = 11 THEN '✓ 所有验证通过'
+        ) = 11
+        AND (
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE
+                TABLE_SCHEMA = 'feduwacomm'
+                AND DATA_TYPE = 'json'
+        ) >= 8 THEN '✓ 所有验证通过'
         ELSE '✗ 部分验证失败'
     END AS '结果';
 
+-- 验证表结构详细信息（新增）
+SELECT
+    '表结构详细验证' AS '验证项目',
+    table_name AS '表名',
+    CASE
+        WHEN table_name IN (
+            'users', 'user_permissions', 'vm_instances', 'federated_tasks',
+            'training_dataset', 'training_dataset_row', 'model_versions',
+            'system_logs', 'vm_runtime_logs', 'vm_round_models', 'vm_secrets'
+        ) THEN '✓ 表存在'
+        ELSE '✗ 意外表'
+    END AS '验证结果'
+FROM information_schema.tables
+WHERE
+    table_schema = 'feduwacomm'
+    AND table_type = 'BASE TABLE'
+ORDER BY table_name;
+
+-- 验证JSON字段（新增）
+SELECT
+    'JSON字段验证' AS '验证项目',
+    COUNT(*) AS 'JSON字段数量',
+    '>= 8' AS '期望数量',
+    CASE
+        WHEN COUNT(*) >= 8 THEN '✓ 通过'
+        ELSE '✗ 失败'
+    END AS '结果'
+FROM information_schema.COLUMNS
+WHERE
+    TABLE_SCHEMA = 'feduwacomm'
+    AND DATA_TYPE = 'json';
+
+-- 验证ENUM字段（新增）
+SELECT
+    'ENUM字段验证' AS '验证项目',
+    COUNT(*) AS 'ENUM字段数量',
+    '>= 10' AS '期望数量',
+    CASE
+        WHEN COUNT(*) >= 10 THEN '✓ 通过'
+        ELSE '✗ 失败'
+    END AS '结果'
+FROM information_schema.COLUMNS
+WHERE
+    TABLE_SCHEMA = 'feduwacomm'
+    AND DATA_TYPE = 'enum';
+
+-- =====================================================
+-- 数据库结构摘要
+-- =====================================================
+-- 表数量: 11个
+-- 外键约束: 12个
+-- JSON字段: 8+个
+-- ENUM字段: 10+个
+-- 索引: 30+个
+-- UUID字段(id): 11个
 -- =====================================================

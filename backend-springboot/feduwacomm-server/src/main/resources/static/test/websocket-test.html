@@ -546,12 +546,38 @@
                 未连接
             </div>
             <div class="input-group">
-                <input type="text" id="vmId" placeholder="虚拟机ID" value="vm-test-123">
-                <input type="text" id="token" placeholder="JWT Token" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLTEyMyIsInVzZXJuYW1lIjoidGVzdF91c2VyIiwicm9sZSI6InVzZXIiLCJ2bUlkIjoidm0tdGVzdC0xMjMiLCJpYXQiOjE3MzUyODgwMDAsImV4cCI6MTczNTM3NDQwMH0.test">
+                <input type="text" id="vmId" placeholder="虚拟机ID" value="">
+                <input type="text" id="token" placeholder="JWT Token" value="">
                 <button onclick="connect()">连接</button>
                 <button onclick="disconnect()">断开</button>
                 <button onclick="testConnection()" class="btn-info">测试连接</button>
                 <button onclick="pingServer()" class="btn-warning">Ping测试</button>
+            </div>
+            <div class="input-group">
+                <button onclick="toggleVmRegistration()" id="vmRegBtn" class="btn-success">显示VM注册</button>
+                <button onclick="openVmApiTest()" class="btn-secondary">打开VM API测试页</button>
+            </div>
+            <div id="vmRegistrationPanel" style="display: none;">
+                <hr style="margin: 15px 0;">
+                <h3>快速VM注册</h3>
+                <div class="input-group">
+                    <input type="text" id="quickVmName" placeholder="VM名称" value="">
+                    <input type="text" id="quickVmDescription" placeholder="VM描述" value="WebSocket测试虚拟机">
+                    <select id="quickVmType">
+                        <option value="TRAINING">训练VM</option>
+                        <option value="INFERENCE">推理VM</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <button onclick="quickRegisterVm()" class="btn-success">快速注册VM</button>
+                    <button onclick="quickRefreshToken()" class="btn-warning">刷新Token</button>
+                    <button onclick="fillQuickVmData()" class="btn-secondary">填充示例数据</button>
+                </div>
+                <div id="quickVmInfo" style="display: none; background: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 4px;">
+                    <div><strong>VM ID:</strong> <span id="quickVmIdDisplay"></span></div>
+                    <div><strong>Secret ID:</strong> <span id="quickSecretIdDisplay"></span></div>
+                    <div><strong>Token:</strong> <span id="quickTokenStatus">无</span></div>
+                </div>
             </div>
             <div class="stats">
                 <div class="stat-item">
@@ -1438,6 +1464,30 @@
                     applyMessageFilters();
                 });
             });
+
+            // 检查URL参数，自动填充VM ID和Token
+            const urlParams = new URLSearchParams(window.location.search);
+            const vmIdParam = urlParams.get('vmId');
+            const tokenParam = urlParams.get('token');
+            
+            if (vmIdParam) {
+                document.getElementById('vmId').value = vmIdParam;
+                document.getElementById('vmIdDisplay').textContent = vmIdParam;
+                showProtocolMessage({ type: 'SENT', content: '从URL参数加载VM ID: ' + vmIdParam });
+            }
+            
+            if (tokenParam) {
+                document.getElementById('token').value = tokenParam;
+                showProtocolMessage({ type: 'SENT', content: '从URL参数加载Token (长度: ' + tokenParam.length + ')' });
+            }
+
+            // 如果有完整的VM ID和Token，显示提示
+            if (vmIdParam && tokenParam) {
+                showProtocolMessage({ 
+                    type: 'SENT', 
+                    content: '已从VM API测试页面加载凭据，可以直接连接WebSocket' 
+                });
+            }
         });
 
         // 应用消息过滤器
@@ -1813,6 +1863,176 @@
             if (messageHistory.length > 1000) {
                 messageHistory = messageHistory.slice(-1000);
             }
+        }
+
+        // VM注册相关功能
+        let quickVmData = null;
+        let isVmRegistrationVisible = false;
+
+        // 切换VM注册面板显示
+        function toggleVmRegistration() {
+            isVmRegistrationVisible = !isVmRegistrationVisible;
+            const panel = document.getElementById('vmRegistrationPanel');
+            const btn = document.getElementById('vmRegBtn');
+            
+            if (isVmRegistrationVisible) {
+                panel.style.display = 'block';
+                btn.textContent = '隐藏VM注册';
+                btn.style.backgroundColor = '#dc3545';
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = '显示VM注册';
+                btn.style.backgroundColor = '#28a745';
+            }
+        }
+
+        // 打开VM API测试页面
+        function openVmApiTest() {
+            const vmId = document.getElementById('vmId').value;
+            const token = document.getElementById('token').value;
+            
+            let url = '/test/vm-api-test.html';
+            if (vmId && token) {
+                const params = new URLSearchParams();
+                params.append('vmId', vmId);
+                params.append('token', token);
+                url += '?' + params.toString();
+            }
+            
+            window.open(url, '_blank');
+        }
+
+        // 填充快速VM数据
+        function fillQuickVmData() {
+            document.getElementById('quickVmName').value = 'WebSocketTestVM-' + Date.now();
+            document.getElementById('quickVmDescription').value = 'WebSocket测试虚拟机 - ' + new Date().toLocaleString();
+            document.getElementById('quickVmType').value = 'TRAINING';
+        }
+
+        // 快速注册VM
+        async function quickRegisterVm() {
+            const vmName = document.getElementById('quickVmName').value;
+            const vmDescription = document.getElementById('quickVmDescription').value;
+            const vmType = document.getElementById('quickVmType').value;
+
+            if (!vmName) {
+                showProtocolMessage({ type: 'ERROR', content: '请输入VM名称' });
+                return;
+            }
+
+            const requestData = {
+                vmName: vmName,
+                vmDescription: vmDescription || 'WebSocket测试虚拟机',
+                vmType: vmType,
+                vmVersion: '1.0.0',
+                capabilities: ['FEDAVG', 'FEDPROX'],
+                systemInfo: {
+                    os: 'WebSocket Test Environment',
+                    source: 'websocket-test-page'
+                }
+            };
+
+            showProtocolMessage({ type: 'SENT', content: '正在注册VM: ' + vmName });
+
+            try {
+                const response = await fetch('/api/vm/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    quickVmData = result.data;
+                    updateQuickVmDisplay(result.data);
+                    
+                    // 自动填充到连接区域
+                    document.getElementById('vmId').value = result.data.vmId;
+                    document.getElementById('vmIdDisplay').textContent = result.data.vmId;
+                    
+                    showProtocolMessage({ 
+                        type: 'RECEIVED', 
+                        content: 'VM注册成功',
+                        timestamp: new Date().toISOString(),
+                        data: result.data
+                    });
+                } else {
+                    showProtocolMessage({ 
+                        type: 'ERROR', 
+                        content: 'VM注册失败: ' + (result.message || 'Unknown error'),
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                showProtocolMessage({ 
+                    type: 'ERROR', 
+                    content: 'VM注册网络错误: ' + error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+
+        // 快速刷新Token
+        async function quickRefreshToken() {
+            if (!quickVmData) {
+                showProtocolMessage({ type: 'ERROR', content: '请先注册VM' });
+                return;
+            }
+
+            const requestData = {
+                vmId: quickVmData.vmId,
+                secretId: quickVmData.secretId
+            };
+
+            showProtocolMessage({ type: 'SENT', content: '正在刷新Token for VM: ' + quickVmData.vmId });
+
+            try {
+                const response = await fetch('/api/vm/token/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // 自动填充到连接区域
+                    document.getElementById('token').value = result.data.token;
+                    document.getElementById('quickTokenStatus').textContent = '有效';
+                    
+                    showProtocolMessage({ 
+                        type: 'RECEIVED', 
+                        content: 'Token刷新成功',
+                        timestamp: new Date().toISOString(),
+                        data: { tokenLength: result.data.token.length }
+                    });
+                } else {
+                    document.getElementById('quickTokenStatus').textContent = '无效';
+                    showProtocolMessage({ 
+                        type: 'ERROR', 
+                        content: 'Token刷新失败: ' + (result.message || 'Unknown error'),
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                showProtocolMessage({ 
+                    type: 'ERROR', 
+                    content: 'Token刷新网络错误: ' + error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+
+        // 更新快速VM显示
+        function updateQuickVmDisplay(vmData) {
+            document.getElementById('quickVmIdDisplay').textContent = vmData.vmId;
+            document.getElementById('quickSecretIdDisplay').textContent = vmData.secretId;
+            document.getElementById('quickVmInfo').style.display = 'block';
         }
     </script>
 </body>

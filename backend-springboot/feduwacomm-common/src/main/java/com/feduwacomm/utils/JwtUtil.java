@@ -129,4 +129,39 @@ public class JwtUtil {
     public long getTokenExpireTime() {
         return jwtConfig.getExpiration(); // 返回秒数
     }
+
+    /**
+     * 静态方法：创建Token（用于VM认证）
+     */
+    public static String createToken(Map<String, Object> claims) {
+        // 使用默认密钥和过期时间
+        String defaultSecret = "feduwacomm_jwt_secret_key_2024_default_256_bit_length_for_security";
+        SecretKey defaultKey = Keys.hmacShaKeyFor(defaultSecret.getBytes());
+        long defaultExpiration = 86400; // 24小时，单位：秒
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + defaultExpiration * 1000))
+                .signWith(defaultKey, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * 静态方法：验证Token（用于VM认证）
+     */
+    public static boolean validateTokenStatic(String token) {
+        try {
+            String defaultSecret = "feduwacomm_jwt_secret_key_2024_default_256_bit_length_for_security";
+            SecretKey defaultKey = Keys.hmacShaKeyFor(defaultSecret.getBytes());
+            
+            Jwts.parserBuilder()
+                    .setSigningKey(defaultKey)
+                    .build()
+                    .parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

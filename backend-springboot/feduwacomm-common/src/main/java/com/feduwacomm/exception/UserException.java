@@ -21,17 +21,17 @@ public class UserException extends RuntimeException {
         return code;
     }
 
-    // 预定义异�?
+    // 预定义异常
     public static UserException userNotFound() {
-        return new UserException(404, "用户不存�?);
+        return new UserException(404, "用户不存在");
     }
 
     public static UserException userAlreadyExists() {
-        return new UserException(409, "用户已存�?);
+        return new UserException(409, "用户已存在");
     }
 
     public static UserException emailExists() {
-        return new UserException(409, "邮箱已存�?);
+        return new UserException(409, "邮箱已存在");
     }
 
     public static UserException usernameExists() {
@@ -43,11 +43,11 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException accountLocked() {
-        return new UserException(423, "账号已锁�?);
+        return new UserException(423, "账号已锁定");
     }
 
     public static UserException statusInvalid() {
-        return new UserException(400, "用户状态无�?);
+        return new UserException(400, "用户状态无效");
     }
 
     public static UserException roleInvalid() {
@@ -59,7 +59,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException tokenExpired() {
-        return new UserException(401, "Token已过�?);
+        return new UserException(401, "Token已过期");
     }
 
     public static UserException tokenInvalid() {
@@ -71,7 +71,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException refreshTokenExpired() {
-        return new UserException(401, "刷新Token已过�?);
+        return new UserException(401, "刷新Token已过期");
     }
 
     public static UserException refreshTokenInvalid() {
@@ -91,7 +91,7 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException passwordMismatch() {
-        return new UserException(400, "密码不匹�?);
+        return new UserException(400, "密码不匹配");
     }
 
     public static UserException passwordModificationDenied() {
@@ -103,15 +103,15 @@ public class UserException extends RuntimeException {
     }
 
     public static UserException usernameFormatError() {
-        return new UserException(400, "用户名格式错�?);
+        return new UserException(400, "用户名格式错误");
     }
 
     public static UserException permissionAlreadyGranted() {
-        return new UserException(409, "权限已授�?);
+        return new UserException(409, "权限已授权");
     }
 
     public static UserException permissionNotFound() {
-        return new UserException(404, "权限不存�?);
+        return new UserException(404, "权限不存在");
     }
 
     public static UserException permissionNotOwned() {
@@ -119,23 +119,23 @@ public class UserException extends RuntimeException {
     }
 
     /**
-     * �����ʽ����ͨ�ã�
+     * 密码格式错误（通用）
      */
     public static UserException passwordFormatError(String message) {
         return new UserException(400, message);
     }
 
     /**
-     * ����ȱ����ĸ
+     * 密码缺少字母
      */
     public static UserException passwordMissingLetter() {
-        return new UserException(400, \"�����ʽ���󣬱����������һ����ĸ\");
+        return new UserException(400, "密码格式错误，必须包含至少一个字母");
     }
 
     /**
-     * ����ȱ������
+     * 密码缺少数字
      */
     public static UserException passwordMissingDigit() {
-        return new UserException(400, \"�����ʽ���󣬱����������һ������\");
+        return new UserException(400, "密码格式错误，必须包含至少一个数字");
     }
 }

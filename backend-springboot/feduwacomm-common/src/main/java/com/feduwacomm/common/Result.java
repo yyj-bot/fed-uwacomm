@@ -39,42 +39,42 @@ public class Result<T> {
     public static final String SUCCESS_MESSAGE = "success";
 
     public static <T> Result<T> success() {
-        return Result.<T>builder()
-                .code(SUCCESS_CODE)
-                .message(SUCCESS_MESSAGE)
-                .data(null)
-                .build();
+        Result<T> result = new Result<>();
+        result.setCode(SUCCESS_CODE);
+        result.setMessage(SUCCESS_MESSAGE);
+        result.setData(null);
+        return result;
     }
 
     public static <T> Result<T> success(T data) {
-        return Result.<T>builder()
-                .code(SUCCESS_CODE)
-                .message(SUCCESS_MESSAGE)
-                .data(data)
-                .build();
+        Result<T> result = new Result<>();
+        result.setCode(SUCCESS_CODE);
+        result.setMessage(SUCCESS_MESSAGE);
+        result.setData(data);
+        return result;
     }
 
     public static <T> Result<T> success(String message, T data) {
-        return Result.<T>builder()
-                .code(SUCCESS_CODE)
-                .message(message)
-                .data(data)
-                .build();
+        Result<T> result = new Result<>();
+        result.setCode(SUCCESS_CODE);
+        result.setMessage(message);
+        result.setData(data);
+        return result;
     }
 
     public static <T> Result<T> failure(int code, String message) {
-        return Result.<T>builder()
-                .code(code)
-                .message(message)
-                .data(null)
-                .build();
+        Result<T> result = new Result<>();
+        result.setCode(code);
+        result.setMessage(message);
+        result.setData(null);
+        return result;
     }
 
     public static <T> Result<T> failure(int code, String message, T data) {
-        return Result.<T>builder()
-                .code(code)
-                .message(message)
-                .data(data)
-                .build();
+        Result<T> result = new Result<>();
+        result.setCode(code);
+        result.setMessage(message);
+        result.setData(data);
+        return result;
     }
 } 
