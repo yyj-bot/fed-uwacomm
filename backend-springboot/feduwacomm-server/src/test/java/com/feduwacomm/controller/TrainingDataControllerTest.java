@@ -3,15 +3,18 @@ package com.feduwacomm.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.TrainingDataService;
+import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -21,13 +24,20 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.impl.DefaultClaims;
+import com.feduwacomm.common.BaseContext;
+import org.mockito.MockedStatic;
+import org.junit.jupiter.api.AfterEach;
 
 /**
  * 训练数据控制器测试类
  */
-@WebMvcTest(TrainingDataController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 public class TrainingDataControllerTest {
 
     @Autowired
@@ -35,9 +45,18 @@ public class TrainingDataControllerTest {
 
     @MockBean
     private TrainingDataService trainingDataService;
+    
+    @MockBean
+    private JwtUtil jwtUtil;
+    
+    @MockBean
+    private JwtConfig jwtConfig;
 
     @Autowired
     private ObjectMapper objectMapper;
+    
+    private String validToken;
+    private MockedStatic<BaseContext> baseContextMock;
 
     private TrainingDataUploadDTO uploadDTO;
     private TrainingDataTextDTO textDTO;
@@ -47,6 +66,23 @@ public class TrainingDataControllerTest {
 
     @BeforeEach
     void setUp() {
+        // 设置JWT Mock
+        validToken = "test_token";
+        Claims claims = new DefaultClaims();
+        claims.put("userId", "user123");
+        claims.put("username", "testuser");
+        claims.put("role", "RESEARCHER");
+        claims.put("type", "access");
+        
+        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        
+        // Mock BaseContext static method
+        baseContextMock = mockStatic(BaseContext.class);
+        baseContextMock.when(BaseContext::getCurrentId).thenReturn("user123");
+        
+        // Setup service mocks
+        setupServiceMocks();
+        
         // 设置测试数据
         uploadDTO = TrainingDataUploadDTO.builder()
                 .vmId("a1b2c3d4e5f678901234567890123456")
@@ -114,11 +150,13 @@ public class TrainingDataControllerTest {
 
         mockMvc.perform(multipart("/api/training-data/upload")
                         .file(file)
+                        .header("Authorization", "Bearer " + validToken)
                         .param("vmId", uploadDTO.getVmId())
                         .param("dataType", uploadDTO.getDataType())
                         .param("description", uploadDTO.getDescription())
-                        .param("tags", "[\"test\", \"acoustic\"]")
-                        .param("metadata", "{\"source\": \"test\", \"version\": \"1.0\"}")
+                        .param("tags", String.join(",", "test", "acoustic"))
+                        .param("metadata.source", "test")
+                        .param("metadata.version", "1.0")
                         .contentType(MediaType.MULTIPART_FORM_DATA))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -138,6 +176,7 @@ public class TrainingDataControllerTest {
 
         mockMvc.perform(multipart("/api/training-data/upload")
                         .file(emptyFile)
+                        .header("Authorization", "Bearer " + validToken)
                         .param("vmId", uploadDTO.getVmId())
                         .param("dataType", uploadDTO.getDataType())
                         .contentType(MediaType.MULTIPART_FORM_DATA))
@@ -163,13 +202,14 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post("/api/training-data/text")
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(textDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.message").value("文本信息上传成功"))
-                .andExpected(jsonPath("$.data.datasetId").value("text123"))
-                .andExpected(jsonPath("$.data.status").value("READY"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("文本信息上传成功"))
+                .andExpect(jsonPath("$.data.datasetId").value("text123"))
+                .andExpect(jsonPath("$.data.status").value("READY"));
     }
 
     @Test
@@ -200,10 +240,10 @@ public class TrainingDataControllerTest {
                         .param("dataType", "ACOUSTIC")
                         .param("keyword", "test"))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.total").value(1))
-                .andExpected(jsonPath("$.data.dataList").isArray())
-                .andExpected(jsonPath("$.data.dataList[0].datasetId").value("test123"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.dataList").isArray())
+                .andExpect(jsonPath("$.data.dataList[0].datasetId").value("test123"));
     }
 
     @Test
@@ -226,9 +266,9 @@ public class TrainingDataControllerTest {
 
         mockMvc.perform(get("/api/training-data/{datasetId}", datasetId))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.datasetId").value(datasetId))
-                .andExpected(jsonPath("$.data.status").value("READY"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.datasetId").value(datasetId))
+                .andExpect(jsonPath("$.data.status").value("READY"));
     }
 
     @Test
@@ -240,7 +280,7 @@ public class TrainingDataControllerTest {
 
         mockMvc.perform(get("/api/training-data/{datasetId}", datasetId))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(500));
+                .andExpect(jsonPath("$.code").value(500));
     }
 
     @Test
@@ -253,8 +293,8 @@ public class TrainingDataControllerTest {
 
         mockMvc.perform(get("/api/training-data/{datasetId}/download", datasetId))
                 .andExpect(status().isOk())
-                .andExpected(header().string("Content-Disposition", "attachment; filename=\"" + datasetId + ".data\""))
-                .andExpected(content().bytes(fileData));
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"" + datasetId + ".data\""))
+                .andExpect(content().bytes(fileData));
     }
 
     @Test
@@ -276,9 +316,9 @@ public class TrainingDataControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(preprocessDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.taskId").value("preprocess_123"))
-                .andExpected(jsonPath("$.data.status").value("PROCESSING"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.taskId").value("preprocess_123"))
+                .andExpect(jsonPath("$.data.status").value("PROCESSING"));
     }
 
     @Test
@@ -304,9 +344,9 @@ public class TrainingDataControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validateDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.isValid").value(true))
-                .andExpected(jsonPath("$.data.results.totalRows").value(100));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.isValid").value(true))
+                .andExpect(jsonPath("$.data.results.totalRows").value(100));
     }
 
     @Test
@@ -328,11 +368,12 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(put("/api/training-data/{datasetId}", datasetId)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.datasetId").value(datasetId));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.datasetId").value(datasetId));
     }
 
     @Test
@@ -356,12 +397,13 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(delete("/api/training-data/{datasetId}", datasetId)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(deleteDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.datasetId").value(datasetId))
-                .andExpected(jsonPath("$.data.fileDeleted").value(true));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.datasetId").value(datasetId))
+                .andExpect(jsonPath("$.data.fileDeleted").value(true));
     }
 
     @Test
@@ -405,10 +447,10 @@ public class TrainingDataControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(batchDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.total").value(3))
-                .andExpected(jsonPath("$.data.success").value(2))
-                .andExpected(jsonPath("$.data.failed").value(1));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.success").value(2))
+                .andExpect(jsonPath("$.data.failed").value(1));
     }
 
     @Test
@@ -435,9 +477,9 @@ public class TrainingDataControllerTest {
                         .param("vmId", "vm1")
                         .param("dataType", "ACOUSTIC"))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.totalCount").value(150))
-                .andExpected(jsonPath("$.data.totalSize").value(1024000));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.totalCount").value(150))
+                .andExpect(jsonPath("$.data.totalSize").value(1024000));
     }
 
     @Test
@@ -468,8 +510,20 @@ public class TrainingDataControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(exportDTO)))
                 .andExpect(status().isOk())
-                .andExpected(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.data.taskId").value("export_123"))
-                .andExpected(jsonPath("$.data.status").value("PROCESSING"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.taskId").value("export_123"))
+                .andExpect(jsonPath("$.data.status").value("PROCESSING"));
+    }
+    
+    @AfterEach
+    void tearDown() {
+        if (baseContextMock != null) {
+            baseContextMock.close();
+        }
+    }
+    
+    private void setupServiceMocks() {
+        // TODO: Add proper service mocks - for now just basic setup
+        // Will add specific mocks as needed based on test failures
     }
 }

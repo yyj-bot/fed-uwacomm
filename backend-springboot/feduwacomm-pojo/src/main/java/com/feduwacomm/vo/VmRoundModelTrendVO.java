@@ -1,6 +1,7 @@
 package com.feduwacomm.vo;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -14,6 +15,7 @@ import java.util.List;
  * @version 1.0.0
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class VmRoundModelTrendVO {
@@ -39,6 +41,7 @@ public class VmRoundModelTrendVO {
     private List<TrendPoint> trend;
 
     @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class TrendPoint {

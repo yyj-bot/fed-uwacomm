@@ -1,5 +1,6 @@
 package com.feduwacomm.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.TrainingData;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
@@ -28,6 +29,9 @@ public class TrainingDataServiceTest {
 
     @Mock
     private TrainingDatasetMapper trainingDatasetMapper;
+    
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private TrainingDataServiceImpl trainingDataService;
@@ -164,12 +168,12 @@ public class TrainingDataServiceTest {
         Long mockTotal = 1L;
 
         when(trainingDatasetMapper.selectByQuery(
-                anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList(), anyInt(), anyInt()))
+                eq("a1b2c3d4e5f678901234567890123456"), eq("ACOUSTIC"), isNull(), eq("test"),
+                isNull(), isNull(), isNull(), eq(0), eq(20)))
                 .thenReturn(mockDataList);
         when(trainingDatasetMapper.countByQuery(
-                anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList()))
+                eq("a1b2c3d4e5f678901234567890123456"), eq("ACOUSTIC"), isNull(), eq("test"),
+                isNull(), isNull(), isNull()))
                 .thenReturn(mockTotal);
 
         // 执行测试
@@ -190,11 +194,11 @@ public class TrainingDataServiceTest {
 
         // 验证调用
         verify(trainingDatasetMapper, times(1)).selectByQuery(
-                anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList(), anyInt(), anyInt());
+                eq("a1b2c3d4e5f678901234567890123456"), eq("ACOUSTIC"), isNull(), eq("test"),
+                isNull(), isNull(), isNull(), eq(0), eq(20));
         verify(trainingDatasetMapper, times(1)).countByQuery(
-                anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyList());
+                eq("a1b2c3d4e5f678901234567890123456"), eq("ACOUSTIC"), isNull(), eq("test"),
+                isNull(), isNull(), isNull());
     }
 
     @Test
@@ -280,6 +284,13 @@ public class TrainingDataServiceTest {
                 .thenReturn(sampleTrainingData);
         when(trainingDatasetMapper.updateValidationResult(eq(datasetId), anyBoolean(), anyString()))
                 .thenReturn(1);
+        
+        // Mock ObjectMapper.writeValueAsString
+        try {
+            when(objectMapper.writeValueAsString(any())).thenReturn("{\"isValid\":true,\"validationTime\":\"2024-01-01T10:00:00\"}");
+        } catch (Exception e) {
+            // ignore
+        }
 
         // 执行测试
         TrainingDataValidateVO result = trainingDataService.validateData(datasetId, validateDTO);

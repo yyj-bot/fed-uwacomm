@@ -3,14 +3,18 @@ package com.feduwacomm.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.FederatedTaskService;
+import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -18,14 +22,20 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.impl.DefaultClaims;
+import com.feduwacomm.common.BaseContext;
+import org.mockito.MockedStatic;
 
 /**
  * 联邦学习任务控制器测试类
  * 测试任务管理相关接口
  */
-@WebMvcTest(FederatedTaskController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 public class FederatedTaskControllerTest {
 
     @Autowired
@@ -33,6 +43,12 @@ public class FederatedTaskControllerTest {
 
     @MockBean
     private FederatedTaskService federatedTaskService;
+    
+    @MockBean
+    private JwtUtil jwtUtil;
+    
+    @MockBean
+    private JwtConfig jwtConfig;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -43,11 +59,34 @@ public class FederatedTaskControllerTest {
     private TaskListVO taskListVO;
     private TaskResultVO taskResultVO;
     private TaskLogVO taskLogVO;
+    private String validToken;
+    private MockedStatic<BaseContext> baseContextMock;
 
     @BeforeEach
     void setUp() {
         // 设置测试数据
         setupTestData();
+        
+        // 设置JWT Mock
+        validToken = "test_token";
+        Claims claims = new DefaultClaims();
+        claims.put("userId", "user123");
+        claims.put("username", "testuser");
+        claims.put("role", "RESEARCHER");
+        claims.put("type", "access");
+        
+        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        
+        // Mock BaseContext static method
+        baseContextMock = mockStatic(BaseContext.class);
+        baseContextMock.when(BaseContext::getCurrentId).thenReturn("user123");
+    }
+    
+    @AfterEach
+    void tearDown() {
+        if (baseContextMock != null) {
+            baseContextMock.close();
+        }
     }
 
     private void setupTestData() {
@@ -192,10 +231,11 @@ public class FederatedTaskControllerTest {
 
     @Test
     void testCreateTask_Success() throws Exception {
-        when(federatedTaskService.createTask(any(TaskCreateDTO.class), anyString()))
+        when(federatedTaskService.createTask(any(TaskCreateDTO.class), eq("user123")))
             .thenReturn(taskOperationVO);
 
         mockMvc.perform(post("/api/federated/tasks")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(taskCreateDTO)))
                 .andExpect(status().isOk())
@@ -212,9 +252,12 @@ public class FederatedTaskControllerTest {
         TaskCreateDTO invalidDTO = TaskCreateDTO.builder().build(); // 缺少必填字段
 
         mockMvc.perform(post("/api/federated/tasks")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidDTO)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk()) // FedUWAComm uses HTTP 200 with internal error codes
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("验证失败"));
     }
 
     @Test
@@ -234,6 +277,7 @@ public class FederatedTaskControllerTest {
             .thenReturn(configResponse);
 
         mockMvc.perform(put("/api/federated/tasks/task123/config")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(configDTO)))
                 .andExpect(status().isOk())
@@ -255,7 +299,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.startTask(eq("task123"), anyString()))
             .thenReturn(startResponse);
 
-        mockMvc.perform(post("/api/federated/tasks/task123/start"))
+        mockMvc.perform(post("/api/federated/tasks/task123/start")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("任务启动成功"))
@@ -274,10 +319,11 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.pauseTask(eq("task123"), anyString()))
             .thenReturn(pauseResponse);
 
-        mockMvc.perform(post("/api/federated/tasks/task123/pause"))
+        mockMvc.perform(post("/api/federated/tasks/task123/pause")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpected(jsonPath("$.message").value("任务暂停成功"))
+                .andExpect(jsonPath("$.message").value("任务暂停成功"))
                 .andExpect(jsonPath("$.data.status").value("PAUSED"));
     }
 
@@ -293,7 +339,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.resumeTask(eq("task123"), anyString()))
             .thenReturn(resumeResponse);
 
-        mockMvc.perform(post("/api/federated/tasks/task123/resume"))
+        mockMvc.perform(post("/api/federated/tasks/task123/resume")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("任务恢复成功"))
@@ -319,6 +366,7 @@ public class FederatedTaskControllerTest {
             .thenReturn(stopResponse);
 
         mockMvc.perform(post("/api/federated/tasks/task123/stop")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(stopDTO)))
                 .andExpect(status().isOk())
@@ -345,6 +393,7 @@ public class FederatedTaskControllerTest {
             .thenReturn(cancelResponse);
 
         mockMvc.perform(post("/api/federated/tasks/task123/cancel")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(cancelDTO)))
                 .andExpect(status().isOk())
@@ -435,6 +484,7 @@ public class FederatedTaskControllerTest {
             .thenReturn(deleteResponse);
 
         mockMvc.perform(delete("/api/federated/tasks/task123")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(deleteDTO)))
                 .andExpect(status().isOk())
@@ -452,7 +502,7 @@ public class FederatedTaskControllerTest {
         mockMvc.perform(get("/api/federated/tasks/nonexistent"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.message").doesNotExist().or(jsonPath("$.message").value("查询失败: 任务不存在")));
+                .andExpect(jsonPath("$.message").value("查询失败: 任务不存在"));
     }
 
     @Test
@@ -460,7 +510,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.startTask(eq("task123"), anyString()))
             .thenThrow(new RuntimeException("任务状态不允许启动"));
 
-        mockMvc.perform(post("/api/federated/tasks/task123/start"))
+        mockMvc.perform(post("/api/federated/tasks/task123/start")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").value("任务启动失败: 任务状态不允许启动"));
@@ -472,9 +523,10 @@ public class FederatedTaskControllerTest {
             .thenThrow(new RuntimeException("任务创建失败"));
 
         mockMvc.perform(post("/api/federated/tasks")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(taskCreateDTO)))
-                .andExpected(status().isOk())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").value("任务创建失败: 任务创建失败"));
     }

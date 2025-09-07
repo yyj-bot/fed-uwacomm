@@ -2,15 +2,18 @@ package com.feduwacomm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
+import com.feduwacomm.exception.UserException;
 import com.feduwacomm.service.UserService;
+import com.feduwacomm.utils.JwtUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
 import java.time.LocalDateTime;
 
@@ -18,12 +21,15 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.impl.DefaultClaims;
 
 /**
  * 用户控制器测试类
  * 测试用户自助功能接口
  */
-@WebMvcTest(UserController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 public class UserControllerTest {
 
     @Autowired
@@ -32,11 +38,16 @@ public class UserControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private JwtUtil jwtUtil;
+
     @Autowired
     private ObjectMapper objectMapper;
 
     private UserRegisterDTO registerDTO;
     private UserLoginDTO loginDTO;
+    private String validToken;
+    private String refreshToken;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +66,25 @@ public class UserControllerTest {
             .captchaKey("key123")
             .rememberMe(false)
             .build();
+
+        // 设置测试用的有效token
+        validToken = "token123";
+        refreshToken = "refresh123";
+        
+        // Mock JWT验证，返回有效的access token Claims
+        Claims accessClaims = new DefaultClaims();
+        accessClaims.put("userId", "user123");
+        accessClaims.put("username", "testuser");
+        accessClaims.put("role", "VIEWER");
+        accessClaims.put("type", "access");
+        
+        // Mock JWT验证，返回有效的refresh token Claims
+        Claims refreshClaims = new DefaultClaims();
+        refreshClaims.put("userId", "user123");
+        refreshClaims.put("type", "refresh");
+        
+        when(jwtUtil.validateToken(validToken)).thenReturn(accessClaims);
+        when(jwtUtil.validateToken(refreshToken)).thenReturn(refreshClaims);
     }
 
     @Test
@@ -116,7 +146,7 @@ public class UserControllerTest {
         when(userService.refreshToken(anyString())).thenReturn(response);
 
         mockMvc.perform(post("/api/user/refresh")
-                .header("Authorization", "Bearer refresh123"))
+                .header("Authorization", "Bearer " + refreshToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.message").value("Token刷新成功"));
@@ -125,7 +155,7 @@ public class UserControllerTest {
     @Test
     void testUserLogout() throws Exception {
         mockMvc.perform(post("/api/user/logout")
-                .header("Authorization", "Bearer token123"))
+                .header("Authorization", "Bearer " + validToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.message").value("登出成功"));
@@ -148,7 +178,7 @@ public class UserControllerTest {
         when(userService.getCurrentUserInfo("user123")).thenReturn(userInfo);
 
         mockMvc.perform(get("/api/user/profile")
-                .header("Authorization", "Bearer token123"))
+                .header("Authorization", "Bearer " + validToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.message").value("获取成功"))
@@ -174,7 +204,7 @@ public class UserControllerTest {
         when(userService.updateUserInfo("user123", updateDTO)).thenReturn(response);
 
         mockMvc.perform(put("/api/user/profile")
-                .header("Authorization", "Bearer token123")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateDTO)))
             .andExpect(status().isOk())
@@ -192,7 +222,7 @@ public class UserControllerTest {
             .build();
 
         mockMvc.perform(put("/api/user/password")
-                .header("Authorization", "Bearer token123")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(passwordDTO)))
             .andExpect(status().isOk())
@@ -243,10 +273,15 @@ public class UserControllerTest {
             .confirmPassword("differentpassword")
             .build();
 
+        // 当密码不匹配时，服务应该抛出UserException
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenThrow(UserException.passwordMismatch());
+
         mockMvc.perform(post("/api/user/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidDTO)))
-            .andExpect(status().isOk()); // 全局异常处理器返回200状态码
+            .andExpect(status().isOk()) // 全局异常处理器返回200状态码
+            .andExpect(jsonPath("$.code").value(400));
     }
 
     @Test

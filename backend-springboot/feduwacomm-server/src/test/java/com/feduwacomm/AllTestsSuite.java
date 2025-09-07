@@ -1,5 +1,9 @@
 package com.feduwacomm;
 
+import com.feduwacomm.suite.FederatedTaskModuleTestSuite;
+import com.feduwacomm.suite.HealthModuleTestSuite;
+import com.feduwacomm.suite.VmModuleTestSuite;
+import com.feduwacomm.suite.WebSocketModuleTestSuite;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 import org.junit.platform.suite.api.SuiteDisplayName;
@@ -10,7 +14,11 @@ import org.junit.platform.suite.api.SuiteDisplayName;
  * 包含以下测试套件：
  * - UserModuleTestSuite: 用户模块测试套件
  * - AdminModuleTestSuite: 管理员模块测试套件
- * - 其他模块测试套件（待添加）
+ * - ModelVersionModuleTestSuite: 模型版本管理测试套件
+ * - FederatedTaskModuleTestSuite: 联邦任务管理测试套件
+ * - HealthModuleTestSuite: 健康检查模块测试套件
+ * - VmModuleTestSuite: 虚拟机管理模块测试套件
+ * - WebSocketModuleTestSuite: WebSocket通信模块测试套件
  * 
  * 使用方法：
  * 1. 单独运行：右键此文件 -> Run 'AllTestsSuite'
@@ -31,7 +39,11 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SelectClasses({
         UserModuleTestSuite.class,
         AdminModuleTestSuite.class,
-        ModelVersionModuleTestSuite.class
+        ModelVersionModuleTestSuite.class,
+        FederatedTaskModuleTestSuite.class,
+        HealthModuleTestSuite.class,
+        VmModuleTestSuite.class,
+        WebSocketModuleTestSuite.class
 })
 public class AllTestsSuite {
 

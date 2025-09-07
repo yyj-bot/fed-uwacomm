@@ -8,18 +8,39 @@ import com.feduwacomm.dto.LogQueryDTO;
 import com.feduwacomm.enums.LogCleanupStrategy;
 import com.feduwacomm.enums.LogExportFormat;
 import com.feduwacomm.enums.LogLevel;
+import com.feduwacomm.enums.LogCategory;
+import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.config.JwtConfig;
+import com.feduwacomm.service.LogService;
+import com.feduwacomm.common.PageResult;
+import com.feduwacomm.vo.*;
+import com.feduwacomm.common.BaseContext;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.impl.DefaultClaims;
+import org.mockito.MockedStatic;
 
-@WebMvcTest(LogController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 @DisplayName("日志管理控制器测试")
 class LogControllerTest {
 
@@ -28,16 +49,102 @@ class LogControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+    
+    @MockBean
+    private JwtUtil jwtUtil;
+    
+    @MockBean
+    private JwtConfig jwtConfig;
+    
+    @MockBean
+    private LogService logService;
+    
+    private String validToken;
+    private MockedStatic<BaseContext> baseContextMock;
 
     @BeforeEach
     void setUp() {
-        // 测试前置准备
+        // 设置JWT Mock
+        validToken = "test_token";
+        Claims claims = new DefaultClaims();
+        claims.put("userId", "user123");
+        claims.put("username", "testuser");
+        claims.put("role", "RESEARCHER");
+        claims.put("type", "access");
+        
+        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        
+        // Mock BaseContext static method
+        baseContextMock = mockStatic(BaseContext.class);
+        baseContextMock.when(BaseContext::getCurrentId).thenReturn("user123");
+        
+        // 设置测试数据Mocks
+        setupMockData();
+    }
+    
+    @AfterEach
+    void tearDown() {
+        if (baseContextMock != null) {
+            baseContextMock.close();
+        }
+    }
+    
+    private void setupMockData() {
+        // Mock PageResult for log list
+        LogListVO logVO = LogListVO.builder()
+            .logId("test-log-id-12345")
+            .message("日志详情信息")
+            .level(LogLevel.INFO)
+            .category(LogCategory.SYSTEM)
+            .createdAt(LocalDateTime.now())
+            .build();
+        
+        PageResult<LogListVO> pageResult = PageResult.<LogListVO>builder()
+            .total(1000L)
+            .current(1L)
+            .size(10L)
+            .records(Arrays.asList(logVO))
+            .build();
+        
+        when(logService.queryLogs(any(LogQueryDTO.class))).thenReturn(pageResult);
+        
+        // Mock LogDetailVO
+        LogDetailVO logDetail = LogDetailVO.builder()
+            .logId("test-log-id-12345")
+            .message("日志详情信息")
+            .level(LogLevel.INFO)
+            .category(LogCategory.SYSTEM)
+            .createdAt(LocalDateTime.now())
+            .build();
+        
+        when(logService.getLogDetail(eq("test-log-id-12345"))).thenReturn(logDetail);
+        
+        // Mock realtime logs
+        List<LogListVO> realtimeLogs = Arrays.asList(
+            LogListVO.builder().logId("realtime-1").message("实时日志1").level(LogLevel.ERROR).build(),
+            LogListVO.builder().logId("realtime-2").message("实时日志2").level(LogLevel.ERROR).build()
+        );
+        // Create 100 logs for the realtime test
+        realtimeLogs = new java.util.ArrayList<>(realtimeLogs);
+        for (int i = 3; i <= 100; i++) {
+            realtimeLogs.add(LogListVO.builder().logId("realtime-" + i).message("实时日志" + i).level(LogLevel.ERROR).build());
+        }
+        
+        when(logService.getRealtimeLogs(any(LogQueryDTO.class))).thenReturn(realtimeLogs);
+        
+        // Mock statistics
+        LogStatisticsVO statistics = LogStatisticsVO.builder()
+            .totalLogs(10000L)
+            .build();
+        
+        when(logService.getStatistics(any(LogQueryDTO.class))).thenReturn(statistics);
     }
 
     @Test
     @DisplayName("测试日志列表查询")
     void testQueryLogs() throws Exception {
         mockMvc.perform(get("/api/log/list")
+                .header("Authorization", "Bearer " + validToken)
                 .param("level", "INFO")
                 .param("category", "SYSTEM")
                 .param("page", "1")
@@ -45,7 +152,7 @@ class LogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("操作成功"))
+                .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.total").value(1000))
                 .andExpect(jsonPath("$.data.current").value(1))
                 .andExpect(jsonPath("$.data.size").value(10));
@@ -56,7 +163,8 @@ class LogControllerTest {
     void testGetLogDetail() throws Exception {
         String logId = "test-log-id-12345";
         
-        mockMvc.perform(get("/api/log/detail/{logId}", logId))
+        mockMvc.perform(get("/api/log/detail/{logId}", logId)
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200))
@@ -68,6 +176,7 @@ class LogControllerTest {
     @DisplayName("测试实时日志查询")
     void testGetRealtimeLogs() throws Exception {
         mockMvc.perform(get("/api/log/realtime")
+                .header("Authorization", "Bearer " + validToken)
                 .param("level", "ERROR")
                 .param("tail", "100"))
                 .andExpect(status().isOk())
@@ -80,6 +189,7 @@ class LogControllerTest {
     @DisplayName("测试日志统计查询")
     void testGetStatistics() throws Exception {
         mockMvc.perform(get("/api/log/statistics")
+                .header("Authorization", "Bearer " + validToken)
                 .param("startTime", "2024-01-01T00:00:00")
                 .param("endTime", "2024-01-02T00:00:00"))
                 .andExpect(status().isOk())
@@ -125,7 +235,7 @@ class LogControllerTest {
         
         mockMvc.perform(get("/api/log/export/download/{exportId}", exportId))
                 .andExpect(status().isOk())
-                .andExpected(content().bytes("导出文件内容".getBytes()));
+                .andExpect(content().bytes("导出文件内容".getBytes()));
     }
 
     @Test
@@ -135,7 +245,7 @@ class LogControllerTest {
                 .param("page", "1")
                 .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpected(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.total").value(50));
     }
@@ -219,16 +329,20 @@ class LogControllerTest {
     @Test
     @DisplayName("测试无效参数验证")
     void testInvalidParameters() throws Exception {
-        // 测试页码小于1的情况
+        // 测试页码小于1的情况 - FedUWAComm uses HTTP 200 with internal error codes
         mockMvc.perform(get("/api/log/list")
+                .header("Authorization", "Bearer " + validToken)
                 .param("page", "0")
                 .param("size", "10"))
-                .andExpected(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
 
-        // 测试每页大小超过限制的情况
+        // 测试每页大小超过限制的情况 - FedUWAComm uses HTTP 200 with internal error codes
         mockMvc.perform(get("/api/log/list")
+                .header("Authorization", "Bearer " + validToken)
                 .param("page", "1")
                 .param("size", "101"))
-                .andExpected(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
     }
 }

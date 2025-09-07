@@ -1,0 +1,20 @@
+# 测试环境配置
+server:
+  port: 8080
+
+spring:
+  # 数据库配置 - 测试环境（模板）
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:feduwacomm_test}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# 日志配置
+logging:
+  level:
+    com.feduwacomm: INFO
+    org.springframework: WARN
+    com.zaxxer.hikari: WARN
+  db:
+    enabled: true # 测试环境启用数据库日志

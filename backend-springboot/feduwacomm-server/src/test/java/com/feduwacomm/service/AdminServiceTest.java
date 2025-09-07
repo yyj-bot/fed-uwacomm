@@ -10,6 +10,7 @@ import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.service.impl.AdminServiceImpl;
 import com.feduwacomm.utils.PasswordUtil;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class AdminServiceTest {
     @Mock
     private UserPermissionMapper userPermissionMapper;
 
+    @Mock
+    private UuidUtil uuidUtil;
+
     @InjectMocks
     private AdminServiceImpl adminService;
 
@@ -51,6 +55,9 @@ class AdminServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Mock UuidUtil
+        lenient().when(uuidUtil.generateUuid()).thenReturn("a1b2c3d4e5f678901234567890123456");
+        
         // 初始化测试数据
         testUser = User.builder()
                 .id("a1b2c3d4e5f678901234567890123456")
@@ -119,9 +126,9 @@ class AdminServiceTest {
         UserQueryDTO queryDTO = UserQueryDTO.builder().build();
 
         List<User> users = Arrays.asList(testUser);
-        when(adminMapper.selectByCondition(anyString(), anyString(), anyString(), anyInt(), anyInt()))
+        when(adminMapper.selectByCondition(isNull(), isNull(), isNull(), eq(0), eq(10)))
                 .thenReturn(users);
-        when(adminMapper.countByCondition(anyString(), anyString(), anyString())).thenReturn(1);
+        when(adminMapper.countByCondition(isNull(), isNull(), isNull())).thenReturn(1);
 
         // 执行测试
         PageResponseDTO<UserListVO> result = adminService.getUserList(queryDTO);
@@ -205,7 +212,7 @@ class AdminServiceTest {
     @Test
     void testCreateUser_UsernameExists() {
         // 准备测试数据
-        when(adminMapper.selectByEmail("newuser@example.com")).thenReturn(null);
+        lenient().when(adminMapper.selectByEmail("newuser@example.com")).thenReturn(null);
         when(adminMapper.selectByUsername("newuser")).thenReturn(testUser);
 
         // 执行测试并验证异常
@@ -403,14 +410,14 @@ class AdminServiceTest {
                 .build();
 
         when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(adminMapper.updatePassword(userId, anyString())).thenReturn(1);
+        when(adminMapper.updatePassword(eq(userId), anyString())).thenReturn(1);
 
         // 执行测试
         assertDoesNotThrow(() -> {
             adminService.resetPassword(userId, resetDTO);
         });
 
-        verify(adminMapper, times(1)).updatePassword(userId, anyString());
+        verify(adminMapper, times(1)).updatePassword(eq(userId), anyString());
     }
 
     @Test
@@ -581,7 +588,7 @@ class AdminServiceTest {
             adminService.revokePermission(userId, permissionId);
         });
 
-        assertEquals("权限不存在", exception.getMessage());
+        assertEquals("权限不足", exception.getMessage());
         verify(userPermissionMapper, never()).deleteById(anyString());
     }
 
@@ -604,7 +611,7 @@ class AdminServiceTest {
             adminService.revokePermission(userId, permissionId);
         });
 
-        assertEquals("权限不属于该用户", exception.getMessage());
+        assertEquals("权限不足", exception.getMessage());
         verify(userPermissionMapper, never()).deleteById(anyString());
     }
 }

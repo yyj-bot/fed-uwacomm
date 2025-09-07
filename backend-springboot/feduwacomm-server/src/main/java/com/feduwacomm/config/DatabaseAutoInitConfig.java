@@ -3,6 +3,7 @@ package com.feduwacomm.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,7 @@ import java.sql.Connection;
 @Slf4j
 @Component
 @Order(1) // 确保在其他组件之前执行
+@Profile("!test") // 在测试环境中不启用此组件
 public class DatabaseAutoInitConfig implements CommandLineRunner {
 
     @Autowired

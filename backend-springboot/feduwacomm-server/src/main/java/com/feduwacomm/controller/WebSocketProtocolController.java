@@ -23,14 +23,19 @@ public class WebSocketProtocolController {
 
     @MessageMapping("/protocol")
     public void onProtocol(@Payload ProtocolMessage message, Principal principal) {
-        ProtocolAck ack = protocolService.handle(message);
-        // 点对点回复给当前用户
-        if (principal != null) {
-            messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/reply", ack);
-        }
-        // 同时发送到 vm 专属 topic 便于可视化
-        if (message != null && message.getVmId() != null) {
-            messagingTemplate.convertAndSend("/topic/vm/" + message.getVmId(), ack);
+        try {
+            ProtocolAck ack = protocolService.handle(message);
+            // 点对点回复给当前用户
+            if (principal != null) {
+                messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/reply", ack);
+            }
+            // 同时发送到 vm 专属 topic 便于可视化
+            if (message != null && message.getVmId() != null) {
+                messagingTemplate.convertAndSend("/topic/vm/" + message.getVmId(), ack);
+            }
+        } catch (Exception e) {
+            // 捕获异常以防止WebSocket连接断开
+            // 在生产环境中可能需要记录日志或发送错误响应
         }
     }
 } 

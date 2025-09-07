@@ -1,4 +1,5 @@
 # CLAUDE.md
+所有回复应该使用简体中文生成
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 

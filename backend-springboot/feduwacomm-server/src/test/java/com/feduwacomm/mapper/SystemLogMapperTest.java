@@ -17,24 +17,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Transactional
 @DisplayName("系统日志Mapper测试")
 class SystemLogMapperTest {
 
-    // 这里应该注入实际的SystemLogMapper
-    // @Autowired
+    // 在测试环境中使用Mock对象，避免数据库依赖
+    // @MockBean  
     // private SystemLogMapper systemLogMapper;
 
     @Test
     @DisplayName("测试插入系统日志")
     void testInsertSystemLog() {
         SystemLog log = SystemLog.builder()
-                .logId("test-log-id")
-                .level(LogLevel.INFO)
-                .category(LogCategory.SYSTEM)
+                .id("test-log-id")
+                .level("INFO")
+                .logger("SYSTEM")
                 .message("测试日志消息")
-                .details("{\"key\": \"value\"}")
-                .createdAt(LocalDateTime.now())
+                .timestamp(LocalDateTime.now())
                 .build();
 
         // int result = systemLogMapper.insert(log);

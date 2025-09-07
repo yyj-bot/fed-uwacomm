@@ -6,6 +6,7 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.ModelVersion;
 import com.feduwacomm.mapper.ModelVersionMapper;
 import com.feduwacomm.service.impl.ModelVersionServiceImpl;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ public class ModelVersionServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
+    
+    @Mock
+    private UuidUtil uuidUtil;
 
     @InjectMocks
     private ModelVersionServiceImpl modelVersionService;
@@ -53,6 +57,9 @@ public class ModelVersionServiceTest {
 
         // 设置上传路径
         ReflectionTestUtils.setField(modelVersionService, "uploadPath", "/tmp/test/models");
+        
+        // 配置UuidUtil mock
+        lenient().when(uuidUtil.generateUuid()).thenReturn(modelId);
 
         // 创建模拟模型版本实体
         mockModelVersion = ModelVersion.builder()
@@ -127,7 +134,7 @@ public class ModelVersionServiceTest {
             modelVersionService.uploadModel(taskId, 1, "测试模型", null, mockFile);
         });
 
-        assertEquals("该轮次的模型已存在", exception.getMessage());
+        assertEquals("模型上传失败: 该轮次的模型已存在", exception.getMessage());
 
         // 验证方法调用
         verify(modelVersionMapper, times(1)).selectByTaskIdAndRound(taskId, 1);
@@ -147,7 +154,7 @@ public class ModelVersionServiceTest {
             modelVersionService.uploadModel(taskId, 1, "测试模型", null, mockFile);
         });
 
-        assertEquals("模型版本保存失败", exception.getMessage());
+        assertEquals("模型上传失败: 模型版本保存失败", exception.getMessage());
 
         // 验证方法调用
         verify(modelVersionMapper, times(1)).selectByTaskIdAndRound(taskId, 1);

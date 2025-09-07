@@ -57,14 +57,30 @@ public class JwtAuthenticationInterceptor implements HandlerInterceptor {
             String role = claims.get("role", String.class);
             String type = claims.get("type", String.class);
 
-            // 验证Token类型
-            if (!"access".equals(type)) {
-                log.warn("Token类型错误，期望access类型: {}", type);
-                throw UserException.tokenInvalid();
+            // 验证Token类型，根据请求路径确定允许的token类型
+            boolean isRefreshEndpoint = request.getRequestURI().endsWith("/refresh");
+            if (isRefreshEndpoint) {
+                // refresh端点允许refresh token
+                if (!"refresh".equals(type)) {
+                    log.warn("Token类型错误，refresh端点期望refresh类型: {}", type);
+                    throw UserException.tokenInvalid();
+                }
+            } else {
+                // 其他端点只允许access token
+                if (!"access".equals(type)) {
+                    log.warn("Token类型错误，期望access类型: {}", type);
+                    throw UserException.tokenInvalid();
+                }
             }
 
             // 设置用户上下文
-            BaseContext.setUserInfo(userId, username, role);
+            if (isRefreshEndpoint) {
+                // refresh token只包含userId，设置默认值
+                BaseContext.setUserInfo(userId, null, null);
+            } else {
+                // access token包含完整用户信息
+                BaseContext.setUserInfo(userId, username, role);
+            }
 
             log.debug("JWT认证成功 - 用户ID: {}, 用户名: {}, 角色: {}", userId, username, role);
             return true;

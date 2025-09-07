@@ -4,7 +4,6 @@ import com.feduwacomm.dto.LogQueryDTO;
 import com.feduwacomm.enums.LogCategory;
 import com.feduwacomm.enums.LogLevel;
 import com.feduwacomm.mapper.SystemLogMapper;
-import com.feduwacomm.mapper.VmRuntimeLogMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,8 +22,6 @@ class LogServiceTest {
     @Mock
     private SystemLogMapper systemLogMapper;
 
-    @Mock
-    private VmRuntimeLogMapper vmRuntimeLogMapper;
 
     private LogService logService;
 
@@ -101,7 +98,7 @@ class LogServiceTest {
                 .build();
 
         // 模拟mapper返回结果
-        when(systemLogMapper.countByCondition(any(LogQueryDTO.class))).thenReturn(100L);
+        lenient().when(systemLogMapper.countByCondition(any(LogQueryDTO.class))).thenReturn(100L);
 
         // 这里需要实际的service实现来测试
         // PageResult<LogListVO> result = logService.queryLogs(queryDTO);

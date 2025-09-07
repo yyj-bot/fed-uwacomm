@@ -290,7 +290,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="baseUrl">基础URL</label>
-                        <input type="text" id="baseUrl" value="http://localhost:8080" placeholder="请输入服务器地址">
+                        <input type="text" id="baseUrl" value="" placeholder="请输入服务器地址（留空使用当前域名端口）">
                     </div>
                     <div class="form-group">
                         <label for="adminToken">管理员Token</label>
@@ -626,7 +626,7 @@
 
     <script>
         // 全局变量
-        let baseUrl = 'http://localhost:8080';
+        let baseUrl = '';
         let adminToken = '';
 
         // 页面加载完成后初始化
@@ -640,6 +640,10 @@
             if (savedBaseUrl) {
                 document.getElementById('baseUrl').value = savedBaseUrl;
                 baseUrl = savedBaseUrl;
+            } else {
+                // 默认使用当前域名和端口
+                baseUrl = `${window.location.protocol}//${window.location.host}`;
+                document.getElementById('baseUrl').value = baseUrl;
             }
             if (savedToken) {
                 document.getElementById('adminToken').value = savedToken;

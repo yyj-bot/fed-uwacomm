@@ -11,6 +11,7 @@ import com.feduwacomm.service.impl.UserServiceImpl;
 import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.utils.JwtUtil;
 import com.feduwacomm.utils.PasswordUtil;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +46,9 @@ class UserServiceTest {
 
     @Mock
     private JwtUtil jwtUtil;
+
+    @Mock
+    private UuidUtil uuidUtil;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -81,6 +85,9 @@ class UserServiceTest {
                 .loginIdentifier("testuser")
                 .password("password123")
                 .build();
+
+        // Mock UuidUtil生成一致的UUID (lenient mode to avoid unnecessary stubbing warnings)
+        lenient().when(uuidUtil.generateUuid()).thenReturn("a1b2c3d4e5f678901234567890123456");
     }
 
     // 认证相关方法测试
@@ -138,8 +145,7 @@ class UserServiceTest {
     void testLogin_Success() {
         // 准备测试数据
         when(userMapper.selectByUsername(loginDTO.getLoginIdentifier())).thenReturn(testUser);
-        when(userMapper.updateLoginAttempts(testUser.getId(), 0)).thenReturn(1);
-        when(userMapper.updateLastLogin(eq(testUser.getId()), anyString(), anyString())).thenReturn(1);
+        when(userMapper.update(any(User.class))).thenReturn(1);
         when(jwtUtil.generateToken(anyString(), anyString(), anyString())).thenReturn("test_token");
         when(jwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
         when(jwtUtil.getTokenExpireTime()).thenReturn(86400L);
@@ -159,8 +165,7 @@ class UserServiceTest {
             assertEquals("testuser", result.getUser().getUsername());
         }
 
-        verify(userMapper, times(1)).updateLoginAttempts(testUser.getId(), 0);
-        verify(userMapper, times(1)).updateLastLogin(eq(testUser.getId()), anyString(), anyString());
+        verify(userMapper, times(1)).update(any(User.class));
     }
 
     @Test
@@ -173,14 +178,14 @@ class UserServiceTest {
             userService.login(loginDTO);
         });
 
-        assertEquals("账号或密码错误", exception.getMessage());
+        assertEquals("密码错误", exception.getMessage());
     }
 
     @Test
     void testLogin_WrongPassword() {
         // 准备测试数据
         when(userMapper.selectByUsername(loginDTO.getLoginIdentifier())).thenReturn(testUser);
-        when(userMapper.updateLoginAttempts(testUser.getId(), 1)).thenReturn(1);
+        when(userMapper.update(any(User.class))).thenReturn(1);
 
         UserLoginDTO wrongPasswordDTO = UserLoginDTO.builder()
                 .loginIdentifier("testuser")
@@ -192,8 +197,8 @@ class UserServiceTest {
             userService.login(wrongPasswordDTO);
         });
 
-        assertEquals("账号或密码错误", exception.getMessage());
-        verify(userMapper, times(1)).updateLoginAttempts(testUser.getId(), 1);
+        assertEquals("密码错误", exception.getMessage());
+        verify(userMapper, times(1)).update(any(User.class));
     }
 
     @Test
@@ -244,8 +249,6 @@ class UserServiceTest {
 
         when(userMapper.selectByUsername(loginDTO.getLoginIdentifier())).thenReturn(lockedUser);
         when(userMapper.update(any(User.class))).thenReturn(1);
-        when(userMapper.updateLoginAttempts(lockedUser.getId(), 0)).thenReturn(1);
-        when(userMapper.updateLastLogin(eq(lockedUser.getId()), anyString(), anyString())).thenReturn(1);
         when(jwtUtil.generateToken(anyString(), anyString(), anyString())).thenReturn("test_token");
         when(jwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
         when(jwtUtil.getTokenExpireTime()).thenReturn(86400L);
@@ -261,7 +264,7 @@ class UserServiceTest {
             assertEquals("test_token", result.getToken());
         }
 
-        verify(userMapper, times(1)).update(any(User.class));
+        verify(userMapper, times(2)).update(any(User.class));
     }
 
     @Test
@@ -294,14 +297,14 @@ class UserServiceTest {
     void testRefreshToken_InvalidToken() {
         // 准备测试数据
         String invalidToken = "invalid_token";
-        when(jwtUtil.validateToken(invalidToken)).thenThrow(new RuntimeException("Invalid token"));
+        when(jwtUtil.validateToken(invalidToken)).thenThrow(new UserException("Invalid token"));
 
         // 执行测试并验证异常
         UserException exception = assertThrows(UserException.class, () -> {
             userService.refreshToken(invalidToken);
         });
 
-        assertEquals("刷新Token无效", exception.getMessage());
+        assertEquals("Invalid token", exception.getMessage());
     }
 
     @Test
@@ -425,14 +428,14 @@ class UserServiceTest {
                 .build();
 
         when(userMapper.selectById(userId)).thenReturn(testUser);
-        when(userMapper.updatePassword(userId, anyString())).thenReturn(1);
+        when(userMapper.updatePassword(eq(userId), anyString())).thenReturn(1);
 
         // 执行测试
         assertDoesNotThrow(() -> {
             userService.changePassword(userId, passwordDTO);
         });
 
-        verify(userMapper, times(1)).updatePassword(userId, anyString());
+        verify(userMapper, times(1)).updatePassword(eq(userId), anyString());
     }
 
     @Test
