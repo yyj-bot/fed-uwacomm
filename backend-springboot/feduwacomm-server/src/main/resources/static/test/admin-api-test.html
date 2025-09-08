@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员接口测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid #e1e8ed;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e1e8ed;
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .section-content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .response h4 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.1em;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .response-content {
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+
+        .response-content.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .response-content.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .response-status {
+            margin-bottom: 15px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 600;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .status-badge.success {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-badge.error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .response-data pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .request-content {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+        }
+
+        .request-content pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e1e8ed;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            background: #f8f9fa;
+        }
+
+        .tab:hover {
+            background: #f8f9fa;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #27ae60;
+        }
+
+        .status-disconnected {
+            background: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 管理员接口测试页面</h1>
+            <p>FedUWAComm 系统管理员接口完整测试工具</p>
+        </div>
+
+        <div class="content">
+            <!-- 配置区域 -->
+            <div class="config-section">
+                <h3>🔧 接口配置</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="baseUrl">基础URL</label>
+                        <input type="text" id="baseUrl" value="" placeholder="请输入服务器地址（留空使用当前域名端口）">
+                    </div>
+                    <div class="form-group">
+                        <label for="adminToken">管理员Token</label>
+                        <input type="text" id="adminToken" placeholder="请输入管理员JWT Token">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="userId">测试用户ID</label>
+                        <input type="text" id="userId" placeholder="用于测试的用户ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="permissionId">测试权限ID</label>
+                        <input type="text" id="permissionId" placeholder="用于测试的权限ID">
+                    </div>
+                </div>
+                <button class="btn" onclick="testConnection()">测试连接</button>
+                <span id="connectionStatus" class="status-indicator status-disconnected"></span>
+                <span id="connectionText">未连接</span>
+            </div>
+
+            <!-- 标签页 -->
+            <div class="tabs">
+                <div class="tab active" onclick="showTab('user-management')">👥 用户管理</div>
+                <div class="tab" onclick="showTab('user-status')">🔒 用户状态</div>
+                <div class="tab" onclick="showTab('permissions')">🔑 权限管理</div>
+                <div class="tab" onclick="showTab('statistics')">📊 统计信息</div>
+            </div>
+
+            <!-- 用户管理标签页 -->
+            <div id="user-management" class="tab-content active">
+                <div class="section">
+                    <div class="section-header">📋 获取用户列表</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="listPage">页码</label>
+                                <input type="number" id="listPage" value="1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="listSize">每页大小</label>
+                                <input type="number" id="listSize" value="10" min="1" max="100">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="listUsername">用户名筛选</label>
+                                <input type="text" id="listUsername" placeholder="用户名模糊查询">
+                            </div>
+                            <div class="form-group">
+                                <label for="listEmail">邮箱筛选</label>
+                                <input type="text" id="listEmail" placeholder="邮箱模糊查询">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="listRole">角色筛选</label>
+                                <select id="listRole">
+                                    <option value="">全部角色</option>
+                                    <option value="ADMIN">管理员</option>
+                                    <option value="RESEARCHER">研究员</option>
+                                    <option value="OPERATOR">操作员</option>
+                                    <option value="VIEWER">观察者</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="listStatus">状态筛选</label>
+                                <select id="listStatus">
+                                    <option value="">全部状态</option>
+                                    <option value="ACTIVE">活跃</option>
+                                    <option value="INACTIVE">非活跃</option>
+                                    <option value="LOCKED">锁定</option>
+                                    <option value="DELETED">已删除</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn" onclick="getUserList()">获取用户列表</button>
+                        <div id="userListResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">👤 获取用户详情</div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="detailUserId">用户ID</label>
+                            <input type="text" id="detailUserId" placeholder="请输入用户ID">
+                        </div>
+                        <button class="btn" onclick="getUserDetail()">获取用户详情</button>
+                        <div id="userDetailResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">➕ 创建用户</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="createUsername">用户名</label>
+                                <input type="text" id="createUsername" placeholder="请输入用户名">
+                            </div>
+                            <div class="form-group">
+                                <label for="createEmail">邮箱</label>
+                                <input type="email" id="createEmail" placeholder="请输入邮箱">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="createPassword">密码</label>
+                                <input type="password" id="createPassword" placeholder="请输入密码">
+                            </div>
+                            <div class="form-group">
+                                <label for="createRole">角色</label>
+                                <select id="createRole">
+                                    <option value="VIEWER">观察者</option>
+                                    <option value="OPERATOR">操作员</option>
+                                    <option value="RESEARCHER">研究员</option>
+                                    <option value="ADMIN">管理员</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="createUser()">创建用户</button>
+                        <div id="createUserResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">✏️ 更新用户</div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="updateUserId">用户ID</label>
+                            <input type="text" id="updateUserId" placeholder="请输入用户ID">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="updateUsername">新用户名</label>
+                                <input type="text" id="updateUsername" placeholder="新用户名（可选）">
+                            </div>
+                            <div class="form-group">
+                                <label for="updateEmail">新邮箱</label>
+                                <input type="email" id="updateEmail" placeholder="新邮箱（可选）">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="updateRole">新角色</label>
+                                <select id="updateRole">
+                                    <option value="">保持不变</option>
+                                    <option value="VIEWER">观察者</option>
+                                    <option value="OPERATOR">操作员</option>
+                                    <option value="RESEARCHER">研究员</option>
+                                    <option value="ADMIN">管理员</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="updateStatus">新状态</label>
+                                <select id="updateStatus">
+                                    <option value="">保持不变</option>
+                                    <option value="ACTIVE">活跃</option>
+                                    <option value="INACTIVE">非活跃</option>
+                                    <option value="LOCKED">锁定</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="updatePassword">新密码</label>
+                            <input type="password" id="updatePassword" placeholder="新密码（可选）">
+                        </div>
+                        <button class="btn" onclick="updateUser()">更新用户</button>
+                        <div id="updateUserResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">🗑️ 删除用户</div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="deleteUserId">用户ID</label>
+                            <input type="text" id="deleteUserId" placeholder="请输入要删除的用户ID">
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteUser()">删除用户</button>
+                        <div id="deleteUserResponse" class="response"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户状态标签页 -->
+            <div id="user-status" class="tab-content">
+                <div class="section">
+                    <div class="section-header">🔒 锁定用户</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="lockUserId">用户ID</label>
+                                <input type="text" id="lockUserId" placeholder="请输入要锁定的用户ID">
+                            </div>
+                            <div class="form-group">
+                                <label for="lockDuration">锁定时长（秒）</label>
+                                <input type="number" id="lockDuration" value="3600" min="60" placeholder="默认1小时">
+                            </div>
+                        </div>
+                        <button class="btn btn-warning" onclick="lockUser()">锁定用户</button>
+                        <div id="lockUserResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">🔓 解锁用户</div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="unlockUserId">用户ID</label>
+                            <input type="text" id="unlockUserId" placeholder="请输入要解锁的用户ID">
+                        </div>
+                        <button class="btn btn-success" onclick="unlockUser()">解锁用户</button>
+                        <div id="unlockUserResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">🔑 重置用户密码</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="resetUserId">用户ID</label>
+                                <input type="text" id="resetUserId" placeholder="请输入要重置密码的用户ID">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">新密码</label>
+                                <input type="password" id="newPassword" placeholder="请输入新密码">
+                            </div>
+                        </div>
+                        <button class="btn" onclick="resetPassword()">重置密码</button>
+                        <div id="resetPasswordResponse" class="response"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 权限管理标签页 -->
+            <div id="permissions" class="tab-content">
+                <div class="section">
+                    <div class="section-header">📋 获取用户权限</div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label for="permissionsUserId">用户ID</label>
+                            <input type="text" id="permissionsUserId" placeholder="请输入用户ID">
+                        </div>
+                        <button class="btn" onclick="getUserPermissions()">获取用户权限</button>
+                        <div id="getPermissionsResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">➕ 授予用户权限</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="grantUserId">用户ID</label>
+                                <input type="text" id="grantUserId" placeholder="请输入用户ID">
+                            </div>
+                            <div class="form-group">
+                                <label for="permissionName">权限名称</label>
+                                <select id="permissionName">
+                                    <option value="READ_DATA">读取数据权限</option>
+                                    <option value="WRITE_DATA">写入数据权限</option>
+                                    <option value="DELETE_DATA">删除数据权限</option>
+                                    <option value="EXECUTE_TASK">执行任务权限</option>
+                                    <option value="ADMIN_SYSTEM">系统管理权限</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="expiresAt">过期时间</label>
+                            <input type="datetime-local" id="expiresAt" placeholder="权限过期时间（可选）">
+                        </div>
+                        <button class="btn btn-success" onclick="grantPermission()">授予权限</button>
+                        <div id="grantPermissionResponse" class="response"></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">➖ 撤销用户权限</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="revokeUserId">用户ID</label>
+                                <input type="text" id="revokeUserId" placeholder="请输入用户ID">
+                            </div>
+                            <div class="form-group">
+                                <label for="revokePermissionId">权限ID</label>
+                                <input type="text" id="revokePermissionId" placeholder="请输入权限ID">
+                            </div>
+                        </div>
+                        <button class="btn btn-danger" onclick="revokePermission()">撤销权限</button>
+                        <div id="revokePermissionResponse" class="response"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 统计信息标签页 -->
+            <div id="statistics" class="tab-content">
+                <div class="section">
+                    <div class="section-header">📊 用户统计</div>
+                    <div class="section-content">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="statsRole">按角色统计</label>
+                                <select id="statsRole">
+                                    <option value="">选择角色</option>
+                                    <option value="ADMIN">管理员</option>
+                                    <option value="RESEARCHER">研究员</option>
+                                    <option value="OPERATOR">操作员</option>
+                                    <option value="VIEWER">观察者</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="statsStatus">按状态统计</label>
+                                <select id="statsStatus">
+                                    <option value="">选择状态</option>
+                                    <option value="ACTIVE">活跃</option>
+                                    <option value="INACTIVE">非活跃</option>
+                                    <option value="LOCKED">锁定</option>
+                                    <option value="DELETED">已删除</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn" onclick="getUserStatistics()">获取统计信息</button>
+                        <div id="statisticsResponse" class="response"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let baseUrl = '';
+        let adminToken = '';
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 从localStorage恢复配置
+            const savedBaseUrl = localStorage.getItem('adminBaseUrl');
+            const savedToken = localStorage.getItem('adminToken');
+            const savedUserId = localStorage.getItem('adminUserId');
+            const savedPermissionId = localStorage.getItem('adminPermissionId');
+
+            if (savedBaseUrl) {
+                document.getElementById('baseUrl').value = savedBaseUrl;
+                baseUrl = savedBaseUrl;
+            } else {
+                // 默认使用当前域名和端口
+                baseUrl = `${window.location.protocol}//${window.location.host}`;
+                document.getElementById('baseUrl').value = baseUrl;
+            }
+            if (savedToken) {
+                document.getElementById('adminToken').value = savedToken;
+                adminToken = savedToken;
+            }
+            if (savedUserId) {
+                document.getElementById('userId').value = savedUserId;
+            }
+            if (savedPermissionId) {
+                document.getElementById('permissionId').value = savedPermissionId;
+            }
+
+            // 绑定输入框变化事件
+            document.getElementById('baseUrl').addEventListener('input', function() {
+                baseUrl = this.value;
+                localStorage.setItem('adminBaseUrl', baseUrl);
+            });
+
+            document.getElementById('adminToken').addEventListener('input', function() {
+                adminToken = this.value;
+                localStorage.setItem('adminToken', adminToken);
+            });
+
+            document.getElementById('userId').addEventListener('input', function() {
+                localStorage.setItem('adminUserId', this.value);
+            });
+
+            document.getElementById('permissionId').addEventListener('input', function() {
+                localStorage.setItem('adminPermissionId', this.value);
+            });
+        });
+
+        // 标签页切换
+        function showTab(tabName) {
+            // 隐藏所有标签页内容
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // 移除所有标签页的active状态
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // 显示选中的标签页
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // 测试连接
+        async function testConnection() {
+            try {
+                const response = await fetch(`${baseUrl}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const statusIndicator = document.getElementById('connectionStatus');
+                const statusText = document.getElementById('connectionText');
+
+                if (response.ok) {
+                    statusIndicator.className = 'status-indicator status-connected';
+                    statusText.textContent = '连接成功';
+                    showResponse('connectionStatus', { success: true, message: '服务器连接正常' });
+                } else {
+                    statusIndicator.className = 'status-indicator status-disconnected';
+                    statusText.textContent = '连接失败';
+                    showResponse('connectionStatus', { success: false, message: '服务器连接失败' });
+                }
+            } catch (error) {
+                const statusIndicator = document.getElementById('connectionStatus');
+                const statusText = document.getElementById('connectionText');
+                statusIndicator.className = 'status-indicator status-disconnected';
+                statusText.textContent = '连接失败';
+                showResponse('connectionStatus', { success: false, message: '连接错误: ' + error.message });
+            }
+        }
+
+        // 通用请求函数
+        async function makeRequest(url, options = {}) {
+            if (!adminToken) {
+                throw new Error('请先设置管理员Token');
+            }
+
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`
+                }
+            };
+
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+                
+                return data;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // 通用响应显示函数
+        function showResponse(elementId, data) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.style.display = 'block';
+                
+                const isSuccess = data.success;
+                const statusText = isSuccess ? '✅ 成功' : '❌ 错误';
+                const statusClass = isSuccess ? 'success' : 'error';
+                
+                element.innerHTML = `
+                    <h4>📥 响应结果 - ${statusText}</h4>
+                    <div class="response-content ${statusClass}">
+                        <div class="response-status">
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="response-data">
+                            <strong>响应数据:</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 显示请求数据的函数
+        function showRequest(elementId, requestData) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const requestDiv = element.querySelector('.request-content');
+                if (requestDiv) {
+                    const formattedRequest = JSON.stringify(requestData, null, 2);
+                    requestDiv.innerHTML = `<pre>${formattedRequest}</pre>`;
+                }
+            }
+        }
+
+        // 获取用户列表
+        async function getUserList() {
+            try {
+                const page = document.getElementById('listPage').value;
+                const size = document.getElementById('listSize').value;
+                const username = document.getElementById('listUsername').value;
+                const email = document.getElementById('listEmail').value;
+                const role = document.getElementById('listRole').value;
+                const status = document.getElementById('listStatus').value;
+
+                let url = `${baseUrl}/api/admin/user/list?page=${page}&size=${size}`;
+                if (username) url += `&username=${encodeURIComponent(username)}`;
+                if (email) url += `&email=${encodeURIComponent(email)}`;
+                if (role) url += `&role=${encodeURIComponent(role)}`;
+                if (status) url += `&status=${encodeURIComponent(status)}`;
+
+                const data = await makeRequest(url);
+                showResponse('userListResponse', { success: true, data: data });
+            } catch (error) {
+                showResponse('userListResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 获取用户详情
+        async function getUserDetail() {
+            try {
+                const userId = document.getElementById('detailUserId').value;
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`);
+                showResponse('userDetailResponse', { success: true, data: data });
+            } catch (error) {
+                showResponse('userDetailResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 创建用户
+        async function createUser() {
+            try {
+                const username = document.getElementById('createUsername').value;
+                const email = document.getElementById('createEmail').value;
+                const password = document.getElementById('createPassword').value;
+                const role = document.getElementById('createRole').value;
+
+                if (!username || !email || !password) {
+                    throw new Error('请填写所有必填字段');
+                }
+
+                const userData = {
+                    username: username,
+                    email: email,
+                    password: password,
+                    role: role
+                };
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/create`, {
+                    method: 'POST',
+                    body: JSON.stringify(userData)
+                });
+
+                showResponse('createUserResponse', { success: true, data: data });
+                
+                // 清空表单
+                document.getElementById('createUsername').value = '';
+                document.getElementById('createEmail').value = '';
+                document.getElementById('createPassword').value = '';
+            } catch (error) {
+                showResponse('createUserResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 更新用户
+        async function updateUser() {
+            try {
+                const userId = document.getElementById('updateUserId').value;
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                const updateData = {};
+                const username = document.getElementById('updateUsername').value;
+                const email = document.getElementById('updateEmail').value;
+                const role = document.getElementById('updateRole').value;
+                const status = document.getElementById('updateStatus').value;
+                const password = document.getElementById('updatePassword').value;
+
+                if (username) updateData.username = username;
+                if (email) updateData.email = email;
+                if (role) updateData.role = role;
+                if (status) updateData.status = status;
+                if (password) updateData.password = password;
+
+                if (Object.keys(updateData).length === 0) {
+                    throw new Error('请至少填写一个要更新的字段');
+                }
+
+                                                         const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+
+                showResponse('updateUserResponse', { success: true, data: data });
+                
+                // 清空表单
+                document.getElementById('updateUsername').value = '';
+                document.getElementById('updateEmail').value = '';
+                document.getElementById('updatePassword').value = '';
+            } catch (error) {
+                showResponse('updateUserResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 删除用户
+        async function deleteUser() {
+            try {
+                const userId = document.getElementById('deleteUserId').value;
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                if (!confirm(`确定要删除用户 ${userId} 吗？此操作不可恢复！`)) {
+                    return;
+                }
+
+                                                         const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}`, {
+                method: 'DELETE'
+            });
+
+                showResponse('deleteUserResponse', { success: true, data: data });
+                document.getElementById('deleteUserId').value = '';
+            } catch (error) {
+                showResponse('deleteUserResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 锁定用户
+        async function lockUser() {
+            try {
+                const userId = document.getElementById('lockUserId').value;
+                const duration = document.getElementById('lockDuration').value;
+
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                const lockData = {
+                    duration: parseInt(duration)
+                };
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/lock`, {
+                    method: 'POST',
+                    body: JSON.stringify(lockData)
+                });
+
+                showResponse('lockUserResponse', { success: true, data: data });
+                document.getElementById('lockUserId').value = '';
+            } catch (error) {
+                showResponse('lockUserResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 解锁用户
+        async function unlockUser() {
+            try {
+                const userId = document.getElementById('unlockUserId').value;
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/unlock`, {
+                    method: 'POST'
+                });
+
+                showResponse('unlockUserResponse', { success: true, data: data });
+                document.getElementById('unlockUserId').value = '';
+            } catch (error) {
+                showResponse('unlockUserResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 重置密码
+        async function resetPassword() {
+            try {
+                const userId = document.getElementById('resetUserId').value;
+                const newPassword = document.getElementById('newPassword').value;
+
+                if (!userId || !newPassword) {
+                    throw new Error('请输入用户ID和新密码');
+                }
+
+                const resetData = {
+                    newPassword: newPassword
+                };
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/reset-password`, {
+                    method: 'POST',
+                    body: JSON.stringify(resetData)
+                });
+
+                showResponse('resetPasswordResponse', { success: true, data: data });
+                document.getElementById('resetUserId').value = '';
+                document.getElementById('newPassword').value = '';
+            } catch (error) {
+                showResponse('resetPasswordResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 获取用户权限
+        async function getUserPermissions() {
+            try {
+                const userId = document.getElementById('permissionsUserId').value;
+                if (!userId) {
+                    throw new Error('请输入用户ID');
+                }
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/permissions`);
+                showResponse('getPermissionsResponse', { success: true, data: data });
+            } catch (error) {
+                showResponse('getPermissionsResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 授予权限
+        async function grantPermission() {
+            try {
+                const userId = document.getElementById('grantUserId').value;
+                const permissionName = document.getElementById('permissionName').value;
+                const expiresAt = document.getElementById('expiresAt').value;
+
+                if (!userId || !permissionName) {
+                    throw new Error('请输入用户ID和权限名称');
+                }
+
+                const grantData = {
+                    permissionName: permissionName
+                };
+
+                if (expiresAt) {
+                    grantData.expiresAt = expiresAt;
+                }
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/permissions`, {
+                    method: 'POST',
+                    body: JSON.stringify(grantData)
+                });
+
+                showResponse('grantPermissionResponse', { success: true, data: data });
+                document.getElementById('grantUserId').value = '';
+                document.getElementById('expiresAt').value = '';
+            } catch (error) {
+                showResponse('grantPermissionResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 撤销权限
+        async function revokePermission() {
+            try {
+                const userId = document.getElementById('revokeUserId').value;
+                const permissionId = document.getElementById('revokePermissionId').value;
+
+                if (!userId || !permissionId) {
+                    throw new Error('请输入用户ID和权限ID');
+                }
+
+                if (!confirm(`确定要撤销权限 ${permissionId} 吗？`)) {
+                    return;
+                }
+
+                const data = await makeRequest(`${baseUrl}/api/admin/user/${userId}/permissions/${permissionId}`, {
+                    method: 'DELETE'
+                });
+
+                showResponse('revokePermissionResponse', { success: true, data: data });
+                document.getElementById('revokeUserId').value = '';
+                document.getElementById('revokePermissionId').value = '';
+            } catch (error) {
+                showResponse('revokePermissionResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 获取用户统计
+        async function getUserStatistics() {
+            try {
+                const role = document.getElementById('statsRole').value;
+                const status = document.getElementById('statsStatus').value;
+
+                let url = `${baseUrl}/api/admin/user/statistics`;
+                if (role) url += `?role=${encodeURIComponent(role)}`;
+                if (status) url += `${role ? '&' : '?'}status=${encodeURIComponent(status)}`;
+
+                const data = await makeRequest(url);
+                showResponse('statisticsResponse', { success: true, data: data });
+            } catch (error) {
+                showResponse('statisticsResponse', { success: false, message: error.message });
+            }
+        }
+
+        // 自动填充测试数据
+        function fillTestData() {
+            document.getElementById('userId').value = 'test-user-123';
+            document.getElementById('permissionId').value = 'test-perm-456';
+            document.getElementById('detailUserId').value = 'test-user-123';
+            document.getElementById('deleteUserId').value = 'test-user-123';
+            document.getElementById('lockUserId').value = 'test-user-123';
+            document.getElementById('unlockUserId').value = 'test-user-123';
+            document.getElementById('resetUserId').value = 'test-user-123';
+            document.getElementById('permissionsUserId').value = 'test-user-123';
+            document.getElementById('grantUserId').value = 'test-user-123';
+            document.getElementById('revokeUserId').value = 'test-user-123';
+            document.getElementById('revokePermissionId').value = 'test-perm-456';
+        }
+
+        // 页面加载完成后自动填充测试数据
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(fillTestData, 1000);
+        });
+    </script>
+</body>
+</html> 

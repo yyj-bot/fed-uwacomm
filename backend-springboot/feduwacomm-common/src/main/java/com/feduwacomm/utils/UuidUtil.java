@@ -48,6 +48,28 @@ public class UuidUtil {
     }
 
     /**
+     * 生成短UUID（16位）
+     * 使用时间戳和随机数的组合
+     * 
+     * @return 16位短UUID字符串
+     */
+    public static String generateShortUuid() {
+        SecureRandom secureRandom = new SecureRandom();
+        
+        // 获取当前时间戳的低32位
+        long timestamp = System.currentTimeMillis() & 0xFFFFFFFFL;
+        
+        // 生成32位随机数
+        int randomPart = secureRandom.nextInt();
+        
+        // 组合成64位值
+        long combined = (timestamp << 32) | (randomPart & 0xFFFFFFFFL);
+        
+        // 转换为16位十六进制字符串
+        return Long.toHexString(combined);
+    }
+
+    /**
      * 生成UUID v7
      * 基于RFC 9562标准实现
      * 

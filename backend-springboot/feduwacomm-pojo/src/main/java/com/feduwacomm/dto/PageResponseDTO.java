@@ -17,7 +17,10 @@ import java.util.List;
 public class PageResponseDTO<T> {
 
     private Long total;
+    private Long pages;
+    private Integer current;
     private Integer page;
     private Integer size;
     private List<T> list;
+    private List<T> records;
 }

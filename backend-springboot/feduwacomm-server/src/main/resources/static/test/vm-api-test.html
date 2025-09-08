@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM API测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .result-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background-color: white;
+            border-radius: 4px;
+        }
+
+        .result-item.success {
+            border-left-color: #28a745;
+            background-color: #f8fff9;
+        }
+
+        .result-item.error {
+            border-left-color: #dc3545;
+            background-color: #fff8f8;
+        }
+
+        .result-item.warning {
+            border-left-color: #ffc107;
+            background-color: #fffdf5;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .result-method {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .result-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .result-status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .result-status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .result-content {
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .clear-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            float: right;
+        }
+
+        .clear-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .token-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .vm-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .vm-info div {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .vm-info span {
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .quick-fill {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .quick-fill button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FedUWAComm VM API测试页面</h1>
+    <p>测试虚拟机注册和Token刷新API接口</p>
+
+    <div class="container">
+        <!-- VM注册面板 -->
+        <div class="panel">
+            <h2>虚拟机注册</h2>
+            <div class="quick-fill">
+                <button onclick="fillSampleVmData()" class="btn-secondary">填充示例数据</button>
+                <button onclick="clearVmForm()" class="btn-secondary">清空表单</button>
+            </div>
+            <div class="form-group">
+                <label for="vmName">虚拟机名称:</label>
+                <input type="text" id="vmName" placeholder="输入虚拟机名称">
+            </div>
+            <div class="form-group">
+                <label for="vmDescription">虚拟机描述:</label>
+                <textarea id="vmDescription" placeholder="输入虚拟机描述"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="vmType">虚拟机类型:</label>
+                <select id="vmType">
+                    <option value="TRAINING">训练虚拟机</option>
+                    <option value="INFERENCE">推理虚拟机</option>
+                    <option value="DATA_PROCESSING">数据处理虚拟机</option>
+                    <option value="HYBRID">混合虚拟机</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="vmVersion">虚拟机版本:</label>
+                <input type="text" id="vmVersion" placeholder="例如: 1.0.0">
+            </div>
+            <div class="form-group">
+                <label for="vmCapabilities">支持的算法 (JSON数组):</label>
+                <textarea id="vmCapabilities" placeholder='例如: ["FEDAVG", "FEDPROX", "FEDNOVA"]'></textarea>
+            </div>
+            <div class="form-group">
+                <label for="vmSystemInfo">系统信息 (JSON):</label>
+                <textarea id="vmSystemInfo" placeholder='例如: {"os": "Ubuntu 20.04", "python": "3.8"}'></textarea>
+            </div>
+            <button onclick="registerVm()" class="btn-primary">注册虚拟机</button>
+            <button onclick="registerMultipleVm()" class="btn-success">批量注册测试</button>
+        </div>
+
+        <!-- Token刷新面板 -->
+        <div class="panel">
+            <h2>Token刷新</h2>
+            <div class="vm-info" id="currentVmInfo">
+                <div><span>当前VM ID:</span> <span id="currentVmId">未注册</span></div>
+                <div><span>当前Secret ID:</span> <span id="currentSecretId">无</span></div>
+                <div><span>Token状态:</span> <span id="tokenStatus">无效</span></div>
+            </div>
+            <div class="form-group">
+                <label for="refreshVmId">虚拟机ID:</label>
+                <input type="text" id="refreshVmId" placeholder="输入虚拟机ID">
+            </div>
+            <div class="form-group">
+                <label for="refreshSecretId">Secret ID:</label>
+                <input type="text" id="refreshSecretId" placeholder="输入Secret ID">
+            </div>
+            <button onclick="refreshToken()" class="btn-warning">刷新Token</button>
+            <button onclick="useLastRegisteredVm()" class="btn-secondary">使用最新注册的VM</button>
+            <button onclick="validateCurrentToken()" class="btn-success">验证当前Token</button>
+            
+            <div id="currentToken" class="token-display" style="display: none;">
+                <strong>当前Token:</strong><br>
+                <span id="tokenValue"></span>
+            </div>
+        </div>
+
+        <!-- WebSocket连接测试面板 -->
+        <div class="panel">
+            <h2>WebSocket连接测试</h2>
+            <div class="form-group">
+                <label for="wsVmId">虚拟机ID:</label>
+                <input type="text" id="wsVmId" placeholder="输入虚拟机ID">
+            </div>
+            <div class="form-group">
+                <label for="wsToken">JWT Token:</label>
+                <textarea id="wsToken" placeholder="输入JWT Token"></textarea>
+            </div>
+            <button onclick="testWebSocketConnection()" class="btn-primary">测试WebSocket连接</button>
+            <button onclick="openWebSocketTestPage()" class="btn-success">打开WebSocket测试页面</button>
+            <button onclick="copyTokenToWebSocket()" class="btn-secondary">复制当前Token</button>
+        </div>
+
+        <!-- API响应面板 -->
+        <div class="panel">
+            <h2>API响应</h2>
+            <button onclick="clearResults()" class="clear-btn">清空结果</button>
+            <div id="resultArea" class="result-area"></div>
+        </div>
+    </div>
+
+    <script>
+        let lastRegisteredVm = null;
+        let currentToken = null;
+
+        // 填充示例数据
+        function fillSampleVmData() {
+            document.getElementById('vmName').value = 'TestVM-' + Date.now();
+            document.getElementById('vmDescription').value = '用于联邦学习训练的测试虚拟机';
+            document.getElementById('vmType').value = 'TRAINING';
+            document.getElementById('vmVersion').value = '1.0.0';
+            document.getElementById('vmCapabilities').value = '["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"]';
+            document.getElementById('vmSystemInfo').value = JSON.stringify({
+                "os": "Ubuntu 20.04",
+                "python": "3.8.10",
+                "memory": "8GB",
+                "cpu": "Intel Xeon E5-2680 v4",
+                "gpu": "NVIDIA Tesla V100"
+            }, null, 2);
+        }
+
+        // 清空VM表单
+        function clearVmForm() {
+            document.getElementById('vmName').value = '';
+            document.getElementById('vmDescription').value = '';
+            document.getElementById('vmType').value = 'TRAINING';
+            document.getElementById('vmVersion').value = '';
+            document.getElementById('vmCapabilities').value = '';
+            document.getElementById('vmSystemInfo').value = '';
+        }
+
+        // 注册虚拟机
+        async function registerVm() {
+            const vmName = document.getElementById('vmName').value;
+            const vmDescription = document.getElementById('vmDescription').value;
+            const vmType = document.getElementById('vmType').value;
+            const vmVersion = document.getElementById('vmVersion').value;
+            const vmCapabilitiesStr = document.getElementById('vmCapabilities').value;
+            const vmSystemInfoStr = document.getElementById('vmSystemInfo').value;
+
+            if (!vmName || !vmDescription) {
+                addResult('错误', 'POST /api/vm/register', '请填写虚拟机名称和描述', 'error');
+                return;
+            }
+
+            let vmCapabilities = [];
+            let vmSystemInfo = {};
+
+            try {
+                if (vmCapabilitiesStr) {
+                    vmCapabilities = JSON.parse(vmCapabilitiesStr);
+                }
+                if (vmSystemInfoStr) {
+                    vmSystemInfo = JSON.parse(vmSystemInfoStr);
+                }
+            } catch (error) {
+                addResult('错误', 'POST /api/vm/register', 'JSON格式错误: ' + error.message, 'error');
+                return;
+            }
+
+            const requestData = {
+                vmName: vmName,
+                vmDescription: vmDescription,
+                vmType: vmType,
+                vmVersion: vmVersion,
+                capabilities: vmCapabilities,
+                systemInfo: vmSystemInfo
+            };
+
+            addResult('请求', 'POST /api/vm/register', JSON.stringify(requestData, null, 2), 'info');
+
+            try {
+                const response = await fetch('/api/vm/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    lastRegisteredVm = result.data;
+                    updateVmInfo(result.data);
+                    addResult('成功', 'POST /api/vm/register', JSON.stringify(result, null, 2), 'success');
+                } else {
+                    addResult('失败', 'POST /api/vm/register', JSON.stringify(result, null, 2), 'error');
+                }
+            } catch (error) {
+                addResult('错误', 'POST /api/vm/register', '网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 批量注册测试
+        async function registerMultipleVm() {
+            const vmTypes = ['TRAINING', 'INFERENCE', 'DATA_PROCESSING', 'HYBRID'];
+            const capabilities = [
+                ['FEDAVG', 'FEDPROX'],
+                ['FEDAVG', 'FEDNOVA'],
+                ['FEDAVG', 'SCAFFOLD'],
+                ['FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD']
+            ];
+
+            for (let i = 0; i < 3; i++) {
+                const vmType = vmTypes[i % vmTypes.length];
+                const vmCaps = capabilities[i % capabilities.length];
+                
+                const requestData = {
+                    vmName: `BatchTestVM-${i + 1}-${Date.now()}`,
+                    vmDescription: `批量测试虚拟机 #${i + 1}`,
+                    vmType: vmType,
+                    vmVersion: '1.0.0',
+                    capabilities: vmCaps,
+                    systemInfo: {
+                        os: 'Ubuntu 20.04',
+                        python: '3.8.10',
+                        memory: (4 + i * 2) + 'GB'
+                    }
+                };
+
+                try {
+                    const response = await fetch('/api/vm/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        if (i === 2) { // 使用最后一个作为当前VM
+                            lastRegisteredVm = result.data;
+                            updateVmInfo(result.data);
+                        }
+                        addResult('批量注册', `VM #${i + 1}`, JSON.stringify(result, null, 2), 'success');
+                    } else {
+                        addResult('批量注册失败', `VM #${i + 1}`, JSON.stringify(result, null, 2), 'error');
+                    }
+                } catch (error) {
+                    addResult('批量注册错误', `VM #${i + 1}`, '网络错误: ' + error.message, 'error');
+                }
+
+                // 添加延迟避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
+        // 刷新Token
+        async function refreshToken() {
+            const vmId = document.getElementById('refreshVmId').value;
+            const secretId = document.getElementById('refreshSecretId').value;
+
+            if (!vmId || !secretId) {
+                addResult('错误', 'POST /api/vm/token/refresh', '请填写虚拟机ID和Secret ID', 'error');
+                return;
+            }
+
+            const requestData = {
+                vmId: vmId,
+                secretId: secretId
+            };
+
+            addResult('请求', 'POST /api/vm/token/refresh', JSON.stringify(requestData, null, 2), 'info');
+
+            try {
+                const response = await fetch('/api/vm/token/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    currentToken = result.data.token;
+                    updateTokenDisplay(result.data.token);
+                    document.getElementById('tokenStatus').textContent = '有效';
+                    addResult('成功', 'POST /api/vm/token/refresh', JSON.stringify(result, null, 2), 'success');
+                } else {
+                    currentToken = null;
+                    document.getElementById('tokenStatus').textContent = '无效';
+                    addResult('失败', 'POST /api/vm/token/refresh', JSON.stringify(result, null, 2), 'error');
+                }
+            } catch (error) {
+                addResult('错误', 'POST /api/vm/token/refresh', '网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 使用最新注册的VM
+        function useLastRegisteredVm() {
+            if (!lastRegisteredVm) {
+                addResult('错误', '使用最新VM', '没有已注册的虚拟机', 'error');
+                return;
+            }
+
+            document.getElementById('refreshVmId').value = lastRegisteredVm.vmId;
+            document.getElementById('refreshSecretId').value = lastRegisteredVm.secretId;
+            
+            // 同时更新WebSocket测试区域
+            document.getElementById('wsVmId').value = lastRegisteredVm.vmId;
+
+            addResult('信息', '使用最新VM', `已填入VM ID: ${lastRegisteredVm.vmId}`, 'success');
+        }
+
+        // 验证当前Token
+        function validateCurrentToken() {
+            if (!currentToken) {
+                addResult('错误', 'Token验证', '当前没有有效的Token', 'error');
+                return;
+            }
+
+            try {
+                // 简单解析JWT Token (这里只是演示，实际应该由服务端验证)
+                const parts = currentToken.split('.');
+                if (parts.length !== 3) {
+                    addResult('错误', 'Token验证', 'Token格式无效', 'error');
+                    return;
+                }
+
+                const payload = JSON.parse(atob(parts[1]));
+                const now = Math.floor(Date.now() / 1000);
+                const isExpired = payload.exp && payload.exp < now;
+
+                const validationResult = {
+                    valid: !isExpired,
+                    payload: payload,
+                    isExpired: isExpired,
+                    expiresAt: payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A'
+                };
+
+                addResult('Token验证', 'JWT解析', JSON.stringify(validationResult, null, 2), 
+                          isExpired ? 'warning' : 'success');
+            } catch (error) {
+                addResult('错误', 'Token验证', 'Token解析失败: ' + error.message, 'error');
+            }
+        }
+
+        // 测试WebSocket连接
+        function testWebSocketConnection() {
+            const vmId = document.getElementById('wsVmId').value;
+            const token = document.getElementById('wsToken').value;
+
+            if (!vmId || !token) {
+                addResult('错误', 'WebSocket测试', '请填写虚拟机ID和JWT Token', 'error');
+                return;
+            }
+
+            addResult('WebSocket测试', '连接测试', '开始测试WebSocket连接...', 'info');
+
+            try {
+                const socket = new SockJS('/ws');
+                const stompClient = Stomp.over(socket);
+
+                const headers = {
+                    'Authorization': 'Bearer ' + token,
+                    'vmId': vmId
+                };
+
+                stompClient.connect(headers, function (frame) {
+                    addResult('WebSocket测试', '连接成功', `STOMP版本: ${frame.version}`, 'success');
+                    
+                    // 发送测试消息
+                    const testMessage = {
+                        type: 'HEARTBEAT',
+                        id: 'test-' + Date.now(),
+                        timestamp: new Date().toISOString(),
+                        vmId: vmId,
+                        data: { status: 'TEST' },
+                        signature: 'test_signature'
+                    };
+
+                    stompClient.send("/app/protocol", {}, JSON.stringify(testMessage));
+                    addResult('WebSocket测试', '消息发送', '测试消息已发送', 'success');
+
+                    // 2秒后断开连接
+                    setTimeout(() => {
+                        stompClient.disconnect();
+                        addResult('WebSocket测试', '连接断开', '测试完成，连接已断开', 'success');
+                    }, 2000);
+
+                }, function (error) {
+                    addResult('WebSocket测试', '连接失败', error.toString(), 'error');
+                });
+
+            } catch (error) {
+                addResult('WebSocket测试', '连接错误', error.message, 'error');
+            }
+        }
+
+        // 打开WebSocket测试页面
+        function openWebSocketTestPage() {
+            const vmId = document.getElementById('wsVmId').value;
+            const token = document.getElementById('wsToken').value;
+            
+            let url = '/test/websocket-test.html';
+            if (vmId && token) {
+                const params = new URLSearchParams();
+                params.append('vmId', vmId);
+                params.append('token', token);
+                url += '?' + params.toString();
+            }
+            
+            window.open(url, '_blank');
+        }
+
+        // 复制当前Token到WebSocket测试区域
+        function copyTokenToWebSocket() {
+            if (!currentToken) {
+                addResult('错误', '复制Token', '当前没有有效的Token', 'error');
+                return;
+            }
+
+            document.getElementById('wsToken').value = currentToken;
+            addResult('信息', '复制Token', 'Token已复制到WebSocket测试区域', 'success');
+        }
+
+        // 更新VM信息显示
+        function updateVmInfo(vmData) {
+            document.getElementById('currentVmId').textContent = vmData.vmId;
+            document.getElementById('currentSecretId').textContent = vmData.secretId;
+        }
+
+        // 更新Token显示
+        function updateTokenDisplay(token) {
+            document.getElementById('tokenValue').textContent = token;
+            document.getElementById('currentToken').style.display = 'block';
+        }
+
+        // 添加结果到显示区域
+        function addResult(method, endpoint, content, type = 'info') {
+            const resultArea = document.getElementById('resultArea');
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item ${type}`;
+            
+            const statusClass = type === 'success' ? 'success' : 'error';
+            const timestamp = new Date().toLocaleTimeString();
+            
+            resultItem.innerHTML = `
+                <div class="result-header">
+                    <span class="result-method">${method}</span>
+                    <span class="result-status ${statusClass}">${endpoint}</span>
+                    <small>${timestamp}</small>
+                </div>
+                <div class="result-content">${content}</div>
+            `;
+            
+            resultArea.appendChild(resultItem);
+            resultArea.scrollTop = resultArea.scrollHeight;
+        }
+
+        // 清空结果
+        function clearResults() {
+            document.getElementById('resultArea').innerHTML = '';
+        }
+
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const vmId = urlParams.get('vmId');
+            const token = urlParams.get('token');
+            
+            if (vmId) {
+                document.getElementById('wsVmId').value = vmId;
+                document.getElementById('refreshVmId').value = vmId;
+            }
+            
+            if (token) {
+                document.getElementById('wsToken').value = token;
+                currentToken = token;
+                updateTokenDisplay(token);
+            }
+        });
+
+        // 添加SockJS和STOMP库
+        const sockjsScript = document.createElement('script');
+        sockjsScript.src = 'https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js';
+        document.head.appendChild(sockjsScript);
+
+        const stompScript = document.createElement('script');
+        stompScript.src = 'https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js';
+        document.head.appendChild(stompScript);
+    </script>
+</body>
+
+</html>

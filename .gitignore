@@ -220,3 +220,5 @@ Thumbs.db
 config/local_*.py
 config/production_*.py
 
+/CLAUDE.md
+/.mcp.json

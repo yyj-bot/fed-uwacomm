@@ -16,7 +16,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class UserPermissionVO {
 
-    private String permissionId;
+    private String id;
+    private String userId;
     private String resourceType;
     private String resourceId;
     private String permission;

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水声联邦学习系统 - 用户接口测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid #e1e8ed;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e1e8ed;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header:hover {
+            background: #e9ecef;
+        }
+
+        .section-header h3 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin: 0;
+        }
+
+        .section-content {
+            padding: 20px;
+            display: none;
+        }
+
+        .section-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+
+        .response-area h4 {
+            margin-bottom: 10px;
+            color: #495057;
+            font-size: 1.1em;
+        }
+
+        .response-status {
+            margin-bottom: 10px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-badge.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .response-content pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .request-content {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .request-content pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .token-display {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .token-display h4 {
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .token-value {
+            background: #34495e;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s;
+        }
+
+        .toggle-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .user-info {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .user-info h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .user-info p {
+            margin: 5px 0;
+            color: #1b5e20;
+        }
+
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .note h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .note p {
+            color: #856404;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 用户接口测试页面</h1>
+            <p>水声联邦学习系统 - 用户自助功能测试工具</p>
+        </div>
+
+        <div class="content">
+            <!-- 说明信息 -->
+            <div class="note">
+                <h4>📋 接口说明</h4>
+                <p>本页面提供用户自助功能的测试，包括：</p>
+                <p>• 用户注册、登录、Token刷新、登出</p>
+                <p>• 获取和更新用户信息</p>
+                <p>• 修改用户密码</p>
+                <p><strong>注意：</strong>管理员功能请使用 AdminController 中的接口</p>
+            </div>
+
+            <!-- 认证状态显示 -->
+            <div id="authStatus" class="alert alert-info">
+                <strong>认证状态:</strong> 未登录
+            </div>
+
+            <!-- 用户信息显示 -->
+            <div id="userInfo" class="user-info hidden">
+                <h4>👤 当前用户信息</h4>
+                <div id="userInfoContent"></div>
+            </div>
+
+            <!-- Token显示 -->
+            <div id="tokenDisplay" class="token-display hidden">
+                <h4>🔑 当前Token</h4>
+                <div class="token-value" id="currentToken"></div>
+                <h4 style="margin-top: 15px;">🔄 刷新Token</h4>
+                <div class="token-value" id="refreshToken"></div>
+            </div>
+
+            <!-- 认证相关接口 -->
+            <div class="section">
+                <div class="section-header" onclick="toggleSection('auth')">
+                    <h3>🔐 认证相关接口</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div id="auth" class="section-content">
+                    <!-- 用户注册 -->
+                    <div class="form-group">
+                        <h4>📝 用户注册</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>用户名:</label>
+                                <input type="text" id="regUsername" placeholder="输入用户名" value="testuser">
+                            </div>
+                            <div class="form-group">
+                                <label>邮箱:</label>
+                                <input type="email" id="regEmail" placeholder="输入邮箱" value="test@example.com">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>密码:</label>
+                                <input type="password" id="regPassword" placeholder="输入密码" value="password123">
+                            </div>
+                            <div class="form-group">
+                                <label>确认密码:</label>
+                                <input type="password" id="regConfirmPassword" placeholder="确认密码" value="password123">
+                            </div>
+                        </div>
+                        <button class="btn" onclick="testRegister()">注册用户</button>
+                        <div id="registerResponse" class="response-area hidden">
+                            <h4>📤 请求数据</h4>
+                            <div class="request-content"></div>
+                            <h4>📥 响应结果</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- 用户登录 -->
+                    <div class="form-group">
+                        <h4>🚪 用户登录</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>登录标识符:</label>
+                                <input type="text" id="loginIdentifier" placeholder="用户名或邮箱" value="testuser">
+                            </div>
+                            <div class="form-group">
+                                <label>密码:</label>
+                                <input type="password" id="loginPassword" placeholder="输入密码" value="password123">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>验证码:</label>
+                                <input type="text" id="captcha" placeholder="验证码（可选）">
+                            </div>
+                            <div class="form-group">
+                                <label>验证码标识:</label>
+                                <input type="text" id="captchaKey" placeholder="验证码标识（可选）">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="rememberMe"> 记住登录状态
+                            </label>
+                        </div>
+                        <button class="btn" onclick="testLogin()">登录</button>
+                        <div id="loginResponse" class="response-area hidden">
+                            <h4>📤 请求数据</h4>
+                            <div class="request-content"></div>
+                            <h4>📥 响应结果</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- Token刷新 -->
+                    <div class="form-group">
+                        <h4>🔄 Token刷新</h4>
+                        <button class="btn btn-secondary" onclick="testRefreshToken()">刷新Token</button>
+                        <div id="refreshResponse" class="response-area hidden">
+                            <h4>响应状态</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- 用户登出 -->
+                    <div class="form-group">
+                        <h4>🚪 用户登出</h4>
+                        <button class="btn btn-danger" onclick="testLogout()">登出</button>
+                        <div id="logoutResponse" class="response-area hidden">
+                            <h4>响应状态</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户信息相关接口 -->
+            <div class="section">
+                <div class="section-header" onclick="toggleSection('userInfo')">
+                    <h3>👤 用户信息相关接口</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div id="userInfo" class="section-content">
+                    <!-- 获取当前用户信息 -->
+                    <div class="form-group">
+                        <h4>📋 获取当前用户信息</h4>
+                        <button class="btn" onclick="testGetCurrentUserInfo()">获取信息</button>
+                        <div id="getUserInfoResponse" class="response-area hidden">
+                            <h4>响应状态</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- 更新用户信息 -->
+                    <div class="form-group">
+                        <h4>✏️ 更新用户信息</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>新用户名:</label>
+                                <input type="text" id="updateUsername" placeholder="新用户名">
+                            </div>
+                            <div class="form-group">
+                                <label>新邮箱:</label>
+                                <input type="email" id="updateEmail" placeholder="新邮箱">
+                            </div>
+                        </div>
+                        <button class="btn" onclick="testUpdateUserInfo()">更新信息</button>
+                        <div id="updateUserInfoResponse" class="response-area hidden">
+                            <h4>响应状态</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- 修改密码 -->
+                    <div class="form-group">
+                        <h4>🔒 修改密码</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>旧密码:</label>
+                                <input type="password" id="oldPassword" placeholder="旧密码">
+                            </div>
+                            <div class="form-group">
+                                <label>新密码:</label>
+                                <input type="password" id="newPassword" placeholder="新密码">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>确认新密码:</label>
+                            <input type="password" id="confirmNewPassword" placeholder="确认新密码">
+                        </div>
+                        <button class="btn" onclick="testChangePassword()">修改密码</button>
+                        <div id="changePasswordResponse" class="response-area hidden">
+                            <h4>响应状态</h4>
+                            <div class="response-status"></div>
+                            <div class="response-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 接口说明 -->
+            <div class="section">
+                <div class="section-header" onclick="toggleSection('apiInfo')">
+                    <h3>📚 接口说明</h3>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div id="apiInfo" class="section-content">
+                    <div class="form-group">
+                        <h4>🔗 接口地址</h4>
+                        <p><strong>基础URL:</strong> <code>http://localhost:8080/api/user</code></p>
+                        
+                        <h4>📋 接口列表</h4>
+                        <ul style="margin-left: 20px; line-height: 1.8;">
+                            <li><strong>POST /register</strong> - 用户注册</li>
+                            <li><strong>POST /login</strong> - 用户登录</li>
+                            <li><strong>POST /refresh</strong> - 刷新Token</li>
+                            <li><strong>POST /logout</strong> - 用户登出</li>
+                            <li><strong>GET /profile</strong> - 获取当前用户信息</li>
+                            <li><strong>PUT /profile</strong> - 更新用户信息</li>
+                            <li><strong>PUT /password</strong> - 修改密码</li>
+                        </ul>
+
+                        <h4>🔐 认证方式</h4>
+                        <p>除登录、注册接口外，所有接口都需要在请求头中携带JWT Token：</p>
+                        <code>Authorization: Bearer {token}</code>
+
+                        <h4>📊 响应格式</h4>
+                        <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
+{
+  "code": 200,
+  "message": "success",
+  "data": {}
+}
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentToken = '';
+        let refreshToken = '';
+        let currentUser = null;
+        const baseUrl = '/api/user'; // 使用相对路径，通过PathMatchConfigurer配置的/api前缀
+
+        // 工具函数
+        function showResponse(elementId, response, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.classList.remove('hidden');
+            element.classList.remove('status-success', 'status-error');
+            element.classList.add(isSuccess ? 'status-success' : 'status-error');
+            
+            const content = element.querySelector('.response-content');
+            if (content) {
+                // 格式化JSON显示
+                const formattedResponse = JSON.stringify(response, null, 2);
+                content.innerHTML = `<pre>${formattedResponse}</pre>`;
+            }
+            
+            // 添加状态指示
+            const statusDiv = element.querySelector('.response-status');
+            if (statusDiv) {
+                statusDiv.innerHTML = isSuccess ? 
+                    '<span class="status-badge success">✅ 成功</span>' : 
+                    '<span class="status-badge error">❌ 错误</span>';
+            }
+        }
+        
+        function showRequest(elementId, requestData) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const requestDiv = element.querySelector('.request-content');
+                if (requestDiv) {
+                    const formattedRequest = JSON.stringify(requestData, null, 2);
+                    requestDiv.innerHTML = `<pre>${formattedRequest}</pre>`;
+                }
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = message;
+            
+            const content = document.querySelector('.content');
+            content.insertBefore(alertDiv, content.firstChild);
+            
+            setTimeout(() => alertDiv.remove(), 5000);
+        }
+
+        function updateAuthStatus() {
+            const authStatus = document.getElementById('authStatus');
+            const userInfo = document.getElementById('userInfo');
+            const tokenDisplay = document.getElementById('tokenDisplay');
+            
+            if (currentToken && currentUser) {
+                authStatus.className = 'alert alert-success';
+                authStatus.innerHTML = `<strong>认证状态:</strong> 已登录 - ${currentUser.username} (${currentUser.role})`;
+                userInfo.classList.remove('hidden');
+                tokenDisplay.classList.remove('hidden');
+                
+                // 更新用户信息显示
+                const userInfoContent = document.getElementById('userInfoContent');
+                userInfoContent.innerHTML = `
+                    <p><strong>用户ID:</strong> ${currentUser.userId}</p>
+                    <p><strong>用户名:</strong> ${currentUser.username}</p>
+                    <p><strong>邮箱:</strong> ${currentUser.email}</p>
+                    <p><strong>角色:</strong> ${currentUser.role}</p>
+                    <p><strong>状态:</strong> ${currentUser.status}</p>
+                `;
+                
+                // 更新Token显示
+                document.getElementById('currentToken').textContent = currentToken;
+                document.getElementById('refreshToken').textContent = refreshToken;
+            } else {
+                authStatus.className = 'alert alert-info';
+                authStatus.innerHTML = '<strong>认证状态:</strong> 未登录';
+                userInfo.classList.add('hidden');
+                tokenDisplay.classList.add('hidden');
+            }
+        }
+
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            
+            content.classList.toggle('active');
+            icon.classList.toggle('rotated');
+        }
+
+        // API调用函数
+        async function makeRequest(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(currentToken && { 'Authorization': `Bearer ${currentToken}` })
+                }
+            };
+            
+            try {
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+                
+                return data;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // 认证相关接口测试
+        async function testRegister() {
+            try {
+                const data = {
+                    username: document.getElementById('regUsername').value,
+                    email: document.getElementById('regEmail').value,
+                    password: document.getElementById('regPassword').value,
+                    confirmPassword: document.getElementById('regConfirmPassword').value
+                };
+                
+                // 显示请求JSON
+                showRequest('registerResponse', data);
+                
+                const response = await makeRequest(`${baseUrl}/register`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                showResponse('registerResponse', response, true);
+                showAlert('用户注册成功！', 'success');
+            } catch (error) {
+                showResponse('registerResponse', { error: error.message }, false);
+                showAlert(`注册失败: ${error.message}`, 'danger');
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const data = {
+                    loginIdentifier: document.getElementById('loginIdentifier').value,
+                    password: document.getElementById('loginPassword').value,
+                    captcha: document.getElementById('captcha').value || null,
+                    captchaKey: document.getElementById('captchaKey').value || null,
+                    rememberMe: document.getElementById('rememberMe').checked
+                };
+                
+                // 显示请求JSON
+                showRequest('loginResponse', data);
+                
+                const response = await makeRequest(`${baseUrl}/login`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                // 保存Token和用户信息
+                currentToken = response.data.token;
+                refreshToken = response.data.refreshToken;
+                currentUser = response.data.user;
+                
+                updateAuthStatus();
+                showResponse('loginResponse', response, true);
+                showAlert('登录成功！', 'success');
+            } catch (error) {
+                showResponse('loginResponse', { error: error.message }, false);
+                showAlert(`登录失败: ${error.message}`, 'danger');
+            }
+        }
+
+        async function testRefreshToken() {
+            try {
+                const response = await makeRequest(`${baseUrl}/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${refreshToken}`
+                    }
+                });
+                
+                // 更新Token
+                currentToken = response.data.token;
+                refreshToken = response.data.refreshToken;
+                
+                updateAuthStatus();
+                showResponse('refreshResponse', response, true);
+                showAlert('Token刷新成功！', 'success');
+            } catch (error) {
+                showResponse('refreshResponse', { error: error.message }, false);
+                showAlert(`Token刷新失败: ${error.message}`, 'danger');
+            }
+        }
+
+        async function testLogout() {
+            try {
+                await makeRequest(`${baseUrl}/logout`, {
+                    method: 'POST'
+                });
+                
+                // 清除Token和用户信息
+                currentToken = '';
+                refreshToken = '';
+                currentUser = null;
+                
+                updateAuthStatus();
+                showResponse('logoutResponse', { message: '登出成功' }, true);
+                showAlert('登出成功！', 'success');
+            } catch (error) {
+                showResponse('logoutResponse', { error: error.message }, false);
+                showAlert(`登出失败: ${error.message}`, 'danger');
+            }
+        }
+
+        // 用户信息相关接口测试
+        async function testGetCurrentUserInfo() {
+            try {
+                const response = await makeRequest(`${baseUrl}/profile`);
+                showResponse('getUserInfoResponse', response, true);
+            } catch (error) {
+                showResponse('getUserInfoResponse', { error: error.message }, false);
+                showAlert(`获取用户信息失败: ${error.message}`, 'danger');
+            }
+        }
+
+        async function testUpdateUserInfo() {
+            try {
+                const data = {};
+                const username = document.getElementById('updateUsername').value;
+                const email = document.getElementById('updateEmail').value;
+                
+                if (username) data.username = username;
+                if (email) data.email = email;
+                
+                const response = await makeRequest(`${baseUrl}/profile`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                
+                showResponse('updateUserInfoResponse', response, true);
+                showAlert('用户信息更新成功！', 'success');
+            } catch (error) {
+                showResponse('updateUserInfoResponse', { error: error.message }, false);
+                showAlert(`更新失败: ${error.message}`, 'danger');
+            }
+        }
+
+        async function testChangePassword() {
+            try {
+                const data = {
+                    oldPassword: document.getElementById('oldPassword').value,
+                    newPassword: document.getElementById('newPassword').value,
+                    confirmPassword: document.getElementById('confirmNewPassword').value
+                };
+                
+                const response = await makeRequest(`${baseUrl}/password`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                
+                showResponse('changePasswordResponse', response, true);
+                showAlert('密码修改成功！', 'success');
+            } catch (error) {
+                showResponse('changePasswordResponse', { error: error.message }, false);
+                showAlert(`密码修改失败: ${error.message}`, 'danger');
+            }
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAuthStatus();
+        });
+    </script>
+</body>
+</html> 

@@ -2,6 +2,7 @@ package com.feduwacomm;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
  * 水声联邦学习后端服务主应用程序类
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @version 1.0.0
  */
 @SpringBootApplication
+@EnableTransactionManagement
 public class FedUWACommApplication {
 
     public static void main(String[] args) {

@@ -17,5 +17,11 @@ import java.time.LocalDateTime;
 public class PermissionGrantResponseVO {
 
     private String permissionId;
+    private String userId;
+    private String resourceType;
+    private String resourceId;
+    private String permission;
+    private String grantedBy;
     private LocalDateTime grantedAt;
+    private LocalDateTime expiresAt;
 }

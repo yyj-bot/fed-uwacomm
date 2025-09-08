@@ -105,4 +105,37 @@ public class UserException extends RuntimeException {
     public static UserException usernameFormatError() {
         return new UserException(400, "用户名格式错误");
     }
+
+    public static UserException permissionAlreadyGranted() {
+        return new UserException(409, "权限已授权");
+    }
+
+    public static UserException permissionNotFound() {
+        return new UserException(404, "权限不存在");
+    }
+
+    public static UserException permissionNotOwned() {
+        return new UserException(403, "权限不属于该用户");
+    }
+
+    /**
+     * 密码格式错误（通用）
+     */
+    public static UserException passwordFormatError(String message) {
+        return new UserException(400, message);
+    }
+
+    /**
+     * 密码缺少字母
+     */
+    public static UserException passwordMissingLetter() {
+        return new UserException(400, "密码格式错误，必须包含至少一个字母");
+    }
+
+    /**
+     * 密码缺少数字
+     */
+    public static UserException passwordMissingDigit() {
+        return new UserException(400, "密码格式错误，必须包含至少一个数字");
+    }
 }

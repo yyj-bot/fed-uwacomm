@@ -1,0 +1,26 @@
+# 测试环境配置
+server:
+  port: 8080
+
+spring:
+  # 数据库配置 - 测试环境（使用H2内存数据库以避免DDL事务问题）
+  datasource:
+    url: jdbc:h2:mem:feduwacomm_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  
+  # SQL初始化配置
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:create-test-database.sql
+
+# 日志配置
+logging:
+  level:
+    com.feduwacomm: INFO
+    org.springframework: WARN
+    com.zaxxer.hikari: WARN
+  db:
+    enabled: true # 测试环境启用数据库日志

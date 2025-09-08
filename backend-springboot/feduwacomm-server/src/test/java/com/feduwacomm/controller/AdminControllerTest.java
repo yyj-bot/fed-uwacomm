@@ -62,14 +62,6 @@ class AdminControllerTest {
         @Test
         void testGetUserList_Success() throws Exception {
                 // 准备测试数据
-                UserQueryDTO queryDTO = UserQueryDTO.builder()
-                                .page(1)
-                                .size(10)
-                                .role("ADMIN")
-                                .status("ACTIVE")
-                                .keyword("admin")
-                                .build();
-
                 List<UserListVO> userList = Arrays.asList(
                                 UserListVO.builder()
                                                 .userId("a1b2c3d4e5f678901234567890123456")
@@ -323,7 +315,7 @@ class AdminControllerTest {
                 String userId = "a1b2c3d4e5f678901234567890123456";
                 List<UserPermissionVO> permissions = Arrays.asList(
                                 UserPermissionVO.builder()
-                                                .permissionId("p1b2c3d4e5f678901234567890123456")
+                                                .id("p1b2c3d4e5f678901234567890123456")
                                                 .resourceType("DATA")
                                                 .resourceId("data_123")
                                                 .permission("READ")
@@ -332,7 +324,7 @@ class AdminControllerTest {
                                                 .expiresAt(null)
                                                 .build(),
                                 UserPermissionVO.builder()
-                                                .permissionId("p2b3c4d5e6f789012345678901234567")
+                                                .id("p2b3c4d5e6f789012345678901234567")
                                                 .resourceType("VM")
                                                 .resourceId("vm_456")
                                                 .permission("WRITE")
@@ -350,11 +342,11 @@ class AdminControllerTest {
                                 .andExpect(jsonPath("$.message").value("获取成功"))
                                 .andExpect(jsonPath("$.data").isArray())
                                 .andExpect(jsonPath("$.data.length()").value(2))
-                                .andExpect(jsonPath("$.data[0].permissionId").value("p1b2c3d4e5f678901234567890123456"))
+                                .andExpect(jsonPath("$.data[0].id").value("p1b2c3d4e5f678901234567890123456"))
                                 .andExpect(jsonPath("$.data[0].resourceType").value("DATA"))
                                 .andExpect(jsonPath("$.data[0].resourceId").value("data_123"))
                                 .andExpect(jsonPath("$.data[0].permission").value("READ"))
-                                .andExpect(jsonPath("$.data[1].permissionId").value("p2b3c4d5e6f789012345678901234567"))
+                                .andExpect(jsonPath("$.data[1].id").value("p2b3c4d5e6f789012345678901234567"))
                                 .andExpect(jsonPath("$.data[1].resourceType").value("VM"))
                                 .andExpect(jsonPath("$.data[1].resourceId").value("vm_456"))
                                 .andExpect(jsonPath("$.data[1].permission").value("WRITE"));

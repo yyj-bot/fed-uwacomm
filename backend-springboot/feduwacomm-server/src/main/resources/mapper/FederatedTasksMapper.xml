@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.FederatedTasksMapper">
+
+    <!-- Result mapping -->
+    <resultMap id="TaskResultMap" type="com.feduwacomm.entity.FederatedTask">
+        <id property="id" column="id"/>
+        <result property="taskName" column="name"/>
+        <result property="taskType" column="task_type"/>
+        <result property="description" column="description"/>
+        <result property="algorithm" column="algorithm"/>
+        <result property="status" column="status"/>
+        <result property="learningRate" column="learning_rate"/>
+        <result property="batchSize" column="batch_size"/>
+        <result property="epochs" column="epochs"/>
+        <result property="totalRounds" column="total_rounds"/>
+        <result property="currentRound" column="current_round"/>
+        <result property="minParticipants" column="min_participants"/>
+        <result property="modelType" column="model_type"/>
+        <result property="featureColumns" column="feature_columns"/>
+        <result property="targetColumn" column="target_column"/>
+        <result property="testSize" column="test_size"/>
+        <result property="randomState" column="random_state"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="timeout" column="timeout"/>
+        <result property="encryption" column="encryption"/>
+        <result property="differentialPrivacy" column="differential_privacy"/>
+        <result property="epsilon" column="epsilon"/>
+        <result property="delta" column="delta"/>
+        <result property="secureAggregation" column="secure_aggregation"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="pausedAt" column="paused_at"/>
+        <result property="resumedAt" column="resumed_at"/>
+        <result property="stoppedAt" column="stopped_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="cancelledAt" column="cancelled_at"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="participantCount" column="participant_count"/>
+        <result property="progress" column="progress"/>
+        <result property="estimatedDuration" column="estimated_duration"/>
+        <result property="config" column="config"/>
+        <result property="finalResults" column="final_results"/>
+        <result property="modelInfo" column="model_info"/>
+    </resultMap>
+
+    <resultMap id="ParticipantResultMap" type="com.feduwacomm.entity.TaskParticipant">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="vmId" column="vm_id"/>
+        <result property="role" column="role"/>
+        <result property="status" column="status"/>
+        <result property="dataSource" column="data_source"/>
+        <result property="currentEpoch" column="current_epoch"/>
+        <result property="loss" column="loss"/>
+        <result property="accuracy" column="accuracy"/>
+        <result property="lastHeartbeat" column="last_heartbeat"/>
+        <result property="finalAccuracy" column="final_accuracy"/>
+        <result property="finalLoss" column="final_loss"/>
+        <result property="trainingTime" column="training_time"/>
+        <result property="dataSize" column="data_size"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="joinedAt" column="joined_at"/>
+        <result property="leftAt" column="left_at"/>
+        <result property="parameters" column="parameters"/>
+    </resultMap>
+
+    <!-- TaskLog entity has been removed, using SystemLog instead -->
+
+    <!-- Task CRUD operations -->
+    <insert id="insertTask" parameterType="com.feduwacomm.entity.FederatedTask">
+        INSERT INTO federated_tasks (
+            id, name, algorithm, status, total_rounds, current_round, 
+            batch_size, learning_rate, mu, created_at, updated_at, 
+            started_at, completed_at, config
+        ) VALUES (
+            #{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound},
+            #{batchSize}, #{learningRate}, #{learningRate}, #{createdAt}, #{updatedAt},
+            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON)
+        )
+    </insert>
+
+    <update id="updateTask" parameterType="com.feduwacomm.entity.FederatedTask">
+        UPDATE federated_tasks SET
+            name = #{taskName},
+            algorithm = #{algorithm},
+            status = #{status},
+            learning_rate = #{learningRate},
+            batch_size = #{batchSize},
+            total_rounds = #{totalRounds},
+            current_round = #{currentRound},
+            mu = #{learningRate},
+            updated_at = #{updatedAt},
+            started_at = #{startedAt},
+            completed_at = #{completedAt},
+            config = CAST(#{config} AS JSON)
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateTaskStatus">
+        UPDATE federated_tasks SET 
+            status = #{status}, 
+            updated_at = #{timestamp}
+            <if test="status == 'RUNNING'">
+                , started_at = #{timestamp}
+            </if>
+            <if test="status == 'PAUSED'">
+                , paused_at = #{timestamp}
+            </if>
+            <if test="status == 'COMPLETED'">
+                , completed_at = #{timestamp}
+            </if>
+            <if test="status == 'STOPPED'">
+                , stopped_at = #{timestamp}
+            </if>
+            <if test="status == 'CANCELLED'">
+                , cancelled_at = #{timestamp}
+            </if>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateTaskProgress">
+        UPDATE federated_tasks SET 
+            current_round = #{currentRound},
+            progress = #{progress},
+            status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteTask">
+        DELETE FROM federated_tasks WHERE id = #{id}
+    </delete>
+
+    <select id="selectTaskById" resultMap="TaskResultMap">
+        SELECT * FROM federated_tasks WHERE id = #{id}
+    </select>
+
+    <select id="selectTasksByQuery" parameterType="com.feduwacomm.dto.TaskQueryDTO" resultMap="TaskResultMap">
+        SELECT * FROM federated_tasks
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="type != null and type != ''">
+                AND task_type = #{type}
+            </if>
+            <if test="startDate != null">
+                AND created_at &gt;= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND created_at &lt;= #{endDate}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND name LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="createdBy != null and createdBy != ''">
+                AND created_by = #{createdBy}
+            </if>
+            <if test="algorithm != null and algorithm != ''">
+                AND algorithm = #{algorithm}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        LIMIT #{size} OFFSET #{page}
+    </select>
+
+    <select id="countTasksByQuery" parameterType="com.feduwacomm.dto.TaskQueryDTO" resultType="int">
+        SELECT COUNT(*) FROM federated_tasks
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="type != null and type != ''">
+                AND task_type = #{type}
+            </if>
+            <if test="startDate != null">
+                AND created_at &gt;= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND created_at &lt;= #{endDate}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND name LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="createdBy != null and createdBy != ''">
+                AND created_by = #{createdBy}
+            </if>
+            <if test="algorithm != null and algorithm != ''">
+                AND algorithm = #{algorithm}
+            </if>
+        </where>
+    </select>
+
+    <!-- Participant management -->
+    <insert id="insertParticipant" parameterType="com.feduwacomm.entity.TaskParticipant">
+        INSERT INTO task_participants (
+            id, task_id, vm_id, role, status, data_source,
+            current_epoch, loss, accuracy, last_heartbeat,
+            final_accuracy, final_loss, training_time, data_size,
+            created_at, updated_at, joined_at, left_at, parameters
+        ) VALUES (
+            #{id}, #{taskId}, #{vmId}, #{role}, #{status}, #{dataSource},
+            #{currentEpoch}, #{loss}, #{accuracy}, #{lastHeartbeat},
+            #{finalAccuracy}, #{finalLoss}, #{trainingTime}, #{dataSize},
+            #{createdAt}, #{updatedAt}, #{joinedAt}, #{leftAt}, CAST(#{parameters} AS JSON)
+        )
+    </insert>
+
+    <update id="updateParticipant" parameterType="com.feduwacomm.entity.TaskParticipant">
+        UPDATE task_participants SET
+            role = #{role},
+            status = #{status},
+            data_source = #{dataSource},
+            current_epoch = #{currentEpoch},
+            loss = #{loss},
+            accuracy = #{accuracy},
+            last_heartbeat = #{lastHeartbeat},
+            final_accuracy = #{finalAccuracy},
+            final_loss = #{finalLoss},
+            training_time = #{trainingTime},
+            data_size = #{dataSize},
+            updated_at = #{updatedAt},
+            left_at = #{leftAt},
+            parameters = CAST(#{parameters} AS JSON)
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateParticipantStatus">
+        UPDATE task_participants SET 
+            status = #{status},
+            last_heartbeat = #{lastHeartbeat},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_id = #{taskId} AND vm_id = #{vmId}
+    </update>
+
+    <delete id="deleteParticipantsByTaskId">
+        DELETE FROM task_participants WHERE task_id = #{taskId}
+    </delete>
+
+    <select id="selectParticipantsByTaskId" resultMap="ParticipantResultMap">
+        SELECT * FROM task_participants WHERE task_id = #{taskId} ORDER BY created_at
+    </select>
+
+    <!-- Task log management removed - using unified system_logs table via LogService instead -->
+
+    <!-- Statistics queries -->
+    <select id="countTasksByStatus" resultType="int">
+        SELECT COUNT(*) FROM federated_tasks WHERE status = #{status}
+    </select>
+
+    <select id="selectTaskStatsByDateRange" resultType="map">
+        SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as task_count,
+            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed_count,
+            SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed_count
+        FROM federated_tasks
+        WHERE created_at BETWEEN #{startDate} AND #{endDate}
+        GROUP BY DATE(created_at)
+        ORDER BY date
+    </select>
+
+    <!-- Legacy compatibility methods -->
+    <insert id="upsertTask">
+        INSERT INTO federated_tasks (id, name, algorithm, status, total_rounds, current_round, config)
+        VALUES (#{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            algorithm = VALUES(algorithm),
+            status = VALUES(status),
+            total_rounds = VALUES(total_rounds),
+            current_round = VALUES(current_round),
+            config = VALUES(config),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="updateProgress">
+        UPDATE federated_tasks
+        SET current_round = #{currentRound}, status = #{status}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE federated_tasks SET status = #{status}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultType="map">
+        SELECT id, name as taskName, algorithm, status, total_rounds, current_round, config, created_at, updated_at
+        FROM federated_tasks WHERE id = #{id}
+    </select>
+
+</mapper>

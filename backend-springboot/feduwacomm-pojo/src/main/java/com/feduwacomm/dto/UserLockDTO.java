@@ -15,4 +15,6 @@ import lombok.NoArgsConstructor;
 public class UserLockDTO {
 
     private Integer duration; // 锁定时长（秒）
+    private Integer lockHours; // 锁定时长（小时）
+    private String lockReason; // 锁定原因
 }
