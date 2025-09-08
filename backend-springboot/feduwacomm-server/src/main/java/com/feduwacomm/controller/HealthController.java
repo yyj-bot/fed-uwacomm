@@ -2,7 +2,6 @@ package com.feduwacomm.controller;
 
 import com.feduwacomm.common.Result;
 import com.feduwacomm.service.DatabaseHealthService;
-import com.feduwacomm.service.DatabaseInitService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,8 +24,6 @@ public class HealthController {
     @Autowired
     private DatabaseHealthService databaseHealthService;
 
-    @Autowired
-    private DatabaseInitService databaseInitService;
 
     /**
      * 基础健康检查接口
@@ -94,35 +91,4 @@ public class HealthController {
         return Result.success(message, result);
     }
 
-    /**
-     * 数据库表结构检查
-     * 
-     * @return 表结构状态
-     */
-    @GetMapping("/database/tables")
-    public Result<Map<String, Object>> checkDatabaseTables() {
-        Map<String, Object> result = new HashMap<>();
-        
-        try {
-            // 检查并初始化表结构
-            databaseInitService.checkAndInitDatabase();
-            
-            // 检查表数据
-            databaseInitService.checkTableData();
-            
-            result.put("status", "SUCCESS");
-            result.put("message", "数据库表结构检查完成");
-            result.put("checkTime", LocalDateTime.now());
-            
-            return Result.success("数据库表结构检查完成", result);
-            
-        } catch (Exception e) {
-            result.put("status", "ERROR");
-            result.put("message", "数据库表结构检查失败: " + e.getMessage());
-            result.put("checkTime", LocalDateTime.now());
-            result.put("error", e.getMessage());
-            
-            return Result.failure(500, "数据库表结构检查失败", result);
-        }
-    }
 }

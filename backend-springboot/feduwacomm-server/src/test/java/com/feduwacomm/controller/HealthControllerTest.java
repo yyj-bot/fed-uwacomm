@@ -2,7 +2,6 @@ package com.feduwacomm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.service.DatabaseHealthService;
-import com.feduwacomm.service.DatabaseInitService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 
 import java.time.LocalDateTime;
 
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -33,16 +31,13 @@ public class HealthControllerTest {
     @MockBean
     private DatabaseHealthService databaseHealthService;
 
-    @MockBean
-    private DatabaseInitService databaseInitService;
-
     @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         // 重置所有mock对象
-        reset(databaseHealthService, databaseInitService);
+        reset(databaseHealthService);
     }
 
     /**
@@ -162,77 +157,6 @@ public class HealthControllerTest {
     }
 
     /**
-     * 测试数据库表结构检查 - 成功
-     */
-    @Test
-    void testCheckDatabaseTables_Success() throws Exception {
-        // 模拟表结构检查成功
-        doNothing().when(databaseInitService).checkAndInitDatabase();
-        doNothing().when(databaseInitService).checkTableData();
-
-        mockMvc.perform(get("/health/database/tables"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("数据库表结构检查完成"))
-                .andExpect(jsonPath("$.data.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.data.message").value("数据库表结构检查完成"))
-                .andExpect(jsonPath("$.data.checkTime").exists());
-
-        // 验证服务调用
-        verify(databaseInitService).checkAndInitDatabase();
-        verify(databaseInitService).checkTableData();
-    }
-
-    /**
-     * 测试数据库表结构检查 - 失败
-     */
-    @Test
-    void testCheckDatabaseTables_Failed() throws Exception {
-        // 模拟表结构检查异常
-        String errorMessage = "表创建失败";
-        doThrow(new RuntimeException(errorMessage))
-                .when(databaseInitService).checkAndInitDatabase();
-
-        mockMvc.perform(get("/health/database/tables"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.message").value("数据库表结构检查失败"))
-                .andExpect(jsonPath("$.data.status").value("ERROR"))
-                .andExpect(jsonPath("$.data.message").value("数据库表结构检查失败: " + errorMessage))
-                .andExpect(jsonPath("$.data.error").value(errorMessage))
-                .andExpect(jsonPath("$.data.checkTime").exists());
-
-        // 验证服务调用
-        verify(databaseInitService).checkAndInitDatabase();
-        // checkTableData不应该被调用，因为checkAndInitDatabase抛出了异常
-        verify(databaseInitService, never()).checkTableData();
-    }
-
-    /**
-     * 测试数据库表数据检查异常
-     */
-    @Test
-    void testCheckDatabaseTables_CheckDataFailed() throws Exception {
-        // 模拟表结构初始化成功，但数据检查失败
-        doNothing().when(databaseInitService).checkAndInitDatabase();
-        String errorMessage = "数据验证失败";
-        doThrow(new RuntimeException(errorMessage))
-                .when(databaseInitService).checkTableData();
-
-        mockMvc.perform(get("/health/database/tables"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.message").value("数据库表结构检查失败"))
-                .andExpect(jsonPath("$.data.status").value("ERROR"))
-                .andExpect(jsonPath("$.data.message").value("数据库表结构检查失败: " + errorMessage))
-                .andExpect(jsonPath("$.data.error").value(errorMessage));
-
-        // 验证服务调用
-        verify(databaseInitService).checkAndInitDatabase();
-        verify(databaseInitService).checkTableData();
-    }
-
-    /**
      * 测试所有健康检查端点的HTTP方法
      */
     @Test
@@ -249,11 +173,6 @@ public class HealthControllerTest {
 
         // 强制数据库检查只支持GET - 全局异常处理器会返回200和统一JSON格式  
         mockMvc.perform(delete("/health/database/check"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
-
-        // 表结构检查只支持GET - 全局异常处理器会返回200和统一JSON格式
-        mockMvc.perform(patch("/health/database/tables"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500));
     }

@@ -67,3 +67,4 @@ node_modules/
 application-*.yml
 !application.yml
 !application-test.yml 
+/feduwacomm-server/uploads/

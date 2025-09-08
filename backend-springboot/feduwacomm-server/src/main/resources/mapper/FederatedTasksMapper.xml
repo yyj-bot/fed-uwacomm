@@ -268,7 +268,7 @@
     <!-- Legacy compatibility methods -->
     <insert id="upsertTask">
         INSERT INTO federated_tasks (id, name, algorithm, status, total_rounds, current_round, config)
-        VALUES (#{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
+        VALUES (#{id}, #{name}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
         ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             algorithm = VALUES(algorithm),

@@ -17,6 +17,12 @@
     <description>水声联邦学习服务端模块</description>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- 依赖pojo模块 -->
         <dependency>
             <groupId>com.feduwacomm</groupId>
