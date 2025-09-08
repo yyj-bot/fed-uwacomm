@@ -6,7 +6,7 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.service.UserService;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class UserIntegrationTest {
         private ObjectMapper objectMapper;
 
         @Autowired
-        private JwtUtil jwtUtil;
+        private UserJwtUtil userJwtUtil;
 
         private MockMvc mockMvc;
         

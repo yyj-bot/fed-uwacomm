@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
  * AdminService单元测试类
  */
 @ExtendWith(MockitoExtension.class)
-class AdminServiceTest {
+public class AdminServiceTest {
 
     @Mock
     private AdminMapper adminMapper;

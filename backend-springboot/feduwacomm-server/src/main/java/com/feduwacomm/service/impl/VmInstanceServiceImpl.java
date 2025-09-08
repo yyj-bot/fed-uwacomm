@@ -8,8 +8,9 @@ import com.feduwacomm.dto.VmTokenRefreshDTO;
 import com.feduwacomm.entity.VmInstance;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.VmInstanceService;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.utils.ApiKeyUtil;
 import com.feduwacomm.vo.VmRegisterResponseVO;
 import com.feduwacomm.vo.VmTokenRefreshResponseVO;
 import org.slf4j.Logger;
@@ -48,6 +49,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private VmJwtUtil vmJwtUtil;
+
     @Value("${server.port:8080}")
     private String serverPort;
 
@@ -68,9 +72,10 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             throw new BusinessException("虚拟机已存在");
         }
 
-        // 2. 生成访问令牌和刷新凭证
+        // 2. 生成访问令牌和API Key
         String accessToken = generateAccessToken(registerDTO.getVmId());
-        String secretId = generateSecretId();
+        String rawApiKey = ApiKeyUtil.generateApiKey(); // 明文API Key，只返回一次
+        String hashedApiKey = ApiKeyUtil.encodeApiKey(rawApiKey); // BCrypt哈希后存储
         String sessionId = UUID.randomUUID().toString().replace("-", "");
 
         // 3. 创建虚拟机实例
@@ -86,9 +91,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         vmInstance.setStatus("OFFLINE");
         vmInstance.setConnectionStatus("DISCONNECTED");
         vmInstance.setWsSessionId(sessionId);
-        // JWT令牌不存储在数据库中
-        vmInstance.setSecretId(secretId);
-        vmInstance.setSecretExpireTime(LocalDateTime.now().plusDays(secretExpireDays));
+        // 存储BCrypt哈希后的API Key到secretId字段
+        vmInstance.setSecretId(hashedApiKey);
+        vmInstance.setSecretExpireTime(null); // API Key无期限
         vmInstance.setCreatedAt(LocalDateTime.now());
         vmInstance.setUpdatedAt(LocalDateTime.now());
 
@@ -129,7 +134,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .createdAt(vmInstance.getCreatedAt())
                 .sessionId(sessionId)
                 .accessToken(accessToken) // JWT令牌只返回给客户端，不存储
-                .secretId(secretId)
+                .secretId(rawApiKey) // 返回明文API Key，仅此一次
                 .tokenExpireSeconds(tokenExpireSeconds)
                 .websocket(VmRegisterResponseVO.WebSocketInfo.builder()
                         .sockjs("http://localhost:" + serverPort + "/ws")
@@ -147,44 +152,41 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     public VmTokenRefreshResponseVO refreshToken(VmTokenRefreshDTO refreshDTO) {
         logger.info("开始刷新Token: vmId={}", refreshDTO.getVmId());
 
-        // 1. 验证刷新凭证
-        VmInstance vmInstance = vmInstancesMapper.selectBySecretId(refreshDTO.getSecretId());
-        if (vmInstance == null || !vmInstance.getId().equals(refreshDTO.getVmId())) {
-            logger.warn("无效的刷新凭证: vmId={}", refreshDTO.getVmId());
-            throw new BusinessException("无效的刷新凭证");
+        // 1. 先根据vmId查询虚拟机实例
+        VmInstance vmInstance = vmInstancesMapper.selectByVmId(refreshDTO.getVmId());
+        if (vmInstance == null) {
+            logger.warn("虚拟机不存在: vmId={}", refreshDTO.getVmId());
+            throw new BusinessException("虚拟机不存在");
         }
 
-        // 2. 检查凭证是否过期
-        if (vmInstance.getSecretExpireTime().isBefore(LocalDateTime.now())) {
-            logger.warn("刷新凭证已过期: vmId={}", refreshDTO.getVmId());
-            throw new BusinessException("刷新凭证已过期");
+        // 2. 验证API Key格式
+        if (!ApiKeyUtil.isValidFormat(refreshDTO.getSecretId())) {
+            logger.warn("API Key格式错误: vmId={}", refreshDTO.getVmId());
+            throw new BusinessException("API Key格式错误");
         }
 
-        // 3. 生成新的访问令牌
+        // 3. 验证API Key是否匹配
+        if (vmInstance.getSecretId() == null || !ApiKeyUtil.matches(refreshDTO.getSecretId(), vmInstance.getSecretId())) {
+            logger.warn("API Key验证失败: vmId={}", refreshDTO.getVmId());
+            throw new BusinessException("API Key验证失败");
+        }
+
+        // 4. 检查API Key是否过期（如果设置了过期时间）
+        if (vmInstance.getSecretExpireTime() != null && vmInstance.getSecretExpireTime().isBefore(LocalDateTime.now())) {
+            logger.warn("API Key已过期: vmId={}", refreshDTO.getVmId());
+            throw new BusinessException("API Key已过期");
+        }
+
+        // 5. 生成新的访问令牌
         String newAccessToken = generateAccessToken(refreshDTO.getVmId());
-        LocalDateTime newTokenExpireTime = LocalDateTime.now().plusSeconds(tokenExpireSeconds);
-
-        // 4. 生成新的刷新凭证（凭证旋转）
-        String newSecretId = generateSecretId();
-        LocalDateTime newSecretExpireTime = LocalDateTime.now().plusDays(secretExpireDays);
-
-        // 5. 更新数据库（只更新secretId，不存储JWT）
-        vmInstance.setSecretId(newSecretId);
-        vmInstance.setSecretExpireTime(newSecretExpireTime);
-        vmInstance.setUpdatedAt(LocalDateTime.now());
-
-        int result = vmInstancesMapper.update(vmInstance);
-        if (result <= 0) {
-            logger.error("Token刷新失败: vmId={}", refreshDTO.getVmId());
-            throw new BusinessException("Token刷新失败");
-        }
 
         logger.info("Token刷新成功: vmId={}", refreshDTO.getVmId());
 
+        // 6. 返回新的访问令牌，API Key保持不变
         return VmTokenRefreshResponseVO.builder()
                 .accessToken(newAccessToken)
                 .tokenExpireSeconds(tokenExpireSeconds)
-                .secretId(newSecretId)
+                .secretId(refreshDTO.getSecretId()) // 返回原始API Key，保持不变
                 .build();
     }
 
@@ -245,20 +247,12 @@ public class VmInstanceServiceImpl implements VmInstanceService {
      * @return JWT访问令牌
      */
     private String generateAccessToken(String vmId) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("vmId", vmId);
-        claims.put("type", "vm_access");
-        return JwtUtil.createToken(claims);
+        // 从数据库获取VM信息
+        VmInstance vmInstance = vmInstancesMapper.selectByVmId(vmId);
+        if (vmInstance == null) {
+            throw new BusinessException("VM实例不存在: " + vmId);
+        }
+        return vmJwtUtil.generateAccessToken(vmId, vmInstance.getName(), vmInstance.getStatus());
     }
 
-    /**
-     * 生成刷新凭证
-     *
-     * @return 刷新凭证
-     */
-    private String generateSecretId() {
-        byte[] randomBytes = new byte[32];
-        secureRandom.nextBytes(randomBytes);
-        return "s3cr3t_" + Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-    }
 }

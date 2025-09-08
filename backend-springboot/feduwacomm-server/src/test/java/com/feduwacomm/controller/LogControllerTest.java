@@ -9,7 +9,7 @@ import com.feduwacomm.enums.LogCleanupStrategy;
 import com.feduwacomm.enums.LogExportFormat;
 import com.feduwacomm.enums.LogLevel;
 import com.feduwacomm.enums.LogCategory;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.common.PageResult;
@@ -51,7 +51,7 @@ class LogControllerTest {
     private ObjectMapper objectMapper;
     
     @MockBean
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
     
     @MockBean
     private JwtConfig jwtConfig;
@@ -72,7 +72,7 @@ class LogControllerTest {
         claims.put("role", "RESEARCHER");
         claims.put("type", "access");
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        when(userJwtUtil.validateToken(validToken)).thenReturn(claims);
         
         // Mock BaseContext static method
         baseContextMock = mockStatic(BaseContext.class);

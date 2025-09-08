@@ -1,9 +1,11 @@
 package com.feduwacomm.config;
 
 import com.feduwacomm.interceptor.JwtAuthenticationInterceptor;
+import com.feduwacomm.interceptor.VmJwtAuthenticationInterceptor;
 import com.feduwacomm.interceptor.PermissionInterceptor;
 import com.feduwacomm.interceptor.LoggingInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -23,10 +25,16 @@ public class WebConfig implements WebMvcConfigurer {
     private JwtAuthenticationInterceptor jwtAuthenticationInterceptor;
 
     @Autowired
+    private VmJwtAuthenticationInterceptor vmJwtAuthenticationInterceptor;
+
+    @Autowired
     private PermissionInterceptor permissionInterceptor;
 
     @Autowired
     private LoggingInterceptor loggingInterceptor;
+
+    @Value("${test.interceptors.vm-jwt.enabled:true}")
+    private boolean vmJwtInterceptorEnabled;
 
     /**
      * 配置路径匹配，为API添加前缀
@@ -40,29 +48,42 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册JWT认证拦截器
+        // 注册用户JWT认证拦截器
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**") // 需要认证的路径
+                .addPathPatterns("/api/user/**", "/api/admin/**") // 用户相关接口需要用户JWT认证
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
                         "/api/health", // 健康检查
-                        "/api/websocket/**", // WebSocket接口
                         "/pages/**", // 测试页面
                         "/assets/**", // 静态资源
                         "/error" // 错误页面
                 );
 
+        // 注册VM JWT认证拦截器（在测试环境中可配置为禁用）
+        if (vmJwtInterceptorEnabled) {
+            registry.addInterceptor(vmJwtAuthenticationInterceptor)
+                    .addPathPatterns("/api/vm/**", "/api/federated/**", "/api/training-data/**", "/api/model-version/**") // VM相关接口需要VM JWT认证
+                    .excludePathPatterns(
+                            "/api/vm/register", // VM注册接口
+                            "/api/vm/token/refresh", // Token刷新接口，使用API Key认证
+                            "/api/health", // 健康检查
+                            "/api/websocket/**", // WebSocket接口
+                            "/pages/**", // 测试页面
+                            "/assets/**", // 静态资源
+                            "/error" // 错误页面
+                    );
+        }
+
         // 注册权限拦截器
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**") // 需要权限检查的路径
+                .addPathPatterns("/api/user/**", "/api/admin/**") // 只对用户相关接口进行权限检查
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
                         "/api/user/profile", // 获取个人信息
                         "/api/user/logout", // 登出接口
                         "/api/health", // 健康检查
-                        "/api/websocket/**", // WebSocket接口
                         "/pages/**", // 测试页面
                         "/assets/**", // 静态资源
                         "/error" // 错误页面

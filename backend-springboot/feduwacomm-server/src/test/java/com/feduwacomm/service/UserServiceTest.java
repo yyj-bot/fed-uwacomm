@@ -9,7 +9,7 @@ import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.service.impl.UserServiceImpl;
 import com.feduwacomm.utils.IpUtil;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.utils.PasswordUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
@@ -45,7 +45,7 @@ class UserServiceTest {
     private UserPermissionMapper userPermissionMapper;
 
     @Mock
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
 
     @Mock
     private UuidUtil uuidUtil;
@@ -146,9 +146,8 @@ class UserServiceTest {
         // 准备测试数据
         when(userMapper.selectByUsername(loginDTO.getLoginIdentifier())).thenReturn(testUser);
         when(userMapper.update(any(User.class))).thenReturn(1);
-        when(jwtUtil.generateToken(anyString(), anyString(), anyString())).thenReturn("test_token");
-        when(jwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
-        when(jwtUtil.getTokenExpireTime()).thenReturn(86400L);
+        when(userJwtUtil.generateAccessToken(anyString(), anyString(), anyString())).thenReturn("test_token");
+        when(userJwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
 
         try (MockedStatic<IpUtil> ipUtilMock = mockStatic(IpUtil.class)) {
             ipUtilMock.when(IpUtil::getClientIpAddress).thenReturn("192.168.1.100");
@@ -249,9 +248,8 @@ class UserServiceTest {
 
         when(userMapper.selectByUsername(loginDTO.getLoginIdentifier())).thenReturn(lockedUser);
         when(userMapper.update(any(User.class))).thenReturn(1);
-        when(jwtUtil.generateToken(anyString(), anyString(), anyString())).thenReturn("test_token");
-        when(jwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
-        when(jwtUtil.getTokenExpireTime()).thenReturn(86400L);
+        when(userJwtUtil.generateAccessToken(anyString(), anyString(), anyString())).thenReturn("test_token");
+        when(userJwtUtil.generateRefreshToken(anyString())).thenReturn("test_refresh_token");
 
         try (MockedStatic<IpUtil> ipUtilMock = mockStatic(IpUtil.class)) {
             ipUtilMock.when(IpUtil::getClientIpAddress).thenReturn("192.168.1.100");
@@ -275,13 +273,12 @@ class UserServiceTest {
         claims.put("userId", testUser.getId());
         claims.put("type", "refresh");
 
-        when(jwtUtil.validateToken(refreshToken)).thenReturn(mock(Claims.class));
-        when(jwtUtil.validateToken(refreshToken).get("userId", String.class)).thenReturn(testUser.getId());
-        when(jwtUtil.validateToken(refreshToken).get("type", String.class)).thenReturn("refresh");
+        when(userJwtUtil.validateToken(refreshToken)).thenReturn(mock(Claims.class));
+        when(userJwtUtil.validateToken(refreshToken).get("userId", String.class)).thenReturn(testUser.getId());
+        when(userJwtUtil.validateToken(refreshToken).get("type", String.class)).thenReturn("refresh");
         when(userMapper.selectById(testUser.getId())).thenReturn(testUser);
-        when(jwtUtil.generateToken(anyString(), anyString(), anyString())).thenReturn("new_token");
-        when(jwtUtil.generateRefreshToken(anyString())).thenReturn("new_refresh_token");
-        when(jwtUtil.getTokenExpireTime()).thenReturn(86400L);
+        when(userJwtUtil.generateAccessToken(anyString(), anyString(), anyString())).thenReturn("new_token");
+        when(userJwtUtil.generateRefreshToken(anyString())).thenReturn("new_refresh_token");
 
         // 执行测试
         TokenRefreshResponseVO result = userService.refreshToken(refreshToken);
@@ -297,7 +294,7 @@ class UserServiceTest {
     void testRefreshToken_InvalidToken() {
         // 准备测试数据
         String invalidToken = "invalid_token";
-        when(jwtUtil.validateToken(invalidToken)).thenThrow(new UserException("Invalid token"));
+        when(userJwtUtil.validateToken(invalidToken)).thenThrow(new UserException("Invalid token"));
 
         // 执行测试并验证异常
         UserException exception = assertThrows(UserException.class, () -> {

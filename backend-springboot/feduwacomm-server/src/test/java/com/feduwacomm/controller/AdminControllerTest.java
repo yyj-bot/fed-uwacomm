@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 根据admin-api-reference.md文档实现
  */
 @ExtendWith(MockitoExtension.class)
-class AdminControllerTest {
+public class AdminControllerTest {
 
         @Mock
         private AdminService adminService;
