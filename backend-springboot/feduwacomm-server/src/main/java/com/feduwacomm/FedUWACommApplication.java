@@ -2,6 +2,10 @@ package com.feduwacomm;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
@@ -10,7 +14,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * @author FedUWAComm Team
  * @version 1.0.0
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+    SecurityAutoConfiguration.class,
+    SecurityFilterAutoConfiguration.class,
+    UserDetailsServiceAutoConfiguration.class,
+    ManagementWebSecurityAutoConfiguration.class
+})
 @EnableTransactionManagement
 public class FedUWACommApplication {
 

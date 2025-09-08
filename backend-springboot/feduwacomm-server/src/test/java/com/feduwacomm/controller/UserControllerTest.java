@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.service.UserService;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,7 @@ public class UserControllerTest {
     private UserService userService;
 
     @MockBean
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -85,8 +85,8 @@ public class UserControllerTest {
         refreshClaims.put("userId", "user123");
         refreshClaims.put("type", "refresh");
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(accessClaims);
-        when(jwtUtil.validateToken(refreshToken)).thenReturn(refreshClaims);
+        when(userJwtUtil.validateToken(validToken)).thenReturn(accessClaims);
+        when(userJwtUtil.validateToken(refreshToken)).thenReturn(refreshClaims);
     }
 
     @Test

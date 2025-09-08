@@ -1,5 +1,6 @@
 package com.feduwacomm.utils;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -9,7 +10,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class PasswordUtil {
 
-    private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    private static BCryptPasswordEncoder encoder;
+
+    @Autowired
+    public void setBCryptPasswordEncoder(BCryptPasswordEncoder encoder) {
+        PasswordUtil.encoder = encoder;
+    }
 
     /**
      * 加密密码

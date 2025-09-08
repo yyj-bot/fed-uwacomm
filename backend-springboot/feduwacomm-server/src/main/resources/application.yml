@@ -40,8 +40,13 @@ feduwacomm:
   module:
     name: feduwacomm # 模块名称，用于UUID前缀
 
-# JWT配置
+# JWT配置 - 双套配置（用户JWT和VM JWT）
 jwt:
-  secret: ${JWT_SECRET:feduwacomm_jwt_secret_key_2024_water_acoustic_federated_learning}
-  expiration: ${JWT_EXPIRATION:86400} # 24小时，单位：秒
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800} # 7天，单位：秒
+  user:
+    secret: ${JWT_USER_SECRET:feduwacomm_user_jwt_secret_key_2024_water_acoustic_federated_learning_user_auth}
+    expiration: ${JWT_USER_EXPIRATION:86400} # 用户Token 24小时，单位：秒
+    refresh-expiration: ${JWT_USER_REFRESH_EXPIRATION:2592000} # 用户刷新Token 30天，单位：秒
+  vm:
+    secret: ${JWT_VM_SECRET:feduwacomm_vm_jwt_secret_key_2024_water_acoustic_federated_learning_vm_machine_auth}
+    expiration: ${JWT_VM_EXPIRATION:3600} # VM Token 1小时，单位：秒
+    refresh-expiration: ${JWT_VM_REFRESH_EXPIRATION:86400} # VM刷新Token 24小时，单位：秒

@@ -7,7 +7,7 @@ import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.service.UserService;
 import com.feduwacomm.utils.IpUtil;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.utils.PasswordUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
@@ -34,7 +34,7 @@ public class UserServiceImpl implements UserService {
     private UserMapper userMapper;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
 
     @Autowired
     private UuidUtil uuidUtil;
@@ -186,8 +186,8 @@ public class UserServiceImpl implements UserService {
             userMapper.update(user);
 
             // 生成Token
-            String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
-            String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+            String token = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+            String refreshToken = userJwtUtil.generateRefreshToken(user.getId());
 
             // 构建用户信息
             UserInfoVO userInfo = UserInfoVO.builder()
@@ -214,7 +214,7 @@ public class UserServiceImpl implements UserService {
             return LoginResponseVO.builder()
                     .token(token)
                     .refreshToken(refreshToken)
-                    .expiresIn(jwtUtil.getTokenExpireTime())
+                    .expiresIn(86400L) // 24小时
                     .user(userInfo)
                     .build();
 
@@ -234,7 +234,7 @@ public class UserServiceImpl implements UserService {
         
         try {
             // 验证刷新Token
-            var claims = jwtUtil.validateToken(refreshToken);
+            var claims = userJwtUtil.validateToken(refreshToken);
             String userId = claims.get("userId", String.class);
             String type = claims.get("type", String.class);
 
@@ -251,8 +251,8 @@ public class UserServiceImpl implements UserService {
             }
 
             // 生成新的Token
-            String newToken = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
-            String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
+            String newToken = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+            String newRefreshToken = userJwtUtil.generateRefreshToken(user.getId());
 
             log.info("Token刷新成功: userId={}, username={}, ip={}", 
                 user.getId(), user.getUsername(), clientIp);
@@ -263,7 +263,7 @@ public class UserServiceImpl implements UserService {
             return TokenRefreshResponseVO.builder()
                     .token(newToken)
                     .refreshToken(newRefreshToken)
-                    .expiresIn(jwtUtil.getTokenExpireTime())
+                    .expiresIn(86400L) // 24小时
                     .build();
 
         } catch (Exception e) {
@@ -279,7 +279,7 @@ public class UserServiceImpl implements UserService {
         if (token != null && !token.trim().isEmpty()) {
             try {
                 // 解析Token获取用户信息
-                var claims = jwtUtil.validateToken(token);
+                var claims = userJwtUtil.validateToken(token);
                 String userId = claims.get("userId", String.class);
                 String username = claims.get("username", String.class);
                 

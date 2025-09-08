@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.impl.DefaultClaims;
 import com.feduwacomm.common.BaseContext;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.config.JwtConfig;
 import org.mockito.MockedStatic;
 import org.junit.jupiter.api.AfterEach;
@@ -50,7 +50,7 @@ public class ModelVersionControllerTest {
     private ModelVersionService modelVersionService;
     
     @MockBean
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
     
     @MockBean
     private JwtConfig jwtConfig;
@@ -76,7 +76,7 @@ public class ModelVersionControllerTest {
         claims.put("role", "RESEARCHER");
         claims.put("type", "access");
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        when(userJwtUtil.validateToken(validToken)).thenReturn(claims);
         
         // Mock BaseContext static method
         baseContextMock = mockStatic(BaseContext.class);

@@ -1,6 +1,7 @@
 package com.feduwacomm.config;
 
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
+import com.feduwacomm.utils.VmJwtUtil;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
@@ -29,7 +30,10 @@ import java.util.List;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
+    
+    @Autowired
+    private VmJwtUtil vmJwtUtil;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -53,25 +57,62 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 throw new MessagingException("WebSocket/STOMP认证失败：缺少Token");
             }
 
-            Claims claims;
+            Claims claims = null;
+            String category = null;
+            String username = null;
+            String role = null;
+            
+            // 尝试用用户JWT验证
             try {
-                claims = jwtUtil.validateToken(token);
+                claims = userJwtUtil.validateToken(token);
+                category = claims.get("category", String.class);
+                if ("user".equals(category)) {
+                    String type = claims.get("type", String.class);
+                    if (!"access".equals(type)) {
+                        throw new MessagingException("WebSocket/STOMP认证失败：用户Token类型错误");
+                    }
+                    
+                    String userId = claims.get("userId", String.class);
+                    username = claims.get("username", String.class);
+                    role = claims.get("role", String.class);
+                    
+                    accessor.getSessionAttributes().put("userId", userId);
+                    accessor.getSessionAttributes().put("username", username);
+                    accessor.getSessionAttributes().put("role", role);
+                    accessor.getSessionAttributes().put("category", "user");
+                }
             } catch (Exception ex) {
-                throw new MessagingException("WebSocket/STOMP认证失败：Token无效或已过期");
+                // 用户JWT验证失败，尝试VM JWT验证
+                try {
+                    claims = vmJwtUtil.validateToken(token);
+                    category = claims.get("category", String.class);
+                    if ("vm".equals(category)) {
+                        String type = claims.get("type", String.class);
+                        if (!"access".equals(type)) {
+                            throw new MessagingException("WebSocket/STOMP认证失败：VM Token类型错误");
+                        }
+                        
+                        String vmId = claims.get("vmId", String.class);
+                        String vmName = claims.get("vmName", String.class);
+                        String status = claims.get("status", String.class);
+                        
+                        accessor.getSessionAttributes().put("vmId", vmId);
+                        accessor.getSessionAttributes().put("vmName", vmName);
+                        accessor.getSessionAttributes().put("status", status);
+                        accessor.getSessionAttributes().put("category", "vm");
+                        
+                        // 为VM设置默认用户信息
+                        username = vmName != null ? vmName : vmId;
+                        role = "VM";
+                    }
+                } catch (Exception vmEx) {
+                    throw new MessagingException("WebSocket/STOMP认证失败：Token无效或已过期");
+                }
             }
-
-            String type = claims.get("type", String.class);
-            if (!"access".equals(type)) {
-                throw new MessagingException("WebSocket/STOMP认证失败：Token类型错误");
+            
+            if (claims == null) {
+                throw new MessagingException("WebSocket/STOMP认证失败：Token验证失败");
             }
-
-            String userId = claims.get("userId", String.class);
-            String username = claims.get("username", String.class);
-            String role = claims.get("role", String.class);
-
-            accessor.getSessionAttributes().put("userId", userId);
-            accessor.getSessionAttributes().put("username", username);
-            accessor.getSessionAttributes().put("role", role);
 
             // 设置 Principal 以支持点对点消息
             List<SimpleGrantedAuthority> authorities = new ArrayList<>();

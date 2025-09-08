@@ -2,7 +2,7 @@ package com.feduwacomm.interceptor;
 
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.exception.UserException;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +14,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * JWT认证拦截器
- * 用于验证JWT Token并设置用户上下文信息
+ * 用户JWT认证拦截器
+ * 用于验证用户JWT Token并设置用户上下文信息
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -26,7 +26,7 @@ public class JwtAuthenticationInterceptor implements HandlerInterceptor {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationInterceptor.class);
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -49,7 +49,7 @@ public class JwtAuthenticationInterceptor implements HandlerInterceptor {
 
         try {
             // 验证Token
-            var claims = jwtUtil.validateToken(token);
+            var claims = userJwtUtil.validateToken(token);
 
             // 从Token中提取用户信息
             String userId = claims.get("userId", String.class);

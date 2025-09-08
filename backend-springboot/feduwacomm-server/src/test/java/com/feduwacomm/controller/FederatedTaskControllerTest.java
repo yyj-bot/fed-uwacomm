@@ -3,7 +3,7 @@ package com.feduwacomm.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.FederatedTaskService;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +36,7 @@ import org.mockito.MockedStatic;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.test.context.ActiveProfiles("test")
 public class FederatedTaskControllerTest {
 
     @Autowired
@@ -45,7 +46,7 @@ public class FederatedTaskControllerTest {
     private FederatedTaskService federatedTaskService;
     
     @MockBean
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
     
     @MockBean
     private JwtConfig jwtConfig;
@@ -75,7 +76,7 @@ public class FederatedTaskControllerTest {
         claims.put("role", "RESEARCHER");
         claims.put("type", "access");
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        when(userJwtUtil.validateToken(validToken)).thenReturn(claims);
         
         // Mock BaseContext static method
         baseContextMock = mockStatic(BaseContext.class);
@@ -407,7 +408,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.getTaskDetail(eq("task123")))
             .thenReturn(taskDetailVO);
 
-        mockMvc.perform(get("/api/federated/tasks/task123"))
+        mockMvc.perform(get("/api/federated/tasks/task123")
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("查询成功"))
@@ -424,9 +426,10 @@ public class FederatedTaskControllerTest {
             .thenReturn(taskListVO);
 
         mockMvc.perform(get("/api/federated/tasks")
-                .param("page", "1")
-                .param("size", "20")
-                .param("status", "RUNNING"))
+                        .header("Authorization", "Bearer " + validToken)
+                        .param("page", "1")
+                        .param("size", "20")
+                        .param("status", "RUNNING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("查询成功"))
@@ -440,7 +443,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.getTaskResult(eq("task123")))
             .thenReturn(taskResultVO);
 
-        mockMvc.perform(get("/api/federated/tasks/task123/results"))
+        mockMvc.perform(get("/api/federated/tasks/task123/results")
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("查询成功"))
@@ -455,9 +459,10 @@ public class FederatedTaskControllerTest {
             .thenReturn(taskLogVO);
 
         mockMvc.perform(get("/api/federated/tasks/task123/logs")
-                .param("page", "1")
-                .param("size", "10")
-                .param("level", "INFO"))
+                        .header("Authorization", "Bearer " + validToken)
+                        .param("page", "1")
+                        .param("size", "10")
+                        .param("level", "INFO"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("查询成功"))
@@ -499,7 +504,8 @@ public class FederatedTaskControllerTest {
         when(federatedTaskService.getTaskDetail(eq("nonexistent")))
             .thenThrow(new RuntimeException("任务不存在"));
 
-        mockMvc.perform(get("/api/federated/tasks/nonexistent"))
+        mockMvc.perform(get("/api/federated/tasks/nonexistent")
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").value("查询失败: 任务不存在"));

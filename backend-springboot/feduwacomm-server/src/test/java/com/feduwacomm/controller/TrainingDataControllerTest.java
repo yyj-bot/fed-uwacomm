@@ -3,7 +3,7 @@ package com.feduwacomm.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.TrainingDataService;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.AfterEach;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 public class TrainingDataControllerTest {
 
     @Autowired
@@ -47,7 +49,7 @@ public class TrainingDataControllerTest {
     private TrainingDataService trainingDataService;
     
     @MockBean
-    private JwtUtil jwtUtil;
+    private UserJwtUtil userJwtUtil;
     
     @MockBean
     private JwtConfig jwtConfig;
@@ -74,7 +76,7 @@ public class TrainingDataControllerTest {
         claims.put("role", "RESEARCHER");
         claims.put("type", "access");
         
-        when(jwtUtil.validateToken(validToken)).thenReturn(claims);
+        when(userJwtUtil.validateToken(validToken)).thenReturn(claims);
         
         // Mock BaseContext static method
         baseContextMock = mockStatic(BaseContext.class);
@@ -234,6 +236,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(get("/api/training-data")
+                        .header("Authorization", "Bearer " + validToken)
                         .param("page", "1")
                         .param("size", "20")
                         .param("vmId", "a1b2c3d4e5f678901234567890123456")
@@ -264,7 +267,8 @@ public class TrainingDataControllerTest {
         when(trainingDataService.getDataDetail(datasetId))
                 .thenReturn(expectedResponse);
 
-        mockMvc.perform(get("/api/training-data/{datasetId}", datasetId))
+        mockMvc.perform(get("/api/training-data/{datasetId}", datasetId)
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.datasetId").value(datasetId))
@@ -278,7 +282,8 @@ public class TrainingDataControllerTest {
         when(trainingDataService.getDataDetail(datasetId))
                 .thenThrow(new RuntimeException("数据不存在"));
 
-        mockMvc.perform(get("/api/training-data/{datasetId}", datasetId))
+        mockMvc.perform(get("/api/training-data/{datasetId}", datasetId)
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500));
     }
@@ -291,7 +296,8 @@ public class TrainingDataControllerTest {
         when(trainingDataService.downloadData(datasetId))
                 .thenReturn(fileData);
 
-        mockMvc.perform(get("/api/training-data/{datasetId}/download", datasetId))
+        mockMvc.perform(get("/api/training-data/{datasetId}/download", datasetId)
+                        .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"" + datasetId + ".data\""))
                 .andExpect(content().bytes(fileData));
@@ -313,6 +319,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post("/api/training-data/{datasetId}/preprocess", datasetId)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(preprocessDTO)))
                 .andExpect(status().isOk())
@@ -341,6 +348,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post("/api/training-data/{datasetId}/validate", datasetId)
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validateDTO)))
                 .andExpect(status().isOk())
@@ -444,6 +452,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post("/api/training-data/batch")
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(batchDTO)))
                 .andExpect(status().isOk())
@@ -474,6 +483,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(get("/api/training-data/statistics")
+                        .header("Authorization", "Bearer " + validToken)
                         .param("vmId", "vm1")
                         .param("dataType", "ACOUSTIC"))
                 .andExpect(status().isOk())
@@ -507,6 +517,7 @@ public class TrainingDataControllerTest {
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post("/api/training-data/export")
+                        .header("Authorization", "Bearer " + validToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(exportDTO)))
                 .andExpect(status().isOk())

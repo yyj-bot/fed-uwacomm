@@ -7,8 +7,9 @@ import com.feduwacomm.dto.VmTokenRefreshDTO;
 import com.feduwacomm.entity.VmInstance;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.impl.VmInstanceServiceImpl;
-import com.feduwacomm.utils.JwtUtil;
+import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.utils.ApiKeyUtil;
 import com.feduwacomm.vo.VmRegisterResponseVO;
 import com.feduwacomm.vo.VmTokenRefreshResponseVO;
 import io.jsonwebtoken.Claims;
@@ -42,6 +43,12 @@ public class VmInstanceServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private VmJwtUtil vmJwtUtil;
+
+    @Mock
+    private ApiKeyUtil apiKeyUtil;
+
     @InjectMocks
     private VmInstanceServiceImpl vmInstanceService;
 
@@ -52,7 +59,7 @@ public class VmInstanceServiceTest {
     @BeforeEach
     void setUp() {
         // 重置mock对象
-        reset(vmInstancesMapper, objectMapper);
+        reset(vmInstancesMapper, objectMapper, vmJwtUtil, apiKeyUtil);
         
         // 设置服务器端口和令牌过期时间
         ReflectionTestUtils.setField(vmInstanceService, "serverPort", "8080");
@@ -88,7 +95,7 @@ public class VmInstanceServiceTest {
         // 准备令牌刷新DTO
         refreshDTO = new VmTokenRefreshDTO();
         refreshDTO.setVmId("a1b2c3d4e5f678901234567890123456");
-        refreshDTO.setSecretId("refresh-token-123");
+        refreshDTO.setSecretId("fua_testRefreshApiKey123456789"); // 明文API Key
 
         // 准备虚拟机实例Entity
         vmInstance = new VmInstance();
@@ -102,6 +109,7 @@ public class VmInstanceServiceTest {
         vmInstance.setDiskGb(100);
         vmInstance.setStatus("ACTIVE");
         vmInstance.setConnectionStatus("CONNECTED");
+        vmInstance.setSecretId("$2a$10$hashedRefreshToken"); // BCrypt哈希后的API Key
         vmInstance.setCreatedAt(LocalDateTime.now());
         vmInstance.setUpdatedAt(LocalDateTime.now());
         vmInstance.setSecretExpireTime(LocalDateTime.now().plusDays(7));
@@ -114,17 +122,22 @@ public class VmInstanceServiceTest {
     void testRegister_Success() {
         // 准备mock数据
         when(vmInstancesMapper.existsByVmId(anyString())).thenReturn(0);
+        when(vmInstancesMapper.selectByVmId(anyString())).thenReturn(vmInstance);
         when(vmInstancesMapper.insert(any(VmInstance.class))).thenReturn(1);
 
         try (MockedStatic<UuidUtil> uuidUtilMock = mockStatic(UuidUtil.class);
-             MockedStatic<JwtUtil> jwtUtilMock = mockStatic(JwtUtil.class)) {
+             MockedStatic<ApiKeyUtil> apiKeyUtilMock = mockStatic(ApiKeyUtil.class)) {
             
             String sessionId = "session-001";
-            String accessToken = "access-token-123";
+            String accessToken = "vm-access-token-123";
+            String apiKey = "fua_testApiKey123456789";
+            String encodedApiKey = "$2a$10$encodedHashedApiKey";
             
             uuidUtilMock.when(() -> UuidUtil.generateShortUuid()).thenReturn(sessionId);
-            jwtUtilMock.when(() -> JwtUtil.createToken(anyMap()))
+            when(vmJwtUtil.generateAccessToken(anyString(), anyString(), anyString()))
                     .thenReturn(accessToken);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.generateApiKey()).thenReturn(apiKey);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.encodeApiKey(anyString())).thenReturn(encodedApiKey);
 
             // 执行测试
             VmRegisterResponseVO response = vmInstanceService.register(registerDTO);
@@ -168,20 +181,24 @@ public class VmInstanceServiceTest {
     }
 
     /**
-     * 测试令牌刷新 - 成功场景
+     * 测试令牌刷新 - 成功场景（使用API Key认证）
      */
     @Test
     void testRefreshToken_Success() {
         // 准备mock数据
-        when(vmInstancesMapper.selectBySecretId(anyString())).thenReturn(vmInstance);
-        when(vmInstancesMapper.update(any(VmInstance.class))).thenReturn(1);
+        when(vmInstancesMapper.selectByVmId(anyString())).thenReturn(vmInstance);
 
-        try (MockedStatic<JwtUtil> jwtUtilMock = mockStatic(JwtUtil.class)) {
-            String newAccessToken = "new-access-token-456";
-            String newRefreshToken = "new-refresh-token-456";
+        try (MockedStatic<ApiKeyUtil> apiKeyUtilMock = mockStatic(ApiKeyUtil.class)) {
+            String newAccessToken = "new-vm-access-token-456";
+            String newApiKey = "fua_newApiKey987654321";
+            String encodedApiKey = "$2a$10$newEncodedHashedApiKey";
             
-            jwtUtilMock.when(() -> JwtUtil.createToken(anyMap()))
-                    .thenReturn(newAccessToken, newRefreshToken);
+            when(vmJwtUtil.generateAccessToken(anyString(), anyString(), anyString()))
+                    .thenReturn(newAccessToken);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.generateApiKey()).thenReturn(newApiKey);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.encodeApiKey(anyString())).thenReturn(encodedApiKey);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.isValidFormat(anyString())).thenReturn(true);
+            apiKeyUtilMock.when(() -> ApiKeyUtil.matches(anyString(), anyString())).thenReturn(true);
 
             // 执行测试
             VmTokenRefreshResponseVO response = vmInstanceService.refreshToken(refreshDTO);
@@ -189,12 +206,11 @@ public class VmInstanceServiceTest {
             // 验证结果
             assertNotNull(response);
             assertEquals(newAccessToken, response.getAccessToken());
-            assertNotNull(response.getSecretId()); // secretId由generateSecretId()生成，不依赖Mock
-            assertTrue(response.getSecretId().startsWith("s3cr3t_"));
+            assertEquals(refreshDTO.getSecretId(), response.getSecretId()); // API Key保持原样返回
             assertNotNull(response.getTokenExpireSeconds());
 
-            // 验证mock调用
-            verify(vmInstancesMapper).selectBySecretId(refreshDTO.getSecretId());
+            // 验证mock调用 (refreshToken中1次，generateAccessToken中1次，共2次)
+            verify(vmInstancesMapper, times(2)).selectByVmId(refreshDTO.getVmId());
         }
     }
 
@@ -203,17 +219,17 @@ public class VmInstanceServiceTest {
      */
     @Test
     void testRefreshToken_VmNotFound() {
-        // 准备mock数据 - 无效的刷新凭证
-        when(vmInstancesMapper.selectBySecretId(anyString())).thenReturn(null);
+        // 准备mock数据 - 虚拟机不存在
+        when(vmInstancesMapper.selectByVmId(anyString())).thenReturn(null);
 
         // 执行测试并验证异常
         BusinessException exception = assertThrows(BusinessException.class, 
             () -> vmInstanceService.refreshToken(refreshDTO));
         
-        assertEquals("无效的刷新凭证", exception.getMessage());
+        assertEquals("虚拟机不存在", exception.getMessage());
         
         // 验证mock调用
-        verify(vmInstancesMapper).selectBySecretId(refreshDTO.getSecretId());
+        verify(vmInstancesMapper).selectByVmId(refreshDTO.getVmId());
     }
 
     /**
