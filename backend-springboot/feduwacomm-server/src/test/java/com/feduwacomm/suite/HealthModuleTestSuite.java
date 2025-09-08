@@ -2,7 +2,6 @@ package com.feduwacomm.suite;
 
 import com.feduwacomm.controller.HealthControllerTest;
 import com.feduwacomm.service.DatabaseHealthServiceTest;
-import com.feduwacomm.service.DatabaseInitServiceTest;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
@@ -13,8 +12,7 @@ import org.junit.platform.suite.api.Suite;
 @Suite
 @SelectClasses({
     HealthControllerTest.class,
-    DatabaseHealthServiceTest.class,
-    DatabaseInitServiceTest.class
+    DatabaseHealthServiceTest.class
 })
 public class HealthModuleTestSuite {
     // 测试套件类，无需实现方法

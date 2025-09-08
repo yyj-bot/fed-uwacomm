@@ -286,12 +286,6 @@ public class TrainingDataServiceTest {
         // when(trainingDatasetMapper.updateValidationResult(eq(datasetId), anyBoolean(), anyString()))
         //         .thenReturn(1);
         
-        // Mock ObjectMapper.writeValueAsString
-        try {
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"isValid\":true,\"validationTime\":\"2024-01-01T10:00:00\"}");
-        } catch (Exception e) {
-            // ignore
-        }
 
         // 执行测试
         TrainingDataValidateVO result = trainingDataService.validateData(datasetId, validateDTO);

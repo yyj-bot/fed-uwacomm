@@ -1,6 +1,5 @@
 package com.feduwacomm.config;
 
-import com.feduwacomm.service.DatabaseInitService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,8 +32,6 @@ public class DatabaseHealthCheckConfig implements CommandLineRunner {
     @Autowired
     private Environment environment;
 
-    @Autowired
-    private DatabaseInitService databaseInitService;
 
     @Override
     public void run(String... args) throws Exception {
@@ -47,12 +44,8 @@ public class DatabaseHealthCheckConfig implements CommandLineRunner {
             // 检查数据库版本和基本信息
             checkDatabaseInfo();
             
-            // 检查并初始化必要的表
-            log.info("开始检查数据库表结构...");
-            databaseInitService.checkAndInitDatabase();
-            
-            // 检查表数据
-            databaseInitService.checkTableData();
+            // 数据库连接正常
+            log.info("数据库连接正常");
             
             log.info("✅ 数据库连接检查成功！");
             

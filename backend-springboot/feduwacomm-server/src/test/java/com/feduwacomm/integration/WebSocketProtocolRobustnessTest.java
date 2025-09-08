@@ -256,7 +256,7 @@ public class WebSocketProtocolRobustnessTest {
         metrics.put("valLoss", 0.18);
         data.put("metrics", metrics);
         
-        data.put("status", "TRAINING");
+        data.put("status", "RUNNING");
 
         ProtocolMessage msg = buildMessage(ProtocolType.TRAINING_PROGRESS, TEST_VM_ID, data);
         ProtocolAck ack = protocolService.handle(msg);
@@ -467,7 +467,7 @@ public class WebSocketProtocolRobustnessTest {
         Map<String, Object> data = new HashMap<>();
         data.put("datasetId", specialDatasetId);
         data.put("datasetDescription", "包含特殊字符：\n\t\"'<>&");
-        data.put("datasetType", "TEST");
+        data.put("datasetType", "OTHER");
         
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("emoji", "🚀💻🔧");
@@ -499,7 +499,7 @@ public class WebSocketProtocolRobustnessTest {
         Map<String, Object> data = new HashMap<>();
         data.put("datasetId", TEST_DATASET_ID);
         data.put("datasetDescription", "测试数据集");
-        data.put("datasetType", "TEST");
+        data.put("datasetType", "OTHER");
         
         ProtocolMessage msg = buildMessage(ProtocolType.DATASET_CREATE, TEST_VM_ID, data);
         protocolService.handle(msg);
