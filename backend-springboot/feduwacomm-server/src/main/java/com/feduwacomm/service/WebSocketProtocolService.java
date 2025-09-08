@@ -11,6 +11,7 @@ import com.feduwacomm.mapper.VmRoundModelsMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class WebSocketProtocolService {
 
     private final SimpMessagingTemplate messagingTemplate;

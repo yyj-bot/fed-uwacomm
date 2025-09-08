@@ -5,7 +5,7 @@
     <!-- Result mapping -->
     <resultMap id="TaskResultMap" type="com.feduwacomm.entity.FederatedTask">
         <id property="id" column="id"/>
-        <result property="taskName" column="task_name"/>
+        <result property="taskName" column="name"/>
         <result property="taskType" column="task_type"/>
         <result property="description" column="description"/>
         <result property="algorithm" column="algorithm"/>
@@ -74,64 +74,30 @@
     <!-- Task CRUD operations -->
     <insert id="insertTask" parameterType="com.feduwacomm.entity.FederatedTask">
         INSERT INTO federated_tasks (
-            id, task_name, task_type, description, algorithm, status,
-            learning_rate, batch_size, epochs, total_rounds, current_round, min_participants,
-            model_type, feature_columns, target_column, test_size, random_state,
-            start_time, end_time, timeout, encryption, differential_privacy, epsilon, delta, secure_aggregation,
-            created_at, updated_at, started_at, paused_at, resumed_at, stopped_at, completed_at, cancelled_at,
-            created_by, updated_by, participant_count, progress, estimated_duration,
-            config, final_results, model_info
+            id, name, algorithm, status, total_rounds, current_round, 
+            batch_size, learning_rate, mu, created_at, updated_at, 
+            started_at, completed_at, config
         ) VALUES (
-            #{id}, #{taskName}, #{taskType}, #{description}, #{algorithm}, #{status},
-            #{learningRate}, #{batchSize}, #{epochs}, #{totalRounds}, #{currentRound}, #{minParticipants},
-            #{modelType}, #{featureColumns}, #{targetColumn}, #{testSize}, #{randomState},
-            #{startTime}, #{endTime}, #{timeout}, #{encryption}, #{differentialPrivacy}, #{epsilon}, #{delta}, #{secureAggregation},
-            #{createdAt}, #{updatedAt}, #{startedAt}, #{pausedAt}, #{resumedAt}, #{stoppedAt}, #{completedAt}, #{cancelledAt},
-            #{createdBy}, #{updatedBy}, #{participantCount}, #{progress}, #{estimatedDuration},
-            CAST(#{config} AS JSON), CAST(#{finalResults} AS JSON), CAST(#{modelInfo} AS JSON)
+            #{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound},
+            #{batchSize}, #{learningRate}, #{learningRate}, #{createdAt}, #{updatedAt},
+            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON)
         )
     </insert>
 
     <update id="updateTask" parameterType="com.feduwacomm.entity.FederatedTask">
         UPDATE federated_tasks SET
-            task_name = #{taskName},
-            task_type = #{taskType},
-            description = #{description},
+            name = #{taskName},
             algorithm = #{algorithm},
             status = #{status},
             learning_rate = #{learningRate},
             batch_size = #{batchSize},
-            epochs = #{epochs},
             total_rounds = #{totalRounds},
             current_round = #{currentRound},
-            min_participants = #{minParticipants},
-            model_type = #{modelType},
-            feature_columns = #{featureColumns},
-            target_column = #{targetColumn},
-            test_size = #{testSize},
-            random_state = #{randomState},
-            start_time = #{startTime},
-            end_time = #{endTime},
-            timeout = #{timeout},
-            encryption = #{encryption},
-            differential_privacy = #{differentialPrivacy},
-            epsilon = #{epsilon},
-            delta = #{delta},
-            secure_aggregation = #{secureAggregation},
+            mu = #{learningRate},
             updated_at = #{updatedAt},
             started_at = #{startedAt},
-            paused_at = #{pausedAt},
-            resumed_at = #{resumedAt},
-            stopped_at = #{stoppedAt},
             completed_at = #{completedAt},
-            cancelled_at = #{cancelledAt},
-            updated_by = #{updatedBy},
-            participant_count = #{participantCount},
-            progress = #{progress},
-            estimated_duration = #{estimatedDuration},
-            config = CAST(#{config} AS JSON),
-            final_results = CAST(#{finalResults} AS JSON),
-            model_info = CAST(#{modelInfo} AS JSON)
+            config = CAST(#{config} AS JSON)
         WHERE id = #{id}
     </update>
 
@@ -190,8 +156,7 @@
                 AND created_at &lt;= #{endDate}
             </if>
             <if test="keyword != null and keyword != ''">
-                AND (task_name LIKE CONCAT('%', #{keyword}, '%') 
-                     OR description LIKE CONCAT('%', #{keyword}, '%'))
+                AND name LIKE CONCAT('%', #{keyword}, '%')
             </if>
             <if test="createdBy != null and createdBy != ''">
                 AND created_by = #{createdBy}
@@ -220,8 +185,7 @@
                 AND created_at &lt;= #{endDate}
             </if>
             <if test="keyword != null and keyword != ''">
-                AND (task_name LIKE CONCAT('%', #{keyword}, '%') 
-                     OR description LIKE CONCAT('%', #{keyword}, '%'))
+                AND name LIKE CONCAT('%', #{keyword}, '%')
             </if>
             <if test="createdBy != null and createdBy != ''">
                 AND created_by = #{createdBy}
@@ -303,10 +267,10 @@
 
     <!-- Legacy compatibility methods -->
     <insert id="upsertTask">
-        INSERT INTO federated_tasks (id, task_name, algorithm, status, total_rounds, current_round, config)
-        VALUES (#{id}, #{name}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
+        INSERT INTO federated_tasks (id, name, algorithm, status, total_rounds, current_round, config)
+        VALUES (#{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound}, CAST(#{config} AS JSON))
         ON DUPLICATE KEY UPDATE
-            task_name = VALUES(task_name),
+            name = VALUES(name),
             algorithm = VALUES(algorithm),
             status = VALUES(status),
             total_rounds = VALUES(total_rounds),
@@ -327,7 +291,7 @@
     </update>
 
     <select id="selectById" resultType="map">
-        SELECT id, task_name as name, algorithm, status, total_rounds, current_round, config, created_at, updated_at
+        SELECT id, name as taskName, algorithm, status, total_rounds, current_round, config, created_at, updated_at
         FROM federated_tasks WHERE id = #{id}
     </select>
 

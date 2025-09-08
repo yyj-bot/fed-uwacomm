@@ -282,8 +282,9 @@ public class TrainingDataServiceTest {
 
         when(trainingDatasetMapper.selectByIdEntity(datasetId))
                 .thenReturn(sampleTrainingData);
-        when(trainingDatasetMapper.updateValidationResult(eq(datasetId), anyBoolean(), anyString()))
-                .thenReturn(1);
+        // 注释：updateValidationResult 方法已删除
+        // when(trainingDatasetMapper.updateValidationResult(eq(datasetId), anyBoolean(), anyString()))
+        //         .thenReturn(1);
         
         // Mock ObjectMapper.writeValueAsString
         try {
@@ -306,7 +307,8 @@ public class TrainingDataServiceTest {
 
         // 验证调用
         verify(trainingDatasetMapper, times(1)).selectByIdEntity(datasetId);
-        verify(trainingDatasetMapper, times(1)).updateValidationResult(eq(datasetId), anyBoolean(), anyString());
+        // 注释：updateValidationResult 方法已删除
+        // verify(trainingDatasetMapper, times(1)).updateValidationResult(eq(datasetId), anyBoolean(), anyString());
     }
 
     @Test

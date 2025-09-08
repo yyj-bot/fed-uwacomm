@@ -14,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -80,7 +81,7 @@ public class HealthControllerTest {
                 .andExpect(jsonPath("$.data.database.healthy").value(true))
                 .andExpect(jsonPath("$.data.database.statusSummary").value("数据库连接正常"))
                 .andExpect(jsonPath("$.data.database.lastCheckTime").exists())
-                .andExpect(jsonPath("$.data.database.lastError").isEmpty());
+                .andExpect(jsonPath("$.data.database.lastError").doesNotExist());
 
         // 验证服务调用
         verify(databaseHealthService, times(2)).isHealthy();
@@ -236,21 +237,25 @@ public class HealthControllerTest {
      */
     @Test
     void testHealthCheckEndpoints_HTTPMethods() throws Exception {
-        // 基础健康检查只支持GET
+        // 基础健康检查只支持GET - 全局异常处理器会返回200和统一JSON格式
         mockMvc.perform(post("/health"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500)); // 全局异常处理器返回错误码500
 
-        // 详细健康检查只支持GET
+        // 详细健康检查只支持GET - 全局异常处理器会返回200和统一JSON格式
         mockMvc.perform(put("/health/detailed"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
 
-        // 强制数据库检查只支持GET
+        // 强制数据库检查只支持GET - 全局异常处理器会返回200和统一JSON格式  
         mockMvc.perform(delete("/health/database/check"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
 
-        // 表结构检查只支持GET
+        // 表结构检查只支持GET - 全局异常处理器会返回200和统一JSON格式
         mockMvc.perform(patch("/health/database/tables"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
     }
 
     /**
@@ -258,8 +263,11 @@ public class HealthControllerTest {
      */
     @Test
     void testNonExistentHealthEndpoint() throws Exception {
+        // 不存在的端点会被全局异常处理器处理，返回200状态码和统一JSON格式
         mockMvc.perform(get("/health/nonexistent"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     /**

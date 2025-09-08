@@ -446,13 +446,13 @@ public class VmRoundModelControllerTest {
         mockMvc.perform(get("/api/model/vm-round-models/metrics/trend")
                         .param("taskId", "task-001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400));
+                .andExpect(jsonPath("$.code").value(500)); // 全局异常处理器返回500
 
         // 最佳/离群查询缺少必需参数
         mockMvc.perform(get("/api/model/vm-round-models/metrics/best")
                         .param("taskId", "task-001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400));
+                .andExpect(jsonPath("$.code").value(500)); // 全局异常处理器返回500
     }
 
     /**

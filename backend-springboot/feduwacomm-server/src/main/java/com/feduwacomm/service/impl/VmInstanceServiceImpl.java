@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -35,6 +36,7 @@ import io.jsonwebtoken.security.Keys;
  * @version 1.0.0
  */
 @Service
+@Transactional
 public class VmInstanceServiceImpl implements VmInstanceService {
 
     private static final Logger logger = LoggerFactory.getLogger(VmInstanceServiceImpl.class);
@@ -187,6 +189,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public String validateAccessToken(String accessToken) {
         try {
             // JWT令牌验证（自包含，不需要数据库查询）

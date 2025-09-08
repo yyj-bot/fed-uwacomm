@@ -10,7 +10,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.Instant;
 import java.util.*;
@@ -22,10 +22,14 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * WebSocket协议健壮性测试
  * 根据WebSocket协议文档-中心化实现 进行全面测试
+ * 
+ * 注意：该测试类不使用@Transactional，因为需要测试跳过事务的情况
+ * 使用@DirtiesContext确保每个测试方法后清理上下文
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class WebSocketProtocolRobustnessTest {
 
     @Autowired
@@ -106,7 +110,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(3)
     @DisplayName("测试数据集创建")
-    @Transactional
     void testDatasetCreate() {
         Map<String, Object> data = new HashMap<>();
         data.put("datasetId", TEST_DATASET_ID);
@@ -129,7 +132,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(4)
     @DisplayName("测试数据集追加行")
-    @Transactional
     void testDatasetAppendRows() {
         // 先创建数据集
         createTestDataset();
@@ -163,7 +165,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(5)
     @DisplayName("测试数据集批量追加压力测试")
-    @Transactional
     void testDatasetBatchAppendStress() throws InterruptedException, ExecutionException {
         createTestDataset();
 
@@ -213,7 +214,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(6)
     @DisplayName("测试训练启动")
-    @Transactional
     void testTrainingStart() {
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", TEST_TASK_ID);
@@ -237,7 +237,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(7)
     @DisplayName("测试训练进度报告")
-    @Transactional
     void testTrainingProgress() {
         // 先启动训练
         startTestTraining();
@@ -269,7 +268,6 @@ public class WebSocketProtocolRobustnessTest {
     @Test
     @Order(8)
     @DisplayName("测试模型上传")
-    @Transactional
     void testModelUpload() {
         startTestTraining();
 

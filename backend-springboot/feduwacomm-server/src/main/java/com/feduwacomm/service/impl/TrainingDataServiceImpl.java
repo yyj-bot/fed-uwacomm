@@ -298,12 +298,14 @@ public class TrainingDataServiceImpl implements TrainingDataService {
         validationResult.put("isValid", isValid);
         validationResult.put("validationTime", LocalDateTime.now());
         
-        try {
-            trainingDatasetMapper.updateValidationResult(datasetId, isValid, 
-                    objectMapper.writeValueAsString(validationResult));
-        } catch (Exception e) {
-            log.error("更新验证结果失败: {}", e.getMessage(), e);
-        }
+        // 注释：数据库表中没有validation相关字段，暂时移除此功能
+        // try {
+        //     trainingDatasetMapper.updateValidationResult(datasetId, isValid, 
+        //             objectMapper.writeValueAsString(validationResult));
+        // } catch (Exception e) {
+        //     log.error("更新验证结果失败: {}", e.getMessage(), e);
+        // }
+        log.info("数据验证结果: {}", validationResult);
         
         // 构建验证结果
         TrainingDataValidateVO.ValidationResults results = TrainingDataValidateVO.ValidationResults.builder()
@@ -539,7 +541,9 @@ public class TrainingDataServiceImpl implements TrainingDataService {
             // 模拟处理过程
             for (int i = 0; i <= 100; i += 10) {
                 Thread.sleep(1000);
-                trainingDatasetMapper.updateProgress(datasetId, i);
+                // 注释：数据库表中没有progress字段，暂时移除此功能
+                // trainingDatasetMapper.updateProgress(datasetId, i);
+                log.debug("处理进度: {}%", i);
             }
             trainingDatasetMapper.updateStatus(datasetId, "READY");
         } catch (Exception e) {
@@ -558,8 +562,10 @@ public class TrainingDataServiceImpl implements TrainingDataService {
             processResult.put("taskId", taskId);
             processResult.put("completedAt", LocalDateTime.now());
             
-            trainingDatasetMapper.updateProcessResult(datasetId, true, 
-                    new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(processResult));
+            // 注释：数据库表中没有process相关字段，暂时移除此功能
+            // trainingDatasetMapper.updateProcessResult(datasetId, true, 
+            //         new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(processResult));
+            log.info("预处理完成，结果: {}", processResult);
             trainingDatasetMapper.updateStatus(datasetId, "READY");
             
         } catch (Exception e) {

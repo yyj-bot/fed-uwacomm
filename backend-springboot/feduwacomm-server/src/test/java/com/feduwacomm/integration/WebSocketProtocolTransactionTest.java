@@ -6,10 +6,13 @@ import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
 import com.feduwacomm.service.WebSocketProtocolService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -21,6 +24,8 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class WebSocketProtocolTransactionTest {
 
     @Autowired
@@ -43,7 +48,7 @@ class WebSocketProtocolTransactionTest {
         Map<String, Object> createData = new HashMap<>();
         createData.put("datasetId", datasetId);
         createData.put("datasetDescription", "tx dataset");
-        createData.put("datasetType", "JSON");
+        createData.put("datasetType", "OTHER");
         ProtocolMessage createMsg = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_CREATE)
                 .id("m1")

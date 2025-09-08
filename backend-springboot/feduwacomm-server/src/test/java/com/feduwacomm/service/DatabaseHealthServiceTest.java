@@ -60,9 +60,16 @@ public class DatabaseHealthServiceTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getInt(1)).thenReturn(1);
         
-        // Mock表存在检查
-        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        // Mock表存在检查 - 为具体的SQL设置Mock
+        PreparedStatement tableStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("information_schema.tables"))).thenReturn(tableStmt);
         when(connection.getCatalog()).thenReturn("feduwacomm");
+        
+        // Mock表检查查询结果
+        ResultSet tableRs = mock(ResultSet.class);
+        when(tableStmt.executeQuery()).thenReturn(tableRs);
+        when(tableRs.next()).thenReturn(true);
+        when(tableRs.getInt(1)).thenReturn(1); // 表存在
 
         // 执行测试
         boolean result = databaseHealthService.checkHealth();
@@ -75,8 +82,8 @@ public class DatabaseHealthServiceTest {
         assertTrue(databaseHealthService.getStatusSummary().contains("健康"));
 
         // 验证mock调用
-        verify(dataSource).getConnection();
-        verify(connection).isValid(5);
+        verify(dataSource, times(3)).getConnection(); // testConnection + testSimpleQuery + testTableExistence
+        verify(connection, atLeastOnce()).isValid(5);
         verify(preparedStatement, atLeastOnce()).executeQuery();
     }
 
@@ -148,7 +155,7 @@ public class DatabaseHealthServiceTest {
         assertTrue(databaseHealthService.getLastError().contains("简单查询测试失败"));
 
         // 验证mock调用
-        verify(dataSource).getConnection();
+        verify(dataSource, times(2)).getConnection(); // testConnection + testSimpleQuery (在testSimpleQuery阶段失败)
         verify(connection).isValid(5);
         verify(preparedStatement).executeQuery();
     }
@@ -203,9 +210,16 @@ public class DatabaseHealthServiceTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getInt(1)).thenReturn(1);
         
-        // Mock表存在检查
-        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        // Mock表存在检查 - 为具体的SQL设置Mock
+        PreparedStatement tableStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("information_schema.tables"))).thenReturn(tableStmt);
         when(connection.getCatalog()).thenReturn("feduwacomm");
+        
+        // Mock表检查查询结果
+        ResultSet tableRs = mock(ResultSet.class);
+        when(tableStmt.executeQuery()).thenReturn(tableRs);
+        when(tableRs.next()).thenReturn(true);
+        when(tableRs.getInt(1)).thenReturn(1); // 表存在
 
         // 执行测试
         boolean result = databaseHealthService.forceHealthCheck();
@@ -215,8 +229,8 @@ public class DatabaseHealthServiceTest {
         assertTrue(databaseHealthService.isHealthy());
 
         // 验证mock调用
-        verify(dataSource).getConnection();
-        verify(connection).isValid(5);
+        verify(dataSource, times(3)).getConnection(); // testConnection + testSimpleQuery + testTableExistence
+        verify(connection, atLeastOnce()).isValid(5);
     }
 
     /**
@@ -232,9 +246,16 @@ public class DatabaseHealthServiceTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getInt(1)).thenReturn(1);
         
-        // Mock表存在检查
-        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        // Mock表存在检查 - 为具体的SQL设置Mock
+        PreparedStatement tableStmt = mock(PreparedStatement.class);
+        when(connection.prepareStatement(contains("information_schema.tables"))).thenReturn(tableStmt);
         when(connection.getCatalog()).thenReturn("feduwacomm");
+        
+        // Mock表检查查询结果
+        ResultSet tableRs = mock(ResultSet.class);
+        when(tableStmt.executeQuery()).thenReturn(tableRs);
+        when(tableRs.next()).thenReturn(true);
+        when(tableRs.getInt(1)).thenReturn(1); // 表存在
 
         // 执行测试
         databaseHealthService.scheduledHealthCheck();
@@ -244,7 +265,7 @@ public class DatabaseHealthServiceTest {
         assertNotNull(databaseHealthService.getLastCheckTime());
 
         // 验证mock调用
-        verify(dataSource).getConnection();
+        verify(dataSource, times(3)).getConnection(); // testConnection + testSimpleQuery + testTableExistence
     }
 
     /**
@@ -305,7 +326,7 @@ public class DatabaseHealthServiceTest {
         assertTrue(databaseHealthService.getLastError().contains("查询异常"));
 
         // 验证连接被正确获取（资源管理由try-with-resources处理）
-        verify(dataSource).getConnection();
+        verify(dataSource, times(2)).getConnection(); // testConnection + testSimpleQuery (在testSimpleQuery阶段失败)
         verify(connection).isValid(5);
     }
 

@@ -24,15 +24,6 @@ public interface TrainingDatasetMapper {
 
     int updateTrainingData(TrainingData trainingData);
 
-    int updateProgress(@Param("id") String id, @Param("progress") Integer progress);
-
-    int updateValidationResult(@Param("id") String id, 
-                             @Param("isValid") Boolean isValid,
-                             @Param("validationResult") String validationResultJson);
-
-    int updateProcessResult(@Param("id") String id,
-                          @Param("isProcessed") Boolean isProcessed, 
-                          @Param("processResult") String processResultJson);
 
     Map<String, Object> selectById(@Param("id") String id);
 

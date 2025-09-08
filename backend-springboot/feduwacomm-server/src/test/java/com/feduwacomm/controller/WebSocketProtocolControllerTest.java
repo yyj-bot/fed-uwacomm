@@ -7,12 +7,12 @@ import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.service.WebSocketProtocolService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.test.context.TestPropertySource;
 
 import java.security.Principal;
 import java.time.Instant;
@@ -26,22 +26,18 @@ import static org.mockito.Mockito.*;
 /**
  * WebSocket协议控制器测试类
  * 测试WebSocket消息处理和路由功能
+ * 使用单元测试方式，避免Spring上下文加载问题
  */
-@SpringBootTest
-@TestPropertySource(properties = {
-        "spring.websocket.enabled=false"
-})
+@ExtendWith(MockitoExtension.class)
 public class WebSocketProtocolControllerTest {
 
-    @MockBean
+    @Mock
     private WebSocketProtocolService protocolService;
 
-    @MockBean
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
+    @InjectMocks
     private WebSocketProtocolController controller;
     private ProtocolMessage sampleMessage;
     private ProtocolAck sampleAck;
@@ -51,9 +47,6 @@ public class WebSocketProtocolControllerTest {
     void setUp() {
         // 重置mock对象
         reset(protocolService, messagingTemplate);
-
-        // 创建控制器实例
-        controller = new WebSocketProtocolController(protocolService, messagingTemplate);
 
         // 准备测试数据
         setupTestData();
@@ -90,7 +83,7 @@ public class WebSocketProtocolControllerTest {
 
         // Mock Principal
         mockPrincipal = mock(Principal.class);
-        when(mockPrincipal.getName()).thenReturn("test-user");
+        lenient().when(mockPrincipal.getName()).thenReturn("test-user");
     }
 
     /**

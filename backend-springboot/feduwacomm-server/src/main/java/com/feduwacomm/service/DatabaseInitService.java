@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.io.BufferedReader;
@@ -20,6 +21,9 @@ import java.util.List;
  * 数据库初始化服务
  * 检查并创建必要的数据库表
  * 
+ * 注意：DDL操作（CREATE TABLE等）在MySQL中会隐式提交事务，无法回滚
+ * 因此本服务不使用@Transactional注解，而是采用手动错误处理
+ * 
  * @author FedUWAComm Team
  * @version 1.0.0
  */
@@ -33,6 +37,9 @@ public class DatabaseInitService {
 
     /**
      * 检查并初始化数据库
+     * 
+     * 注意：DDL操作在MySQL中会隐式提交，无法通过@Transactional回滚
+     * 如果某个表创建失败，需要手动处理清理工作
      */
     public void checkAndInitDatabase() {
         log.info("开始检查数据库初始化状态...");
@@ -68,8 +75,10 @@ public class DatabaseInitService {
             log.info("数据库初始化检查完成");
             
         } catch (Exception e) {
-            log.error("数据库初始化检查失败", e);
-            throw new RuntimeException("数据库初始化失败", e);
+            log.error("数据库初始化检查失败：{}", e.getMessage(), e);
+            // 由于DDL操作无法回滚，这里只能记录错误并抛出异常
+            // 如需清理，需要手动执行DROP TABLE操作
+            throw new RuntimeException("数据库初始化失败，可能需要手动清理已创建的表", e);
         }
     }
 
@@ -91,6 +100,8 @@ public class DatabaseInitService {
 
     /**
      * 创建users表
+     * 
+     * 注意：CREATE TABLE是DDL操作，在MySQL中会隐式提交事务
      */
     private void createUsersTable() throws SQLException {
         String sql = """
@@ -120,6 +131,8 @@ public class DatabaseInitService {
 
     /**
      * 创建user_permissions表
+     * 
+     * 注意：CREATE TABLE是DDL操作，在MySQL中会隐式提交事务
      */
     private void createUserPermissionsTable() throws SQLException {
         String sql = """
@@ -143,6 +156,8 @@ public class DatabaseInitService {
 
     /**
      * 创建vm_instances表
+     * 
+     * 注意：CREATE TABLE是DDL操作，在MySQL中会隐式提交事务
      */
     private void createVmInstancesTable() throws SQLException {
         String sql = """
@@ -185,19 +200,23 @@ public class DatabaseInitService {
 
     /**
      * 检查表数据
+     * 该方法只执行DML操作（SELECT），可以在事务中安全使用
      */
+    @Transactional(readOnly = true)
     public void checkTableData() {
         try {
             checkUsersTableData();
             checkUserPermissionsTableData();
             checkVmInstancesTableData();
         } catch (Exception e) {
-            log.error("检查表数据失败", e);
+            log.error("检查表数据失败：{}", e.getMessage(), e);
+            // 只读操作失败，通常是连接问题或表不存在
         }
     }
 
     /**
      * 检查users表数据
+     * 这是DML操作（SELECT），不涉及DDL
      */
     private void checkUsersTableData() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -208,12 +227,16 @@ public class DatabaseInitService {
                     int count = rs.getInt("count");
                     log.info("users表中共有 {} 条记录", count);
                 }
+            } catch (SQLException e) {
+                log.warn("检查users表数据时发生错误，可能表不存在：{}", e.getMessage());
+                throw e;
             }
         }
     }
 
     /**
      * 检查user_permissions表数据
+     * 这是DML操作（SELECT），不涉及DDL
      */
     private void checkUserPermissionsTableData() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -224,12 +247,16 @@ public class DatabaseInitService {
                     int count = rs.getInt("count");
                     log.info("user_permissions表中共有 {} 条记录", count);
                 }
+            } catch (SQLException e) {
+                log.warn("检查user_permissions表数据时发生错误，可能表不存在：{}", e.getMessage());
+                throw e;
             }
         }
     }
 
     /**
      * 检查vm_instances表数据
+     * 这是DML操作（SELECT），不涉及DDL
      */
     private void checkVmInstancesTableData() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -240,6 +267,9 @@ public class DatabaseInitService {
                     int count = rs.getInt("count");
                     log.info("vm_instances表中共有 {} 条记录", count);
                 }
+            } catch (SQLException e) {
+                log.warn("检查vm_instances表数据时发生错误，可能表不存在：{}", e.getMessage());
+                throw e;
             }
         }
     }
