@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟机轮次模型结果 API 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            margin-top: 30px;
+            border-bottom: 1px solid #ddd;
+            font-size: 1.3em;
+        }
+        .api-section {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .flex-row {
+            display: flex;
+            gap: 10px;
+        }
+        .flex-row > div {
+            flex: 1;
+        }
+        .back-button {
+            background-color: #6c757d;
+            margin-bottom: 20px;
+        }
+        .back-button:hover {
+            background-color: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="back-button" onclick="window.location.href='index.html'">← 返回主页</button>
+        
+        <h1>🔄 虚拟机轮次模型结果 API 测试</h1>
+        <p>测试虚拟机本地模型查询、分析等功能</p>
+
+        <!-- 1. 分页查询 -->
+        <div class="api-section">
+            <h2>1. 本地模型结果分页查询</h2>
+            <p><strong>接口路径:</strong> <code>GET /api/model/vm-round-models</code></p>
+            
+            <div class="flex-row">
+                <div>
+                    <div class="form-group">
+                        <label for="query-taskId">任务ID (可选):</label>
+                        <input type="text" id="query-taskId" placeholder="例如: a1b2c3d4e5f678901234567890123456">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="query-vmId">虚拟机ID (可选):</label>
+                        <input type="text" id="query-vmId" placeholder="例如: a1b2c3d4e5f678901234567890123456">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex-row">
+                <div>
+                    <div class="form-group">
+                        <label for="query-roundNumber">轮数 (可选):</label>
+                        <input type="number" id="query-roundNumber" placeholder="例如: 25" min="1">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="query-page">页码:</label>
+                        <input type="number" id="query-page" value="1" min="1">
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="query-size">页大小:</label>
+                        <input type="number" id="query-size" value="10" min="1" max="100">
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="queryVmRoundModels()">🔍 查询本地模型结果</button>
+            <div id="query-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 2. 详情查询 -->
+        <div class="api-section">
+            <h2>2. 本地模型结果详情查询</h2>
+            <p><strong>接口路径:</strong> <code>GET /api/model/vm-round-models/{vmRoundModelId}</code></p>
+            
+            <div class="form-group">
+                <label for="detail-vmRoundModelId">虚拟机轮次模型ID:</label>
+                <input type="text" id="detail-vmRoundModelId" placeholder="例如: vmrm-xxx" required>
+            </div>
+            
+            <button onclick="getVmRoundModelDetail()">📋 查询模型详情</button>
+            <div id="detail-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 3. 趋势查询 -->
+        <div class="api-section">
+            <h2>3. 本地模型训练指标趋势</h2>
+            <p><strong>接口路径:</strong> <code>GET /api/model/vm-round-models/metrics/trend</code></p>
+            
+            <div class="flex-row">
+                <div>
+                    <div class="form-group">
+                        <label for="trend-taskId">任务ID:</label>
+                        <input type="text" id="trend-taskId" placeholder="例如: a1b2c3d4e5f678901234567890123456" required>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="trend-vmId">虚拟机ID:</label>
+                        <input type="text" id="trend-vmId" placeholder="例如: a1b2c3d4e5f678901234567890123456" required>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="trend-metric">指标类型:</label>
+                        <select id="trend-metric" required>
+                            <option value="">请选择</option>
+                            <option value="accuracy">准确率 (accuracy)</option>
+                            <option value="loss">损失值 (loss)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="getVmRoundModelTrend()">📈 查询指标趋势</button>
+            <div id="trend-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 4. 最佳/离群查询 -->
+        <div class="api-section">
+            <h2>4. 本地模型最佳/离群查询</h2>
+            <p><strong>接口路径:</strong> <code>GET /api/model/vm-round-models/metrics/best</code></p>
+            
+            <div class="flex-row">
+                <div>
+                    <div class="form-group">
+                        <label for="best-taskId">任务ID:</label>
+                        <input type="text" id="best-taskId" placeholder="例如: a1b2c3d4e5f678901234567890123456" required>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="best-metric">指标类型:</label>
+                        <select id="best-metric" required>
+                            <option value="">请选择</option>
+                            <option value="accuracy">准确率 (accuracy)</option>
+                            <option value="loss">损失值 (loss)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <div class="form-group">
+                        <label for="best-type">查询类型:</label>
+                        <select id="best-type" required>
+                            <option value="">请选择</option>
+                            <option value="best">最佳表现</option>
+                            <option value="outlier">离群检测</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="getVmRoundModelBest()">🏆 查询最佳/离群结果</button>
+            <div id="best-result" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- 便捷测试数据 -->
+        <div class="api-section">
+            <h2>💡 测试数据示例</h2>
+            <p>以下是一些便于测试的示例数据:</p>
+            <ul>
+                <li><strong>任务ID:</strong> <code>task-001</code>, <code>task-002</code></li>
+                <li><strong>虚拟机ID:</strong> <code>vm-001</code>, <code>vm-002</code>, <code>vm-003</code></li>
+                <li><strong>轮数:</strong> <code>1</code>, <code>5</code>, <code>10</code>, <code>25</code></li>
+                <li><strong>模型ID:</strong> <code>vmrm-xxx</code> (从分页查询结果中获取)</li>
+            </ul>
+            
+            <button onclick="fillTestData()">🔧 自动填充测试数据</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = '/api/model/vm-round-models';
+
+        // 显示结果
+        function showResult(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // 1. 分页查询本地模型结果
+        async function queryVmRoundModels() {
+            try {
+                const taskId = document.getElementById('query-taskId').value;
+                const vmId = document.getElementById('query-vmId').value;
+                const roundNumber = document.getElementById('query-roundNumber').value;
+                const page = document.getElementById('query-page').value;
+                const size = document.getElementById('query-size').value;
+
+                const params = new URLSearchParams();
+                if (taskId) params.append('taskId', taskId);
+                if (vmId) params.append('vmId', vmId);
+                if (roundNumber) params.append('roundNumber', roundNumber);
+                if (page) params.append('page', page);
+                if (size) params.append('size', size);
+
+                const response = await fetch(`${BASE_URL}?${params}`);
+                const data = await response.json();
+                
+                showResult('query-result', data, response.ok);
+            } catch (error) {
+                showResult('query-result', { error: error.message }, false);
+            }
+        }
+
+        // 2. 查询模型详情
+        async function getVmRoundModelDetail() {
+            try {
+                const vmRoundModelId = document.getElementById('detail-vmRoundModelId').value.trim();
+                if (!vmRoundModelId) {
+                    alert('请输入虚拟机轮次模型ID');
+                    return;
+                }
+
+                const response = await fetch(`${BASE_URL}/${vmRoundModelId}`);
+                const data = await response.json();
+                
+                showResult('detail-result', data, response.ok);
+            } catch (error) {
+                showResult('detail-result', { error: error.message }, false);
+            }
+        }
+
+        // 3. 查询指标趋势
+        async function getVmRoundModelTrend() {
+            try {
+                const taskId = document.getElementById('trend-taskId').value.trim();
+                const vmId = document.getElementById('trend-vmId').value.trim();
+                const metric = document.getElementById('trend-metric').value;
+
+                if (!taskId || !vmId || !metric) {
+                    alert('请填写所有必需的字段');
+                    return;
+                }
+
+                const params = new URLSearchParams({
+                    taskId: taskId,
+                    vmId: vmId,
+                    metric: metric
+                });
+
+                const response = await fetch(`${BASE_URL}/metrics/trend?${params}`);
+                const data = await response.json();
+                
+                showResult('trend-result', data, response.ok);
+            } catch (error) {
+                showResult('trend-result', { error: error.message }, false);
+            }
+        }
+
+        // 4. 查询最佳/离群结果
+        async function getVmRoundModelBest() {
+            try {
+                const taskId = document.getElementById('best-taskId').value.trim();
+                const metric = document.getElementById('best-metric').value;
+                const type = document.getElementById('best-type').value;
+
+                if (!taskId || !metric || !type) {
+                    alert('请填写所有必需的字段');
+                    return;
+                }
+
+                const params = new URLSearchParams({
+                    taskId: taskId,
+                    metric: metric,
+                    type: type
+                });
+
+                const response = await fetch(`${BASE_URL}/metrics/best?${params}`);
+                const data = await response.json();
+                
+                showResult('best-result', data, response.ok);
+            } catch (error) {
+                showResult('best-result', { error: error.message }, false);
+            }
+        }
+
+        // 填充测试数据
+        function fillTestData() {
+            // 分页查询测试数据
+            document.getElementById('query-taskId').value = 'task-001';
+            document.getElementById('query-vmId').value = 'vm-001';
+            document.getElementById('query-roundNumber').value = '5';
+            
+            // 详情查询测试数据
+            document.getElementById('detail-vmRoundModelId').value = 'vmrm-test-001';
+            
+            // 趋势查询测试数据
+            document.getElementById('trend-taskId').value = 'task-001';
+            document.getElementById('trend-vmId').value = 'vm-001';
+            document.getElementById('trend-metric').value = 'accuracy';
+            
+            // 最佳/离群查询测试数据
+            document.getElementById('best-taskId').value = 'task-001';
+            document.getElementById('best-metric').value = 'accuracy';
+            document.getElementById('best-type').value = 'best';
+            
+            alert('✅ 测试数据已填充完成！');
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('虚拟机轮次模型结果 API 测试页面加载完成');
+        });
+    </script>
+</body>
+</html>

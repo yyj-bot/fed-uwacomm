@@ -2,6 +2,17 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feduwacomm.mapper.VmRoundModelsMapper">
 
+    <resultMap id="VmRoundModelResultMap" type="com.feduwacomm.entity.VmRoundModel">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="vmId" column="vm_id"/>
+        <result property="roundNumber" column="round_number"/>
+        <result property="accuracy" column="accuracy"/>
+        <result property="loss" column="loss"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="parameters" column="parameters"/>
+    </resultMap>
+
     <insert id="upsertRoundModel">
         INSERT INTO vm_round_models (id, task_id, vm_id, round_number, accuracy, loss, parameters)
         VALUES (#{id}, #{taskId}, #{vmId}, #{roundNumber}, #{accuracy}, #{loss}, CAST(#{parameters} AS JSON))
@@ -10,5 +21,70 @@
             loss = VALUES(loss),
             parameters = VALUES(parameters)
     </insert>
+
+    <select id="selectByTaskIdAndRound" resultMap="VmRoundModelResultMap">
+        SELECT id, task_id, vm_id, round_number, accuracy, loss, created_at, parameters
+        FROM vm_round_models
+        WHERE task_id = #{taskId} AND round_number = #{roundNumber}
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="countReadyModels" resultType="int">
+        SELECT COUNT(*)
+        FROM vm_round_models
+        WHERE task_id = #{taskId} AND round_number = #{roundNumber}
+    </select>
+
+    <select id="selectPendingAggregation" resultMap="VmRoundModelResultMap">
+        SELECT id, task_id, vm_id, round_number, accuracy, loss, created_at, parameters
+        FROM vm_round_models
+        ORDER BY created_at ASC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <select id="selectByTaskId" resultMap="VmRoundModelResultMap">
+        SELECT id, task_id, vm_id, round_number, accuracy, loss, created_at, parameters
+        FROM vm_round_models
+        WHERE task_id = #{taskId}
+        ORDER BY round_number DESC, created_at DESC
+    </select>
+
+    <select id="selectLatestRoundByTaskId" resultType="Integer">
+        SELECT MAX(round_number)
+        FROM vm_round_models
+        WHERE task_id = #{taskId}
+    </select>
+
+    <select id="selectById" resultMap="VmRoundModelResultMap">
+        SELECT id, task_id, vm_id, round_number, accuracy, loss, created_at, parameters
+        FROM vm_round_models
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByTaskIdAndVmId" resultMap="VmRoundModelResultMap">
+        SELECT id, task_id, vm_id, round_number, accuracy, loss, created_at, parameters
+        FROM vm_round_models
+        WHERE task_id = #{taskId} AND vm_id = #{vmId}
+        ORDER BY round_number DESC
+    </select>
+
+    <delete id="deleteByTaskId">
+        DELETE FROM vm_round_models
+        WHERE task_id = #{taskId}
+    </delete>
+
+    <select id="selectParticipantVmIds" resultType="String">
+        SELECT DISTINCT vm_id
+        FROM vm_round_models
+        WHERE task_id = #{taskId}
+    </select>
+
+    <select id="countParticipantsInRound" resultType="int">
+        SELECT COUNT(DISTINCT vm_id)
+        FROM vm_round_models
+        WHERE task_id = #{taskId} AND round_number = #{roundNumber}
+    </select>
 
 </mapper> 

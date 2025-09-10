@@ -8,9 +8,7 @@ spring:
     
   sql:
     init:
-      mode: always
-      schema-locations: classpath:create-test-database.sql
-      continue-on-error: true
+      mode: never
 
   jpa:
     hibernate:

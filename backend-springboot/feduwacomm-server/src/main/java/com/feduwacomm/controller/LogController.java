@@ -53,101 +53,92 @@ public class LogController {
 
     @PostMapping("/export")
     public Result<LogExportTaskVO> exportLogs(@RequestBody @Valid LogExportDTO exportDTO) {
-        LogExportTaskVO exportTask = LogExportTaskVO.builder()
-                .exportId("export_" + System.currentTimeMillis())
-                .build();
+        LogExportTaskVO exportTask = logService.createExportTask(exportDTO);
         return Result.success(exportTask);
     }
 
     @GetMapping("/export/status/{exportId}")
     public Result<LogExportTaskVO> getExportStatus(@PathVariable String exportId) {
-        LogExportTaskVO exportTask = LogExportTaskVO.builder()
-                .exportId(exportId)
-                .build();
+        LogExportTaskVO exportTask = logService.getExportStatus(exportId);
         return Result.success(exportTask);
     }
 
     @GetMapping("/export/download/{exportId}")
     public ResponseEntity<byte[]> downloadExport(@PathVariable String exportId) {
-        return ResponseEntity.ok().body("导出文件内容".getBytes());
+        try {
+            byte[] fileContent = logService.downloadExport(exportId);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"" + exportId + ".csv\"")
+                    .header("Content-Type", "application/octet-stream")
+                    .body(fileContent);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/export/history")
     public Result<PageResult<LogExportTaskVO>> getExportHistory(@RequestParam(defaultValue = "1") Integer page,
-                                                               @RequestParam(defaultValue = "10") Integer size) {
-        PageResult<LogExportTaskVO> pageResult = PageResult.<LogExportTaskVO>builder()
-                .total(50L)
-                .current(page.longValue())
-                .size(size.longValue())
-                .pages(5L)
-                .records(List.of())
-                .build();
+                                                               @RequestParam(defaultValue = "10") Integer size,
+                                                               @RequestParam(required = false) String status) {
+        PageResult<LogExportTaskVO> pageResult = logService.getExportHistory(page, size, status);
         return Result.success(pageResult);
     }
 
     @PostMapping("/cleanup")
     public Result<LogCleanupTaskVO> cleanupLogs(@RequestBody @Valid LogCleanupDTO cleanupDTO) {
-        LogCleanupTaskVO cleanupTask = LogCleanupTaskVO.builder()
-                .cleanupId("cleanup_" + System.currentTimeMillis())
-                .build();
+        LogCleanupTaskVO cleanupTask = logService.createCleanupTask(cleanupDTO);
         return Result.success(cleanupTask);
     }
 
     @GetMapping("/cleanup/status/{cleanupId}")
     public Result<LogCleanupTaskVO> getCleanupStatus(@PathVariable String cleanupId) {
-        LogCleanupTaskVO cleanupTask = LogCleanupTaskVO.builder()
-                .cleanupId(cleanupId)
-                .build();
+        LogCleanupTaskVO cleanupTask = logService.getCleanupStatus(cleanupId);
         return Result.success(cleanupTask);
     }
 
     @GetMapping("/cleanup/history")
     public Result<PageResult<LogCleanupTaskVO>> getCleanupHistory(@RequestParam(defaultValue = "1") Integer page,
-                                                                 @RequestParam(defaultValue = "10") Integer size) {
-        PageResult<LogCleanupTaskVO> pageResult = PageResult.<LogCleanupTaskVO>builder()
-                .total(20L)
-                .current(page.longValue())
-                .size(size.longValue())
-                .pages(2L)
-                .records(List.of())
-                .build();
+                                                                 @RequestParam(defaultValue = "10") Integer size,
+                                                                 @RequestParam(required = false) String status) {
+        PageResult<LogCleanupTaskVO> pageResult = logService.getCleanupHistory(page, size, status);
         return Result.success(pageResult);
     }
 
     @GetMapping("/monitor/system")
     public Result<LogMonitorVO> getSystemMonitor() {
-        LogMonitorVO monitor = LogMonitorVO.builder().build();
+        LogMonitorVO monitor = logService.getSystemMonitor();
         return Result.success(monitor);
     }
 
     @GetMapping("/monitor/logs")
     public Result<LogMonitorVO> getLogMonitor(@RequestParam(defaultValue = "1h") String timeRange,
                                              @RequestParam(required = false) String level) {
-        LogMonitorVO monitor = LogMonitorVO.builder().build();
+        LogMonitorVO monitor = logService.getLogMonitor(timeRange, level);
         return Result.success(monitor);
     }
 
     @GetMapping("/monitor/performance")
     public Result<LogMonitorVO> getPerformanceMonitor(@RequestParam(defaultValue = "1h") String timeRange,
                                                      @RequestParam(required = false) String endpoint) {
-        LogMonitorVO monitor = LogMonitorVO.builder().build();
+        LogMonitorVO monitor = logService.getPerformanceMonitor(timeRange, endpoint);
         return Result.success(monitor);
     }
 
     @GetMapping("/monitor/alerts")
     public Result<LogMonitorVO> getAlerts() {
-        LogMonitorVO monitor = LogMonitorVO.builder().build();
+        LogMonitorVO monitor = logService.getAlerts();
         return Result.success(monitor);
     }
 
     @GetMapping("/config")
     public Result<LogConfigVO> getLogConfig() {
-        LogConfigVO config = LogConfigVO.builder().build();
+        LogConfigVO config = logService.getLogConfig();
         return Result.success(config);
     }
 
     @PutMapping("/config")
     public Result<Void> updateLogConfig(@RequestBody @Valid LogConfigDTO configDTO) {
+        logService.updateLogConfig(configDTO);
         return Result.success();
     }
 

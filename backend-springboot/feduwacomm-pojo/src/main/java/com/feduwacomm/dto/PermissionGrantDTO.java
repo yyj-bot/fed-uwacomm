@@ -19,5 +19,6 @@ public class PermissionGrantDTO {
     private String resourceType;
     private String resourceId;
     private String permission;
+    private String permissionName; // API文档要求的字段名
     private LocalDateTime expiresAt;
 }

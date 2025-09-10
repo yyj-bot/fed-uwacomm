@@ -28,14 +28,12 @@ public class SystemLogSqlProvider {
             sql.append(" AND timestamp <= #{endTime}");
         }
         
-        // LogQueryDTO 没有 userId 字段，如需要可以添加
-        
         if (queryDTO.getVmId() != null && !queryDTO.getVmId().isEmpty()) {
-            sql.append(" AND message LIKE CONCAT('%虚拟机ID: ', #{vmId}, '%')");
+            sql.append(" AND vm_id = #{vmId}");
         }
         
         if (queryDTO.getTaskId() != null && !queryDTO.getTaskId().isEmpty()) {
-            sql.append(" AND message LIKE CONCAT('%任务ID: ', #{taskId}, '%')");
+            sql.append(" AND task_id = #{taskId}");
         }
         
         sql.append(" ORDER BY timestamp DESC");
@@ -71,14 +69,12 @@ public class SystemLogSqlProvider {
             sql.append(" AND timestamp <= #{endTime}");
         }
         
-        // LogQueryDTO 没有 userId 字段，如需要可以添加
-        
         if (queryDTO.getVmId() != null && !queryDTO.getVmId().isEmpty()) {
-            sql.append(" AND message LIKE CONCAT('%虚拟机ID: ', #{vmId}, '%')");
+            sql.append(" AND vm_id = #{vmId}");
         }
         
         if (queryDTO.getTaskId() != null && !queryDTO.getTaskId().isEmpty()) {
-            sql.append(" AND message LIKE CONCAT('%任务ID: ', #{taskId}, '%')");
+            sql.append(" AND task_id = #{taskId}");
         }
         
         return sql.toString();

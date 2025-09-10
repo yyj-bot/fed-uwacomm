@@ -45,7 +45,7 @@ public class HealthControllerTest {
      */
     @Test
     void testHealthCheck_Success() throws Exception {
-        mockMvc.perform(get("/health"))
+        mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("健康检查通过"))
@@ -67,7 +67,7 @@ public class HealthControllerTest {
         when(databaseHealthService.getLastError()).thenReturn(null);
         when(databaseHealthService.getStatusSummary()).thenReturn("数据库连接正常");
 
-        mockMvc.perform(get("/health/detailed"))
+        mockMvc.perform(get("/api/health/detailed"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("所有服务运行正常"))
@@ -96,7 +96,7 @@ public class HealthControllerTest {
         when(databaseHealthService.getLastError()).thenReturn("连接超时");
         when(databaseHealthService.getStatusSummary()).thenReturn("数据库连接异常");
 
-        mockMvc.perform(get("/health/detailed"))
+        mockMvc.perform(get("/api/health/detailed"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("部分服务异常"))
@@ -121,7 +121,7 @@ public class HealthControllerTest {
         when(databaseHealthService.forceHealthCheck()).thenReturn(true);
         when(databaseHealthService.getStatusSummary()).thenReturn("数据库连接正常");
 
-        mockMvc.perform(get("/health/database/check"))
+        mockMvc.perform(get("/api/health/database/check"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("数据库健康检查通过"))
@@ -143,7 +143,7 @@ public class HealthControllerTest {
         when(databaseHealthService.forceHealthCheck()).thenReturn(false);
         when(databaseHealthService.getStatusSummary()).thenReturn("数据库连接失败");
 
-        mockMvc.perform(get("/health/database/check"))
+        mockMvc.perform(get("/api/health/database/check"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("数据库健康检查失败"))
@@ -162,17 +162,17 @@ public class HealthControllerTest {
     @Test
     void testHealthCheckEndpoints_HTTPMethods() throws Exception {
         // 基础健康检查只支持GET - 全局异常处理器会返回200和统一JSON格式
-        mockMvc.perform(post("/health"))
+        mockMvc.perform(post("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500)); // 全局异常处理器返回错误码500
 
         // 详细健康检查只支持GET - 全局异常处理器会返回200和统一JSON格式
-        mockMvc.perform(put("/health/detailed"))
+        mockMvc.perform(put("/api/health/detailed"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500));
 
         // 强制数据库检查只支持GET - 全局异常处理器会返回200和统一JSON格式  
-        mockMvc.perform(delete("/health/database/check"))
+        mockMvc.perform(delete("/api/health/database/check"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500));
     }
@@ -183,7 +183,7 @@ public class HealthControllerTest {
     @Test
     void testNonExistentHealthEndpoint() throws Exception {
         // 不存在的端点会被全局异常处理器处理，返回200状态码和统一JSON格式
-        mockMvc.perform(get("/health/nonexistent"))
+        mockMvc.perform(get("/api/health/nonexistent"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").exists());
@@ -194,7 +194,7 @@ public class HealthControllerTest {
      */
     @Test
     void testHealthCheckContentType() throws Exception {
-        mockMvc.perform(get("/health")
+        mockMvc.perform(get("/api/health")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON));

@@ -15,6 +15,7 @@ public enum ProtocolType {
 
     MODEL_UPLOAD,
     MODEL_DOWNLOAD,
+    GLOBAL_MODEL_UPDATE,
 
     STATUS_QUERY,
     STATUS_RESPONSE,
