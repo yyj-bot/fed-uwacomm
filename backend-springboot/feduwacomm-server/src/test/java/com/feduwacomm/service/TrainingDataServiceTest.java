@@ -48,7 +48,7 @@ public class TrainingDataServiceTest {
         uploadDTO = TrainingDataUploadDTO.builder()
                 .vmId("a1b2c3d4e5f678901234567890123456")
                 .dataType("ACOUSTIC")
-                .description("测试声学数据")
+                .datasetDescription("测试声学数据")
                 .tags(Arrays.asList("test", "acoustic"))
                 .metadata(Map.of("source", "test", "version", "1.0"))
                 .build();
@@ -58,7 +58,7 @@ public class TrainingDataServiceTest {
                 .dataType("ENVIRONMENT")
                 .title("测试环境配置")
                 .content("测试环境配置内容")
-                .description("测试环境配置描述")
+                .datasetDescription("测试环境配置描述")
                 .tags(Arrays.asList("test", "environment"))
                 .metadata(Map.of("source", "test"))
                 .build();
@@ -112,7 +112,7 @@ public class TrainingDataServiceTest {
         assertNotNull(result.getDatasetId());
         assertEquals(uploadDTO.getVmId(), result.getVmId());
         assertEquals(uploadDTO.getDataType(), result.getDatasetType());
-        assertEquals(uploadDTO.getDescription(), result.getDatasetDescription());
+        assertEquals(uploadDTO.getDatasetDescription(), result.getDatasetDescription());
         assertEquals("UPLOADING", result.getStatus());
         assertEquals("testuser", result.getUploadedBy());
 
@@ -152,7 +152,7 @@ public class TrainingDataServiceTest {
         assertNotNull(result.getDatasetId());
         assertEquals(textDTO.getVmId(), result.getVmId());
         assertEquals(textDTO.getDataType(), result.getDatasetType());
-        assertEquals(textDTO.getDescription(), result.getDatasetDescription());
+        assertEquals(textDTO.getDatasetDescription(), result.getDatasetDescription());
         assertEquals("READY", result.getStatus());
         assertEquals("testuser", result.getUploadedBy());
         assertEquals(100, result.getProgress());

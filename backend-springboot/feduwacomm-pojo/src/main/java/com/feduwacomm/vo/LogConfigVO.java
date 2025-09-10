@@ -20,7 +20,7 @@ public class LogConfigVO {
     private LogLevel logLevel;
     private Integer retentionDays;
     private Long maxFileSize;
-    private Map<LogCategory, CategoryConfig> categories;
+    private Map<String, CategoryConfig> categories;
     private ExportSettings exportSettings;
     private LocalDateTime updatedAt;
 

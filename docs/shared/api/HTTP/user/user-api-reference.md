@@ -331,6 +331,6 @@ Authorization: Bearer {token}
 
 ## 8. 相关文档
 
-- [HTTP接口导览.md](./HTTP接口导览.md) - 系统整体API接口
+- [HTTP接口导览.md](../HTTP接口导览.md) - 系统整体API接口
 - [数据库表结构文档](../../database/database_schema.md) - 用户相关数据库设计
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议 

@@ -142,7 +142,7 @@ public class VmInstanceControllerTest {
                     .andExpect(jsonPath("$.data.secretId").value("secret-id-12345"))
                     .andExpect(jsonPath("$.data.tokenExpireSeconds").value(3600))
                     .andExpect(jsonPath("$.data.websocket.sockjs").value("ws://localhost:8080/sockjs-vm"))
-                    .andExpect(jsonPath("$.data.websocket.nativeWs").value("ws://localhost:8080/vm-websocket"))
+                    .andExpect(jsonPath("$.data.websocket.native").value("ws://localhost:8080/vm-websocket"))
                     .andExpect(jsonPath("$.data.apiEndpoints.status").value("/api/v1/vm/status"))
                     .andExpect(jsonPath("$.data.apiEndpoints.control").value("/api/v1/vm/control"))
                     .andExpect(jsonPath("$.data.apiEndpoints.tokenRefresh").value("/api/v1/vm/token/refresh"));

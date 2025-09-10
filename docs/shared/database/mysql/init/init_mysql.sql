@@ -483,14 +483,199 @@ CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
 -- CREATE INDEX idx_vm_runtime_logs_created_at ON vm_runtime_logs (created_at);
 
 -- =====================================================
+-- 重构扩展 - 新增服务相关表
+-- =====================================================
+
+-- 15. 初始模型表
+CREATE TABLE IF NOT EXISTS initial_models (
+    id VARCHAR(32) PRIMARY KEY COMMENT '初始模型唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    model_type VARCHAR(50) NOT NULL COMMENT '模型类型',
+    generation_method ENUM('RANDOM', 'CUSTOM_UPLOAD') NOT NULL COMMENT '生成方式',
+    model_size BIGINT COMMENT '模型大小(字节)',
+    architecture_params JSON COMMENT '架构参数(JSON格式)',
+    file_path VARCHAR(500) COMMENT '文件存储路径',
+    checksum VARCHAR(128) COMMENT '文件校验和',
+    status ENUM('GENERATING', 'READY', 'DISTRIBUTED', 'FAILED') DEFAULT 'GENERATING' COMMENT '状态',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_initial_models_task_id (task_id),
+    INDEX idx_initial_models_status (status),
+    INDEX idx_initial_models_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='初始模型表 - 存储联邦学习初始模型信息';
+
+-- 16. 模型分发记录表
+CREATE TABLE IF NOT EXISTS model_distributions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '分发记录唯一标识(32位UUID)',
+    model_id VARCHAR(32) NOT NULL COMMENT '模型ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    distribution_status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+    distributed_at TIMESTAMP NULL COMMENT '分发时间',
+    verified_at TIMESTAMP NULL COMMENT '验证时间',
+    error_message TEXT COMMENT '错误信息',
+    checksum_verified BOOLEAN DEFAULT FALSE COMMENT '校验和验证状态',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_model_distributions_model_id (model_id),
+    INDEX idx_model_distributions_vm_id (vm_id),
+    INDEX idx_model_distributions_status (distribution_status),
+    FOREIGN KEY (model_id) REFERENCES initial_models (id) ON DELETE CASCADE,
+    FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='模型分发记录表 - 跟踪模型分发到虚拟机的状态';
+
+-- 17. 数据分发任务表
+CREATE TABLE IF NOT EXISTS data_distributions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '数据分发任务唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    distribution_name VARCHAR(100) COMMENT '分发任务名称',
+    strategy ENUM('RANDOM', 'BALANCED', 'CUSTOM', 'ROUND_ROBIN') NOT NULL DEFAULT 'BALANCED' COMMENT '分发策略',
+    status ENUM('CREATED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED') DEFAULT 'CREATED' COMMENT '分发状态',
+    config JSON COMMENT '分发配置参数(JSON格式)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    INDEX idx_data_distributions_task_id (task_id),
+    INDEX idx_data_distributions_status (status),
+    INDEX idx_data_distributions_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='数据分发任务表 - 管理训练数据分发任务';
+
+-- 18. 数据分发详情表
+CREATE TABLE IF NOT EXISTS data_distribution_details (
+    id VARCHAR(32) PRIMARY KEY COMMENT '分发详情唯一标识(32位UUID)',
+    distribution_id VARCHAR(32) NOT NULL COMMENT '分发任务ID(32位UUID)',
+    dataset_id VARCHAR(32) NOT NULL COMMENT '数据集ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+    data_size BIGINT COMMENT '数据大小(字节)',
+    transferred_size BIGINT DEFAULT 0 COMMENT '已传输大小(字节)',
+    checksum VARCHAR(128) COMMENT '数据校验和',
+    distributed_at TIMESTAMP NULL COMMENT '分发时间',
+    verified_at TIMESTAMP NULL COMMENT '验证时间',
+    error_message TEXT COMMENT '错误信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_data_distribution_details_distribution_id (distribution_id),
+    INDEX idx_data_distribution_details_vm_id (vm_id),
+    INDEX idx_data_distribution_details_dataset_id (dataset_id),
+    INDEX idx_data_distribution_details_status (status),
+    FOREIGN KEY (distribution_id) REFERENCES data_distributions (id) ON DELETE CASCADE,
+    FOREIGN KEY (dataset_id) REFERENCES training_dataset (id) ON DELETE CASCADE,
+    FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='数据分发详情表 - 跟踪具体数据分发到各虚拟机的状态';
+
+-- 19. 工作流编排表
+CREATE TABLE IF NOT EXISTS orchestration_workflows (
+    id VARCHAR(32) PRIMARY KEY COMMENT '工作流唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    workflow_name VARCHAR(100) COMMENT '工作流名称',
+    status ENUM('CREATED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED', 'TERMINATED') DEFAULT 'CREATED' COMMENT '工作流状态',
+    current_stage ENUM('INITIALIZATION', 'INITIAL_MODEL_GENERATION', 'DATA_DISTRIBUTION', 
+                      'MODEL_DISTRIBUTION', 'FEDERATED_TRAINING', 'FINAL_AGGREGATION', 'COMPLETED') 
+                DEFAULT 'INITIALIZATION' COMMENT '当前阶段',
+    config JSON COMMENT '工作流配置(JSON格式)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_orchestration_workflows_task_id (task_id),
+    INDEX idx_orchestration_workflows_status (status),
+    INDEX idx_orchestration_workflows_stage (current_stage),
+    INDEX idx_orchestration_workflows_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='工作流编排表 - 管理联邦学习工作流执行状态';
+
+-- 20. 工作流阶段执行记录表
+CREATE TABLE IF NOT EXISTS workflow_stage_executions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '阶段执行记录唯一标识(32位UUID)',
+    orchestration_id VARCHAR(32) NOT NULL COMMENT '工作流ID(32位UUID)',
+    stage_name VARCHAR(50) NOT NULL COMMENT '阶段名称',
+    status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'SKIPPED') DEFAULT 'PENDING' COMMENT '执行状态',
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    input_data JSON COMMENT '输入数据(JSON格式)',
+    output_data JSON COMMENT '输出数据(JSON格式)',
+    error_message TEXT COMMENT '错误信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_workflow_stage_executions_orchestration_id (orchestration_id),
+    INDEX idx_workflow_stage_executions_stage (stage_name),
+    INDEX idx_workflow_stage_executions_status (status),
+    INDEX idx_workflow_stage_executions_created_at (created_at),
+    FOREIGN KEY (orchestration_id) REFERENCES orchestration_workflows (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='工作流阶段执行记录表 - 跟踪每个工作流阶段的执行状态';
+
+-- 21. 虚拟机部署表
+CREATE TABLE IF NOT EXISTS vm_deployments (
+    id VARCHAR(32) PRIMARY KEY COMMENT '部署唯一标识(32位UUID)',
+    deployment_name VARCHAR(100) NOT NULL COMMENT '部署名称',
+    platform_type VARCHAR(50) NOT NULL COMMENT '平台类型(DOCKER, VMWARE, KVM等)',
+    status ENUM('CREATED', 'IN_PROGRESS', 'DEPLOYED', 'SCALING', 'FAILED', 'DESTROYED') DEFAULT 'CREATED' COMMENT '部署状态',
+    vm_count INT NOT NULL DEFAULT 0 COMMENT '虚拟机数量',
+    config JSON COMMENT '部署配置(JSON格式)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_vm_deployments_status (status),
+    INDEX idx_vm_deployments_platform (platform_type),
+    INDEX idx_vm_deployments_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='虚拟机部署表 - 管理虚拟机部署任务';
+
+-- 22. 部署的虚拟机实例表
+CREATE TABLE IF NOT EXISTS deployed_vm_instances (
+    id VARCHAR(32) PRIMARY KEY COMMENT '实例唯一标识(32位UUID)',
+    deployment_id VARCHAR(32) NOT NULL COMMENT '部署ID(32位UUID)',
+    vm_name VARCHAR(100) NOT NULL COMMENT '虚拟机名称',
+    platform_vm_id VARCHAR(100) COMMENT '平台虚拟机ID',
+    status ENUM('CREATING', 'RUNNING', 'STOPPED', 'FAILED', 'DESTROYED') DEFAULT 'CREATING' COMMENT '实例状态',
+    ip_address VARCHAR(45) COMMENT 'IP地址',
+    resource_spec JSON COMMENT '资源规格(JSON格式)',
+    health_status VARCHAR(20) COMMENT '健康状态',
+    deployed_at TIMESTAMP NULL COMMENT '部署时间',
+    last_health_check TIMESTAMP NULL COMMENT '最后健康检查时间',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_deployed_vm_instances_deployment_id (deployment_id),
+    INDEX idx_deployed_vm_instances_status (status),
+    INDEX idx_deployed_vm_instances_ip (ip_address),
+    FOREIGN KEY (deployment_id) REFERENCES vm_deployments (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='部署的虚拟机实例表 - 跟踪通过部署服务创建的VM实例';
+
+-- 扩展现有表结构
+-- 为federated_tasks表添加新字段
+ALTER TABLE federated_tasks 
+ADD COLUMN orchestration_id VARCHAR(32) NULL COMMENT '工作流编排ID(32位UUID)',
+ADD COLUMN initial_model_strategy ENUM('RANDOM', 'CUSTOM_UPLOAD') DEFAULT 'RANDOM' COMMENT '初始模型策略',
+ADD COLUMN deployment_id VARCHAR(32) NULL COMMENT '部署ID(32位UUID)',
+ADD COLUMN workflow_config JSON COMMENT '工作流配置(JSON格式)',
+ADD INDEX idx_federated_tasks_orchestration_id (orchestration_id),
+ADD INDEX idx_federated_tasks_deployment_id (deployment_id);
+
+-- 为global_models表添加分发状态字段
+ALTER TABLE global_models
+ADD COLUMN distribution_status ENUM('PENDING', 'DISTRIBUTING', 'DISTRIBUTED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+ADD COLUMN distributed_vms JSON COMMENT '已分发的虚拟机列表(JSON格式)',
+ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间';
+
+-- =====================================================
 -- 初始化完成
 -- =====================================================
 -- 数据库初始化脚本执行完成
--- 共创建了 14 个表:
+-- 共创建了 22 个表:
 -- 1. users - 用户表
 -- 2. user_permissions - 用户权限表
 -- 3. vm_instances - 虚拟机表
--- 4. federated_tasks - 联邦学习任务表
+-- 4. federated_tasks - 联邦学习任务表（已扩展）
 -- 5. training_dataset - 训练数据集元信息表
 -- 6. training_dataset_row - 训练数据明细表
 -- 7. model_versions - 模型版本表
@@ -498,7 +683,15 @@ CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
 -- 9. vm_runtime_logs - 虚拟机运行日志表
 -- 10. vm_round_models - 虚拟机轮次模型结果表
 -- 11. vm_secrets - 虚拟机刷新凭证表
--- 12. global_models - 全局模型表
+-- 12. global_models - 全局模型表（已扩展）
 -- 13. log_export_tasks - 日志导出任务表
 -- 14. log_cleanup_tasks - 日志清理任务表
+-- 15. initial_models - 初始模型表（新增）
+-- 16. model_distributions - 模型分发记录表（新增）
+-- 17. data_distributions - 数据分发任务表（新增）
+-- 18. data_distribution_details - 数据分发详情表（新增）
+-- 19. orchestration_workflows - 工作流编排表（新增）
+-- 20. workflow_stage_executions - 工作流阶段执行记录表（新增）
+-- 21. vm_deployments - 虚拟机部署表（新增）
+-- 22. deployed_vm_instances - 部署的虚拟机实例表（新增）
 -- =====================================================

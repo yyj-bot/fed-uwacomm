@@ -18,8 +18,8 @@ import java.util.Map;
 public class LogStatisticsVO {
 
     private Long totalLogs;
-    private Map<LogLevel, Long> levelDistribution;
-    private Map<LogCategory, Long> categoryDistribution;
+    private Map<String, Long> levelDistribution;
+    private Map<String, Long> categoryDistribution;
     private List<TimeDistribution> timeDistribution;
     private List<ErrorTrend> errorTrend;
 

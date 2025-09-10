@@ -187,4 +187,11 @@ public class UserException extends RuntimeException {
     public static UserException passwordTooWeak() {
         return new UserException(400, "密码格式不正确");
     }
+
+    /**
+     * 密码为空
+     */
+    public static UserException passwordEmpty() {
+        return new UserException(400, "密码不能为空");
+    }
 }

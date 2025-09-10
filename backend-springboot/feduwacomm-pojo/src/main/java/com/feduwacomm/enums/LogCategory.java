@@ -1,5 +1,7 @@
 package com.feduwacomm.enums;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum LogCategory {
     SYSTEM("SYSTEM", "系统级日志，如启动、关闭、配置变更等"),
     USER("USER", "用户操作日志，如登录、注册、权限变更等"),
@@ -18,6 +20,7 @@ public enum LogCategory {
         this.description = description;
     }
 
+    @JsonValue
     public String getCode() {
         return code;
     }

@@ -467,6 +467,8 @@
                         </div>
                         <button class="btn" onclick="getUserList()">获取用户列表</button>
                         <button class="btn btn-secondary" onclick="getUserDetail()">获取用户详情</button>
+                        <button class="btn btn-secondary" onclick="updateUser()">更新用户</button>
+                        <button class="btn btn-danger" onclick="deleteUser()">删除用户</button>
                     </div>
                 </div>
 
@@ -732,6 +734,77 @@
                 }
             } catch (error) {
                 addResult('user-detail', '获取用户详情', error.message, 'error');
+            }
+        }
+
+        // 更新用户
+        async function updateUser() {
+            const userId = document.getElementById('userId').value;
+            const username = document.getElementById('newUsername').value;
+            const email = document.getElementById('newEmail').value;
+            const role = document.getElementById('newRole').value;
+            
+            if (!userId) {
+                addResult('update-user', '更新用户', '请输入用户ID', 'warning');
+                return;
+            }
+            
+            // 构建更新数据，只包含非空字段
+            const updateData = {};
+            if (username && username.trim()) updateData.username = username;
+            if (email && email.trim()) updateData.email = email;
+            if (role && role.trim()) updateData.role = role;
+            
+            if (Object.keys(updateData).length === 0) {
+                addResult('update-user', '更新用户', '请至少填写一个要更新的字段', 'warning');
+                return;
+            }
+            
+            try {
+                const { response, data } = await makeRequest(`/api/admin/user/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (response.ok && data.code === 200) {
+                    addResult('update-user', '更新用户', 
+                        `用户 ${userId} 更新成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('update-user', '更新用户', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('update-user', '更新用户', error.message, 'error');
+            }
+        }
+
+        // 删除用户
+        async function deleteUser() {
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                addResult('delete-user', '删除用户', '请输入用户ID', 'warning');
+                return;
+            }
+            
+            // 确认删除
+            if (!confirm(`确定要删除用户 ${userId} 吗？此操作不可逆！`)) {
+                return;
+            }
+            
+            try {
+                const { response, data } = await makeRequest(`/api/admin/user/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok && data.code === 200) {
+                    addResult('delete-user', '删除用户', `用户 ${userId} 已删除`, 'success');
+                } else {
+                    addResult('delete-user', '删除用户', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('delete-user', '删除用户', error.message, 'error');
             }
         }
 

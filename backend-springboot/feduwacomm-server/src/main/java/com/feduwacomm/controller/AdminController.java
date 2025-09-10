@@ -229,14 +229,17 @@ public class AdminController {
     @PostMapping("/user/{userId}/permissions")
     public Result<PermissionGrantResponseVO> grantPermission(@PathVariable String userId,
             @Valid @RequestBody PermissionGrantDTO grantDTO) {
-        logger.info("管理员授予用户权限 - 用户ID: {}, 权限: {}", userId, grantDTO.getPermission());
+        // 支持两种字段名：permissionName（文档要求）和permission（兼容）
+        String permissionName = grantDTO.getPermissionName() != null ? 
+                grantDTO.getPermissionName() : grantDTO.getPermission();
+        logger.info("管理员授予用户权限 - 用户ID: {}, 权限: {}", userId, permissionName);
         
         try {
             PermissionGrantResponseVO response = adminService.grantPermission(userId, grantDTO);
             logger.info("管理员授予用户权限成功 - 用户ID: {}, 权限ID: {}", userId, response.getPermissionId());
             return Result.success("权限授予成功", response);
         } catch (Exception e) {
-            logger.error("管理员授予用户权限失败 - 用户ID: {}, 权限: {}", userId, grantDTO.getPermission(), e);
+            logger.error("管理员授予用户权限失败 - 用户ID: {}, 权限: {}", userId, permissionName, e);
             throw e;
         }
     }

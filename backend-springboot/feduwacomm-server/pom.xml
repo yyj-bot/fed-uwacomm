@@ -23,6 +23,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- 依赖common模块 -->
+        <dependency>
+            <groupId>com.feduwacomm</groupId>
+            <artifactId>feduwacomm-common</artifactId>
+        </dependency>
+
         <!-- 依赖pojo模块 -->
         <dependency>
             <groupId>com.feduwacomm</groupId>

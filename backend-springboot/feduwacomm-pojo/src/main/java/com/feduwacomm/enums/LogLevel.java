@@ -1,5 +1,7 @@
 package com.feduwacomm.enums;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum LogLevel {
     DEBUG("DEBUG", "调试信息，用于开发调试"),
     INFO("INFO", "一般信息，记录系统正常运行状态"),
@@ -14,6 +16,7 @@ public enum LogLevel {
         this.description = description;
     }
 
+    @JsonValue
     public String getCode() {
         return code;
     }

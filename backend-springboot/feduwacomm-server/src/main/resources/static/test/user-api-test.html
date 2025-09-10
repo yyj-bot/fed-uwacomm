@@ -922,7 +922,7 @@
 
         // 更新updateAuthStatus函数以支持token输入框同步
         const originalUpdateAuthStatus = updateAuthStatus;
-        function updateAuthStatus() {
+        updateAuthStatus = function() {
             originalUpdateAuthStatus();
             
             // 同步token输入框的值

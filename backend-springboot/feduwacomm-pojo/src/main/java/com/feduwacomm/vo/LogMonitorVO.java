@@ -28,6 +28,7 @@ public class LogMonitorVO {
     private List<ResponseTimeData> responseTimeTrend;
     private List<Alert> alerts;
     private List<AlertHistory> alertHistory;
+    private Map<String, Object> alertStatistics;
 
     @Data
     @Builder
@@ -162,6 +163,10 @@ public class LogMonitorVO {
         private String type;
         private String condition;
         private String status;
+        private String severity;
+        private Boolean enabled;
+        private Double threshold;
+        private Double currentValue;
         private LocalDateTime lastTriggered;
         private Integer triggerCount;
     }
@@ -172,8 +177,12 @@ public class LogMonitorVO {
     @AllArgsConstructor
     public static class AlertHistory {
         private String alertId;
+        private String alertName;
         private LocalDateTime triggeredAt;
+        private LocalDateTime resolvedAt;
         private String message;
         private String severity;
+        private Double value;
+        private Boolean resolved;
     }
 }

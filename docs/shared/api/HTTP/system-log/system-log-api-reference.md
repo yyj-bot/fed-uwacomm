@@ -728,10 +728,10 @@
 
 ## 11. 相关文档
 
-- [HTTP接口导览](./HTTP接口导览.md) - 系统API接口总览
-- [用户管理API参考文档](./user-api-reference.md) - 用户管理相关接口
-- [联邦学习任务管理API参考文档](./federated-task-api-reference.md) - 联邦学习任务管理相关接口
-- [训练数据管理API参考文档](./training-data-api-reference.md) - 训练数据管理相关接口
-- [模型版本管理API参考文档](./model-version-api-reference.md) - 模型版本管理相关接口
+- [HTTP接口导览](../HTTP接口导览.md) - 系统API接口总览
+- [用户管理API参考文档](../user/user-api-reference.md) - 用户管理相关接口
+- [联邦学习任务管理API参考文档](../federated-task/federated-task-api-reference.md) - 联邦学习任务管理相关接口
+- [训练数据管理API参考文档](../train-data/training-data-api-reference.md) - 训练数据管理相关接口
+- [模型版本管理API参考文档](../model/model-version-api-reference.md) - 模型版本管理相关接口
 - [数据库表结构文档](../../database/database_schema.md) - 数据库设计
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议 

@@ -656,9 +656,9 @@ Content-Type: application/json
 
 ## 7. 相关文档
 
-- [HTTP接口导览.md](./HTTP接口导览.md) - 系统整体API接口
-- [用户管理API参考文档](./user-api-reference.md) - 用户管理相关接口
-- [虚拟机API参考文档](./vm-api-reference.md) - 虚拟机管理相关接口
-- [联邦学习任务管理API参考文档](./federated-task-api-reference.md) - 联邦学习任务管理相关接口
+- [HTTP接口导览.md](../HTTP接口导览.md) - 系统整体API接口
+- [用户管理API参考文档](../user/user-api-reference.md) - 用户管理相关接口
+- [虚拟机API参考文档](../vm/vm-api-reference.md) - 虚拟机管理相关接口
+- [联邦学习任务管理API参考文档](../federated-task/federated-task-api-reference.md) - 联邦学习任务管理相关接口
 - [数据库表结构文档](../../database/database_schema.md) - 训练数据相关数据库设计
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议 

@@ -359,9 +359,18 @@ public class AdminServiceImpl implements AdminService {
             throw UserException.userNotFound();
         }
 
+        // 获取密码值，优先使用newPassword，兼容password字段
+        String passwordValue = resetDTO.getNewPassword() != null ? 
+            resetDTO.getNewPassword() : resetDTO.getPassword();
+        
+        if (passwordValue == null || passwordValue.trim().isEmpty()) {
+            log.warn("密码为空 - 用户ID: {}", userId);
+            throw UserException.passwordEmpty();
+        }
+        
         // 验证新密码格式
         try {
-            PasswordUtil.validatePasswordFormat(resetDTO.getNewPassword());
+            PasswordUtil.validatePasswordFormat(passwordValue);
         } catch (UserException e) {
             log.warn("密码格式无效 - 用户ID: {}, error: {}", userId, e.getMessage());
             throw e;
@@ -370,7 +379,7 @@ public class AdminServiceImpl implements AdminService {
         log.info("管理员重置用户密码 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
 
         // 更新密码
-        String newPasswordHash = PasswordUtil.encode(resetDTO.getNewPassword());
+        String newPasswordHash = PasswordUtil.encode(passwordValue);
         adminMapper.updatePassword(userId, newPasswordHash);
         log.warn("密码重置完成 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
     }

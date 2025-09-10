@@ -29,7 +29,7 @@ public class TrainingDataTextDTO {
     @NotBlank(message = "内容不能为空")
     private String content;
 
-    private String description;
+    private String datasetDescription;
 
     private List<String> tags;
 
