@@ -46,7 +46,7 @@
 1. **初始模型管理服务** - 缺少随机生成和分发初始模型的能力
 2. **数据分发服务** - 无法自动将训练数据分发到虚拟机
 3. **流程编排服务** - 缺少端到端工作流协调器
-4. **虚拟机部署服务** - 没有自动化部署和管理能力
+4. **管理员虚拟机管理服务** - 缺少虚拟机分配和权限管理功能
 5. **全局模型分发服务** - 模型分发功能不完整
 
 ❌ **架构问题**:
@@ -432,81 +432,149 @@ public class InitialModelGenerationHandler implements StageHandler {
 }
 ```
 
-### 4.4 虚拟机部署服务 (VmDeploymentService)
+### 4.4 管理员虚拟机管理服务 (VmAssignmentService)
 
 #### 4.4.1 服务职责
-- 自动化虚拟机的创建和部署
-- 支持多种虚拟化平台(Docker、VMware、KVM)
-- 管理虚拟机生命周期
-- 提供批量部署和扩容功能
+- 管理虚拟机分配给用户的权限
+- 支持批量分配和权限管理
+- 提供管理员视图的虚拟机管理功能
+- 实现"手动部署→注册→分配→使用"的完整流程
 
-#### 4.4.2 核心接口设计
+#### 4.4.2 虚拟机管理流程
+现有系统采用更符合实际运维的管理流程：
+1. **管理员手动部署虚拟机** - 在物理环境中部署虚拟机
+2. **虚拟机自动注册** - 虚拟机启动后调用注册接口向系统注册
+3. **管理员分配权限** - 管理员将注册的虚拟机分配给特定用户
+4. **用户正常使用** - 用户根据权限使用被分配的虚拟机
+
+#### 4.4.3 核心接口设计
 ```java
 @Service
-public class VmDeploymentService {
+public class VmAssignmentService {
     
     /**
-     * 创建部署任务
+     * 分配虚拟机给用户
      */
-    public VmDeployment createDeployment(VmDeploymentRequest request) {
-        // 1. 验证部署配置
-        // 2. 选择合适的部署平台
-        // 3. 生成部署计划
-        // 4. 创建部署任务记录
+    public VmAssignmentResult assignVmToUser(String vmId, String userId, Set<String> permissions) {
+        // 1. 验证虚拟机和用户存在性
+        // 2. 检查虚拟机是否已分配给该用户
+        // 3. 写入user_permissions表
+        // 4. 发布虚拟机分配事件
+        // 5. 返回分配结果
     }
     
     /**
-     * 启动虚拟机部署
+     * 取消虚拟机分配
      */
-    public void startDeployment(String deploymentId) {
-        // 1. 获取部署配置
-        // 2. 准备部署环境
-        // 3. 执行批量部署
-        // 4. 监控部署状态
+    public void unassignVmFromUser(String vmId, String userId) {
+        // 1. 验证分配关系存在
+        // 2. 删除user_permissions中的相关记录
+        // 3. 发布取消分配事件
+        // 4. 清理相关资源
     }
     
     /**
-     * 扩容虚拟机集群
+     * 获取用户被分配的虚拟机列表
      */
-    public ScaleOperation scaleDeployment(String deploymentId, ScaleRequest request) {
-        // 1. 验证扩容请求
-        // 2. 计算资源需求
-        // 3. 执行扩容操作
-        // 4. 更新负载均衡配置
+    public List<UserVmInfo> getUserAssignedVms(String userId) {
+        // 1. 查询user_permissions表
+        // 2. 关联vm_instances表获取虚拟机详情
+        // 3. 整合权限信息
+        // 4. 返回虚拟机列表
+    }
+    
+    /**
+     * 获取虚拟机的分配情况
+     */
+    public VmAssignmentInfo getVmAssignments(String vmId) {
+        // 1. 查询该虚拟机的所有分配记录
+        // 2. 关联用户信息
+        // 3. 统计分配状态
+        // 4. 返回分配概况
+    }
+    
+    /**
+     * 获取未分配的虚拟机列表
+     */
+    public List<VmInstance> getUnassignedVms() {
+        // 1. 查询所有虚拟机
+        // 2. 排除已有权限分配记录的虚拟机
+        // 3. 返回未分配列表
+    }
+    
+    /**
+     * 批量分配虚拟机
+     */
+    public BatchAssignmentResult batchAssignVms(String userId, List<String> vmIds, Set<String> permissions) {
+        // 1. 验证所有虚拟机和用户
+        // 2. 批量写入权限记录
+        // 3. 统计成功和失败情况
+        // 4. 发布批量分配事件
+        // 5. 返回批量操作结果
     }
 }
 ```
 
-#### 4.4.3 多平台适配设计
+#### 4.4.4 管理员虚拟机服务扩展
 ```java
-// 部署平台接口
-public interface DeploymentPlatform {
-    String getPlatformType();
-    boolean isAvailable();
-    VmInstance createVm(VmSpec spec);
-    void startVm(String vmId);
-    void stopVm(String vmId);
-    void destroyVm(String vmId);
-    VmStatus getVmStatus(String vmId);
-}
-
-// Docker平台实现
-@Component
-public class DockerDeploymentPlatform implements DeploymentPlatform {
+@Service
+public class AdminVmService {
     
     @Autowired
-    private DockerClient dockerClient;
+    private VmInstanceService vmInstanceService;
     
-    @Override
-    public VmInstance createVm(VmSpec spec) {
-        // 1. 构建Docker容器配置
-        // 2. 拉取镜像
-        // 3. 创建容器
-        // 4. 配置网络和存储
-        // 5. 返回虚拟机实例信息
+    @Autowired
+    private VmAssignmentService vmAssignmentService;
+    
+    /**
+     * 管理员查看所有虚拟机（不受权限限制）
+     */
+    public PageResult<AdminVmListVO> getAllVmsForAdmin(VmQueryDTO queryDTO) {
+        // 1. 绕过权限检查，查询所有虚拟机
+        // 2. 关联分配状态信息
+        // 3. 返回管理员视图的虚拟机列表
+    }
+    
+    /**
+     * 管理员强制控制虚拟机
+     */
+    public VmControlResult forceControlVm(String vmId, String operation, String adminId, String reason) {
+        // 1. 验证管理员权限
+        // 2. 记录强制操作日志
+        // 3. 执行虚拟机控制操作
+        // 4. 发布管理员操作事件
+    }
+    
+    /**
+     * 获取虚拟机分配概况
+     */
+    public VmAssignmentOverview getVmAssignmentOverview() {
+        // 1. 统计总虚拟机数量
+        // 2. 统计已分配和未分配数量
+        // 3. 分析用户分配分布
+        // 4. 返回概况统计
     }
 }
 ```
+
+#### 4.4.5 权限管理设计
+基于现有的`user_permissions`表实现虚拟机权限管理：
+```sql
+-- 虚拟机权限记录示例
+INSERT INTO user_permissions (
+    id, user_id, resource_type, resource_id, 
+    permission, granted_by, granted_at
+) VALUES (
+    'perm123', 'user456', 'VM', 'vm789',
+    'READ', 'admin123', NOW()
+);
+```
+
+支持的权限类型：
+- **READ**: 查看虚拟机信息和状态
+- **WRITE**: 修改虚拟机配置
+- **EXECUTE**: 执行虚拟机控制操作（启动、停止、重启）
+- **ADMIN**: 完全管理权限（包括删除等危险操作）
 
 ---
 
@@ -586,41 +654,38 @@ CREATE TABLE data_distribution_details (
 );
 ```
 
-#### 5.1.3 虚拟机部署相关表
+#### 5.1.3 虚拟机管理说明
+现有的数据库结构已经完全支持虚拟机管理需求，无需新增部署相关表：
+
+**现有表支持**：
+- **vm_instances表**: 存储所有注册的虚拟机信息
+- **user_permissions表**: 通过`resource_type='VM'`和`resource_id=vmId`实现虚拟机权限管理
+
+**虚拟机管理流程**：
+1. **管理员手动部署虚拟机** - 在物理环境或虚拟化平台中部署虚拟机
+2. **虚拟机自动注册** - 虚拟机启动后自动调用注册接口，记录写入`vm_instances`表
+3. **管理员分配权限** - 管理员通过分配接口，在`user_permissions`表中创建权限记录
+4. **用户正常使用** - 用户根据权限访问和使用虚拟机
+
+**权限管理示例**：
 ```sql
--- 虚拟机部署表
-CREATE TABLE vm_deployments (
-    id VARCHAR(50) PRIMARY KEY,
-    deployment_name VARCHAR(100) NOT NULL,
-    platform_type VARCHAR(50) NOT NULL,
-    status ENUM('CREATED', 'IN_PROGRESS', 'DEPLOYED', 'SCALING', 'FAILED', 'DESTROYED'),
-    vm_count INT NOT NULL DEFAULT 0,
-    config JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    started_at TIMESTAMP NULL,
-    completed_at TIMESTAMP NULL,
-    created_by VARCHAR(50),
-    INDEX idx_status (status),
-    INDEX idx_platform (platform_type)
+-- 分配虚拟机READ权限给用户
+INSERT INTO user_permissions (
+    id, user_id, resource_type, resource_id, 
+    permission, granted_by, granted_at
+) VALUES (
+    UUID(), 'user123', 'VM', 'vm456',
+    'READ', 'admin789', NOW()
 );
 
--- 部署的虚拟机实例表
-CREATE TABLE deployed_vm_instances (
-    id VARCHAR(50) PRIMARY KEY,
-    deployment_id VARCHAR(50) NOT NULL,
-    vm_name VARCHAR(100) NOT NULL,
-    platform_vm_id VARCHAR(100),
-    status ENUM('CREATING', 'RUNNING', 'STOPPED', 'FAILED', 'DESTROYED'),
-    ip_address VARCHAR(45),
-    resource_spec JSON,
-    health_status VARCHAR(20),
-    deployed_at TIMESTAMP NULL,
-    last_health_check TIMESTAMP NULL,
-    FOREIGN KEY (deployment_id) REFERENCES vm_deployments(id),
-    INDEX idx_deployment_id (deployment_id),
-    INDEX idx_status (status)
-);
+-- 查询用户拥有的虚拟机
+SELECT v.*, up.permission 
+FROM vm_instances v
+JOIN user_permissions up ON v.id = up.resource_id
+WHERE up.user_id = 'user123' AND up.resource_type = 'VM';
 ```
+
+这种设计避免了复杂的自动化部署逻辑，更符合实际的企业运维场景。
 
 ### 5.2 现有表扩展
 
@@ -630,10 +695,8 @@ CREATE TABLE deployed_vm_instances (
 ALTER TABLE federated_tasks 
 ADD COLUMN orchestration_id VARCHAR(50) NULL,
 ADD COLUMN initial_model_strategy ENUM('RANDOM', 'CUSTOM_UPLOAD') DEFAULT 'RANDOM',
-ADD COLUMN deployment_id VARCHAR(50) NULL,
 ADD COLUMN workflow_config JSON,
-ADD INDEX idx_orchestration_id (orchestration_id),
-ADD INDEX idx_deployment_id (deployment_id);
+ADD INDEX idx_orchestration_id (orchestration_id);
 ```
 
 #### 5.2.2 全局模型表扩展  
@@ -679,19 +742,19 @@ ADD COLUMN distribution_completed_at TIMESTAMP NULL;
 - [ ] 开发异常处理和恢复机制
 - [ ] 实现流程监控功能
 
-### 6.3 阶段三：虚拟机部署服务 (Week 9-12)
+### 6.3 阶段三：管理员虚拟机管理服务 (Week 9-12)
 
-#### Week 9-10: 部署框架
-- [ ] 实现VmDeploymentService基础框架
-- [ ] 设计多平台适配接口
-- [ ] 实现Docker部署平台
-- [ ] 添加部署相关数据表
+#### Week 9-10: 管理员接口和服务实现
+- [ ] 实现VmAssignmentService虚拟机分配服务
+- [ ] 实现AdminVmService管理员虚拟机服务
+- [ ] 开发AdminVmController管理员接口
+- [ ] 完善权限验证和授权逻辑
 
-#### Week 11-12: 部署功能完善
-- [ ] 实现批量部署和扩容
-- [ ] 开发部署状态监控
-- [ ] 实现健康检查机制
-- [ ] 集成网络和存储管理
+#### Week 11-12: 虚拟机管理功能完善
+- [ ] 实现批量分配和权限管理
+- [ ] 开发虚拟机分配状态监控
+- [ ] 实现管理员强制控制功能
+- [ ] 完善虚拟机分配概况统计
 
 ### 6.4 阶段四：系统集成和测试 (Week 13-16)
 
@@ -1505,7 +1568,7 @@ groups:
 - ✅ 实现端到端联邦学习自动化流程
 - ✅ 支持初始模型自动生成和分发
 - ✅ 提供训练数据自动分发能力
-- ✅ 实现虚拟机自动化部署管理
+- ✅ 实现完整的虚拟机权限分配和管理体系
 
 **系统可靠性提升**:
 - ✅ 增强错误处理和故障恢复能力

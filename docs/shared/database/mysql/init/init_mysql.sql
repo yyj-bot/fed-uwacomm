@@ -612,54 +612,14 @@ CREATE TABLE IF NOT EXISTS workflow_stage_executions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='工作流阶段执行记录表 - 跟踪每个工作流阶段的执行状态';
 
--- 21. 虚拟机部署表
-CREATE TABLE IF NOT EXISTS vm_deployments (
-    id VARCHAR(32) PRIMARY KEY COMMENT '部署唯一标识(32位UUID)',
-    deployment_name VARCHAR(100) NOT NULL COMMENT '部署名称',
-    platform_type VARCHAR(50) NOT NULL COMMENT '平台类型(DOCKER, VMWARE, KVM等)',
-    status ENUM('CREATED', 'IN_PROGRESS', 'DEPLOYED', 'SCALING', 'FAILED', 'DESTROYED') DEFAULT 'CREATED' COMMENT '部署状态',
-    vm_count INT NOT NULL DEFAULT 0 COMMENT '虚拟机数量',
-    config JSON COMMENT '部署配置(JSON格式)',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    started_at TIMESTAMP NULL COMMENT '开始时间',
-    completed_at TIMESTAMP NULL COMMENT '完成时间',
-    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_vm_deployments_status (status),
-    INDEX idx_vm_deployments_platform (platform_type),
-    INDEX idx_vm_deployments_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
-  COMMENT='虚拟机部署表 - 管理虚拟机部署任务';
-
--- 22. 部署的虚拟机实例表
-CREATE TABLE IF NOT EXISTS deployed_vm_instances (
-    id VARCHAR(32) PRIMARY KEY COMMENT '实例唯一标识(32位UUID)',
-    deployment_id VARCHAR(32) NOT NULL COMMENT '部署ID(32位UUID)',
-    vm_name VARCHAR(100) NOT NULL COMMENT '虚拟机名称',
-    platform_vm_id VARCHAR(100) COMMENT '平台虚拟机ID',
-    status ENUM('CREATING', 'RUNNING', 'STOPPED', 'FAILED', 'DESTROYED') DEFAULT 'CREATING' COMMENT '实例状态',
-    ip_address VARCHAR(45) COMMENT 'IP地址',
-    resource_spec JSON COMMENT '资源规格(JSON格式)',
-    health_status VARCHAR(20) COMMENT '健康状态',
-    deployed_at TIMESTAMP NULL COMMENT '部署时间',
-    last_health_check TIMESTAMP NULL COMMENT '最后健康检查时间',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_deployed_vm_instances_deployment_id (deployment_id),
-    INDEX idx_deployed_vm_instances_status (status),
-    INDEX idx_deployed_vm_instances_ip (ip_address),
-    FOREIGN KEY (deployment_id) REFERENCES vm_deployments (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
-  COMMENT='部署的虚拟机实例表 - 跟踪通过部署服务创建的VM实例';
 
 -- 扩展现有表结构
 -- 为federated_tasks表添加新字段
 ALTER TABLE federated_tasks 
 ADD COLUMN orchestration_id VARCHAR(32) NULL COMMENT '工作流编排ID(32位UUID)',
 ADD COLUMN initial_model_strategy ENUM('RANDOM', 'CUSTOM_UPLOAD') DEFAULT 'RANDOM' COMMENT '初始模型策略',
-ADD COLUMN deployment_id VARCHAR(32) NULL COMMENT '部署ID(32位UUID)',
 ADD COLUMN workflow_config JSON COMMENT '工作流配置(JSON格式)',
-ADD INDEX idx_federated_tasks_orchestration_id (orchestration_id),
-ADD INDEX idx_federated_tasks_deployment_id (deployment_id);
+ADD INDEX idx_federated_tasks_orchestration_id (orchestration_id);
 
 -- 为global_models表添加分发状态字段
 ALTER TABLE global_models
@@ -671,7 +631,7 @@ ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间'
 -- 初始化完成
 -- =====================================================
 -- 数据库初始化脚本执行完成
--- 共创建了 22 个表:
+-- 共创建了 20 个表:
 -- 1. users - 用户表
 -- 2. user_permissions - 用户权限表
 -- 3. vm_instances - 虚拟机表
@@ -692,6 +652,4 @@ ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间'
 -- 18. data_distribution_details - 数据分发详情表（新增）
 -- 19. orchestration_workflows - 工作流编排表（新增）
 -- 20. workflow_stage_executions - 工作流阶段执行记录表（新增）
--- 21. vm_deployments - 虚拟机部署表（新增）
--- 22. deployed_vm_instances - 部署的虚拟机实例表（新增）
 -- =====================================================

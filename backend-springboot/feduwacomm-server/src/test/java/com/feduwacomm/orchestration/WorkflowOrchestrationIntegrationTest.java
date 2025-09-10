@@ -195,14 +195,23 @@ public class WorkflowOrchestrationIntegrationTest {
         participant2.setRole("TRAINER");
         participants.add(participant2);
         
+        // 创建超参数配置
+        TaskCreateDTO.HyperparametersDTO hyperparameters = TaskCreateDTO.HyperparametersDTO.builder()
+                .learningRate(0.001)
+                .batchSize(32)
+                .rounds(10)
+                .epochs(100)
+                .minParticipants(2)
+                .aggregationMethod("WEIGHTED_AVERAGE")
+                .build();
+
         TaskCreateDTO createDTO = new TaskCreateDTO();
         createDTO.setTaskName("自动化工作流测试任务");
-        createDTO.setAlgorithm("FEDAVG");
-        createDTO.setTotalRounds(10);
-        createDTO.setBatchSize(32);
-        createDTO.setLearningRate(0.001);
+        createDTO.setTaskType("CLASSIFICATION");
+        createDTO.setAlgorithm("FEDERATED_AVERAGING");
         createDTO.setDescription("用于测试自动工作流编排的任务");
         createDTO.setParticipants(participants);
+        createDTO.setHyperparameters(hyperparameters);
         
         return createDTO;
     }

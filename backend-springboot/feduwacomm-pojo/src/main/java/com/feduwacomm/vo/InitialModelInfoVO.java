@@ -128,4 +128,48 @@ public class InitialModelInfoVO {
          */
         private Double progressPercentage;
     }
+    
+    /**
+     * 模型生成统计内部类
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ModelGenerationStats {
+        /**
+         * 总模型数量
+         */
+        private Integer totalModels;
+        
+        /**
+         * 生成中数量
+         */
+        private Integer generating;
+        
+        /**
+         * 就绪数量
+         */
+        private Integer ready;
+        
+        /**
+         * 已分发数量
+         */
+        private Integer distributed;
+        
+        /**
+         * 失败数量
+         */
+        private Integer failed;
+        
+        /**
+         * 成功率
+         */
+        private Double successRate;
+        
+        /**
+         * 平均生成时间(秒)
+         */
+        private Double avgGenerationTime;
+    }
 }

@@ -13,6 +13,7 @@ import com.feduwacomm.testdata.TestHelper;
 import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.utils.PasswordUtil;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,8 @@ class UserServiceTest {
     @Mock
     private UserJwtUtil userJwtUtil;
 
+    @Mock
+    private UuidUtil uuidUtil;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -76,6 +79,9 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 初始化PasswordUtil的encoder用于测试
+        initializePasswordUtil();
+        
         // 初始化Mock数据库，提供状态一致性
         mockDatabase = new TestHelper.MockDatabase();
         
@@ -84,63 +90,21 @@ class UserServiceTest {
         registerDTO = TestDataBuilder.DTOs.validRegisterDTO().build();
         loginDTO = TestDataBuilder.DTOs.validLoginDTO().build();
         
-        // 配置基础Mock行为
-        configureMockMapperBehavior();
+        // 不再统一配置Mock行为，改为按需配置以避免UnnecessaryStubbing
     }
     
     /**
-     * 配置Mapper的Mock行为，模拟数据库状态变化
+     * 为测试初始化PasswordUtil
      */
-    private void configureMockMapperBehavior() {
-        // 用户查询相关Mock
-        when(userMapper.selectById(anyString())).thenAnswer(invocation -> 
-            mockDatabase.selectUserById(invocation.getArgument(0)));
-        
-        when(userMapper.selectByUsername(anyString())).thenAnswer(invocation -> 
-            mockDatabase.selectUserByUsername(invocation.getArgument(0)));
-        
-        when(userMapper.selectByEmail(anyString())).thenAnswer(invocation -> 
-            mockDatabase.selectUserByEmail(invocation.getArgument(0)));
-        
-        // 用户操作相关Mock
-        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            mockDatabase.insertUser(user);
-            return 1;
-        });
-        
-        when(userMapper.update(any(User.class))).thenAnswer(invocation -> {
-            User user = invocation.getArgument(0);
-            return mockDatabase.updateUser(user);
-        });
-        
-        when(userMapper.countAll()).thenAnswer(invocation -> mockDatabase.countUsers());
-        
-        when(userMapper.updatePassword(anyString(), anyString())).thenAnswer(invocation -> {
-            String userId = invocation.getArgument(0);
-            String newPasswordHash = invocation.getArgument(1);
-            User user = mockDatabase.selectUserById(userId);
-            if (user != null) {
-                User updatedUser = User.builder()
-                        .id(user.getId())
-                        .username(user.getUsername())
-                        .email(user.getEmail())
-                        .passwordHash(newPasswordHash)
-                        .role(user.getRole())
-                        .status(user.getStatus())
-                        .loginAttempts(user.getLoginAttempts())
-                        .lastLoginTime(user.getLastLoginTime())
-                        .lastLoginIp(user.getLastLoginIp())
-                        .createdAt(user.getCreatedAt())
-                        .updatedAt(LocalDateTime.now())
-                        .createdBy(user.getCreatedBy())
-                        .updatedBy(user.getUpdatedBy())
-                        .lockedUntil(user.getLockedUntil())
-                        .build();
-                return mockDatabase.updateUser(updatedUser);
-            }
-            return 0;
-        });
+    private void initializePasswordUtil() {
+        try {
+            // 使用反射设置PasswordUtil的encoder
+            java.lang.reflect.Field encoderField = PasswordUtil.class.getDeclaredField("encoder");
+            encoderField.setAccessible(true);
+            encoderField.set(null, new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize PasswordUtil for testing", e);
+        }
     }
 
     // 认证相关方法测试
@@ -156,6 +120,17 @@ class UserServiceTest {
         
         // 清空mock数据库，模拟第一个用户注册
         mockDatabase.clear();
+        
+        // 配置此测试需要的Mock行为
+        when(userMapper.selectByEmail("first@example.com")).thenReturn(null);
+        when(userMapper.selectByUsername("firstuser")).thenReturn(null);
+        when(userMapper.countAll()).thenReturn(0); // 第一个用户
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            mockDatabase.insertUser(user);
+            return 1;
+        });
+        when(uuidUtil.generateUuid()).thenReturn("test-uuid-first-user");
 
         // 执行测试
         UserRegisterResponseVO result = userService.register(firstUserDTO);
@@ -199,6 +174,17 @@ class UserServiceTest {
                 .username("seconduser")
                 .email("second@example.com")
                 .build();
+
+        // 配置此测试需要的Mock行为
+        when(userMapper.selectByEmail("second@example.com")).thenReturn(null);
+        when(userMapper.selectByUsername("seconduser")).thenReturn(null);
+        when(userMapper.countAll()).thenReturn(1); // 已有用户
+        when(userMapper.insert(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            mockDatabase.insertUser(user);
+            return 1;
+        });
+        when(uuidUtil.generateUuid()).thenReturn("test-uuid-second-user");
 
         // 执行测试
         UserRegisterResponseVO result = userService.register(secondUserDTO);

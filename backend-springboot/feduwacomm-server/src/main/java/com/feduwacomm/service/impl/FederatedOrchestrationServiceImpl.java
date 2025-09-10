@@ -56,6 +56,15 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     @Autowired
     private DataDistributionStageHandler dataDistributionHandler;
     
+    @Autowired
+    private ModelDistributionStageHandler modelDistributionHandler;
+    
+    @Autowired
+    private FederatedTrainingStageHandler trainingHandler;
+    
+    @Autowired
+    private FinalAggregationStageHandler aggregationHandler;
+    
     @PostConstruct
     private void initStageHandlers() {
         // 初始化处理器映射
@@ -63,7 +72,11 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
         this.stageHandlers.put(WorkflowStage.INITIALIZATION, initializationHandler);
         this.stageHandlers.put(WorkflowStage.INITIAL_MODEL_GENERATION, modelGenerationHandler);
         this.stageHandlers.put(WorkflowStage.DATA_DISTRIBUTION, dataDistributionHandler);
-        // TODO: 添加其他阶段处理器
+        this.stageHandlers.put(WorkflowStage.MODEL_DISTRIBUTION, modelDistributionHandler);
+        this.stageHandlers.put(WorkflowStage.FEDERATED_TRAINING, trainingHandler);
+        this.stageHandlers.put(WorkflowStage.FINAL_AGGREGATION, aggregationHandler);
+        
+        log.info("工作流阶段处理器初始化完成，支持 {} 个阶段", stageHandlers.size());
     }
 
     /**
