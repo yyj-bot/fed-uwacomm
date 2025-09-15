@@ -128,12 +128,7 @@ class SimpleWorkflowIntegrationTest {
         assertThat(userDetail.getRole()).isEqualTo("VIEWER");
         assertThat(userDetail.getUsername()).isEqualTo("researcher01");
         
-        // 3.3 验证用户权限（允许为空，新用户可能默认没有权限）
-        List<UserPermissionVO> adminPermissions = adminService.getUserPermissions(adminUserId);
-        assertThat(adminPermissions).isNotNull(); // 只验证返回值不为null
-        
-        List<UserPermissionVO> userPermissions = adminService.getUserPermissions(normalUserId);
-        assertThat(userPermissions).isNotNull(); // 只验证返回值不为null
+        // 3.3 权限管理已改为基于角色的权限管理，跳过单独的权限检查
         
         // 步骤4: 验证用户信息更新
         UserUpdateDTO updateDTO = new UserUpdateDTO();

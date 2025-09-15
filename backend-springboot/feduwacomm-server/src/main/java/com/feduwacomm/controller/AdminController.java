@@ -205,60 +205,19 @@ public class AdminController {
     }
 
     /**
-     * 获取用户权限
-     * GET /api/admin/user/{userId}/permissions
+     * 获取用户统计信息
+     * GET /api/admin/user/statistics
      */
-    @GetMapping("/user/{userId}/permissions")
-    public Result<List<UserPermissionVO>> getUserPermissions(@PathVariable String userId) {
-        logger.info("管理员查询用户权限 - 用户ID: {}", userId);
-        
+    @GetMapping("/user/statistics")
+    public Result<UserStatisticsVO> getUserStatistics() {
+        logger.info("管理员查询用户统计信息");
+
         try {
-            List<UserPermissionVO> response = adminService.getUserPermissions(userId);
-            logger.info("管理员查询用户权限成功 - 用户ID: {}, 权限数量: {}", userId, response.size());
+            UserStatisticsVO response = adminService.getUserStatistics();
+            logger.info("管理员查询用户统计信息成功 - 总用户数: {}", response.getTotalUsers());
             return Result.success("获取成功", response);
         } catch (Exception e) {
-            logger.error("管理员查询用户权限失败 - 用户ID: {}", userId, e);
-            throw e;
-        }
-    }
-
-    /**
-     * 授予用户权限
-     * POST /api/admin/user/{userId}/permissions
-     */
-    @PostMapping("/user/{userId}/permissions")
-    public Result<PermissionGrantResponseVO> grantPermission(@PathVariable String userId,
-            @Valid @RequestBody PermissionGrantDTO grantDTO) {
-        // 支持两种字段名：permissionName（文档要求）和permission（兼容）
-        String permissionName = grantDTO.getPermissionName() != null ? 
-                grantDTO.getPermissionName() : grantDTO.getPermission();
-        logger.info("管理员授予用户权限 - 用户ID: {}, 权限: {}", userId, permissionName);
-        
-        try {
-            PermissionGrantResponseVO response = adminService.grantPermission(userId, grantDTO);
-            logger.info("管理员授予用户权限成功 - 用户ID: {}, 权限ID: {}", userId, response.getPermissionId());
-            return Result.success("权限授予成功", response);
-        } catch (Exception e) {
-            logger.error("管理员授予用户权限失败 - 用户ID: {}, 权限: {}", userId, permissionName, e);
-            throw e;
-        }
-    }
-
-    /**
-     * 撤销用户权限
-     * DELETE /api/admin/user/{userId}/permissions/{permissionId}
-     */
-    @DeleteMapping("/user/{userId}/permissions/{permissionId}")
-    public Result<String> revokePermission(@PathVariable String userId,
-            @PathVariable String permissionId) {
-        logger.warn("管理员撤销用户权限 - 用户ID: {}, 权限ID: {}", userId, permissionId);
-        
-        try {
-            adminService.revokePermission(userId, permissionId);
-            logger.warn("管理员撤销用户权限成功 - 用户ID: {}, 权限ID: {}", userId, permissionId);
-            return Result.success("权限撤销成功", null);
-        } catch (Exception e) {
-            logger.error("管理员撤销用户权限失败 - 用户ID: {}, 权限ID: {}", userId, permissionId, e);
+            logger.error("管理员查询用户统计信息失败", e);
             throw e;
         }
     }

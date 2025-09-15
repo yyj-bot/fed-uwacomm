@@ -3,10 +3,8 @@ package com.feduwacomm.service.impl;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
-import com.feduwacomm.entity.UserPermission;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.AdminMapper;
-import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.service.AdminService;
 import com.feduwacomm.utils.PasswordUtil;
 import com.feduwacomm.utils.UuidUtil;
@@ -32,9 +30,6 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     private AdminMapper adminMapper;
-
-    @Autowired
-    private UserPermissionMapper userPermissionMapper;
 
     @Autowired
     private UuidUtil uuidUtil;
@@ -267,12 +262,8 @@ public class AdminServiceImpl implements AdminService {
             throw UserException.permissionDenied();
         }
 
-        log.info("删除用户信息 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}", 
+        log.info("删除用户信息 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}",
                 userId, user.getUsername(), user.getRole(), user.getStatus());
-
-        // 删除用户权限
-        int permissionCount = userPermissionMapper.deleteByUserId(userId);
-        log.info("删除用户权限 - 用户ID: {}, 权限数量: {}", userId, permissionCount);
 
         // 删除用户
         adminMapper.deleteById(userId);
@@ -385,94 +376,47 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public List<UserPermissionVO> getUserPermissions(String userId) {
-        log.info("执行用户权限查询 - 用户ID: {}", userId);
-        
-        User user = getUserById(userId);
-        if (user == null) {
-            log.warn("用户不存在 - 用户ID: {}", userId);
-            throw UserException.userNotFound();
+    public UserStatisticsVO getUserStatistics() {
+        log.info("获取用户统计信息");
+
+        try {
+            // 获取用户总数
+            long totalUsers = adminMapper.countByCondition(null, null, null);
+
+            // 统计各角色用户数量
+            long adminUsers = adminMapper.countByCondition("ADMIN", null, null);
+            long researcherUsers = adminMapper.countByCondition("RESEARCHER", null, null);
+            long operatorUsers = adminMapper.countByCondition("OPERATOR", null, null);
+            long viewerUsers = adminMapper.countByCondition("VIEWER", null, null);
+
+            // 统计各状态用户数量
+            long activeUsers = adminMapper.countByCondition(null, "ACTIVE", null);
+            long lockedUsers = adminMapper.countByCondition(null, "LOCKED", null);
+
+            // 获取今日新增用户数（这里简化处理，实际应根据创建时间筛选）
+            long todayNewUsers = 0; // 暂时设为0，可以后续扩展
+
+            UserStatisticsVO statistics = UserStatisticsVO.builder()
+                    .totalUsers(totalUsers)
+                    .activeUsers(activeUsers)
+                    .lockedUsers(lockedUsers)
+                    .adminUsers(adminUsers)
+                    .researcherUsers(researcherUsers)
+                    .operatorUsers(operatorUsers)
+                    .viewerUsers(viewerUsers)
+                    .todayNewUsers(todayNewUsers)
+                    .timestamp(System.currentTimeMillis())
+                    .hasUsers(totalUsers > 0)
+                    .build();
+
+            log.info("用户统计信息获取成功 - 总用户数: {}, 活跃用户数: {}, 管理员数: {}",
+                    totalUsers, activeUsers, adminUsers);
+
+            return statistics;
+        } catch (Exception e) {
+            log.error("获取用户统计信息时发生错误", e);
+            throw new RuntimeException("获取用户统计信息失败: " + e.getMessage());
         }
-
-        List<UserPermission> permissions = userPermissionMapper.selectByUserId(userId);
-        log.info("用户权限查询完成 - 用户ID: {}, 用户名: {}, 权限数量: {}", 
-                userId, user.getUsername(), permissions.size());
-
-        return permissions.stream()
-                .map(this::convertToUserPermissionVO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional
-    public PermissionGrantResponseVO grantPermission(String userId, PermissionGrantDTO grantDTO) {
-        // 支持两种字段名：permissionName（API文档要求）和permission（向后兼容）
-        String permissionName = grantDTO.getPermissionName() != null ? 
-                grantDTO.getPermissionName() : grantDTO.getPermission();
-        
-        log.info("执行权限授予 - 用户ID: {}, 权限: {}", userId, permissionName);
-        
-        User user = getUserById(userId);
-        if (user == null) {
-            log.warn("用户不存在 - 用户ID: {}", userId);
-            throw UserException.userNotFound();
-        }
-
-        // 检查权限是否已存在
-        UserPermission existingPermission = userPermissionMapper.selectByUserIdAndResource(
-                userId, "SYSTEM", null);
-
-        if (existingPermission != null) {
-            log.warn("权限已存在 - 用户ID: {}, 权限: {}, 权限ID: {}", 
-                    userId, permissionName, existingPermission.getId());
-            throw UserException.permissionDenied();
-        }
-
-        // 创建权限
-        UserPermission permission = UserPermission.builder()
-                .id(uuidUtil.generateUuid())
-                .userId(userId)
-                .resourceType("SYSTEM") // 默认系统权限
-                .resourceId(null) // 系统级权限
-                .permission(permissionName)
-                .grantedAt(LocalDateTime.now())
-                .grantedBy(BaseContext.getCurrentUserId())
-                .expiresAt(grantDTO.getExpiresAt())
-                .build();
-
-        userPermissionMapper.insert(permission);
-        log.info("权限授予成功 - 用户ID: {}, 用户名: {}, 权限: {}, 权限ID: {}", 
-                userId, user.getUsername(), permissionName, permission.getId());
-
-        return PermissionGrantResponseVO.builder()
-                .permissionId(permission.getId())
-                .grantedAt(permission.getGrantedAt())
-                .build();
-    }
-
-    @Override
-    @Transactional
-    public void revokePermission(String userId, String permissionId) {
-        log.warn("执行权限撤销 - 用户ID: {}, 权限ID: {}", userId, permissionId);
-        
-        User user = getUserById(userId);
-        if (user == null) {
-            log.warn("用户不存在 - 用户ID: {}", userId);
-            throw UserException.userNotFound();
-        }
-
-        UserPermission permission = userPermissionMapper.selectById(permissionId);
-        if (permission == null || !permission.getUserId().equals(userId)) {
-            log.warn("权限不存在或不属于该用户 - 用户ID: {}, 权限ID: {}", userId, permissionId);
-            throw UserException.permissionDenied();
-        }
-
-        log.info("撤销用户权限 - 用户ID: {}, 用户名: {}, 权限: {}, 权限ID: {}", 
-                userId, user.getUsername(), permission.getPermission(), permissionId);
-
-        userPermissionMapper.deleteById(permissionId);
-        log.warn("权限撤销完成 - 用户ID: {}, 用户名: {}, 权限: {}, 权限ID: {}", 
-                userId, user.getUsername(), permission.getPermission(), permissionId);
     }
 
     // 私有辅助方法
@@ -541,21 +485,6 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private UserPermissionVO convertToUserPermissionVO(UserPermission permission) {
-        return UserPermissionVO.builder()
-                .id(permission.getId())
-                .permissionId(permission.getId()) // API文档要求的字段名
-                .userId(permission.getUserId())
-                .resourceType(permission.getResourceType())
-                .resourceId(permission.getResourceId())
-                .permission(permission.getPermission())
-                .permissionName(permission.getPermission()) // API文档要求的字段名
-                .description(getPermissionDescription(permission.getPermission())) // API文档要求的权限描述
-                .grantedAt(permission.getGrantedAt())
-                .grantedBy(permission.getGrantedBy())
-                .expiresAt(permission.getExpiresAt())
-                .build();
-    }
 
     /**
      * 获取更新字段信息

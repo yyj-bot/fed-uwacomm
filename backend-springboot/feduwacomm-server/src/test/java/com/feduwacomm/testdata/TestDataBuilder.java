@@ -2,7 +2,6 @@ package com.feduwacomm.testdata;
 
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
-import com.feduwacomm.entity.UserPermission;
 import com.feduwacomm.entity.VmInstance;
 import com.feduwacomm.utils.PasswordUtil;
 import com.feduwacomm.vo.*;
@@ -145,13 +144,6 @@ public class TestDataBuilder {
                     .keyword("test");
         }
         
-        public static PermissionGrantDTO.PermissionGrantDTOBuilder validPermissionGrantDTO() {
-            return PermissionGrantDTO.builder()
-                    .resourceType("VM")
-                    .resourceId(generateTestId())
-                    .permission("READ")
-                    .expiresAt(LocalDateTime.now().plusDays(30));
-        }
     }
 
     /**
@@ -256,22 +248,7 @@ public class TestDataBuilder {
                     .status("ACTIVE");
         }
         
-        public static UserPermissionVO.UserPermissionVOBuilder validPermissionVO() {
-            return UserPermissionVO.builder()
-                    .id(generateTestId())
-                    .resourceType("VM")
-                    .resourceId(generateTestId())
-                    .permission("READ")
-                    .grantedAt(LocalDateTime.now())
-                    .grantedBy(generateTestId())
-                    .expiresAt(LocalDateTime.now().plusDays(30));
-        }
         
-        public static PermissionGrantResponseVO.PermissionGrantResponseVOBuilder validPermissionGrantResponseVO() {
-            return PermissionGrantResponseVO.builder()
-                    .permissionId(generateTestId())
-                    .grantedAt(LocalDateTime.now());
-        }
     }
 
     /**
@@ -279,17 +256,6 @@ public class TestDataBuilder {
      */
     public static class Entities {
         
-        public static UserPermission.UserPermissionBuilder validUserPermission() {
-            return UserPermission.builder()
-                    .id(generateTestId())
-                    .userId(generateTestId())
-                    .resourceType("VM")
-                    .resourceId(generateTestId())
-                    .permission("read")
-                    .grantedAt(LocalDateTime.now())
-                    .grantedBy(generateTestId())
-                    .expiresAt(LocalDateTime.now().plusDays(30));
-        }
         
         public static VmInstance.VmInstanceBuilder validVmInstance() {
             return VmInstance.builder()

@@ -53,19 +53,9 @@ public interface AdminService {
      */
     void resetPassword(String userId, PasswordResetDTO resetDTO);
 
-    // 权限管理
     /**
-     * 获取用户权限
+     * 获取用户统计信息
      */
-    List<UserPermissionVO> getUserPermissions(String userId);
+    UserStatisticsVO getUserStatistics();
 
-    /**
-     * 授予用户权限
-     */
-    PermissionGrantResponseVO grantPermission(String userId, PermissionGrantDTO grantDTO);
-
-    /**
-     * 撤销用户权限
-     */
-    void revokePermission(String userId, String permissionId);
 }

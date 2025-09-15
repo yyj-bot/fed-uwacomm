@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.LogCleanupTaskMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="LogCleanupTaskResultMap" type="com.feduwacomm.entity.LogCleanupTask">
+        <id property="id" column="id"/>
+        <result property="cleanupId" column="cleanup_id"/>
+        <result property="status" column="status"/>
+        <result property="strategy" column="strategy"/>
+        <result property="cleanupConditions" column="cleanup_conditions"/>
+        <result property="progress" column="progress"/>
+        <result property="estimatedRecords" column="estimated_records"/>
+        <result property="deletedRecords" column="deleted_records"/>
+        <result property="estimatedSize" column="estimated_size"/>
+        <result property="freedSpace" column="freed_space"/>
+        <result property="dryRun" column="dry_run"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="createdBy" column="created_by"/>
+    </resultMap>
+
+    <!-- 插入日志清理任务 -->
+    <insert id="insert" parameterType="com.feduwacomm.entity.LogCleanupTask">
+        INSERT INTO log_cleanup_tasks (
+            id, cleanup_id, status, strategy, cleanup_conditions, progress,
+            estimated_records, deleted_records, estimated_size, freed_space,
+            dry_run, created_at, started_at, completed_at, error_message, created_by
+        ) VALUES (
+            #{id}, #{cleanupId}, #{status}, #{strategy}, #{cleanupConditions}, #{progress},
+            #{estimatedRecords}, #{deletedRecords}, #{estimatedSize}, #{freedSpace},
+            #{dryRun}, #{createdAt}, #{startedAt}, #{completedAt}, #{errorMessage}, #{createdBy}
+        )
+    </insert>
+
+    <!-- 根据ID查询清理任务 -->
+    <select id="selectById" resultMap="LogCleanupTaskResultMap">
+        SELECT * FROM log_cleanup_tasks WHERE cleanup_id = #{cleanupId}
+    </select>
+
+    <!-- 更新任务状态 -->
+    <update id="updateStatus">
+        UPDATE log_cleanup_tasks
+        SET status = #{status},
+            progress = #{progress},
+            deleted_records = #{deletedRecords},
+            freed_space = #{freedSpace},
+            completed_at = #{completedAt},
+            error_message = #{errorMessage}
+        WHERE cleanup_id = #{cleanupId}
+    </update>
+
+    <!-- 更新任务进度 -->
+    <update id="updateProgress">
+        UPDATE log_cleanup_tasks
+        SET progress = #{progress},
+            deleted_records = #{deletedRecords},
+            freed_space = #{freedSpace}
+        WHERE cleanup_id = #{cleanupId}
+    </update>
+
+    <!-- 根据状态查询清理任务 -->
+    <select id="selectByStatus" resultMap="LogCleanupTaskResultMap">
+        SELECT * FROM log_cleanup_tasks
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 根据状态统计数量 -->
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*) FROM log_cleanup_tasks
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据策略查询清理任务 -->
+    <select id="selectByStrategy" resultMap="LogCleanupTaskResultMap">
+        SELECT * FROM log_cleanup_tasks
+        WHERE strategy = #{strategy}
+        ORDER BY created_at DESC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 根据策略统计数量 -->
+    <select id="countByStrategy" resultType="long">
+        SELECT COUNT(*) FROM log_cleanup_tasks
+        WHERE strategy = #{strategy}
+    </select>
+
+    <!-- 根据创建者查询清理任务 -->
+    <select id="selectByCreatedBy" resultMap="LogCleanupTaskResultMap">
+        SELECT * FROM log_cleanup_tasks
+        WHERE created_by = #{createdBy}
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY created_at DESC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 根据创建者统计数量 -->
+    <select id="countByCreatedBy" resultType="long">
+        SELECT COUNT(*) FROM log_cleanup_tasks
+        WHERE created_by = #{createdBy}
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+    </select>
+
+    <!-- 删除旧任务 -->
+    <delete id="deleteOldTasks">
+        DELETE FROM log_cleanup_tasks
+        WHERE created_at &lt; DATE_SUB(NOW(), INTERVAL #{retentionDays} DAY)
+    </delete>
+
+</mapper>

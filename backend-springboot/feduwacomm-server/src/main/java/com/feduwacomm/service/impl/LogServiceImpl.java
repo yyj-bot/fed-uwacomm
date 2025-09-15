@@ -59,8 +59,6 @@ public class LogServiceImpl implements LogService {
     @Autowired
     private ObjectMapper objectMapper;
     
-    @Autowired
-    private com.feduwacomm.service.cache.LogCacheService logCacheService;
     
     @Autowired
     @Lazy
@@ -181,19 +179,12 @@ public class LogServiceImpl implements LogService {
     @Override
     public PageResult<LogListVO> queryLogs(LogQueryDTO queryDTO) {
         try {
-            // 尝试从缓存获取
-            PageResult<LogListVO> cachedResult = logCacheService.getQueryCache(queryDTO);
-            if (cachedResult != null) {
-                logger.debug("从缓存返回查询结果，查询条件: {}", queryDTO);
-                return cachedResult;
-            }
-            
-            // 缓存未命中，查询数据库
+            // 查询数据库
             List<SystemLog> logs = systemLogMapper.selectByCondition(queryDTO);
             long total = systemLogMapper.countByCondition(queryDTO);
-            
+
             List<LogListVO> logVOs = logs.stream().map(this::convertToLogListVO).collect(Collectors.toList());
-            
+
             PageResult<LogListVO> result = PageResult.<LogListVO>builder()
                     .records(logVOs)
                     .total(total)
@@ -201,11 +192,8 @@ public class LogServiceImpl implements LogService {
                     .size((long)queryDTO.getSize())
                     .pages((total + queryDTO.getSize() - 1) / queryDTO.getSize())
                     .build();
-            
-            // 将结果放入缓存
-            logCacheService.putQueryCache(queryDTO, result);
-            
-            logger.debug("查询数据库并缓存结果，返回 {} 条记录", logVOs.size());
+
+            logger.debug("查询数据库，返回 {} 条记录", logVOs.size());
             return result;
             
         } catch (Exception e) {
@@ -230,40 +218,35 @@ public class LogServiceImpl implements LogService {
         return logs.stream().map(this::convertToLogListVO).collect(Collectors.toList());
     }
     
-    @Override 
+    @Override
     public LogStatisticsVO getStatistics(LogQueryDTO queryDTO) {
-        // TODO: 修复编译错误后重新实现
-        return LogStatisticsVO.builder()
-            .totalLogs(0L)
-            .levelDistribution(new HashMap<>())
-            .categoryDistribution(new HashMap<>())
-            .timeDistribution(new ArrayList<>())
-            .errorTrend(new ArrayList<>())
-            .build();
-    }
-    
-    public LogStatisticsVO getStatistics_TEMP_DISABLED(LogQueryDTO queryDTO) {
         try {
-            // 尝试从缓存获取
-            LogStatisticsVO cachedStats = logCacheService.getStatisticsCache(queryDTO);
-            if (cachedStats != null) {
-                logger.debug("从缓存返回统计结果");
-                return cachedStats;
+            // 如果没有传入时间范围，使用默认范围（最近7天）
+            if (queryDTO.getStartTime() == null || queryDTO.getEndTime() == null) {
+                queryDTO = LogQueryDTO.builder()
+                    .startTime(queryDTO.getStartTime() != null ? queryDTO.getStartTime() : LocalDateTime.now().minusDays(7))
+                    .endTime(queryDTO.getEndTime() != null ? queryDTO.getEndTime() : LocalDateTime.now())
+                    .level(queryDTO.getLevel())
+                    .category(queryDTO.getCategory())
+                    .keyword(queryDTO.getKeyword())
+                    .vmId(queryDTO.getVmId())
+                    .taskId(queryDTO.getTaskId())
+                    .build();
             }
-            
-            // 缓存未命中，计算统计数据
+
+            // 计算统计数据
             long totalLogs = systemLogMapper.countByCondition(queryDTO);
-            
+
             // 计算级别分布
-            LocalDateTime startTime = queryDTO.getStartTime() != null ? queryDTO.getStartTime() : LocalDateTime.now().minusDays(1);
-            LocalDateTime endTime = queryDTO.getEndTime() != null ? queryDTO.getEndTime() : LocalDateTime.now();
-            
+            LocalDateTime startTime = queryDTO.getStartTime();
+            LocalDateTime endTime = queryDTO.getEndTime();
+
             Map<String, Long> levelDistribution = new HashMap<>();
             levelDistribution.put("DEBUG", systemLogMapper.countByLevel("DEBUG", startTime, endTime));
             levelDistribution.put("INFO", systemLogMapper.countByLevel("INFO", startTime, endTime));
             levelDistribution.put("WARN", systemLogMapper.countByLevel("WARN", startTime, endTime));
             levelDistribution.put("ERROR", systemLogMapper.countByLevel("ERROR", startTime, endTime));
-            
+
             // 计算类别分布
             Map<String, Long> categoryDistribution = new HashMap<>();
             categoryDistribution.put("SYSTEM", systemLogMapper.countByCategory("SYSTEM%", startTime, endTime));
@@ -274,41 +257,32 @@ public class LogServiceImpl implements LogService {
             categoryDistribution.put("MODEL", systemLogMapper.countByCategory("MODEL%", startTime, endTime));
             categoryDistribution.put("SECURITY", systemLogMapper.countByCategory("SECURITY%", startTime, endTime));
             categoryDistribution.put("PERFORMANCE", systemLogMapper.countByCategory("PERFORMANCE%", startTime, endTime));
-            
+
             // 获取时间分布数据
             List<Map<String, Object>> timeDistribution = systemLogMapper.countByHour(startTime, endTime);
-            
+
             // 获取错误趋势数据
             List<Map<String, Object>> errorTrend = systemLogMapper.countErrorTrend(startTime, endTime);
-            
-            // Keep level distribution as Map<String, Long> to match VO expectation
-            Map<String, Long> levelDistributionMap = levelDistribution != null ? levelDistribution : new HashMap<>();
-            
-            // Keep category distribution as Map<String, Long> to match VO expectation  
-            Map<String, Long> categoryDistributionMap = categoryDistribution != null ? categoryDistribution : new HashMap<>();
-            
+
             LogStatisticsVO result = LogStatisticsVO.builder()
                     .totalLogs(totalLogs)
-                    .levelDistribution(levelDistributionMap)
-                    .categoryDistribution(categoryDistributionMap)
-                    .timeDistribution(timeDistribution.stream().map(data -> 
+                    .levelDistribution(levelDistribution)
+                    .categoryDistribution(categoryDistribution)
+                    .timeDistribution(timeDistribution.stream().map(data ->
                             LogStatisticsVO.TimeDistribution.builder()
                                     .hour((String) data.get("hour"))
                                     .count(((Number) data.get("count")).longValue())
                                     .build()).collect(Collectors.toList()))
-                    .errorTrend(errorTrend.stream().map(data -> 
+                    .errorTrend(errorTrend.stream().map(data ->
                             LogStatisticsVO.ErrorTrend.builder()
                                     .date((String) data.get("hour"))
                                     .errorCount(((Number) data.get("count")).longValue())
                                     .build()).collect(Collectors.toList()))
                     .build();
-            
-            // 将结果放入缓存
-            logCacheService.putStatisticsCache(queryDTO, result);
-            
-            logger.debug("计算统计数据并缓存结果，总日志数: {}", totalLogs);
+
+            logger.debug("计算统计数据，总日志数: {}", totalLogs);
             return result;
-            
+
         } catch (Exception e) {
             logger.error("获取统计数据失败: {}", e.getMessage(), e);
             throw new RuntimeException("获取统计数据失败: " + e.getMessage());
@@ -541,11 +515,6 @@ public class LogServiceImpl implements LogService {
         String cacheKey = "system_monitor";
         
         // 尝试从缓存获取（监控数据缓存时间较短，1分钟）
-        LogMonitorVO cached = logCacheService.getMonitorCache(cacheKey, LogMonitorVO.class);
-        if (cached != null) {
-            logger.debug("从缓存返回系统监控数据");
-            return cached;
-        }
         
         // 实现系统监控数据收集
         Map<String, Object> systemInfoMap = getSystemInfo();
@@ -572,27 +541,41 @@ public class LogServiceImpl implements LogService {
                         .build())
                 .build();
         
-        // 缓存结果（1分钟过期）
-        logCacheService.putMonitorCache(cacheKey, result, 1);
-        
         return result;
     }
     
     @Override
     public LogMonitorVO getLogMonitor(String timeRange, String level) {
-        // TODO: 修复编译错误后重新实现
-        return LogMonitorVO.builder()
-            .logMetrics(LogMonitorVO.LogMetrics.builder()
-                .totalLogs(0L)
-                .errorCount(0L)
-                .warningCount(0L)
-                .errorRate(0.0)
-                .warningRate(0.0)
-                .build())
-            .alerts(new ArrayList<>())
-            .alertHistory(new ArrayList<>())
-            // .alertStatistics(new HashMap<>()) // TODO: 修复字段问题
-            .build();
+        try {
+            // 实现日志监控数据收集
+            Map<String, Object> logMetricsMap = getLogMetrics(timeRange, level);
+
+            return LogMonitorVO.builder()
+                    .logMetrics(LogMonitorVO.LogMetrics.builder()
+                            .totalLogs((Long) logMetricsMap.get("totalLogs"))
+                            .errorCount((Long) logMetricsMap.get("errorCount"))
+                            .warningCount((Long) logMetricsMap.get("warningCount"))
+                            .errorRate((Double) logMetricsMap.get("errorRate"))
+                            .warningRate((Double) logMetricsMap.get("warningRate"))
+                            .build())
+                    .alerts(new ArrayList<>())
+                    .alertHistory(new ArrayList<>())
+                    .build();
+        } catch (Exception e) {
+            logger.error("获取日志监控数据失败: {}", e.getMessage(), e);
+            // 返回默认数据而不是抛出异常
+            return LogMonitorVO.builder()
+                .logMetrics(LogMonitorVO.LogMetrics.builder()
+                    .totalLogs(0L)
+                    .errorCount(0L)
+                    .warningCount(0L)
+                    .errorRate(0.0)
+                    .warningRate(0.0)
+                    .build())
+                .alerts(new ArrayList<>())
+                .alertHistory(new ArrayList<>())
+                .build();
+        }
     }
 
     public LogMonitorVO getLogMonitor_TEMP_DISABLED(String timeRange, String level) {

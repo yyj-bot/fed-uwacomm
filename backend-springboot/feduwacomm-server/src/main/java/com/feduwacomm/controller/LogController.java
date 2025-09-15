@@ -14,6 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import com.feduwacomm.enums.LogLevel;
+import com.feduwacomm.enums.LogCategory;
 
 @RestController
 @RequestMapping("/api/log")
@@ -46,7 +49,25 @@ public class LogController {
     }
 
     @GetMapping("/statistics")
-    public Result<LogStatisticsVO> getStatistics(@Valid LogQueryDTO queryDTO) {
+    public Result<LogStatisticsVO> getStatistics(
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String vmId,
+            @RequestParam(required = false) String taskId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
+
+        LogQueryDTO queryDTO = LogQueryDTO.builder()
+                .level(level != null ? LogLevel.valueOf(level) : null)
+                .category(category != null ? LogCategory.valueOf(category) : null)
+                .vmId(vmId)
+                .taskId(taskId)
+                .keyword(keyword)
+                .startTime(startTime != null ? LocalDateTime.parse(startTime) : null)
+                .endTime(endTime != null ? LocalDateTime.parse(endTime) : null)
+                .build();
+
         LogStatisticsVO statistics = logService.getStatistics(queryDTO);
         return Result.success(statistics);
     }
