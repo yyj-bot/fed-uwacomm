@@ -1,29 +1,18 @@
-# 测试环境配置 - 使用H2内存数据库
+# 测试环境配置 - 使用MySQL测试数据库
 spring:
   datasource:
-    url: jdbc:h2:mem:feduwacomm_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
-  
-  # H2数据库控制台
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-    
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema-h2.sql
+    url: jdbc:mysql://192.168.5.22:3306/feduwacomm_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: b80db05218fe324c
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create-drop  # 测试环境自动创建和删除表
+      ddl-auto: none  # 测试环境不自动创建表，使用现有数据库结构
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: false
 
 # MyBatis配置
@@ -42,7 +31,7 @@ logging:
     org.springframework.security: WARN
     com.zaxxer.hikari: WARN
     org.mybatis: WARN
-    org.h2: WARN
+    com.mysql: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
