@@ -18,7 +18,7 @@
 #### 1.2 用户登录
 - **接口地址**: `POST /api/user/login`
 - **功能**: 用户登录认证
-- **请求参数**: `UserLoginDTO` (登录标识符、密码、验证码等)
+- **请求参数**: `UserLoginDTO` (登录标识符、密码、记住登录等)
 - **响应**: `LoginResponseVO` (Token、刷新Token、过期时间、用户信息)
 - **实现状态**: ✅ 已完成
 

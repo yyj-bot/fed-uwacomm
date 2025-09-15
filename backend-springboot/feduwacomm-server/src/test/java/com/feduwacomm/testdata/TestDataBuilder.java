@@ -90,15 +90,11 @@ public class TestDataBuilder {
         public static UserLoginDTO.UserLoginDTOBuilder validLoginDTO() {
             return UserLoginDTO.builder()
                     .loginIdentifier("testuser")
-                    .password("password123")
-                    .rememberMe(false);
+                    .password("password123");
         }
-        
-        public static UserLoginDTO.UserLoginDTOBuilder loginWithCaptchaDTO() {
-            return validLoginDTO()
-                    .captcha("1234")
-                    .captchaKey("key123")
-                    .rememberMe(true);
+
+        public static UserLoginDTO.UserLoginDTOBuilder loginWithRememberMeDTO() {
+            return validLoginDTO();
         }
         
         public static UserUpdateDTO.UserUpdateDTOBuilder validUpdateDTO() {
