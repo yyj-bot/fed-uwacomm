@@ -89,10 +89,7 @@
 ```json
 {
   "loginIdentifier": "string", // 登录标识符（用户名或邮箱），必填
-  "password": "string",        // 密码，必填
-  "captcha": "string",         // 验证码，可选
-  "captchaKey": "string",      // 验证码标识，可选
-  "rememberMe": false          // 记住登录状态，可选，默认false
+  "password": "string"         // 密码，必填
 }
 ```
 
