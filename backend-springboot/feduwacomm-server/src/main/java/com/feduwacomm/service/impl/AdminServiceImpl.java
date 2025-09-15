@@ -203,10 +203,12 @@ public class AdminServiceImpl implements AdminService {
         // 处理密码修改（管理员可直接修改密码）
         if (updateDTO.getPassword() != null) {
             log.info("管理员修改用户密码 - 用户ID: {}", userId);
-            // 验证新密码
-            if (!PasswordUtil.isValidPassword(updateDTO.getPassword())) {
-                log.warn("密码格式无效 - 用户ID: {}", userId);
-                throw UserException.passwordTooShort();
+            // 验证新密码格式
+            try {
+                PasswordUtil.validatePasswordFormat(updateDTO.getPassword());
+            } catch (UserException e) {
+                log.warn("密码格式无效 - 用户ID: {}, error: {}", userId, e.getMessage());
+                throw e;
             }
 
             // 更新密码
@@ -357,16 +359,27 @@ public class AdminServiceImpl implements AdminService {
             throw UserException.userNotFound();
         }
 
-        // 验证新密码
-        if (!PasswordUtil.isValidPassword(resetDTO.getNewPassword())) {
-            log.warn("密码格式无效 - 用户ID: {}", userId);
-            throw UserException.passwordTooShort();
+        // 获取密码值，优先使用newPassword，兼容password字段
+        String passwordValue = resetDTO.getNewPassword() != null ? 
+            resetDTO.getNewPassword() : resetDTO.getPassword();
+        
+        if (passwordValue == null || passwordValue.trim().isEmpty()) {
+            log.warn("密码为空 - 用户ID: {}", userId);
+            throw UserException.passwordEmpty();
+        }
+        
+        // 验证新密码格式
+        try {
+            PasswordUtil.validatePasswordFormat(passwordValue);
+        } catch (UserException e) {
+            log.warn("密码格式无效 - 用户ID: {}, error: {}", userId, e.getMessage());
+            throw e;
         }
 
         log.info("管理员重置用户密码 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
 
         // 更新密码
-        String newPasswordHash = PasswordUtil.encode(resetDTO.getNewPassword());
+        String newPasswordHash = PasswordUtil.encode(passwordValue);
         adminMapper.updatePassword(userId, newPasswordHash);
         log.warn("密码重置完成 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
     }
@@ -393,7 +406,11 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public PermissionGrantResponseVO grantPermission(String userId, PermissionGrantDTO grantDTO) {
-        log.info("执行权限授予 - 用户ID: {}, 权限: {}", userId, grantDTO.getPermission());
+        // 支持两种字段名：permissionName（API文档要求）和permission（向后兼容）
+        String permissionName = grantDTO.getPermissionName() != null ? 
+                grantDTO.getPermissionName() : grantDTO.getPermission();
+        
+        log.info("执行权限授予 - 用户ID: {}, 权限: {}", userId, permissionName);
         
         User user = getUserById(userId);
         if (user == null) {
@@ -407,7 +424,7 @@ public class AdminServiceImpl implements AdminService {
 
         if (existingPermission != null) {
             log.warn("权限已存在 - 用户ID: {}, 权限: {}, 权限ID: {}", 
-                    userId, grantDTO.getPermission(), existingPermission.getId());
+                    userId, permissionName, existingPermission.getId());
             throw UserException.permissionDenied();
         }
 
@@ -417,7 +434,7 @@ public class AdminServiceImpl implements AdminService {
                 .userId(userId)
                 .resourceType("SYSTEM") // 默认系统权限
                 .resourceId(null) // 系统级权限
-                .permission(grantDTO.getPermission())
+                .permission(permissionName)
                 .grantedAt(LocalDateTime.now())
                 .grantedBy(BaseContext.getCurrentUserId())
                 .expiresAt(grantDTO.getExpiresAt())
@@ -425,7 +442,7 @@ public class AdminServiceImpl implements AdminService {
 
         userPermissionMapper.insert(permission);
         log.info("权限授予成功 - 用户ID: {}, 用户名: {}, 权限: {}, 权限ID: {}", 
-                userId, user.getUsername(), grantDTO.getPermission(), permission.getId());
+                userId, user.getUsername(), permissionName, permission.getId());
 
         return PermissionGrantResponseVO.builder()
                 .permissionId(permission.getId())
@@ -478,8 +495,11 @@ public class AdminServiceImpl implements AdminService {
         if (createDTO.getEmail() == null || createDTO.getEmail().trim().isEmpty()) {
             throw UserException.paramValidationError("email", "邮箱不能为空");
         }
-        if (createDTO.getPassword() == null || !PasswordUtil.isValidPassword(createDTO.getPassword())) {
-            throw UserException.passwordTooShort();
+        // 验证密码格式
+        try {
+            PasswordUtil.validatePasswordFormat(createDTO.getPassword());
+        } catch (UserException e) {
+            throw e;
         }
         if (createDTO.getRole() != null && !isValidRole(createDTO.getRole())) {
             throw UserException.paramValidationError("role", "无效的用户角色");
@@ -524,10 +544,13 @@ public class AdminServiceImpl implements AdminService {
     private UserPermissionVO convertToUserPermissionVO(UserPermission permission) {
         return UserPermissionVO.builder()
                 .id(permission.getId())
+                .permissionId(permission.getId()) // API文档要求的字段名
                 .userId(permission.getUserId())
                 .resourceType(permission.getResourceType())
                 .resourceId(permission.getResourceId())
                 .permission(permission.getPermission())
+                .permissionName(permission.getPermission()) // API文档要求的字段名
+                .description(getPermissionDescription(permission.getPermission())) // API文档要求的权限描述
                 .grantedAt(permission.getGrantedAt())
                 .grantedBy(permission.getGrantedBy())
                 .expiresAt(permission.getExpiresAt())

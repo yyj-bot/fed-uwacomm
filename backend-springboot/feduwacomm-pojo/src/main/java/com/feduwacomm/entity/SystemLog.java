@@ -29,13 +29,13 @@ public class SystemLog {
     private String environment;     // 对应 system_logs.environment
     private String exception;       // 对应 system_logs.exception
     private LocalDateTime createdAt; // 对应 system_logs.created_at
+    private String vmId;            // 对应 system_logs.vm_id (需要添加数据库字段)
+    private String taskId;          // 对应 system_logs.task_id (需要添加数据库字段)
+    private String details;         // 对应 system_logs.details (需要添加数据库字段，JSON格式)
     
-    // 虚拟字段 - 通过解析 logger 字段获得
+    // 虚拟字段 - 通过解析其他字段获得
     private LogLevel levelEnum;     // level 字符串转换的枚举
     private LogCategory category;   // 从 logger 字段解析的分类
-    private String vmId;           // 从 message 或 logger 解析的虚拟机ID
-    private String taskId;         // 从 message 或 logger 解析的任务ID
-    private String details;        // JSON格式详细信息，可从message解析
     
     // 别名getter方法，保持向后兼容
     public String getLogId() {

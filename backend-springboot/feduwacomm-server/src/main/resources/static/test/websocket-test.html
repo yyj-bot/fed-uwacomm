@@ -766,6 +766,7 @@
                         }
                         
                         showProtocolMessage(response);
+                        updateStatusPanels(response);
                     } catch (error) {
                         showErrorMessage({ 
                             type: 'MESSAGE_PARSE_ERROR', 
@@ -777,7 +778,9 @@
 
                 // 订阅VM专属topic
                 stompClient.subscribe('/topic/vm/' + vmId, function (message) {
-                    showProtocolMessage(JSON.parse(message.body));
+                    const data = JSON.parse(message.body);
+                    showProtocolMessage(data);
+                    updateStatusPanels(data);
                 });
 
                 // 订阅错误消息
@@ -1530,7 +1533,8 @@
             };
             
             testStomp.connect(testHeaders, function (frame) {
-                showProtocolMessage({ type: 'SENT', content: '连接测试成功！STOMP版本: ' + frame.version });
+                const stompVersion = frame.headers ? frame.headers.version || frame.headers['heart-beat'] ? 'STOMP 1.2+' : 'STOMP 1.0' : 'Unknown';
+                showProtocolMessage({ type: 'SENT', content: '连接测试成功！STOMP版本: ' + stompVersion });
                 
                 // 发送测试消息
                 const testMessage = {
@@ -1935,7 +1939,7 @@
             showProtocolMessage({ type: 'SENT', content: '正在注册VM: ' + vmName });
 
             try {
-                const response = await fetch('/api/vm/register', {
+                const response = await fetch('/api/v1/vm/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1990,7 +1994,7 @@
             showProtocolMessage({ type: 'SENT', content: '正在刷新Token for VM: ' + quickVmData.vmId });
 
             try {
-                const response = await fetch('/api/vm/token/refresh', {
+                const response = await fetch('/api/v1/vm/token/refresh', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -2033,6 +2037,149 @@
             document.getElementById('quickVmIdDisplay').textContent = vmData.vmId;
             document.getElementById('quickSecretIdDisplay').textContent = vmData.secretId;
             document.getElementById('quickVmInfo').style.display = 'block';
+        }
+
+        // 更新状态面板
+        function updateStatusPanels(data) {
+            if (!data || !data.type) return;
+
+            const timestamp = new Date().toLocaleTimeString();
+            
+            switch (data.type) {
+                case 'CONNECT_ACK':
+                case 'HEARTBEAT_ACK':
+                case 'STATUS_UPDATED':
+                    updateVmStatusPanel(data, timestamp);
+                    break;
+                case 'DATASET_CREATE_ACK':
+                case 'DATASET_APPEND_ROWS_ACK':
+                case 'DATASET_COMPLETE_ACK':
+                case 'DATASET_STATUS_RESPONSE':
+                    updateDatasetStatusPanel(data, timestamp);
+                    break;
+                case 'TRAINING_START':
+                case 'TRAINING_PROGRESS':
+                case 'MODEL_UPLOAD':
+                    updateTrainingStatusPanel(data, timestamp);
+                    break;
+            }
+        }
+
+        // 更新VM状态面板
+        function updateVmStatusPanel(data, timestamp) {
+            const vmStatus = document.getElementById('vmStatus');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'message';
+            
+            let content = '';
+            if (data.type === 'CONNECT_ACK') {
+                content = `<strong>VM连接成功</strong><br>`;
+                if (data.data) {
+                    content += `会话ID: ${data.data.sessionId || 'N/A'}<br>`;
+                    content += `心跳间隔: ${data.data.heartbeatInterval || 30}秒<br>`;
+                    content += `支持功能: ${data.data.supportedFeatures ? data.data.supportedFeatures.join(', ') : 'N/A'}`;
+                }
+            } else if (data.type === 'HEARTBEAT_ACK') {
+                content = `<strong>心跳响应</strong><br>`;
+                if (data.data) {
+                    content += `服务器时间: ${data.data.serverTime || 'N/A'}<br>`;
+                    content += `系统状态: ${data.data.systemStatus || 'UNKNOWN'}<br>`;
+                    content += `下次心跳: ${data.data.nextHeartbeat || 30}秒后`;
+                }
+            } else if (data.type === 'STATUS_UPDATED' && data.data) {
+                content = `<strong>状态更新</strong><br>`;
+                content += `<pre>${JSON.stringify(data.data, null, 2)}</pre>`;
+            }
+            
+            statusDiv.innerHTML = `${content}<br><small>${timestamp}</small>`;
+            vmStatus.appendChild(statusDiv);
+            vmStatus.scrollTop = vmStatus.scrollHeight;
+            
+            // 限制显示的消息数量
+            while (vmStatus.children.length > 10) {
+                vmStatus.removeChild(vmStatus.firstChild);
+            }
+        }
+
+        // 更新数据集状态面板
+        function updateDatasetStatusPanel(data, timestamp) {
+            const datasetStatus = document.getElementById('datasetStatus');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'message';
+            
+            let content = '';
+            if (data.type === 'DATASET_CREATE_ACK') {
+                content = `<strong>数据集创建成功</strong><br>`;
+                if (data.data) {
+                    content += `数据集ID: ${data.data.datasetId || 'N/A'}<br>`;
+                    content += `状态: ${data.data.status || 'UNKNOWN'}`;
+                }
+            } else if (data.type === 'DATASET_APPEND_ROWS_ACK') {
+                content = `<strong>数据行追加完成</strong><br>`;
+                if (data.data) {
+                    content += `数据集ID: ${data.data.datasetId || 'N/A'}<br>`;
+                    content += `接受行数: ${data.data.accepted || 0}<br>`;
+                    content += `拒绝行数: ${data.data.rejected || 0}`;
+                }
+            } else if (data.type === 'DATASET_COMPLETE_ACK') {
+                content = `<strong>数据集完成</strong><br>`;
+                if (data.data) {
+                    content += `数据集ID: ${data.data.datasetId || 'N/A'}<br>`;
+                    content += `总行数: ${data.data.rowCount || 0}<br>`;
+                    content += `状态: ${data.data.status || 'UNKNOWN'}`;
+                }
+            } else if (data.type === 'DATASET_STATUS_RESPONSE') {
+                content = `<strong>数据集状态查询</strong><br>`;
+                if (data.data) {
+                    content += `数据集ID: ${data.data.datasetId || 'N/A'}<br>`;
+                    content += `描述: ${data.data.datasetDescription || 'N/A'}<br>`;
+                    content += `类型: ${data.data.datasetType || 'N/A'}<br>`;
+                    content += `行数: ${data.data.rowCount || 0}<br>`;
+                    content += `状态: ${data.data.status || 'UNKNOWN'}`;
+                }
+            }
+            
+            statusDiv.innerHTML = `${content}<br><small>${timestamp}</small>`;
+            datasetStatus.appendChild(statusDiv);
+            datasetStatus.scrollTop = datasetStatus.scrollHeight;
+            
+            // 限制显示的消息数量
+            while (datasetStatus.children.length > 10) {
+                datasetStatus.removeChild(datasetStatus.firstChild);
+            }
+        }
+
+        // 更新训练状态面板
+        function updateTrainingStatusPanel(data, timestamp) {
+            const trainingStatus = document.getElementById('trainingStatus');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'message';
+            
+            let content = '';
+            if (data.type === 'TRAINING_START') {
+                content = `<strong>训练开始响应</strong><br>`;
+                content += `状态: ${data.data ? data.data.status || 'RECEIVED' : 'RECEIVED'}`;
+            } else if (data.type === 'TRAINING_PROGRESS') {
+                content = `<strong>训练进度响应</strong><br>`;
+                content += `状态: ${data.data ? data.data.status || 'RECEIVED' : 'RECEIVED'}`;
+            } else if (data.type === 'MODEL_UPLOAD') {
+                content = `<strong>模型上传响应</strong><br>`;
+                content += `状态: ${data.data ? data.data.status || 'RECEIVED' : 'RECEIVED'}`;
+            }
+            
+            // 如果是来自发送消息的数据，显示更详细的信息
+            if (data.data && typeof data.data === 'object' && Object.keys(data.data).length > 1) {
+                content += `<br><pre>${JSON.stringify(data.data, null, 2)}</pre>`;
+            }
+            
+            statusDiv.innerHTML = `${content}<br><small>${timestamp}</small>`;
+            trainingStatus.appendChild(statusDiv);
+            trainingStatus.scrollTop = trainingStatus.scrollHeight;
+            
+            // 限制显示的消息数量
+            while (trainingStatus.children.length > 10) {
+                trainingStatus.removeChild(trainingStatus.firstChild);
+            }
         }
     </script>
 </body>

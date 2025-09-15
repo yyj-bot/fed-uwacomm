@@ -143,6 +143,40 @@
             </div>
             <button onclick="uploadModel()">上传模型</button>
             <div id="upload_result" class="result"></div>
+            
+            <!-- 批量模型上传 -->
+            <h3>批量模型上传</h3>
+            <div class="form-group">
+                <label for="batchUpload_taskId">任务ID:</label>
+                <input type="text" id="batchUpload_taskId" value="a1b2c3d4e5f678901234567890123456">
+            </div>
+            <div id="batchUploadModels">
+                <div class="model-item" style="border: 1px solid #ddd; margin: 10px 0; padding: 10px;">
+                    <h4>模型 1</h4>
+                    <div class="flex-row">
+                        <div>
+                            <label>训练轮数:</label>
+                            <input type="number" class="batch-roundNumber" value="1">
+                        </div>
+                        <div>
+                            <label>描述:</label>
+                            <input type="text" class="batch-description" value="第1轮模型">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>模型参数 (JSON):</label>
+                        <textarea class="batch-parameters" rows="2">{"learning_rate": 0.001, "batch_size": 32}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>模型文件:</label>
+                        <input type="file" class="batch-file" accept=".pth,.pt,.h5,.pb,.onnx,.pkl,.pickle,.joblib">
+                    </div>
+                </div>
+            </div>
+            <button onclick="addBatchUploadModel()">添加模型</button>
+            <button onclick="removeBatchUploadModel()">移除最后一个</button>
+            <button onclick="batchUploadModels()">批量上传模型</button>
+            <div id="batchUpload_result" class="result"></div>
         </div>
 
         <!-- 模型版本查询接口 -->
@@ -213,6 +247,51 @@
             </div>
             <button onclick="getModelVersionDetail()">查询详情</button>
             <div id="detail_result" class="result"></div>
+
+            <!-- 任务模型版本查询 -->
+            <h3>任务模型版本查询</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="taskVersions_taskId">任务ID:</label>
+                    <input type="text" id="taskVersions_taskId" placeholder="a1b2c3d4e5f678901234567890123456">
+                </div>
+                <div>
+                    <label for="taskVersions_roundNumber">训练轮数 (可选):</label>
+                    <input type="number" id="taskVersions_roundNumber" placeholder="1">
+                </div>
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="taskVersions_status">状态 (可选):</label>
+                    <select id="taskVersions_status">
+                        <option value="">全部状态</option>
+                        <option value="UPLOADING">上传中</option>
+                        <option value="UPLOADED">已上传</option>
+                        <option value="VALIDATING">验证中</option>
+                        <option value="VALIDATED">已验证</option>
+                        <option value="DEPLOYED">已部署</option>
+                        <option value="DEPRECATED">已废弃</option>
+                        <option value="FAILED">上传失败</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="taskVersions_sort">排序字段:</label>
+                    <select id="taskVersions_sort">
+                        <option value="roundNumber">训练轮数</option>
+                        <option value="createdAt">创建时间</option>
+                        <option value="accuracy">准确率</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="taskVersions_order">排序方向:</label>
+                <select id="taskVersions_order">
+                    <option value="asc">升序</option>
+                    <option value="desc">降序</option>
+                </select>
+            </div>
+            <button onclick="getModelVersionsByTask()">查询任务模型版本</button>
+            <div id="taskVersions_result" class="result"></div>
         </div>
 
         <!-- 模型评估接口 -->
@@ -249,6 +328,64 @@
             </div>
             <button onclick="evaluateModel()">评估模型</button>
             <div id="eval_result" class="result"></div>
+
+            <!-- 批量模型评估 -->
+            <h3>批量模型评估</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="batchEval_taskId">任务ID:</label>
+                    <input type="text" id="batchEval_taskId" placeholder="a1b2c3d4e5f678901234567890123456">
+                </div>
+                <div>
+                    <label for="batchEval_testDataPath">测试数据路径:</label>
+                    <input type="text" id="batchEval_testDataPath" value="/data/test_dataset.csv">
+                </div>
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="batchEval_roundNumbers">评估轮数 (逗号分隔):</label>
+                    <input type="text" id="batchEval_roundNumbers" value="1,5,10">
+                </div>
+                <div>
+                    <label for="batchEval_metrics">评估指标 (逗号分隔):</label>
+                    <input type="text" id="batchEval_metrics" value="accuracy,loss">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="batchEval_batchSize">批次大小:</label>
+                <input type="number" id="batchEval_batchSize" value="32">
+            </div>
+            <button onclick="batchEvaluateModels()">批量评估模型</button>
+            <div id="batchEval_result" class="result"></div>
+
+            <!-- 评估结果查询 -->
+            <h3>评估结果查询</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="evalResults_modelId">模型ID (可选):</label>
+                    <input type="text" id="evalResults_modelId" placeholder="c3d4e5f6789012345678901234567890">
+                </div>
+                <div>
+                    <label for="evalResults_taskId">任务ID (可选):</label>
+                    <input type="text" id="evalResults_taskId" placeholder="a1b2c3d4e5f678901234567890123456">
+                </div>
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="evalResults_evaluationId">评估ID (可选):</label>
+                    <input type="text" id="evalResults_evaluationId" placeholder="eval_1234567890">
+                </div>
+                <div>
+                    <label for="evalResults_page">页码:</label>
+                    <input type="number" id="evalResults_page" value="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="evalResults_size">每页大小:</label>
+                <input type="number" id="evalResults_size" value="10">
+            </div>
+            <button onclick="getEvaluationResults()">查询评估结果</button>
+            <div id="evalResults_result" class="result"></div>
         </div>
 
         <!-- 模型部署接口 -->
@@ -289,6 +426,144 @@
             </div>
             <button onclick="getDeploymentStatus()">查询部署状态</button>
             <div id="deployStatus_result" class="result"></div>
+
+            <!-- 部署列表查询 -->
+            <h3>部署列表查询</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="deployList_modelId">模型ID (可选):</label>
+                    <input type="text" id="deployList_modelId" placeholder="c3d4e5f6789012345678901234567890">
+                </div>
+                <div>
+                    <label for="deployList_status">状态 (可选):</label>
+                    <select id="deployList_status">
+                        <option value="">全部状态</option>
+                        <option value="RUNNING">运行中</option>
+                        <option value="STOPPED">已停止</option>
+                        <option value="FAILED">失败</option>
+                        <option value="PENDING">待处理</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="deployList_page">页码:</label>
+                    <input type="number" id="deployList_page" value="1">
+                </div>
+                <div>
+                    <label for="deployList_size">每页大小:</label>
+                    <input type="number" id="deployList_size" value="10">
+                </div>
+            </div>
+            <button onclick="getDeploymentList()">查询部署列表</button>
+            <div id="deployList_result" class="result"></div>
+        </div>
+
+        <!-- 模型回滚接口 -->
+        <div class="api-section">
+            <h2>模型回滚接口</h2>
+            
+            <!-- 模型回滚 -->
+            <h3>模型回滚</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="rollback_deploymentId">部署ID:</label>
+                    <input type="text" id="rollback_deploymentId" placeholder="deploy_1234567890">
+                </div>
+                <div>
+                    <label for="rollback_targetModelId">目标模型ID:</label>
+                    <input type="text" id="rollback_targetModelId" placeholder="c3d4e5f6789012345678901234567891">
+                </div>
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="rollback_reason">回滚原因:</label>
+                    <input type="text" id="rollback_reason" value="性能下降">
+                </div>
+                <div>
+                    <label for="rollback_force">强制回滚:</label>
+                    <select id="rollback_force">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="rollbackModel()">执行回滚</button>
+            <div id="rollback_result" class="result"></div>
+
+            <!-- 回滚历史查询 -->
+            <h3>回滚历史查询</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="rollbackHistory_deploymentId">部署ID (可选):</label>
+                    <input type="text" id="rollbackHistory_deploymentId" placeholder="deploy_1234567890">
+                </div>
+                <div>
+                    <label for="rollbackHistory_page">页码:</label>
+                    <input type="number" id="rollbackHistory_page" value="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="rollbackHistory_size">每页大小:</label>
+                <input type="number" id="rollbackHistory_size" value="10">
+            </div>
+            <button onclick="getRollbackHistory()">查询回滚历史</button>
+            <div id="rollbackHistory_result" class="result"></div>
+        </div>
+
+        <!-- 模型下载接口 -->
+        <div class="api-section">
+            <h2>模型下载接口</h2>
+            
+            <!-- 模型文件下载 -->
+            <h3>模型文件下载</h3>
+            <div class="flex-row">
+                <div>
+                    <label for="download_modelId">模型ID:</label>
+                    <input type="text" id="download_modelId" placeholder="c3d4e5f6789012345678901234567890">
+                </div>
+                <div>
+                    <label for="download_format">下载格式:</label>
+                    <select id="download_format">
+                        <option value="original">原始格式</option>
+                        <option value="onnx">ONNX格式</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="download_compressed">是否压缩:</label>
+                <select id="download_compressed">
+                    <option value="true">是</option>
+                    <option value="false">否</option>
+                </select>
+            </div>
+            <button onclick="downloadModel()">下载模型</button>
+            <div id="download_result" class="result"></div>
+
+            <!-- 批量模型下载 -->
+            <h3>批量模型下载</h3>
+            <div class="form-group">
+                <label for="batchDownload_modelIds">模型ID列表 (逗号分隔):</label>
+                <input type="text" id="batchDownload_modelIds" placeholder="id1,id2,id3">
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="batchDownload_format">下载格式:</label>
+                    <select id="batchDownload_format">
+                        <option value="original">原始格式</option>
+                        <option value="onnx">ONNX格式</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="batchDownload_compressed">是否压缩:</label>
+                    <select id="batchDownload_compressed">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="batchDownloadModels()">批量下载模型</button>
+            <div id="batchDownload_result" class="result"></div>
         </div>
 
         <!-- 模型统计接口 -->
@@ -350,6 +625,31 @@
             </div>
             <button onclick="deleteModelVersion()" style="background-color: #dc3545;">删除模型版本</button>
             <div id="delete_result" class="result"></div>
+
+            <!-- 批量模型删除 -->
+            <h3>批量模型删除</h3>
+            <div class="form-group">
+                <label for="batchDelete_modelIds">模型ID列表 (逗号分隔):</label>
+                <input type="text" id="batchDelete_modelIds" placeholder="id1,id2,id3">
+            </div>
+            <div class="flex-row">
+                <div>
+                    <label for="batchDelete_force">强制删除:</label>
+                    <select id="batchDelete_force">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="batchDelete_file">删除文件:</label>
+                    <select id="batchDelete_file">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="batchDeleteModels()" style="background-color: #dc3545;">批量删除模型</button>
+            <div id="batchDelete_result" class="result"></div>
         </div>
     </div>
 
@@ -584,6 +884,371 @@
                 showResult('delete_result', data, !response.ok);
             } catch (error) {
                 showResult('delete_result', { error: error.message }, true);
+            }
+        }
+
+        // 批量模型上传相关函数
+        let batchUploadModelCount = 1;
+
+        function addBatchUploadModel() {
+            batchUploadModelCount++;
+            const container = document.getElementById('batchUploadModels');
+            const modelItem = document.createElement('div');
+            modelItem.className = 'model-item';
+            modelItem.style.cssText = 'border: 1px solid #ddd; margin: 10px 0; padding: 10px;';
+            modelItem.innerHTML = `
+                <h4>模型 ${batchUploadModelCount}</h4>
+                <div class="flex-row">
+                    <div>
+                        <label>训练轮数:</label>
+                        <input type="number" class="batch-roundNumber" value="${batchUploadModelCount}">
+                    </div>
+                    <div>
+                        <label>描述:</label>
+                        <input type="text" class="batch-description" value="第${batchUploadModelCount}轮模型">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>模型参数 (JSON):</label>
+                    <textarea class="batch-parameters" rows="2">{"learning_rate": 0.001, "batch_size": 32}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>模型文件:</label>
+                    <input type="file" class="batch-file" accept=".pth,.pt,.h5,.pb,.onnx,.pkl,.pickle,.joblib">
+                </div>
+            `;
+            container.appendChild(modelItem);
+        }
+
+        function removeBatchUploadModel() {
+            const container = document.getElementById('batchUploadModels');
+            if (container.children.length > 1) {
+                container.removeChild(container.lastChild);
+                batchUploadModelCount--;
+            }
+        }
+
+        async function batchUploadModels() {
+            try {
+                const taskId = document.getElementById('batchUpload_taskId').value;
+                if (!taskId) {
+                    alert('请输入任务ID');
+                    return;
+                }
+
+                const models = [];
+                const modelItems = document.querySelectorAll('#batchUploadModels .model-item');
+                
+                for (let i = 0; i < modelItems.length; i++) {
+                    const item = modelItems[i];
+                    const roundNumber = item.querySelector('.batch-roundNumber').value;
+                    const description = item.querySelector('.batch-description').value;
+                    const parameters = item.querySelector('.batch-parameters').value;
+                    const fileInput = item.querySelector('.batch-file');
+                    
+                    if (!fileInput.files[0]) {
+                        alert(`请为模型 ${i + 1} 选择文件`);
+                        return;
+                    }
+
+                    models.push({
+                        roundNumber: parseInt(roundNumber),
+                        description: description,
+                        parameters: parameters,
+                        file: fileInput.files[0]
+                    });
+                }
+
+                // 对于批量上传，使用JSON格式提交（实际应用中需要后端支持）
+                const requestData = {
+                    taskId: taskId,
+                    models: models.map(m => ({
+                        roundNumber: m.roundNumber,
+                        description: m.description,
+                        parameters: m.parameters
+                        // 文件需要特殊处理
+                    }))
+                };
+
+                const response = await fetch(`${getBaseUrl()}/upload/batch`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                showResult('batchUpload_result', data, !response.ok);
+            } catch (error) {
+                showResult('batchUpload_result', { error: error.message }, true);
+            }
+        }
+
+        async function getModelVersionsByTask() {
+            try {
+                const taskId = document.getElementById('taskVersions_taskId').value;
+                if (!taskId) {
+                    alert('请输入任务ID');
+                    return;
+                }
+
+                const params = new URLSearchParams();
+                const roundNumber = document.getElementById('taskVersions_roundNumber').value;
+                const status = document.getElementById('taskVersions_status').value;
+                
+                if (roundNumber) params.append('roundNumber', roundNumber);
+                if (status) params.append('status', status);
+                params.append('sort', document.getElementById('taskVersions_sort').value);
+                params.append('order', document.getElementById('taskVersions_order').value);
+
+                const response = await fetch(`${getBaseUrl()}/versions/task/${taskId}?${params}`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                showResult('taskVersions_result', data, !response.ok);
+            } catch (error) {
+                showResult('taskVersions_result', { error: error.message }, true);
+            }
+        }
+
+        async function batchEvaluateModels() {
+            try {
+                const requestData = {
+                    taskId: document.getElementById('batchEval_taskId').value,
+                    testDataPath: document.getElementById('batchEval_testDataPath').value,
+                    roundNumbers: document.getElementById('batchEval_roundNumbers').value.split(',').map(r => parseInt(r.trim())),
+                    metrics: document.getElementById('batchEval_metrics').value.split(',').map(m => m.trim()),
+                    batchSize: parseInt(document.getElementById('batchEval_batchSize').value)
+                };
+
+                const response = await fetch(`${getBaseUrl()}/evaluate/batch`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                showResult('batchEval_result', data, !response.ok);
+            } catch (error) {
+                showResult('batchEval_result', { error: error.message }, true);
+            }
+        }
+
+        async function getEvaluationResults() {
+            try {
+                const params = new URLSearchParams();
+                const modelId = document.getElementById('evalResults_modelId').value;
+                const taskId = document.getElementById('evalResults_taskId').value;
+                const evaluationId = document.getElementById('evalResults_evaluationId').value;
+                
+                if (modelId) params.append('modelId', modelId);
+                if (taskId) params.append('taskId', taskId);
+                if (evaluationId) params.append('evaluationId', evaluationId);
+                params.append('page', document.getElementById('evalResults_page').value);
+                params.append('size', document.getElementById('evalResults_size').value);
+
+                const response = await fetch(`${getBaseUrl()}/evaluate/results?${params}`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                showResult('evalResults_result', data, !response.ok);
+            } catch (error) {
+                showResult('evalResults_result', { error: error.message }, true);
+            }
+        }
+
+        async function getDeploymentList() {
+            try {
+                const params = new URLSearchParams();
+                const modelId = document.getElementById('deployList_modelId').value;
+                const status = document.getElementById('deployList_status').value;
+                
+                if (modelId) params.append('modelId', modelId);
+                if (status) params.append('status', status);
+                params.append('page', document.getElementById('deployList_page').value);
+                params.append('size', document.getElementById('deployList_size').value);
+
+                const response = await fetch(`${getBaseUrl()}/deploy/list?${params}`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                showResult('deployList_result', data, !response.ok);
+            } catch (error) {
+                showResult('deployList_result', { error: error.message }, true);
+            }
+        }
+
+        async function rollbackModel() {
+            try {
+                const requestData = {
+                    deploymentId: document.getElementById('rollback_deploymentId').value,
+                    targetModelId: document.getElementById('rollback_targetModelId').value,
+                    rollbackReason: document.getElementById('rollback_reason').value,
+                    force: document.getElementById('rollback_force').value === 'true'
+                };
+
+                if (!requestData.deploymentId || !requestData.targetModelId) {
+                    alert('请输入部署ID和目标模型ID');
+                    return;
+                }
+
+                if (!confirm('确定要执行模型回滚操作吗？')) {
+                    return;
+                }
+
+                const response = await fetch(`${getBaseUrl()}/rollback`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                showResult('rollback_result', data, !response.ok);
+            } catch (error) {
+                showResult('rollback_result', { error: error.message }, true);
+            }
+        }
+
+        async function getRollbackHistory() {
+            try {
+                const params = new URLSearchParams();
+                const deploymentId = document.getElementById('rollbackHistory_deploymentId').value;
+                
+                if (deploymentId) params.append('deploymentId', deploymentId);
+                params.append('page', document.getElementById('rollbackHistory_page').value);
+                params.append('size', document.getElementById('rollbackHistory_size').value);
+
+                const response = await fetch(`${getBaseUrl()}/rollback/history?${params}`, {
+                    headers: getAuthHeaders()
+                });
+
+                const data = await response.json();
+                showResult('rollbackHistory_result', data, !response.ok);
+            } catch (error) {
+                showResult('rollbackHistory_result', { error: error.message }, true);
+            }
+        }
+
+        async function downloadModel() {
+            try {
+                const modelId = document.getElementById('download_modelId').value;
+                if (!modelId) {
+                    alert('请输入模型ID');
+                    return;
+                }
+
+                const params = new URLSearchParams();
+                params.append('format', document.getElementById('download_format').value);
+                params.append('compressed', document.getElementById('download_compressed').value);
+
+                const token = document.getElementById('authToken').value;
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+                }
+
+                const response = await fetch(`${getBaseUrl()}/download/${modelId}?${params}`, {
+                    headers: headers
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `model_${modelId}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    showResult('download_result', { message: '文件下载已开始' }, false);
+                } else {
+                    const data = await response.json();
+                    showResult('download_result', data, true);
+                }
+            } catch (error) {
+                showResult('download_result', { error: error.message }, true);
+            }
+        }
+
+        async function batchDownloadModels() {
+            try {
+                const modelIdsStr = document.getElementById('batchDownload_modelIds').value;
+                if (!modelIdsStr) {
+                    alert('请输入模型ID列表');
+                    return;
+                }
+
+                const requestData = {
+                    modelIds: modelIdsStr.split(',').map(id => id.trim()),
+                    format: document.getElementById('batchDownload_format').value,
+                    compressed: document.getElementById('batchDownload_compressed').value === 'true'
+                };
+
+                const token = document.getElementById('authToken').value;
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+                }
+
+                const response = await fetch(`${getBaseUrl()}/download/batch`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(requestData)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'models_batch.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    showResult('batchDownload_result', { message: '批量下载已开始' }, false);
+                } else {
+                    const data = await response.json();
+                    showResult('batchDownload_result', data, true);
+                }
+            } catch (error) {
+                showResult('batchDownload_result', { error: error.message }, true);
+            }
+        }
+
+        async function batchDeleteModels() {
+            try {
+                const modelIdsStr = document.getElementById('batchDelete_modelIds').value;
+                if (!modelIdsStr) {
+                    alert('请输入模型ID列表');
+                    return;
+                }
+
+                if (!confirm('确定要批量删除这些模型吗？此操作不可恢复！')) {
+                    return;
+                }
+
+                const requestData = {
+                    modelIds: modelIdsStr.split(',').map(id => id.trim()),
+                    force: document.getElementById('batchDelete_force').value === 'true',
+                    deleteFile: document.getElementById('batchDelete_file').value === 'true'
+                };
+
+                const response = await fetch(`${getBaseUrl()}/versions/batch`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                showResult('batchDelete_result', data, !response.ok);
+            } catch (error) {
+                showResult('batchDelete_result', { error: error.message }, true);
             }
         }
     </script>

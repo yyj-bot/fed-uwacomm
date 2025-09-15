@@ -12,9 +12,9 @@ import java.util.Map;
 public interface SystemLogMapper {
 
     @Insert("INSERT INTO system_logs (id, timestamp, level, logger, message, thread, " +
-            "user_id, username, request_uri, client_ip, environment, exception) " +
+            "user_id, username, request_uri, client_ip, vm_id, task_id, details, environment, exception) " +
             "VALUES (#{id}, #{timestamp}, #{level}, #{logger}, #{message}, #{thread}, " +
-            "#{userId}, #{username}, #{requestUri}, #{clientIp}, #{environment}, #{exception})")
+            "#{userId}, #{username}, #{requestUri}, #{clientIp}, #{vmId}, #{taskId}, #{details}, #{environment}, #{exception})")
     int insert(SystemLog systemLog);
 
     @Select("SELECT * FROM system_logs WHERE id = #{logId}")
@@ -29,6 +29,9 @@ public interface SystemLogMapper {
         @Result(property = "username", column = "username"),
         @Result(property = "requestUri", column = "request_uri"),
         @Result(property = "clientIp", column = "client_ip"),
+        @Result(property = "vmId", column = "vm_id"),
+        @Result(property = "taskId", column = "task_id"),
+        @Result(property = "details", column = "details"),
         @Result(property = "environment", column = "environment"),
         @Result(property = "exception", column = "exception"),
         @Result(property = "createdAt", column = "created_at")
@@ -47,6 +50,9 @@ public interface SystemLogMapper {
         @Result(property = "username", column = "username"),
         @Result(property = "requestUri", column = "request_uri"),
         @Result(property = "clientIp", column = "client_ip"),
+        @Result(property = "vmId", column = "vm_id"),
+        @Result(property = "taskId", column = "task_id"),
+        @Result(property = "details", column = "details"),
         @Result(property = "environment", column = "environment"),
         @Result(property = "exception", column = "exception"),
         @Result(property = "createdAt", column = "created_at")
@@ -72,6 +78,9 @@ public interface SystemLogMapper {
         @Result(property = "username", column = "username"),
         @Result(property = "requestUri", column = "request_uri"),
         @Result(property = "clientIp", column = "client_ip"),
+        @Result(property = "vmId", column = "vm_id"),
+        @Result(property = "taskId", column = "task_id"),
+        @Result(property = "details", column = "details"),
         @Result(property = "environment", column = "environment"),
         @Result(property = "exception", column = "exception"),
         @Result(property = "createdAt", column = "created_at")
@@ -147,6 +156,9 @@ public interface SystemLogMapper {
         @Result(property = "username", column = "username"),
         @Result(property = "requestUri", column = "request_uri"),
         @Result(property = "clientIp", column = "client_ip"),
+        @Result(property = "vmId", column = "vm_id"),
+        @Result(property = "taskId", column = "task_id"),
+        @Result(property = "details", column = "details"),
         @Result(property = "environment", column = "environment"),
         @Result(property = "exception", column = "exception"),
         @Result(property = "createdAt", column = "created_at")

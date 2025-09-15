@@ -89,7 +89,7 @@ public class TrainingDataControllerTest {
         uploadDTO = TrainingDataUploadDTO.builder()
                 .vmId("a1b2c3d4e5f678901234567890123456")
                 .dataType("ACOUSTIC")
-                .description("测试声学数据")
+                .datasetDescription("测试声学数据")
                 .tags(Arrays.asList("test", "acoustic"))
                 .metadata(Map.of("source", "test", "version", "1.0"))
                 .build();
@@ -99,7 +99,7 @@ public class TrainingDataControllerTest {
                 .dataType("ENVIRONMENT")
                 .title("测试环境配置")
                 .content("测试环境配置内容")
-                .description("测试环境配置描述")
+                .datasetDescription("测试环境配置描述")
                 .tags(Arrays.asList("test", "environment"))
                 .metadata(Map.of("source", "test"))
                 .build();
@@ -155,7 +155,7 @@ public class TrainingDataControllerTest {
                         .header("Authorization", "Bearer " + validToken)
                         .param("vmId", uploadDTO.getVmId())
                         .param("dataType", uploadDTO.getDataType())
-                        .param("description", uploadDTO.getDescription())
+                        .param("description", uploadDTO.getDatasetDescription())
                         .param("tags", String.join(",", "test", "acoustic"))
                         .param("metadata.source", "test")
                         .param("metadata.version", "1.0")

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
@@ -51,6 +52,9 @@ public class WebSocketProtocolServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private WebSocketProtocolService protocolService;
 
     private ProtocolMessage sampleMessage;
@@ -59,7 +63,7 @@ public class WebSocketProtocolServiceTest {
     void setUp() {
         // 重置mock对象
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
-            federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, objectMapper);
+            federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, objectMapper, eventPublisher);
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -69,7 +73,8 @@ public class WebSocketProtocolServiceTest {
             federatedTasksMapper,
             vmRoundModelsMapper,
             vmInstancesMapper,
-            objectMapper
+            objectMapper,
+            eventPublisher
         );
 
         // 准备测试数据

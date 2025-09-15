@@ -5,7 +5,7 @@ spring:
     name: feduwacomm-backend
 
   profiles:
-    active: dev # 默认开发环境
+    active: test # 默认开发环境
 
   # 静态资源配置
   web:
@@ -48,5 +48,26 @@ jwt:
     refresh-expiration: ${JWT_USER_REFRESH_EXPIRATION:2592000} # 用户刷新Token 30天，单位：秒
   vm:
     secret: ${JWT_VM_SECRET:feduwacomm_vm_jwt_secret_key_2024_water_acoustic_federated_learning_vm_machine_auth}
-    expiration: ${JWT_VM_EXPIRATION:3600} # VM Token 1小时，单位：秒
-    refresh-expiration: ${JWT_VM_REFRESH_EXPIRATION:86400} # VM刷新Token 24小时，单位：秒
+    expiration: ${JWT_VM_EXPIRATION:86400} # VM Token 24小时，单位：秒
+    refresh-expiration: ${JWT_VM_REFRESH_EXPIRATION:864000} # VM刷新Token 240小时，单位：秒
+    
+federated:
+  aggregation:
+    min-participants: 2
+    max-wait-time-seconds: 300
+    participation-rate: 0.8
+    enable-timeout-aggregation: true
+    check-interval-seconds: 30
+    
+    fed-avg:
+      enable-weight-normalization: true
+      decimal-scale: 8
+    
+    fed-prox:
+      default-mu: 0.01
+      enable-adaptive-mu: false
+    
+    model-distribution:
+      enable-compression: false
+      parallel-distribution-count: 10
+      distribution-timeout-seconds: 60

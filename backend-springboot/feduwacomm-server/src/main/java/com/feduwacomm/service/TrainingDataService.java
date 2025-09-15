@@ -69,4 +69,9 @@ public interface TrainingDataService {
      * 数据导出
      */
     TrainingDataExportVO exportData(TrainingDataExportDTO exportDTO);
+
+    /**
+     * 导出文件下载
+     */
+    byte[] downloadExportFile(String taskId);
 }

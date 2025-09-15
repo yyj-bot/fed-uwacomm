@@ -166,7 +166,12 @@
             </if>
         </where>
         ORDER BY created_at DESC
-        LIMIT #{size} OFFSET #{page}
+        <if test="size != null and size > 0">
+            LIMIT #{size}
+            <if test="page != null and page > 0">
+                OFFSET #{offset}
+            </if>
+        </if>
     </select>
 
     <select id="countTasksByQuery" parameterType="com.feduwacomm.dto.TaskQueryDTO" resultType="int">

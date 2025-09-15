@@ -368,4 +368,41 @@ public class TrainingDataController {
             return Result.failure(500, "导出失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 导出文件下载接口
+     * GET /api/training-data/export/download/{taskId}
+     */
+    @GetMapping("/export/download/{taskId}")
+    public void downloadExportFile(@PathVariable String taskId,
+                                 HttpServletRequest request,
+                                 HttpServletResponse response) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String userId = BaseContext.getCurrentId();
+
+        log.info("收到导出文件下载请求: taskId={}, userId={}, ip={}", taskId, userId, clientIp);
+        accessLog.info("训练数据导出文件下载: taskId={}, userId={}, ip={}", taskId, userId, clientIp);
+
+        try {
+            byte[] fileData = trainingDataService.downloadExportFile(taskId);
+            
+            response.setContentType("application/octet-stream");
+            response.setHeader("Content-Disposition", "attachment; filename=\"training_data_export_" + taskId + ".zip\"");
+            response.setContentLength(fileData.length);
+            
+            response.getOutputStream().write(fileData);
+            response.getOutputStream().flush();
+            
+            log.info("导出文件下载成功: taskId={}, size={}, userId={}", taskId, fileData.length, userId);
+            
+        } catch (Exception e) {
+            log.error("导出文件下载失败: taskId={}, userId={}, error={}", taskId, userId, e.getMessage(), e);
+            try {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().write("{\"code\":500,\"message\":\"下载失败: " + e.getMessage() + "\"}");
+            } catch (IOException ioException) {
+                log.error("响应写入失败", ioException);
+            }
+        }
+    }
 }

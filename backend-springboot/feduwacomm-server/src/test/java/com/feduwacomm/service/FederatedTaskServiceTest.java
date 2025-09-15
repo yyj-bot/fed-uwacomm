@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.*;
  */
 @SpringBootTest
 @SpringJUnitConfig
+@ActiveProfiles("test")
 public class FederatedTaskServiceTest {
 
     @MockBean

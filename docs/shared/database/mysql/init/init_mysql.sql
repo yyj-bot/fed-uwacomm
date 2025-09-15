@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS user_permissions (
     ) NOT NULL COMMENT '资源类型',
     resource_id VARCHAR(32) NULL COMMENT '资源ID(32位UUID，NULL表示所有资源)',
     permission ENUM(
-        'READ',
+        'read',
         'WRITE',
         'DELETE',
         'EXECUTE',
@@ -210,11 +210,16 @@ CREATE TABLE IF NOT EXISTS system_logs (
     client_ip VARCHAR(50) COMMENT '客户端IP',
     environment VARCHAR(20) COMMENT '环境',
     exception TEXT COMMENT '异常信息',
+    vm_id VARCHAR(32) NULL COMMENT '虚拟机ID(32位UUID)',
+    task_id VARCHAR(32) NULL COMMENT '任务ID(32位UUID)',
+    details JSON NULL COMMENT '详细信息',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_timestamp (timestamp),
     INDEX idx_level (level),
     INDEX idx_user_id (user_id),
-    INDEX idx_request_uri (request_uri)
+    INDEX idx_request_uri (request_uri),
+    INDEX idx_vm_id (vm_id),
+    INDEX idx_task_id (task_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'SpringBoot系统日志表';
 
 -- 8. 虚拟机运行日志表 (vm_runtime_logs)
@@ -288,6 +293,95 @@ CREATE TABLE IF NOT EXISTS vm_secrets (
 ALTER TABLE vm_secrets
 ADD CONSTRAINT fk_vm_secrets_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
 
+-- 11. 全局模型表 (global_models)
+CREATE TABLE IF NOT EXISTS global_models (
+    id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
+    round_number INT NOT NULL COMMENT '轮次编号',
+    aggregation_method VARCHAR(50) NOT NULL COMMENT '聚合算法类型(FEDAVG, FEDPROX, FEDNOVA等)',
+    global_parameters JSON COMMENT '全局模型参数(JSON格式)',
+    global_loss DECIMAL(10, 8) COMMENT '全局损失值',
+    global_accuracy DECIMAL(10, 8) COMMENT '全局准确率',
+    participant_count INT NOT NULL COMMENT '参与聚合的客户端数量',
+    aggregation_duration BIGINT COMMENT '聚合耗时(毫秒)',
+    status ENUM(
+        'PENDING',
+        'AGGREGATING', 
+        'COMPLETED',
+        'FAILED'
+    ) NOT NULL DEFAULT 'PENDING' COMMENT '聚合状态',
+    started_at TIMESTAMP COMMENT '聚合开始时间',
+    completed_at TIMESTAMP COMMENT '聚合完成时间',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    metadata JSON COMMENT '聚合元数据(JSON格式)',
+    INDEX idx_global_models_task_round (task_id, round_number),
+    INDEX idx_global_models_status (status),
+    INDEX idx_global_models_created_at (created_at),
+    INDEX idx_global_models_completed_at (completed_at),
+    UNIQUE KEY uk_global_models_task_round (task_id, round_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='全局模型表 - 存储联邦学习聚合后的全局模型';
+
+-- 添加外键约束（在表创建后单独添加）
+ALTER TABLE global_models
+ADD CONSTRAINT fk_global_models_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE;
+
+-- 12. 日志导出任务表 (log_export_tasks)
+CREATE TABLE IF NOT EXISTS log_export_tasks (
+    id VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID，32位UUID',
+    export_id VARCHAR(50) NOT NULL UNIQUE COMMENT '导出任务ID（用户可见）',
+    status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'PENDING' COMMENT '任务状态',
+    format ENUM('CSV', 'JSON', 'EXCEL') NOT NULL DEFAULT 'CSV' COMMENT '导出格式',
+    filter_conditions JSON NULL COMMENT '过滤条件，JSON格式存储查询参数',
+    progress INT NOT NULL DEFAULT 0 COMMENT '进度百分比 0-100',
+    total_records BIGINT NULL COMMENT '总记录数',
+    processed_records BIGINT NULL DEFAULT 0 COMMENT '已处理记录数',
+    file_size BIGINT NULL COMMENT '文件大小（字节）',
+    file_path VARCHAR(500) NULL COMMENT '文件存储路径',
+    download_url VARCHAR(500) NULL COMMENT '下载URL',
+    estimated_time INT NULL COMMENT '预估时间（秒）',
+    expires_at DATETIME NULL COMMENT '过期时间',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    started_at DATETIME NULL COMMENT '开始处理时间',
+    completed_at DATETIME NULL COMMENT '完成时间',
+    error_message TEXT NULL COMMENT '错误信息',
+    created_by VARCHAR(50) NULL COMMENT '创建用户',
+    include_details BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否包含详细信息',
+    
+    INDEX idx_export_id (export_id),
+    INDEX idx_status (status),
+    INDEX idx_created_by (created_by),
+    INDEX idx_created_at (created_at),
+    INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日志导出任务表';
+
+-- 13. 日志清理任务表 (log_cleanup_tasks)
+CREATE TABLE IF NOT EXISTS log_cleanup_tasks (
+    id VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID，32位UUID',
+    cleanup_id VARCHAR(50) NOT NULL UNIQUE COMMENT '清理任务ID（用户可见）',
+    status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'PENDING' COMMENT '任务状态',
+    strategy ENUM('TIME_BASED', 'LEVEL_BASED', 'SIZE_BASED', 'CATEGORY_BASED') NOT NULL DEFAULT 'TIME_BASED' COMMENT '清理策略',
+    cleanup_conditions JSON NULL COMMENT '清理条件，JSON格式存储参数',
+    progress INT NOT NULL DEFAULT 0 COMMENT '进度百分比 0-100',
+    estimated_records BIGINT NULL COMMENT '预估删除记录数',
+    deleted_records BIGINT NULL DEFAULT 0 COMMENT '已删除记录数',
+    estimated_size BIGINT NULL COMMENT '预估释放空间（字节）',
+    freed_space BIGINT NULL DEFAULT 0 COMMENT '已释放空间（字节）',
+    dry_run BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否试运行模式',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    started_at DATETIME NULL COMMENT '开始处理时间',
+    completed_at DATETIME NULL COMMENT '完成时间',
+    error_message TEXT NULL COMMENT '错误信息',
+    created_by VARCHAR(50) NULL COMMENT '创建用户',
+    
+    INDEX idx_cleanup_id (cleanup_id),
+    INDEX idx_status (status),
+    INDEX idx_strategy (strategy),
+    INDEX idx_created_by (created_by),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日志清理任务表';
+
 -- =====================================================
 -- 索引创建
 -- =====================================================
@@ -346,6 +440,35 @@ CREATE INDEX idx_vm_round_models_vm_id ON vm_round_models (vm_id);
 
 CREATE INDEX idx_vm_round_models_round_number ON vm_round_models (round_number);
 
+-- 全局模型表索引
+CREATE INDEX idx_global_models_task_id ON global_models (task_id);
+
+CREATE INDEX idx_global_models_round_number ON global_models (round_number);
+
+CREATE INDEX idx_global_models_aggregation_method ON global_models (aggregation_method);
+
+-- 日志导出任务表索引
+CREATE INDEX idx_log_export_tasks_export_id ON log_export_tasks (export_id);
+
+CREATE INDEX idx_log_export_tasks_status ON log_export_tasks (status);
+
+CREATE INDEX idx_log_export_tasks_created_by ON log_export_tasks (created_by);
+
+CREATE INDEX idx_log_export_tasks_created_at ON log_export_tasks (created_at);
+
+CREATE INDEX idx_log_export_tasks_expires_at ON log_export_tasks (expires_at);
+
+-- 日志清理任务表索引
+CREATE INDEX idx_log_cleanup_tasks_cleanup_id ON log_cleanup_tasks (cleanup_id);
+
+CREATE INDEX idx_log_cleanup_tasks_status ON log_cleanup_tasks (status);
+
+CREATE INDEX idx_log_cleanup_tasks_strategy ON log_cleanup_tasks (strategy);
+
+CREATE INDEX idx_log_cleanup_tasks_created_by ON log_cleanup_tasks (created_by);
+
+CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
+
 -- SpringBoot系统日志表索引（已在表定义中包含）
 -- CREATE INDEX idx_system_logs_timestamp ON system_logs (timestamp);
 -- CREATE INDEX idx_system_logs_level ON system_logs (level);
@@ -360,14 +483,159 @@ CREATE INDEX idx_vm_round_models_round_number ON vm_round_models (round_number);
 -- CREATE INDEX idx_vm_runtime_logs_created_at ON vm_runtime_logs (created_at);
 
 -- =====================================================
+-- 重构扩展 - 新增服务相关表
+-- =====================================================
+
+-- 15. 初始模型表
+CREATE TABLE IF NOT EXISTS initial_models (
+    id VARCHAR(32) PRIMARY KEY COMMENT '初始模型唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    model_type VARCHAR(50) NOT NULL COMMENT '模型类型',
+    generation_method ENUM('RANDOM', 'CUSTOM_UPLOAD') NOT NULL COMMENT '生成方式',
+    model_size BIGINT COMMENT '模型大小(字节)',
+    architecture_params JSON COMMENT '架构参数(JSON格式)',
+    file_path VARCHAR(500) COMMENT '文件存储路径',
+    checksum VARCHAR(128) COMMENT '文件校验和',
+    status ENUM('GENERATING', 'READY', 'DISTRIBUTED', 'FAILED') DEFAULT 'GENERATING' COMMENT '状态',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_initial_models_task_id (task_id),
+    INDEX idx_initial_models_status (status),
+    INDEX idx_initial_models_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='初始模型表 - 存储联邦学习初始模型信息';
+
+-- 16. 模型分发记录表
+CREATE TABLE IF NOT EXISTS model_distributions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '分发记录唯一标识(32位UUID)',
+    model_id VARCHAR(32) NOT NULL COMMENT '模型ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    distribution_status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+    distributed_at TIMESTAMP NULL COMMENT '分发时间',
+    verified_at TIMESTAMP NULL COMMENT '验证时间',
+    error_message TEXT COMMENT '错误信息',
+    checksum_verified BOOLEAN DEFAULT FALSE COMMENT '校验和验证状态',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_model_distributions_model_id (model_id),
+    INDEX idx_model_distributions_vm_id (vm_id),
+    INDEX idx_model_distributions_status (distribution_status),
+    FOREIGN KEY (model_id) REFERENCES initial_models (id) ON DELETE CASCADE,
+    FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='模型分发记录表 - 跟踪模型分发到虚拟机的状态';
+
+-- 17. 数据分发任务表
+CREATE TABLE IF NOT EXISTS data_distributions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '数据分发任务唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    distribution_name VARCHAR(100) COMMENT '分发任务名称',
+    strategy ENUM('RANDOM', 'BALANCED', 'CUSTOM', 'ROUND_ROBIN') NOT NULL DEFAULT 'BALANCED' COMMENT '分发策略',
+    status ENUM('CREATED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED') DEFAULT 'CREATED' COMMENT '分发状态',
+    config JSON COMMENT '分发配置参数(JSON格式)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    INDEX idx_data_distributions_task_id (task_id),
+    INDEX idx_data_distributions_status (status),
+    INDEX idx_data_distributions_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='数据分发任务表 - 管理训练数据分发任务';
+
+-- 18. 数据分发详情表
+CREATE TABLE IF NOT EXISTS data_distribution_details (
+    id VARCHAR(32) PRIMARY KEY COMMENT '分发详情唯一标识(32位UUID)',
+    distribution_id VARCHAR(32) NOT NULL COMMENT '分发任务ID(32位UUID)',
+    dataset_id VARCHAR(32) NOT NULL COMMENT '数据集ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+    data_size BIGINT COMMENT '数据大小(字节)',
+    transferred_size BIGINT DEFAULT 0 COMMENT '已传输大小(字节)',
+    checksum VARCHAR(128) COMMENT '数据校验和',
+    distributed_at TIMESTAMP NULL COMMENT '分发时间',
+    verified_at TIMESTAMP NULL COMMENT '验证时间',
+    error_message TEXT COMMENT '错误信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_data_distribution_details_distribution_id (distribution_id),
+    INDEX idx_data_distribution_details_vm_id (vm_id),
+    INDEX idx_data_distribution_details_dataset_id (dataset_id),
+    INDEX idx_data_distribution_details_status (status),
+    FOREIGN KEY (distribution_id) REFERENCES data_distributions (id) ON DELETE CASCADE,
+    FOREIGN KEY (dataset_id) REFERENCES training_dataset (id) ON DELETE CASCADE,
+    FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='数据分发详情表 - 跟踪具体数据分发到各虚拟机的状态';
+
+-- 19. 工作流编排表
+CREATE TABLE IF NOT EXISTS orchestration_workflows (
+    id VARCHAR(32) PRIMARY KEY COMMENT '工作流唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+    workflow_name VARCHAR(100) COMMENT '工作流名称',
+    status ENUM('CREATED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'FAILED', 'TERMINATED') DEFAULT 'CREATED' COMMENT '工作流状态',
+    current_stage ENUM('INITIALIZATION', 'INITIAL_MODEL_GENERATION', 'DATA_DISTRIBUTION', 
+                      'MODEL_DISTRIBUTION', 'FEDERATED_TRAINING', 'FINAL_AGGREGATION', 'COMPLETED') 
+                DEFAULT 'INITIALIZATION' COMMENT '当前阶段',
+    config JSON COMMENT '工作流配置(JSON格式)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_orchestration_workflows_task_id (task_id),
+    INDEX idx_orchestration_workflows_status (status),
+    INDEX idx_orchestration_workflows_stage (current_stage),
+    INDEX idx_orchestration_workflows_created_at (created_at),
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='工作流编排表 - 管理联邦学习工作流执行状态';
+
+-- 20. 工作流阶段执行记录表
+CREATE TABLE IF NOT EXISTS workflow_stage_executions (
+    id VARCHAR(32) PRIMARY KEY COMMENT '阶段执行记录唯一标识(32位UUID)',
+    orchestration_id VARCHAR(32) NOT NULL COMMENT '工作流ID(32位UUID)',
+    stage_name VARCHAR(50) NOT NULL COMMENT '阶段名称',
+    status ENUM('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'SKIPPED') DEFAULT 'PENDING' COMMENT '执行状态',
+    started_at TIMESTAMP NULL COMMENT '开始时间',
+    completed_at TIMESTAMP NULL COMMENT '完成时间',
+    input_data JSON COMMENT '输入数据(JSON格式)',
+    output_data JSON COMMENT '输出数据(JSON格式)',
+    error_message TEXT COMMENT '错误信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_workflow_stage_executions_orchestration_id (orchestration_id),
+    INDEX idx_workflow_stage_executions_stage (stage_name),
+    INDEX idx_workflow_stage_executions_status (status),
+    INDEX idx_workflow_stage_executions_created_at (created_at),
+    FOREIGN KEY (orchestration_id) REFERENCES orchestration_workflows (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+  COMMENT='工作流阶段执行记录表 - 跟踪每个工作流阶段的执行状态';
+
+
+-- 扩展现有表结构
+-- 为federated_tasks表添加新字段
+ALTER TABLE federated_tasks 
+ADD COLUMN orchestration_id VARCHAR(32) NULL COMMENT '工作流编排ID(32位UUID)',
+ADD COLUMN initial_model_strategy ENUM('RANDOM', 'CUSTOM_UPLOAD') DEFAULT 'RANDOM' COMMENT '初始模型策略',
+ADD COLUMN workflow_config JSON COMMENT '工作流配置(JSON格式)',
+ADD INDEX idx_federated_tasks_orchestration_id (orchestration_id);
+
+-- 为global_models表添加分发状态字段
+ALTER TABLE global_models
+ADD COLUMN distribution_status ENUM('PENDING', 'DISTRIBUTING', 'DISTRIBUTED', 'FAILED') DEFAULT 'PENDING' COMMENT '分发状态',
+ADD COLUMN distributed_vms JSON COMMENT '已分发的虚拟机列表(JSON格式)',
+ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间';
+
+-- =====================================================
 -- 初始化完成
 -- =====================================================
 -- 数据库初始化脚本执行完成
--- 共创建了 11 个表:
+-- 共创建了 20 个表:
 -- 1. users - 用户表
 -- 2. user_permissions - 用户权限表
 -- 3. vm_instances - 虚拟机表
--- 4. federated_tasks - 联邦学习任务表
+-- 4. federated_tasks - 联邦学习任务表（已扩展）
 -- 5. training_dataset - 训练数据集元信息表
 -- 6. training_dataset_row - 训练数据明细表
 -- 7. model_versions - 模型版本表
@@ -375,4 +643,13 @@ CREATE INDEX idx_vm_round_models_round_number ON vm_round_models (round_number);
 -- 9. vm_runtime_logs - 虚拟机运行日志表
 -- 10. vm_round_models - 虚拟机轮次模型结果表
 -- 11. vm_secrets - 虚拟机刷新凭证表
+-- 12. global_models - 全局模型表（已扩展）
+-- 13. log_export_tasks - 日志导出任务表
+-- 14. log_cleanup_tasks - 日志清理任务表
+-- 15. initial_models - 初始模型表（新增）
+-- 16. model_distributions - 模型分发记录表（新增）
+-- 17. data_distributions - 数据分发任务表（新增）
+-- 18. data_distribution_details - 数据分发详情表（新增）
+-- 19. orchestration_workflows - 工作流编排表（新增）
+-- 20. workflow_stage_executions - 工作流阶段执行记录表（新增）
 -- =====================================================
