@@ -37,7 +37,7 @@
 
 ### 3.1 用户管理接口
 
-用户管理相关的API接口已独立拆分到：[用户管理API参考文档](./user-api-reference.md)
+用户管理相关的API接口已独立拆分到：[用户管理API参考文档](user/user-api-reference.md)
 
 该文档包含以下接口：
 - 用户注册接口
@@ -49,7 +49,7 @@
 
 ### 3.2 虚拟机管理接口
 
-虚拟机管理相关的API接口已独立拆分到：[虚拟机API参考文档](./vm-api-reference.md)
+虚拟机管理相关的API接口已独立拆分到：[虚拟机API参考文档](vm/vm-api-reference.md)
 
 该文档包含以下接口：
 - 虚拟机注册接口
@@ -62,7 +62,7 @@
 
 ### 3.3 联邦学习任务管理接口
 
-联邦学习任务管理相关的API接口已独立拆分到：[联邦学习任务管理API参考文档](./federated-task-api-reference.md)
+联邦学习任务管理相关的API接口已独立拆分到：[联邦学习任务管理API参考文档](federated-task/federated-task-api-reference.md)
 
 该文档包含以下接口：
 - 任务创建接口
@@ -75,7 +75,7 @@
 
 ### 3.4 训练数据管理接口
 
-训练数据管理相关的API接口已独立拆分到：[训练数据管理API参考文档](./training-data-api-reference.md)
+训练数据管理相关的API接口已独立拆分到：[训练数据管理API参考文档](train-data/training-data-api-reference.md)
 
 该文档包含以下接口：
 - 文件上传接口
@@ -93,7 +93,7 @@
 
 ### 3.5 模型版本管理接口
 
-模型版本管理相关的API接口已独立拆分到：[模型版本管理API参考文档](./model-version-api-reference.md)
+模型版本管理相关的API接口已独立拆分到：[模型版本管理API参考文档](model/model-version-api-reference.md)
 
 > 提示：自当前版本起，模型版本仅以`parameters`(JSON)记录所有模型相关信息，不再包含`modelPath`、`modelSize`、`modelType`等字段；如需二进制传输，请使用专门的文件通道。
 
@@ -109,7 +109,7 @@
 
 ### 3.6 系统日志接口
 
-系统日志管理相关的API接口已独立拆分到：[系统日志管理API参考文档](./system-log-api-reference.md)
+系统日志管理相关的API接口已独立拆分到：[系统日志管理API参考文档](system-log/system-log-api-reference.md)
 
 该文档包含以下接口：
 - 日志查询接口（列表/详情/实时/统计）
@@ -187,12 +187,12 @@
 
 ## 7. 相关文档
 
-- [用户管理API参考文档](./user-api-reference.md) - 用户管理相关接口
-- [虚拟机API参考文档](./vm-api-reference.md) - 虚拟机管理相关接口
-- [联邦学习任务管理API参考文档](./federated-task-api-reference.md) - 联邦学习任务管理相关接口
-- [训练数据管理API参考文档](./training-data-api-reference.md) - 训练数据管理相关接口
-- [模型版本管理API参考文档](./model-version-api-reference.md) - 模型版本管理相关接口
-- [系统日志管理API参考文档](./system-log-api-reference.md) - 系统日志管理相关接口
+- [用户管理API参考文档](user/user-api-reference.md) - 用户管理相关接口
+- [虚拟机API参考文档](vm/vm-api-reference.md) - 虚拟机管理相关接口
+- [联邦学习任务管理API参考文档](federated-task/federated-task-api-reference.md) - 联邦学习任务管理相关接口
+- [训练数据管理API参考文档](train-data/training-data-api-reference.md) - 训练数据管理相关接口
+- [模型版本管理API参考文档](model/model-version-api-reference.md) - 模型版本管理相关接口
+- [系统日志管理API参考文档](system-log/system-log-api-reference.md) - 系统日志管理相关接口
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议
 - [数据库表结构文档](../../database/database_schema.md) - 数据库设计
 - [项目概述文档](../../project_overview.md) - 项目整体架构

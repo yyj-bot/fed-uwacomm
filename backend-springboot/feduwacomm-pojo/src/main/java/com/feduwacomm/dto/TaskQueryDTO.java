@@ -32,4 +32,18 @@ public class TaskQueryDTO {
     private String keyword; // 关键词搜索
     private String createdBy; // 创建者过滤
     private String algorithm; // 算法类型过滤
+
+    /**
+     * 计算数据库查询的OFFSET值
+     * @return offset值
+     */
+    public Integer getOffset() {
+        if (page == null || page < 1) {
+            return 0;
+        }
+        if (size == null || size < 1) {
+            return 0;
+        }
+        return (page - 1) * size;
+    }
 }

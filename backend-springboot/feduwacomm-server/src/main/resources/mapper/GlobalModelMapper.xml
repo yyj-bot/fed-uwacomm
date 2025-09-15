@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.GlobalModelMapper">
+
+    <resultMap id="GlobalModelResultMap" type="com.feduwacomm.entity.GlobalModel">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="roundNumber" column="round_number"/>
+        <result property="aggregationMethod" column="aggregation_method"/>
+        <result property="globalParameters" column="global_parameters"/>
+        <result property="globalLoss" column="global_loss"/>
+        <result property="globalAccuracy" column="global_accuracy"/>
+        <result property="participantCount" column="participant_count"/>
+        <result property="aggregationDuration" column="aggregation_duration"/>
+        <result property="status" column="status"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="metadata" column="metadata"/>
+    </resultMap>
+
+    <insert id="insertGlobalModel" parameterType="com.feduwacomm.entity.GlobalModel">
+        INSERT INTO global_models (
+            id, task_id, round_number, aggregation_method, global_parameters,
+            global_loss, global_accuracy, participant_count, aggregation_duration,
+            status, started_at, completed_at, created_at, updated_at, metadata
+        ) VALUES (
+            #{id}, #{taskId}, #{roundNumber}, #{aggregationMethod},
+            CAST(#{globalParameters} AS JSON), #{globalLoss}, #{globalAccuracy},
+            #{participantCount}, #{aggregationDuration}, #{status},
+            #{startedAt}, #{completedAt}, #{createdAt}, #{updatedAt},
+            CAST(#{metadata} AS JSON)
+        )
+    </insert>
+
+    <update id="updateGlobalModel" parameterType="com.feduwacomm.entity.GlobalModel">
+        UPDATE global_models SET
+            aggregation_method = #{aggregationMethod},
+            global_parameters = CAST(#{globalParameters} AS JSON),
+            global_loss = #{globalLoss},
+            global_accuracy = #{globalAccuracy},
+            participant_count = #{participantCount},
+            aggregation_duration = #{aggregationDuration},
+            status = #{status},
+            started_at = #{startedAt},
+            completed_at = #{completedAt},
+            updated_at = #{updatedAt},
+            metadata = CAST(#{metadata} AS JSON)
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE global_models SET
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateAggregationComplete">
+        UPDATE global_models SET
+            global_loss = #{globalLoss},
+            global_accuracy = #{globalAccuracy},
+            status = #{status},
+            completed_at = #{completedAt},
+            aggregation_duration = #{aggregationDuration}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByTaskIdAndRound" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE task_id = #{taskId} AND round_number = #{roundNumber}
+    </select>
+
+    <select id="selectByTaskId" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE task_id = #{taskId}
+        ORDER BY round_number DESC, created_at DESC
+    </select>
+
+    <select id="selectLatestByTaskId" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE task_id = #{taskId}
+        ORDER BY round_number DESC, created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectPendingAggregation" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE status IN ('PENDING', 'AGGREGATING')
+        ORDER BY created_at ASC
+    </select>
+
+    <select id="selectByStatus" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM global_models
+        WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByTaskId">
+        DELETE FROM global_models
+        WHERE task_id = #{taskId}
+    </delete>
+
+    <select id="countByTaskId" resultType="int">
+        SELECT COUNT(*)
+        FROM global_models
+        WHERE task_id = #{taskId}
+    </select>
+
+    <select id="selectAggregationHistory" resultMap="GlobalModelResultMap">
+        SELECT id, task_id, round_number, aggregation_method, global_parameters,
+               global_loss, global_accuracy, participant_count, aggregation_duration,
+               status, started_at, completed_at, created_at, updated_at, metadata
+        FROM global_models
+        WHERE task_id = #{taskId} AND status = 'COMPLETED'
+        ORDER BY round_number DESC, completed_at DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+</mapper>

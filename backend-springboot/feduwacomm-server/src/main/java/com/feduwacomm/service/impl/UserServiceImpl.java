@@ -71,6 +71,12 @@ public class UserServiceImpl implements UserService {
             }
             log.info("用户名检查通过，不存在重复");
 
+            log.info("开始检查系统中是否已有用户");
+            // 检查系统中是否已有用户，如果没有则将新用户设为管理员
+            int totalUsers = userMapper.countAll();
+            String userRole = (totalUsers == 0) ? "ADMIN" : "VIEWER";
+            log.info("系统中现有用户数: {}, 新用户将被设置为: {}", totalUsers, userRole);
+
             log.info("开始创建用户对象");
             // 创建用户
             User user = User.builder()
@@ -78,13 +84,13 @@ public class UserServiceImpl implements UserService {
                     .username(registerDTO.getUsername())
                     .email(registerDTO.getEmail())
                     .passwordHash(PasswordUtil.encode(registerDTO.getPassword()))
-                    .role("VIEWER")
+                    .role(userRole)
                     .status("ACTIVE")
                     .loginAttempts(0)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
-            log.info("用户对象创建完成，userId: {}", user.getId());
+            log.info("用户对象创建完成，userId: {}, role: {}", user.getId(), user.getRole());
 
             log.info("开始插入用户到数据库");
             userMapper.insert(user);
@@ -385,10 +391,13 @@ public class UserServiceImpl implements UserService {
                     throw UserException.passwordError();
                 }
 
-                // 验证新密码
-                if (!PasswordUtil.isValidPassword(updateDTO.getNewPassword())) {
-                    log.warn("密码修改失败 - 新密码格式无效: userId={}, ip={}", userId, clientIp);
-                    throw UserException.passwordTooShort();
+                // 验证新密码格式
+                try {
+                    PasswordUtil.validatePasswordFormat(updateDTO.getNewPassword());
+                } catch (UserException e) {
+                    log.warn("密码修改失败 - 新密码格式无效: userId={}, ip={}, error={}", 
+                        userId, clientIp, e.getMessage());
+                    throw e;
                 }
 
                 // 更新密码
@@ -458,11 +467,13 @@ public class UserServiceImpl implements UserService {
                 throw UserException.passwordError();
             }
 
-            // 验证新密码
-            if (!PasswordUtil.isValidPassword(passwordDTO.getNewPassword())) {
-                log.warn("修改密码失败 - 新密码格式无效: userId={}, username={}, ip={}", 
-                    userId, user.getUsername(), clientIp);
-                throw UserException.passwordTooShort();
+            // 验证新密码格式
+            try {
+                PasswordUtil.validatePasswordFormat(passwordDTO.getNewPassword());
+            } catch (UserException e) {
+                log.warn("修改密码失败 - 新密码格式无效: userId={}, username={}, ip={}, error={}", 
+                    userId, user.getUsername(), clientIp, e.getMessage());
+                throw e;
             }
 
             // 验证确认密码
@@ -536,8 +547,12 @@ public class UserServiceImpl implements UserService {
         if (registerDTO.getEmail() == null || registerDTO.getEmail().trim().isEmpty()) {
             throw UserException.paramValidationError("email", "邮箱不能为空");
         }
-        if (registerDTO.getPassword() == null || !PasswordUtil.isValidPassword(registerDTO.getPassword())) {
-            throw UserException.passwordTooShort();
+        // 使用详细的密码验证
+        try {
+            PasswordUtil.validatePasswordFormat(registerDTO.getPassword());
+        } catch (UserException e) {
+            // 直接抛出具体的密码格式异常
+            throw e;
         }
         if (!registerDTO.getPassword().equals(registerDTO.getConfirmPassword())) {
             throw UserException.passwordMismatch();

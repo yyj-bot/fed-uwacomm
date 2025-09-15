@@ -13,6 +13,7 @@ import org.mockito.MockedStatic;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 public class VmInstanceControllerTest {
 
     @Autowired
@@ -142,7 +144,7 @@ public class VmInstanceControllerTest {
                     .andExpect(jsonPath("$.data.secretId").value("secret-id-12345"))
                     .andExpect(jsonPath("$.data.tokenExpireSeconds").value(3600))
                     .andExpect(jsonPath("$.data.websocket.sockjs").value("ws://localhost:8080/sockjs-vm"))
-                    .andExpect(jsonPath("$.data.websocket.nativeWs").value("ws://localhost:8080/vm-websocket"))
+                    .andExpect(jsonPath("$.data.websocket.native").value("ws://localhost:8080/vm-websocket"))
                     .andExpect(jsonPath("$.data.apiEndpoints.status").value("/api/v1/vm/status"))
                     .andExpect(jsonPath("$.data.apiEndpoints.control").value("/api/v1/vm/control"))
                     .andExpect(jsonPath("$.data.apiEndpoints.tokenRefresh").value("/api/v1/vm/token/refresh"));

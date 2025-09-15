@@ -2,9 +2,10 @@ package com.feduwacomm.service;
 
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.dto.LogQueryDTO;
-import com.feduwacomm.vo.LogDetailVO;
-import com.feduwacomm.vo.LogListVO;
-import com.feduwacomm.vo.LogStatisticsVO;
+import com.feduwacomm.dto.LogExportDTO;
+import com.feduwacomm.dto.LogCleanupDTO;
+import com.feduwacomm.dto.LogConfigDTO;
+import com.feduwacomm.vo.*;
 
 import java.util.List;
 
@@ -18,6 +19,36 @@ public interface LogService {
     List<LogListVO> getRealtimeLogs(LogQueryDTO queryDTO);
     
     LogStatisticsVO getStatistics(LogQueryDTO queryDTO);
+    
+    // 日志导出方法
+    LogExportTaskVO createExportTask(LogExportDTO exportDTO);
+    
+    LogExportTaskVO getExportStatus(String exportId);
+    
+    byte[] downloadExport(String exportId);
+    
+    PageResult<LogExportTaskVO> getExportHistory(Integer page, Integer size, String status);
+    
+    // 日志清理方法
+    LogCleanupTaskVO createCleanupTask(LogCleanupDTO cleanupDTO);
+    
+    LogCleanupTaskVO getCleanupStatus(String cleanupId);
+    
+    PageResult<LogCleanupTaskVO> getCleanupHistory(Integer page, Integer size, String status);
+    
+    // 系统监控方法
+    LogMonitorVO getSystemMonitor();
+    
+    LogMonitorVO getLogMonitor(String timeRange, String level);
+    
+    LogMonitorVO getPerformanceMonitor(String timeRange, String endpoint);
+    
+    LogMonitorVO getAlerts();
+    
+    // 日志配置方法
+    LogConfigVO getLogConfig();
+    
+    void updateLogConfig(LogConfigDTO configDTO);
     
     // 日志记录方法
     void logInfo(String message, String userId, String username, String requestUri, String clientIp);

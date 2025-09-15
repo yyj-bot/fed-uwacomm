@@ -129,13 +129,69 @@ public class UserException extends RuntimeException {
      * 密码缺少字母
      */
     public static UserException passwordMissingLetter() {
-        return new UserException(400, "密码格式错误，必须包含至少一个字母");
+        return new UserException(400, "密码格式不正确");
     }
 
     /**
      * 密码缺少数字
      */
     public static UserException passwordMissingDigit() {
-        return new UserException(400, "密码格式错误，必须包含至少一个数字");
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码长度太短
+     */
+    public static UserException passwordTooShort(int minLength) {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码长度太长
+     */
+    public static UserException passwordTooLong(int maxLength) {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少特殊字符
+     */
+    public static UserException passwordMissingSpecialChar() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少大写字母
+     */
+    public static UserException passwordMissingUppercase() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少小写字母
+     */
+    public static UserException passwordMissingLowercase() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码包含不允许的字符
+     */
+    public static UserException passwordInvalidCharacters() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码强度不够
+     */
+    public static UserException passwordTooWeak() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码为空
+     */
+    public static UserException passwordEmpty() {
+        return new UserException(400, "密码不能为空");
     }
 }

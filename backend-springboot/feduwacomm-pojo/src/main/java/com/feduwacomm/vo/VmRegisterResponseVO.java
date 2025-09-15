@@ -1,5 +1,6 @@
 package com.feduwacomm.vo;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -40,6 +41,8 @@ public class VmRegisterResponseVO {
     @Builder
     public static class WebSocketInfo {
         private String sockjs;
+        
+        @JsonProperty("native")
         private String nativeWs;
     }
 

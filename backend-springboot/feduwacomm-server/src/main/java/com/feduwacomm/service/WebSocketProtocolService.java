@@ -8,7 +8,9 @@ import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
+import com.feduwacomm.event.ModelUploadEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class WebSocketProtocolService {
     private final VmRoundModelsMapper vmRoundModelsMapper;
     private final VmInstancesMapper vmInstancesMapper;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     // in-memory VM 最新状态缓存：vmId -> STATUS_RESPONSE.data（用于快速读，不作为数据源）
     private final ConcurrentHashMap<String, Map<String, Object>> statusCache = new ConcurrentHashMap<>();
@@ -42,7 +45,8 @@ public class WebSocketProtocolService {
                                     FederatedTasksMapper federatedTasksMapper,
                                     VmRoundModelsMapper vmRoundModelsMapper,
                                     VmInstancesMapper vmInstancesMapper,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    ApplicationEventPublisher eventPublisher) {
         this.messagingTemplate = messagingTemplate;
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
@@ -50,6 +54,7 @@ public class WebSocketProtocolService {
         this.vmRoundModelsMapper = vmRoundModelsMapper;
         this.vmInstancesMapper = vmInstancesMapper;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     public ProtocolAck handle(ProtocolMessage msg) {
@@ -287,10 +292,22 @@ public class WebSocketProtocolService {
         Double acc = numberAsDouble(metrics, "accuracy");
         Double loss = numberAsDouble(metrics, "loss");
         String parametersJson = toJsonSafe(mapOf("parameters", parameters, "metrics", metrics));
+        
         // 以 (task, vm, round) 唯一，id 使用随机UUID
         vmRoundModelsMapper.upsertRoundModel(UUID.randomUUID().toString().replace("-", ""), taskId, vmId, round, acc, loss, parametersJson);
+        
+        // 发布模型上传事件，触发聚合检查
+        try {
+            ModelUploadEvent uploadEvent = new ModelUploadEvent(this, taskId, round, vmId, 
+                    (long) parametersJson.length(), acc, loss);
+            eventPublisher.publishEvent(uploadEvent);
+        } catch (Exception e) {
+            // 事件发布失败不应影响模型上传的正常流程
+            System.err.println("发布模型上传事件失败: " + e.getMessage());
+        }
+        
         sendToVmTopic(vmId, msg);
-        return ackFor(msg, ProtocolType.MODEL_UPLOAD, mapOf("status", "RECEIVED"));
+        return ackFor(msg, ProtocolType.MODEL_UPLOAD, mapOf("status", "RECEIVED", "aggregationPending", true));
     }
 
     private ProtocolAck onModelDownload(ProtocolMessage msg) {

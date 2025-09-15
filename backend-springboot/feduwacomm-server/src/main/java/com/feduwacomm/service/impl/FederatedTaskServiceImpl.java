@@ -5,6 +5,7 @@ import com.feduwacomm.exception.UserException;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     
     @Autowired
     private LogService logService;
+    
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     // 任务状态常量
     private static final String STATUS_CREATED = "CREATED";
@@ -96,7 +101,15 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .estimatedDuration(estimateTaskDuration(createDTO))
             .build();
 
-        log.info("联邦学习任务创建完成: taskId={}, participantCount={}", 
+        // 发布任务创建事件，触发自动工作流
+        FederatedTaskCreatedEvent taskCreatedEvent = new FederatedTaskCreatedEvent(
+            taskId, 
+            createDTO.getTaskName(), 
+            createdBy
+        );
+        eventPublisher.publishEvent(taskCreatedEvent);
+        
+        log.info("联邦学习任务创建完成，已发布事件触发工作流: taskId={}, participantCount={}", 
             taskId, createDTO.getParticipants().size());
 
         return response;

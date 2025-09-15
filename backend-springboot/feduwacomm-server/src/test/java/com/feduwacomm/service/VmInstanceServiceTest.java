@@ -1,17 +1,20 @@
 package com.feduwacomm.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.feduwacomm.common.PageResult;
 import com.feduwacomm.common.exception.BusinessException;
 import com.feduwacomm.dto.VmRegisterDTO;
 import com.feduwacomm.dto.VmTokenRefreshDTO;
+import com.feduwacomm.dto.VmQueryDTO;
+import com.feduwacomm.dto.VmUpdateDTO;
+import com.feduwacomm.dto.VmControlDTO;
 import com.feduwacomm.entity.VmInstance;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.impl.VmInstanceServiceImpl;
 import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.ApiKeyUtil;
-import com.feduwacomm.vo.VmRegisterResponseVO;
-import com.feduwacomm.vo.VmTokenRefreshResponseVO;
+import com.feduwacomm.vo.*;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,8 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -55,6 +57,9 @@ public class VmInstanceServiceTest {
     private VmRegisterDTO registerDTO;
     private VmTokenRefreshDTO refreshDTO;
     private VmInstance vmInstance;
+    private VmQueryDTO queryDTO;
+    private VmUpdateDTO updateDTO;
+    private VmControlDTO controlDTO;
 
     @BeforeEach
     void setUp() {
@@ -113,6 +118,37 @@ public class VmInstanceServiceTest {
         vmInstance.setCreatedAt(LocalDateTime.now());
         vmInstance.setUpdatedAt(LocalDateTime.now());
         vmInstance.setSecretExpireTime(LocalDateTime.now().plusDays(7));
+
+        // 准备查询DTO
+        queryDTO = VmQueryDTO.builder()
+            .page(1)
+            .size(10)
+            .status("RUNNING")
+            .osType("Linux")
+            .keyword("test")
+            .connectionStatus("CONNECTED")
+            .sortField("created_at")
+            .sortOrder("desc")
+            .userId("test-user-123")
+            .build();
+
+        // 准备更新DTO
+        updateDTO = VmUpdateDTO.builder()
+            .name("Updated VM Name")
+            .ipAddress("192.168.1.101")
+            .port(2222)
+            .cpuCores(8)
+            .memoryMb(16384)
+            .build();
+
+        // 准备控制DTO
+        controlDTO = VmControlDTO.builder()
+            .operation("start")
+            .force(false)
+            .timeout(300)
+            .graceful(true)
+            .reason("Test operation")
+            .build();
     }
 
     /**
@@ -305,5 +341,407 @@ public class VmInstanceServiceTest {
 
         // 验证mock调用
         verify(vmInstancesMapper).updateWebSocketSession(anyString(), isNull(), eq("DISCONNECTED"));
+    }
+
+    // ==================== 新增CRUD功能测试 ====================
+
+    /**
+     * 测试虚拟机列表查询 - 成功场景
+     */
+    @Test
+    void testQueryVmList_Success() {
+        // 准备测试数据
+        List<VmInstance> vmList = Arrays.asList(vmInstance);
+        
+        // 准备mock数据
+        when(vmInstancesMapper.countVmInstances(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(1);
+        when(vmInstancesMapper.selectPagedList(anyInt(), anyInt(), anyString(), anyString(), 
+            anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(vmList);
+
+        // 执行测试
+        PageResult<VmListVO> result = vmInstanceService.queryVmList(queryDTO);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotal());
+        assertEquals(1, result.getCurrent());
+        assertEquals(10, result.getSize());
+        assertEquals(1, result.getPages());
+        assertEquals(1, result.getRecords().size());
+
+        VmListVO vmListVO = result.getRecords().get(0);
+        assertEquals(vmInstance.getId(), vmListVO.getVmId());
+        assertEquals(vmInstance.getName(), vmListVO.getName());
+        assertEquals(vmInstance.getStatus(), vmListVO.getStatus());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).countVmInstances(anyString(), anyString(), anyString(), anyString());
+        verify(vmInstancesMapper).selectPagedList(anyInt(), anyInt(), anyString(), anyString(), 
+            anyString(), anyString(), anyString(), anyString());
+    }
+
+    /**
+     * 测试虚拟机列表查询 - 空结果
+     */
+    @Test
+    void testQueryVmList_EmptyResult() {
+        // 准备mock数据 - 无数据
+        when(vmInstancesMapper.countVmInstances(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(0);
+
+        // 执行测试
+        PageResult<VmListVO> result = vmInstanceService.queryVmList(queryDTO);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(0, result.getTotal());
+        assertEquals(1, result.getCurrent());
+        assertEquals(10, result.getSize());
+        assertEquals(0, result.getPages());
+        assertTrue(result.getRecords().isEmpty());
+
+        // 验证mock调用 - 当总数为0时，不应查询列表数据
+        verify(vmInstancesMapper).countVmInstances(anyString(), anyString(), anyString(), anyString());
+        verify(vmInstancesMapper, never()).selectPagedList(anyInt(), anyInt(), anyString(), anyString(), 
+            anyString(), anyString(), anyString(), anyString());
+    }
+
+    /**
+     * 测试虚拟机详情查询 - 成功场景
+     */
+    @Test
+    void testGetVmDetail_Success() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectDetailById(vmId)).thenReturn(vmInstance);
+
+        // 执行测试
+        VmDetailVO result = vmInstanceService.getVmDetail(vmId, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmInstance.getId(), result.getVmId());
+        assertEquals(vmInstance.getName(), result.getName());
+        assertEquals(vmInstance.getIpAddress(), result.getIpAddress());
+        assertEquals(vmInstance.getPort(), result.getPort());
+        assertEquals(vmInstance.getStatus(), result.getStatus());
+        assertNotNull(result.getResourceUsage());
+        assertNotNull(result.getNetwork());
+        assertNotNull(result.getProcesses());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectDetailById(vmId);
+    }
+
+    /**
+     * 测试虚拟机详情查询 - 虚拟机不存在
+     */
+    @Test
+    void testGetVmDetail_VmNotFound() {
+        String vmId = "non-existent-vm-id";
+        String userId = "test-user-id";
+
+        // 准备mock数据 - 虚拟机不存在
+        when(vmInstancesMapper.selectDetailById(vmId)).thenReturn(null);
+
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+            () -> vmInstanceService.getVmDetail(vmId, userId));
+        
+        assertTrue(exception.getMessage().contains("虚拟机不存在"));
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectDetailById(vmId);
+    }
+
+    /**
+     * 测试虚拟机更新 - 成功场景
+     */
+    @Test
+    void testUpdateVm_Success() throws Exception {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+        when(vmInstancesMapper.updateBasicInfo(any(VmInstance.class))).thenReturn(1);
+
+        // 执行测试
+        VmUpdateResponseVO result = vmInstanceService.updateVm(vmId, updateDTO, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertEquals(updateDTO.getName(), result.getName());
+        assertNotNull(result.getUpdatedAt());
+        assertNotNull(result.getUpdatedFields());
+        assertTrue(result.getUpdatedFields().length > 0);
+        assertNotNull(result.getRequiresRestart());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper).updateBasicInfo(any(VmInstance.class));
+    }
+
+    /**
+     * 测试虚拟机更新 - 虚拟机不存在
+     */
+    @Test
+    void testUpdateVm_VmNotFound() {
+        String vmId = "non-existent-vm-id";
+        String userId = "test-user-id";
+
+        // 准备mock数据 - 虚拟机不存在
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(null);
+
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+            () -> vmInstanceService.updateVm(vmId, updateDTO, userId));
+        
+        assertTrue(exception.getMessage().contains("虚拟机不存在"));
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper, never()).updateBasicInfo(any(VmInstance.class));
+    }
+
+    /**
+     * 测试虚拟机删除 - 成功场景
+     */
+    @Test
+    void testDeleteVm_Success() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+        Boolean force = false;
+
+        // 设置虚拟机状态为已停止
+        vmInstance.setStatus("STOPPED");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+        when(vmInstancesMapper.deleteByVmId(vmId)).thenReturn(1);
+
+        // 执行测试
+        VmDeleteResponseVO result = vmInstanceService.deleteVm(vmId, force, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertEquals(vmInstance.getName(), result.getName());
+        assertNotNull(result.getDeletedAt());
+        assertEquals(force, result.getForce());
+        assertNotNull(result.getDeletedResources());
+        assertNotNull(result.getMessage());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper).deleteByVmId(vmId);
+    }
+
+    /**
+     * 测试虚拟机删除 - 虚拟机正在运行且不强制删除
+     */
+    @Test
+    void testDeleteVm_RunningVmWithoutForce() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+        Boolean force = false;
+
+        // 设置虚拟机状态为正在运行
+        vmInstance.setStatus("RUNNING");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+            () -> vmInstanceService.deleteVm(vmId, force, userId));
+        
+        assertTrue(exception.getMessage().contains("虚拟机正在运行"));
+
+        // 验证mock调用 - 不应该执行删除操作
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper, never()).deleteByVmId(vmId);
+    }
+
+    /**
+     * 测试虚拟机删除 - 强制删除运行中的虚拟机
+     */
+    @Test
+    void testDeleteVm_ForceDeleteRunningVm() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+        Boolean force = true;
+
+        // 设置虚拟机状态为正在运行
+        vmInstance.setStatus("RUNNING");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+        when(vmInstancesMapper.deleteByVmId(vmId)).thenReturn(1);
+
+        // 执行测试
+        VmDeleteResponseVO result = vmInstanceService.deleteVm(vmId, force, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertTrue(result.getForce());
+
+        // 验证mock调用 - 应该执行删除操作
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper).deleteByVmId(vmId);
+    }
+
+    // ==================== 虚拟机控制功能测试 ====================
+
+    /**
+     * 测试虚拟机启动 - 成功场景
+     */
+    @Test
+    void testStartVm_Success() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 设置虚拟机状态为已停止
+        vmInstance.setStatus("STOPPED");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+        when(vmInstancesMapper.updateStatus(vmId, "STARTING")).thenReturn(1);
+
+        // 执行测试
+        VmControlResponseVO result = vmInstanceService.startVm(vmId, controlDTO, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertEquals("start", result.getOperation());
+        assertEquals("STARTING", result.getExpectedStatus());
+        assertNotNull(result.getCommandId());
+        assertTrue(result.getAsync());
+        assertEquals("PENDING", result.getOperationStatus());
+        assertNotNull(result.getDetails());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper).updateStatus(vmId, "STARTING");
+    }
+
+    /**
+     * 测试虚拟机启动 - 虚拟机已在运行状态
+     */
+    @Test
+    void testStartVm_AlreadyRunning() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 设置虚拟机状态为正在运行
+        vmInstance.setStatus("RUNNING");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+            () -> vmInstanceService.startVm(vmId, controlDTO, userId));
+        
+        assertTrue(exception.getMessage().contains("虚拟机已在运行状态"));
+
+        // 验证mock调用 - 不应该更新状态
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper, never()).updateStatus(anyString(), anyString());
+    }
+
+    /**
+     * 测试虚拟机停止 - 成功场景
+     */
+    @Test
+    void testStopVm_Success() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 设置虚拟机状态为正在运行
+        vmInstance.setStatus("RUNNING");
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+        when(vmInstancesMapper.updateStatus(vmId, "STOPPING")).thenReturn(1);
+
+        // 执行测试
+        VmControlResponseVO result = vmInstanceService.stopVm(vmId, controlDTO, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertEquals("stop", result.getOperation());
+        assertEquals("STOPPING", result.getExpectedStatus());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+        verify(vmInstancesMapper).updateStatus(vmId, "STOPPING");
+    }
+
+    /**
+     * 测试虚拟机状态查询 - 成功场景
+     */
+    @Test
+    void testGetVmStatus_Success() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 准备mock数据
+        when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
+
+        // 执行测试
+        VmStatusVO result = vmInstanceService.getVmStatus(vmId, userId);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(vmId, result.getVmId());
+        assertEquals(vmInstance.getStatus(), result.getStatus());
+        assertEquals(vmInstance.getConnectionStatus(), result.getConnectionStatus());
+        assertNotNull(result.getResourceUsage());
+        assertNotNull(result.getNetwork());
+        assertNotNull(result.getProcesses());
+        assertNotNull(result.getHealthCheck());
+        assertTrue(result.getRealTime());
+
+        // 验证mock调用
+        verify(vmInstancesMapper).selectByVmId(vmId);
+    }
+
+    /**
+     * 测试权限检查 - 有权限
+     */
+    @Test
+    void testHasVmPermission_HasPermission() {
+        String vmId = "test-vm-id";
+        String userId = "test-user-id";
+
+        // 执行测试
+        Boolean result = vmInstanceService.hasVmPermission(vmId, userId);
+
+        // 验证结果 - 当前实现允许所有已认证用户
+        assertTrue(result);
+    }
+
+    /**
+     * 测试权限检查 - 无权限（用户ID为空）
+     */
+    @Test
+    void testHasVmPermission_NoPermission() {
+        String vmId = "test-vm-id";
+        String userId = null;
+
+        // 执行测试
+        Boolean result = vmInstanceService.hasVmPermission(vmId, userId);
+
+        // 验证结果 - 用户ID为空应该返回false
+        assertFalse(result);
     }
 }

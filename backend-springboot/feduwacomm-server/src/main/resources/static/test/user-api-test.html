@@ -239,6 +239,33 @@
             border-radius: 5px;
             margin-top: 10px;
         }
+        
+        .token-input-section {
+            background: rgba(52, 152, 219, 0.1);
+            border: 1px solid rgba(52, 152, 219, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+        
+        .token-input-section label {
+            color: #2980b9 !important;
+            font-weight: 600;
+        }
+        
+        .token-input-section input {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid rgba(52, 152, 219, 0.3) !important;
+        }
+        
+        .token-input-section button {
+            transition: all 0.2s ease;
+        }
+        
+        .token-input-section button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
 
         .alert {
             padding: 15px;
@@ -365,9 +392,18 @@
             </div>
 
             <!-- Token显示 -->
-            <div id="tokenDisplay" class="token-display hidden">
+            <div id="tokenDisplay" class="token-display">
                 <h4>🔑 当前Token</h4>
                 <div class="token-value" id="currentToken"></div>
+                <div class="token-input-section">
+                    <label for="tokenInput" style="font-size: 0.9em; display: block; margin-bottom: 5px;">🔧 手动修改Token (测试用):</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="tokenInput" placeholder="输入自定义Token进行测试" style="flex: 1; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 0.85em;">
+                        <button onclick="updateCustomToken()" style="padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">应用</button>
+                        <button onclick="clearCustomToken()" style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">清除</button>
+                    </div>
+                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 5px;">💡 提示: 可输入任意Token值进行接口测试，无需真实登录</small>
+                </div>
                 <h4 style="margin-top: 15px;">🔄 刷新Token</h4>
                 <div class="token-value" id="refreshToken"></div>
             </div>
@@ -476,11 +512,11 @@
 
             <!-- 用户信息相关接口 -->
             <div class="section">
-                <div class="section-header" onclick="toggleSection('userInfo')">
+                <div class="section-header" onclick="toggleSection('userInfoSection')">
                     <h3>👤 用户信息相关接口</h3>
                     <span class="toggle-icon">▼</span>
                 </div>
-                <div id="userInfo" class="section-content">
+                <div id="userInfoSection" class="section-content">
                     <!-- 获取当前用户信息 -->
                     <div class="form-group">
                         <h4>📋 获取当前用户信息</h4>
@@ -641,7 +677,6 @@
                 authStatus.className = 'alert alert-success';
                 authStatus.innerHTML = `<strong>认证状态:</strong> 已登录 - ${currentUser.username} (${currentUser.role})`;
                 userInfo.classList.remove('hidden');
-                tokenDisplay.classList.remove('hidden');
                 
                 // 更新用户信息显示
                 const userInfoContent = document.getElementById('userInfoContent');
@@ -656,11 +691,19 @@
                 // 更新Token显示
                 document.getElementById('currentToken').textContent = currentToken;
                 document.getElementById('refreshToken').textContent = refreshToken;
+            } else if (currentToken) {
+                // 只有token没有用户信息（手动设置的token）
+                authStatus.className = 'alert alert-warning';
+                authStatus.innerHTML = '<strong>认证状态:</strong> 使用自定义Token (未登录)';
+                userInfo.classList.add('hidden');
+                document.getElementById('currentToken').textContent = currentToken;
+                document.getElementById('refreshToken').textContent = '';
             } else {
                 authStatus.className = 'alert alert-info';
                 authStatus.innerHTML = '<strong>认证状态:</strong> 未登录';
                 userInfo.classList.add('hidden');
-                tokenDisplay.classList.add('hidden');
+                document.getElementById('currentToken').textContent = '';
+                document.getElementById('refreshToken').textContent = '';
             }
         }
 
@@ -847,6 +890,49 @@
             } catch (error) {
                 showResponse('changePasswordResponse', { error: error.message }, false);
                 showAlert(`密码修改失败: ${error.message}`, 'danger');
+            }
+        }
+
+        // Token管理函数
+        function updateCustomToken() {
+            const tokenInput = document.getElementById('tokenInput');
+            const customToken = tokenInput.value.trim();
+            
+            if (!customToken) {
+                alert('请输入有效的Token');
+                return;
+            }
+            
+            currentToken = customToken;
+            updateAuthStatus();
+            addResult('info', 'Token管理', `已更新Token为自定义值 (长度: ${customToken.length})`, 'success');
+        }
+        
+        function clearCustomToken() {
+            document.getElementById('tokenInput').value = '';
+            // 如果没有通过正常登录获得的token，则清除currentToken
+            if (!currentUser) {
+                currentToken = '';
+                updateAuthStatus();
+                addResult('info', 'Token管理', 'Token已清除', 'warning');
+            } else {
+                addResult('info', 'Token管理', '输入框已清空，但保留登录获得的Token。如需完全清除，请点击登出', 'info');
+            }
+        }
+
+        // 更新updateAuthStatus函数以支持token输入框同步
+        const originalUpdateAuthStatus = updateAuthStatus;
+        updateAuthStatus = function() {
+            originalUpdateAuthStatus();
+            
+            // 同步token输入框的值
+            const tokenInput = document.getElementById('tokenInput');
+            if (tokenInput && currentToken) {
+                // 如果token过长，只显示前20个字符
+                const displayToken = currentToken.length > 50 ? currentToken.substring(0, 50) + '...' : currentToken;
+                tokenInput.placeholder = `当前使用: ${displayToken}`;
+            } else if (tokenInput) {
+                tokenInput.placeholder = '输入自定义Token进行测试';
             }
         }
 

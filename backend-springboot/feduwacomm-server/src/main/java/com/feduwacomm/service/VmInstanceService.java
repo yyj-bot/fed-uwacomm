@@ -1,9 +1,8 @@
 package com.feduwacomm.service;
 
-import com.feduwacomm.dto.VmRegisterDTO;
-import com.feduwacomm.dto.VmTokenRefreshDTO;
-import com.feduwacomm.vo.VmRegisterResponseVO;
-import com.feduwacomm.vo.VmTokenRefreshResponseVO;
+import com.feduwacomm.common.PageResult;
+import com.feduwacomm.dto.*;
+import com.feduwacomm.vo.*;
 
 /**
  * 虚拟机实例服务接口
@@ -59,4 +58,95 @@ public interface VmInstanceService {
      * @param vmId 虚拟机ID
      */
     void disconnect(String vmId);
+
+    // ==================== 用户端CRUD接口 ====================
+
+    /**
+     * 分页查询虚拟机列表
+     *
+     * @param queryDTO 查询参数
+     * @return 分页结果
+     */
+    PageResult<VmListVO> queryVmList(VmQueryDTO queryDTO);
+
+    /**
+     * 获取虚拟机详情
+     *
+     * @param vmId 虚拟机ID
+     * @param userId 用户ID（用于权限控制）
+     * @return 虚拟机详情
+     */
+    VmDetailVO getVmDetail(String vmId, String userId);
+
+    /**
+     * 更新虚拟机信息
+     *
+     * @param vmId 虚拟机ID
+     * @param updateDTO 更新数据
+     * @param userId 用户ID（用于权限控制）
+     * @return 更新响应
+     */
+    VmUpdateResponseVO updateVm(String vmId, VmUpdateDTO updateDTO, String userId);
+
+    /**
+     * 删除虚拟机
+     *
+     * @param vmId 虚拟机ID
+     * @param force 是否强制删除
+     * @param userId 用户ID（用于权限控制）
+     * @return 删除响应
+     */
+    VmDeleteResponseVO deleteVm(String vmId, Boolean force, String userId);
+
+    // ==================== 虚拟机控制接口 ====================
+
+    /**
+     * 启动虚拟机
+     *
+     * @param vmId 虚拟机ID
+     * @param controlDTO 控制参数
+     * @param userId 用户ID
+     * @return 控制响应
+     */
+    VmControlResponseVO startVm(String vmId, VmControlDTO controlDTO, String userId);
+
+    /**
+     * 停止虚拟机
+     *
+     * @param vmId 虚拟机ID
+     * @param controlDTO 控制参数
+     * @param userId 用户ID
+     * @return 控制响应
+     */
+    VmControlResponseVO stopVm(String vmId, VmControlDTO controlDTO, String userId);
+
+    /**
+     * 重启虚拟机
+     *
+     * @param vmId 虚拟机ID
+     * @param controlDTO 控制参数
+     * @param userId 用户ID
+     * @return 控制响应
+     */
+    VmControlResponseVO restartVm(String vmId, VmControlDTO controlDTO, String userId);
+
+    // ==================== 状态查询接口 ====================
+
+    /**
+     * 获取虚拟机实时状态
+     *
+     * @param vmId 虚拟机ID
+     * @param userId 用户ID
+     * @return 虚拟机状态
+     */
+    VmStatusVO getVmStatus(String vmId, String userId);
+
+    /**
+     * 检查用户是否有权限访问虚拟机
+     *
+     * @param vmId 虚拟机ID
+     * @param userId 用户ID
+     * @return 是否有权限
+     */
+    Boolean hasVmPermission(String vmId, String userId);
 }

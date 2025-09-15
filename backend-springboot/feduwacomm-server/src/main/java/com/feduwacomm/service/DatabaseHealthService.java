@@ -95,18 +95,46 @@ public class DatabaseHealthService {
      * 测试关键表是否存在
      */
     private void testTableExistence() throws SQLException {
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement stmt = connection.prepareStatement(
-                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?")) {
+        try (Connection connection = dataSource.getConnection()) {
+            
+            // 获取当前数据库名用于调试
+            String currentDatabase;
+            try (PreparedStatement dbStmt = connection.prepareStatement("SELECT DATABASE()");
+                 ResultSet dbRs = dbStmt.executeQuery()) {
+                currentDatabase = dbRs.next() ? dbRs.getString(1) : "unknown";
+            }
+            
+            log.debug("当前连接数据库: {}", currentDatabase);
             
             // 检查用户表是否存在
-            stmt.setString(1, connection.getCatalog());
-            stmt.setString(2, "user");
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next() && rs.getInt(1) == 0) {
-                    log.warn("用户表不存在，数据库可能未初始化");
+            try (PreparedStatement stmt = connection.prepareStatement(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?")) {
+                
+                stmt.setString(1, currentDatabase);
+                stmt.setString(2, "users");
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        int count = rs.getInt(1);
+                        if (count == 0) {
+                            log.warn("用户表不存在，数据库可能未初始化 (数据库: {})", currentDatabase);
+                        } else {
+                            log.debug("用户表存在，数据库状态正常 (数据库: {}, 表数量: {})", currentDatabase, count);
+                        }
+                    }
                 }
+            }
+            
+            // 额外检查：直接尝试查询用户表
+            try (PreparedStatement directStmt = connection.prepareStatement("SELECT COUNT(*) FROM users LIMIT 1")) {
+                try (ResultSet directRs = directStmt.executeQuery()) {
+                    if (directRs.next()) {
+                        log.debug("直接查询用户表成功，表确实存在");
+                    }
+                }
+            } catch (SQLException e) {
+                log.warn("直接查询用户表失败: {}", e.getMessage());
+                throw e;
             }
         }
     }
