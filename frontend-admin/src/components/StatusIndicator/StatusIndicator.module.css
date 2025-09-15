@@ -1,0 +1,137 @@
+/**
+ * 状态指示器组件样式
+ */
+
+.fed-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 变体样式 */
+.fed-status-indicator--dot {
+  font-size: 14px;
+}
+
+.fed-status-indicator--badge {
+  font-size: 14px;
+}
+
+.fed-status-indicator--icon {
+  font-size: 14px;
+  gap: 8px;
+}
+
+.fed-status-indicator--text {
+  font-size: 14px;
+}
+
+/* 尺寸样式 */
+.fed-status-indicator--small {
+  font-size: 12px;
+}
+
+.fed-status-indicator--small .fed-status-icon {
+  font-size: 12px;
+}
+
+.fed-status-indicator--middle {
+  font-size: 14px;
+}
+
+.fed-status-indicator--middle .fed-status-icon {
+  font-size: 14px;
+}
+
+.fed-status-indicator--large {
+  font-size: 16px;
+}
+
+.fed-status-indicator--large .fed-status-icon {
+  font-size: 16px;
+}
+
+/* 状态文本 */
+.fed-status-text {
+  color: #000000d9;
+  line-height: 1;
+}
+
+.fed-status-text-only {
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* 图标样式 */
+.fed-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.fed-status-icon--spinning {
+  animation: fed-status-spin 1s linear infinite;
+}
+
+/* 动画效果 */
+.fed-status-indicator--animated .ant-badge-dot {
+  animation: fed-status-pulse 2s ease-in-out infinite;
+}
+
+.fed-status-indicator--animated .fed-status-icon {
+  transition: all 0.3s ease;
+}
+
+/* 徽章样式调整 */
+.fed-status-badge .ant-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.fed-status-indicator--small .fed-status-badge .ant-badge-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.fed-status-indicator--large .fed-status-badge .ant-badge-dot {
+  width: 10px;
+  height: 10px;
+}
+
+/* 动画定义 */
+@keyframes fed-status-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fed-status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .fed-status-indicator {
+    font-size: 13px;
+  }
+  
+  .fed-status-indicator--large {
+    font-size: 14px;
+  }
+  
+  .fed-status-indicator--large .fed-status-icon {
+    font-size: 14px;
+  }
+}

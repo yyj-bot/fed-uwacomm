@@ -1,0 +1,334 @@
+/**
+ * 仪表盘页面样式
+ */
+
+.fed-dashboard {
+  background: transparent;
+}
+
+.fed-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.fed-dashboard-title {
+  flex: 1;
+}
+
+.fed-dashboard-title .ant-typography {
+  margin-bottom: 0;
+}
+
+.fed-dashboard-title .ant-typography + .ant-typography {
+  margin-top: 4px;
+}
+
+.fed-dashboard-actions {
+  flex-shrink: 0;
+  margin-left: 24px;
+}
+
+.fed-dashboard-content {
+  margin-bottom: 24px;
+}
+
+/* 卡片样式 */
+.fed-dashboard-card {
+  margin-bottom: 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  transition: all 0.3s;
+}
+
+.fed-dashboard-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.fed-dashboard-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.fed-dashboard-card .ant-card-body {
+  padding: 20px 24px;
+}
+
+.fed-dashboard-card.ant-card-small .ant-card-head {
+  padding: 12px 16px;
+}
+
+.fed-dashboard-card.ant-card-small .ant-card-body {
+  padding: 16px;
+}
+
+/* 概览卡片特殊样式 */
+.fed-overview-cards {
+  margin-bottom: 24px;
+}
+
+.fed-overview-card {
+  text-align: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  transition: all 0.3s;
+}
+
+.fed-overview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.fed-overview-card .ant-card-body {
+  padding: 24px 20px;
+}
+
+.fed-overview-card .ant-statistic {
+  color: inherit;
+}
+
+.fed-overview-card .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.fed-overview-card .ant-statistic-content {
+  color: white;
+}
+
+.fed-overview-card .anticon {
+  font-size: 24px;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+/* 不同类型的概览卡片 */
+.fed-overview-card--primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+}
+
+.fed-overview-card--success {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+}
+
+.fed-overview-card--warning {
+  background: linear-gradient(135deg, #faad14 0%, #d48806 100%);
+}
+
+.fed-overview-card--danger {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+}
+
+/* 图表容器 */
+.fed-chart-container {
+  padding: 16px 0;
+  min-height: 300px;
+}
+
+/* 活动列表 */
+.fed-activity-list .ant-list-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.fed-activity-list .ant-list-item:last-child {
+  border-bottom: none;
+}
+
+.fed-activity-list .ant-list-item-meta-description {
+  margin-top: 4px;
+}
+
+/* 快速操作按钮 */
+.fed-quick-actions .ant-btn {
+  height: 40px;
+  margin-bottom: 8px;
+}
+
+.fed-quick-actions .ant-btn:last-child {
+  margin-bottom: 0;
+}
+
+/* 进度条样式 */
+.fed-task-progress .ant-progress {
+  margin-bottom: 0;
+}
+
+.fed-task-progress .ant-progress-text {
+  font-size: 12px;
+}
+
+/* 状态监控网格 */
+.fed-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.fed-status-item {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.fed-status-item:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.fed-status-item .anticon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  color: #1890ff;
+}
+
+.fed-status-item .fed-status-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #000000d9;
+}
+
+.fed-status-item .fed-status-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+  line-height: 1;
+}
+
+/* 响应式样式 */
+@media (max-width: 1200px) {
+  .fed-dashboard-content .ant-col {
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fed-dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .fed-dashboard-actions {
+    margin-left: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .fed-overview-cards .ant-col {
+    margin-bottom: 16px;
+  }
+  
+  .fed-dashboard-card .ant-card-body {
+    padding: 16px;
+  }
+  
+  .fed-status-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .fed-status-item {
+    padding: 16px 12px;
+  }
+  
+  .fed-status-item .anticon {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  
+  .fed-status-item .fed-status-value {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .fed-dashboard {
+    margin: -12px;
+    padding: 12px;
+  }
+  
+  .fed-dashboard-header {
+    margin-bottom: 16px;
+  }
+  
+  .fed-overview-cards .ant-col {
+    margin-bottom: 12px;
+  }
+  
+  .fed-dashboard-card {
+    margin-bottom: 16px;
+  }
+  
+  .fed-dashboard-card .ant-card-head {
+    padding: 12px 16px;
+  }
+  
+  .fed-dashboard-card .ant-card-body {
+    padding: 12px 16px;
+  }
+  
+  .fed-chart-container {
+    min-height: 250px;
+  }
+}
+
+/* 加载状态 */
+.fed-dashboard-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+/* 空状态 */
+.fed-dashboard-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #00000040;
+}
+
+.fed-dashboard-empty .anticon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #d9d9d9;
+}
+
+/* 数据更新指示器 */
+.fed-data-updated {
+  position: relative;
+}
+
+.fed-data-updated::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #52c41a;
+  border-radius: 50%;
+  animation: fed-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fed-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
