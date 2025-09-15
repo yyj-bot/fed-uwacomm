@@ -5,7 +5,7 @@ import type {
 } from '@/types'
 
 // 创建虚拟机API实例
-const vmApiInstance = createApiInstance('http://localhost:8080/api')
+const vmApiInstance = createApiInstance('VM')
 
 // ==================== 类型定义 ====================
 

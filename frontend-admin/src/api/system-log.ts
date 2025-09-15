@@ -8,7 +8,7 @@ import type {
 } from '@/types'
 
 // 创建日志API实例
-const logApiInstance = createApiInstance('http://localhost:8080/api/log')
+const logApiInstance = createApiInstance('LOG')
 
 // 导出任务类型
 interface ExportTask {

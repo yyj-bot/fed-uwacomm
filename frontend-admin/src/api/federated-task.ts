@@ -6,7 +6,7 @@ import type {
 } from '@/types'
 
 // 创建联邦学习任务API实例
-const federatedTaskApiInstance = createApiInstance('http://localhost:8080/api/federated')
+const federatedTaskApiInstance = createApiInstance('FEDERATED')
 
 // 联邦学习任务基础类型
 interface FederatedTask {

@@ -7,7 +7,7 @@ import type {
 } from '@/types'
 
 // 创建管理员API实例
-const adminApiInstance = createApiInstance('http://localhost:8080/api/admin')
+const adminApiInstance = createApiInstance('ADMIN')
 
 // 权限信息类型定义
 interface Permission {

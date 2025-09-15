@@ -9,13 +9,56 @@
 import axios, { type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
 
+// ==================== API 配置常量 ====================
+/**
+ * API基础配置
+ */
+export const API_CONFIG = {
+  // 后端服务基础URL
+  BASE_URL: 'http://localhost:8080',
+  
+  // API路径前缀
+  API_PREFIX: '/api',
+  
+  // 各模块的API路径
+  ENDPOINTS: {
+    USER: '/user',
+    ADMIN: '/admin', 
+    VM: '',  // vm接口直接在/api下
+    FEDERATED: '/federated',
+    MODEL: '/model',
+    TRAINING_DATA: '/training-data',
+    LOG: '/log'
+  },
+  
+  // 请求超时时间
+  TIMEOUT: 30000
+} as const
+
+/**
+ * 获取完整的API端点URL
+ * @param endpoint 端点路径
+ * @returns 完整的API URL
+ */
+export function getApiUrl(endpoint: keyof typeof API_CONFIG.ENDPOINTS): string {
+  return `${API_CONFIG.BASE_URL}${API_CONFIG.API_PREFIX}${API_CONFIG.ENDPOINTS[endpoint]}`
+}
+
 /**
  * 创建标准化的API实例
- * @param baseURL API基础URL
+ * @param endpoint API端点类型或自定义URL
  * @param timeout 请求超时时间（毫秒）
  * @returns 配置好的Axios实例
  */
-export function createApiInstance(baseURL: string, timeout: number = 30000): AxiosInstance {
+export function createApiInstance(
+  endpoint: keyof typeof API_CONFIG.ENDPOINTS | string, 
+  timeout: number = API_CONFIG.TIMEOUT
+): AxiosInstance {
+  // 如果是预定义的端点，使用getApiUrl获取URL；否则直接使用传入的URL
+  const baseURL = typeof endpoint === 'string' && endpoint.startsWith('http') 
+    ? endpoint 
+    : getApiUrl(endpoint as keyof typeof API_CONFIG.ENDPOINTS)
+    
   const instance = axios.create({
     baseURL,
     timeout,

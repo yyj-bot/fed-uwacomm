@@ -9,7 +9,7 @@ import type {
 } from '@/types'
 
 // 创建用户API实例
-const userApiInstance = createApiInstance('http://localhost:8080/api/user')
+const userApiInstance = createApiInstance('USER')
 
 // ==================== 用户认证API ====================
 export const userApi = {

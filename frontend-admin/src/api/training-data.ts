@@ -7,7 +7,7 @@ import type {
 } from '@/types'
 
 // 创建训练数据API实例
-const trainingDataApiInstance = createApiInstance('http://localhost:8080/api/training-data')
+const trainingDataApiInstance = createApiInstance('TRAINING_DATA')
 
 // 数据统计类型
 interface DataStatistics {

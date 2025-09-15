@@ -6,7 +6,7 @@ import type {
 } from '@/types'
 
 // 创建虚拟机轮次模型API实例
-const vmRoundModelsApiInstance = createApiInstance('http://localhost:8080/api/model')
+const vmRoundModelsApiInstance = createApiInstance('MODEL')
 
 // 本地模型结果类型
 interface VMRoundModel {

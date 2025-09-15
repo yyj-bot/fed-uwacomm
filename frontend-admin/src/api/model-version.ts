@@ -16,7 +16,7 @@ interface ModelVersionPaginatedResponse<T> {
 }
 
 // 创建模型API实例
-const modelApiInstance = createApiInstance('http://localhost:8080/api/model')
+const modelApiInstance = createApiInstance('MODEL')
 
 // 部署配置类型
 interface DeploymentConfig {
