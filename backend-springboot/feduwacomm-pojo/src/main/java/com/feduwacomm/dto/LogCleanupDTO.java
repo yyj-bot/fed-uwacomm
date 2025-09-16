@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -33,7 +34,8 @@ public class LogCleanupDTO {
     private String vmId;
     
     private String taskId;
-    
-    @Builder.Default
-    private Boolean dryRun = false;
+
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
 }
