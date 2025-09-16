@@ -254,22 +254,218 @@ byte[] generateLogFile(LogExportDTO exportDTO);
 
 ---
 
-## 四、兼容性说明
+## 四、用户管理功能增强
+
+### 新增用户统计接口
+
+**变更类型**: 新增接口
+
+**影响范围**: 管理员用户管理模块
+
+#### admin-api-reference.md-1.9 获取用户统计信息 (新增)
+
+**接口地址**: `GET /api/admin/user/statistics`
+
+**功能描述**:
+- 提供系统用户的全面统计信息
+- 支持管理员快速了解用户分布和状态
+- 包含角色分布、活跃状态、新增用户等关键指标
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "获取成功",
+  "data": {
+    "totalUsers": 25,           // 总用户数
+    "activeUsers": 20,          // 活跃用户数
+    "lockedUsers": 2,           // 锁定用户数
+    "adminUsers": 3,            // 管理员用户数
+    "researcherUsers": 8,       // 研究人员用户数
+    "operatorUsers": 6,         // 操作员用户数
+    "viewerUsers": 8,           // 查看者用户数
+    "todayNewUsers": 2,         // 今日新增用户数
+    "timestamp": 1642761600000, // 统计时间戳
+    "hasUsers": true            // 是否有用户存在
+  }
+}
+```
+
+**新增原因**:
+- **管理员便利性**: 提供一站式用户数据概览，方便管理员快速了解系统状态
+- **数据监控**: 支持用户增长趋势监控和角色分布分析
+- **系统健康度**: 通过用户活跃度和分布情况评估系统使用状态
+- **决策支持**: 为系统管理和用户管理策略提供数据支持
+
+**权限要求**:
+- 仅管理员角色可访问
+- 需要ADMIN权限验证
+
+#### 后端实现新增
+
+**新增方法**:
+- `AdminController.getUserStatistics()` - 用户统计控制器方法
+- `AdminService.getUserStatistics()` - 用户统计服务方法
+- `UserStatisticsVO` - 用户统计信息VO类
+
+**实现特点**:
+- 高效的数据库聚合查询
+- 缓存支持提升性能
+- 实时统计确保数据准确性
+
+---
+
+## 五、日志清理策略调整
+
+### 修改原因
+- **移除不准确的功能**: SIZE_BASED策略使用经验值估算记录大小，准确性无法保证
+- **简化策略选择**: 减少配置复杂度，专注于可靠的清理策略
+- **提升清理准确性**: 使用真实数据库操作替代硬编码模拟值
+
+### LogCleanupStrategy 枚举修改
+
+#### 修改前
+```java
+public enum LogCleanupStrategy {
+    TIME_BASED("TIME_BASED", "基于时间的清理策略"),
+    LEVEL_BASED("LEVEL_BASED", "基于日志级别的清理策略"),
+    SIZE_BASED("SIZE_BASED", "基于大小的清理策略");
+}
+```
+
+#### 修改后
+```java
+public enum LogCleanupStrategy {
+    TIME_BASED("TIME_BASED", "基于时间的清理策略"),
+    LEVEL_BASED("LEVEL_BASED", "基于日志级别的清理策略"),
+    CATEGORY_BASED("CATEGORY_BASED", "基于分类的清理策略");
+}
+```
+
+### API参数变更
+
+#### 日志清理接口参数调整
+
+**修改前**:
+```json
+{
+  "strategy": "SIZE_BASED",           // 清理策略，TIME_BASED/LEVEL_BASED/SIZE_BASED
+  "maxSize": 1073741824,              // 最大保留大小（字节）
+  "retentionDays": 30,                // 保留天数（时间策略），可选
+  "level": "DEBUG",                   // 清理级别（级别策略），可选
+  "dryRun": false                     // 试运行模式，可选，默认false
+}
+```
+
+**修改后**:
+```json
+{
+  "strategy": "CATEGORY_BASED",       // 清理策略，TIME_BASED/LEVEL_BASED/CATEGORY_BASED
+  "category": "SYSTEM",               // 日志类别过滤，可选
+  "retentionDays": 30,                // 保留天数（时间策略），可选
+  "level": "DEBUG",                   // 清理级别（级别策略），可选
+  "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
+  "taskId": "b2c3d4e5f67890123456789012345678",       // 任务ID过滤，可选
+  "dryRun": false                     // 试运行模式，可选，默认false
+}
+```
+
+### 后端实现改进
+
+#### 清理逻辑优化
+
+**修改前**:
+- 使用硬编码的模拟值 (deletedRecords: 1000, freedSpace: 10485760)
+- SIZE_BASED策略使用经验值估算记录大小
+- 无实际数据库操作
+
+**修改后**:
+- 实现真实的数据库查询和删除操作
+- 移除所有SIZE_BASED相关代码
+- 添加实际的记录统计和空间计算
+- 支持干运行模式进行清理预估
+
+#### 代码变更示例
+
+**删除的代码**:
+```java
+case SIZE_BASED:
+    // 基于大小的清理策略
+    if (cleanupDTO.getMaxSize() != null) {
+        sql.append(" AND estimated_size <= ").append(cleanupDTO.getMaxSize());
+    }
+    break;
+```
+
+**新增的实现**:
+```java
+case CATEGORY_BASED:
+    if (cleanupDTO.getCategory() != null) {
+        sql.append(" AND category = '").append(cleanupDTO.getCategory()).append("'");
+    }
+    break;
+```
+
+### 迁移指南
+
+#### 配置文件更新
+
+如果系统中有使用SIZE_BASED策略的配置，需要更新为其他策略：
+
+**时间策略替代**:
+```json
+{
+  "strategy": "TIME_BASED",
+  "retentionDays": 30
+}
+```
+
+**级别策略替代**:
+```json
+{
+  "strategy": "LEVEL_BASED",
+  "level": "DEBUG"
+}
+```
+
+**新的类别策略**:
+```json
+{
+  "strategy": "CATEGORY_BASED",
+  "category": "SYSTEM"
+}
+```
+
+---
+
+## 六、兼容性说明
 
 ### 不兼容变更
 - 日志导出接口从异步模式改为同步模式
 - 接口路径从 `/api/log/export/*` 改为 `/api/log/download`
 - 请求方式从GET改为POST
 - 参数传递方式发生变化
+- **日志清理策略枚举变更**: SIZE_BASED策略完全移除，替换为CATEGORY_BASED策略
+- **清理参数变更**: 移除maxSize参数，新增category、vmId、taskId参数
+
+### 兼容性新增
+- **用户统计接口**: 新增 `GET /api/admin/user/statistics` 接口，完全向后兼容
+- **管理员功能增强**: 提供用户数据概览功能，不影响现有接口
 
 ### 建议措施
 1. **及时更新客户端代码**: 按照迁移指南更新相关代码
-2. **测试验证**: 确保新接口功能正常
-3. **用户通知**: 告知用户操作流程的简化改进
+2. **更新清理策略配置**: 将使用SIZE_BASED的配置改为TIME_BASED或LEVEL_BASED或CATEGORY_BASED策略
+3. **测试验证**: 确保新接口功能正常
+4. **用户通知**: 告知用户操作流程的简化改进
 
 ---
 
-## 五、相关文档
+## 七、相关文档
 
 - [系统日志API参考文档](../system-log/system-log-api-reference.md) - 完整的日志管理接口文档
 - [已移除接口文档](../removed/removed-interfaces-v1.0.md) - 被移除的接口列表
@@ -277,10 +473,10 @@ byte[] generateLogFile(LogExportDTO exportDTO);
 
 ---
 
-## 六、版本信息
+## 八、版本信息
 
 - **修改版本**: v1.0
 - **修改日期**: 2024年系统架构升级
-- **影响范围**: 日志导出功能
-- **向下兼容**: 不兼容，需要按照迁移指南更新客户端代码
-- **推荐升级**: 强烈建议升级以获得更好的用户体验
+- **影响范围**: 日志管理功能、用户管理功能
+- **向下兼容**: 部分不兼容，需要按照迁移指南更新客户端代码
+- **推荐升级**: 强烈建议升级以获得更好的用户体验和管理功能

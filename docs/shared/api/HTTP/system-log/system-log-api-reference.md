@@ -229,9 +229,9 @@
 
 ## 4. 日志导出接口
 
-### 4.1 日志导出
+### 4.1 日志下载
 
-**接口地址**: `POST /api/log/export`
+**接口地址**: `POST /api/log/download`
 
 **请求参数**:
 ```json
@@ -248,89 +248,7 @@
 }
 ```
 
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "导出任务已创建",
-  "data": {
-    "exportId": "export_1234567890",
-    "status": "PROCESSING",
-    "estimatedTime": 30,
-    "downloadUrl": "http://localhost:8080/api/log/export/download/export_1234567890"
-  }
-}
-```
-
-### 4.2 导出状态查询
-
-**接口地址**: `GET /api/log/export/status/{exportId}`
-
-**路径参数**:
-- exportId: 导出任务ID
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "查询成功",
-  "data": {
-    "exportId": "export_1234567890",
-    "status": "COMPLETED",
-    "progress": 100,
-    "totalRecords": 5000,
-    "processedRecords": 5000,
-    "fileSize": 1048576,
-    "downloadUrl": "http://localhost:8080/api/log/export/download/export_1234567890",
-    "expiresAt": "2024-01-02T10:00:00",
-    "createdAt": "2024-01-01T10:00:00",
-    "completedAt": "2024-01-01T10:00:30"
-  }
-}
-```
-
-### 4.3 导出文件下载
-
-**接口地址**: `GET /api/log/export/download/{exportId}`
-
-**路径参数**:
-- exportId: 导出任务ID
-
-**响应**: 文件流
-
-### 4.4 导出历史查询
-
-**接口地址**: `GET /api/log/export/history`
-
-**请求参数**:
-```
-?status=COMPLETED&page=1&size=10
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "查询成功",
-  "data": {
-    "total": 50,
-    "pages": 5,
-    "current": 1,
-    "size": 10,
-    "records": [
-      {
-        "exportId": "export_1234567890",
-        "status": "COMPLETED",
-        "format": "CSV",
-        "totalRecords": 5000,
-        "fileSize": 1048576,
-        "createdAt": "2024-01-01T10:00:00",
-        "completedAt": "2024-01-01T10:00:30"
-      }
-    ]
-  }
-}
-```
+**响应**: 直接返回文件流进行下载
 
 ## 5. 日志清理接口
 
@@ -341,10 +259,9 @@
 **请求参数**:
 ```json
 {
-  "strategy": "TIME_BASED",           // 清理策略，TIME_BASED/LEVEL_BASED/SIZE_BASED
+  "strategy": "TIME_BASED",           // 清理策略，TIME_BASED/LEVEL_BASED/CATEGORY_BASED
   "retentionDays": 30,                // 保留天数（时间策略），可选
   "level": "DEBUG",                   // 清理级别（级别策略），可选
-  "maxSizeGB": 10,                    // 最大大小GB（大小策略），可选
   "category": "SYSTEM",               // 日志类别过滤，可选
   "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
   "taskId": "b2c3d4e5f67890123456789012345678",       // 任务ID过滤，可选
@@ -633,9 +550,8 @@
         "enabled": true
       }
     },
-    "exportSettings": {
-      "maxRecordsPerExport": 100000,
-      "exportRetentionDays": 7,
+    "downloadSettings": {
+      "maxRecordsPerDownload": 100000,
       "supportedFormats": ["CSV", "JSON", "EXCEL"]
     }
   }
@@ -658,9 +574,8 @@
       "enabled": true
     }
   },
-  "exportSettings": {                 // 导出设置，可选
-    "maxRecordsPerExport": 100000,
-    "exportRetentionDays": 7
+  "downloadSettings": {               // 下载设置，可选
+    "maxRecordsPerDownload": 100000
   }
 }
 ```
@@ -695,7 +610,7 @@
 
 ### 9.1 访问控制
 - 日志查询权限：VIEWER及以上角色
-- 日志导出权限：OPERATOR及以上角色
+- 日志下载权限：ADMIN角色
 - 日志清理权限：ADMIN角色
 - 配置修改权限：ADMIN角色
 
@@ -717,9 +632,9 @@
 - 统计查询响应时间 < 2000ms
 
 ### 10.2 导出性能
-- 支持异步导出处理
-- 大文件分片下载
-- 导出任务队列管理
+- 同步直接下载处理
+- 支持多种文件格式（CSV/JSON/EXCEL）
+- 文件编码UTF-8支持中文
 
 ### 10.3 清理性能
 - 异步清理处理

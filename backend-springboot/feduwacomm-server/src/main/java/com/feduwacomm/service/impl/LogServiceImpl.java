@@ -1,5 +1,6 @@
 package com.feduwacomm.service.impl;
 
+import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.*;
@@ -478,6 +479,7 @@ public class LogServiceImpl implements LogService {
             String taskId = uuidUtil.generateUuid();
             
             LogCleanupTask task = LogCleanupTask.builder()
+                    .id(taskId)
                     .cleanupId(cleanupId)
                     .status(TaskStatus.PENDING)
                     .strategy(cleanupDTO.getStrategy() != null ? 
@@ -491,6 +493,7 @@ public class LogServiceImpl implements LogService {
                     .freedSpace(0L)
                     .dryRun(cleanupDTO.getDryRun() != null ? cleanupDTO.getDryRun() : false)
                     .createdAt(LocalDateTime.now())
+                    .createdBy(BaseContext.getUserId())
                     .build();
             
             logCleanupTaskMapper.insert(task);
@@ -806,20 +809,33 @@ public class LogServiceImpl implements LogService {
         try {
             // 更新任务状态为处理中
             task.setStatus(TaskStatus.PROCESSING);
-            logCleanupTaskMapper.updateStatus(task.getCleanupId(), TaskStatus.PROCESSING, 0, 0L, 0L, null, null);
-            
-            // 模拟清理处理
-            Thread.sleep(3000); // 模拟处理时间
-            
+            logCleanupTaskMapper.updateStatus(task.getCleanupId(), TaskStatus.PROCESSING, 0, 0L, 0L, LocalDateTime.now(), null);
+
+            // 执行真实的日志清理
+            long deletedRecords = 0L;
+            long freedSpace = 0L;
+
+            if (cleanupDTO.getDryRun() != null && cleanupDTO.getDryRun()) {
+                // 干运行模式：只计算会删除的记录数，不实际删除
+                deletedRecords = countRecordsToCleanup(cleanupDTO);
+                freedSpace = estimateFreedSpace(deletedRecords);
+                logger.info("干运行模式: 预计删除 {} 条记录，释放 {} 字节空间", deletedRecords, freedSpace);
+            } else {
+                // 实际执行清理
+                deletedRecords = performActualCleanup(cleanupDTO);
+                freedSpace = estimateFreedSpace(deletedRecords);
+                logger.info("清理完成: 删除了 {} 条记录，释放 {} 字节空间", deletedRecords, freedSpace);
+            }
+
             // 更新任务完成状态
             task.setStatus(TaskStatus.COMPLETED);
             task.setProgress(100);
-            task.setDeletedRecords(1000L);
-            task.setFreedSpace(10485760L); // 10MB
-            
+            task.setDeletedRecords(deletedRecords);
+            task.setFreedSpace(freedSpace);
+
             logCleanupTaskMapper.updateStatus(task.getCleanupId(), TaskStatus.COMPLETED,
-                    100, 1000L, 10485760L, LocalDateTime.now(), null);
-            
+                    100, deletedRecords, freedSpace, LocalDateTime.now(), null);
+
         } catch (Exception e) {
             logger.error("清理任务处理失败: {}", e.getMessage());
             logCleanupTaskMapper.updateStatus(task.getCleanupId(), TaskStatus.FAILED,
@@ -827,9 +843,130 @@ public class LogServiceImpl implements LogService {
         }
     }
     
+    // ==================== 日志清理实现方法 ====================
+
+    /**
+     * 计算需要清理的记录数（用于干运行模式）
+     */
+    private long countRecordsToCleanup(LogCleanupDTO cleanupDTO) {
+        try {
+            StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM system_logs WHERE 1=1");
+            List<Object> params = new ArrayList<>();
+
+            buildCleanupConditions(sql, params, cleanupDTO);
+
+            Long count = jdbcTemplate.queryForObject(sql.toString(), params.toArray(), Long.class);
+            return count != null ? count : 0L;
+        } catch (Exception e) {
+            logger.error("统计待清理记录数失败: {}", e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * 执行实际的日志清理
+     */
+    private long performActualCleanup(LogCleanupDTO cleanupDTO) {
+        try {
+            StringBuilder sql = new StringBuilder("DELETE FROM system_logs WHERE 1=1");
+            List<Object> params = new ArrayList<>();
+
+            buildCleanupConditions(sql, params, cleanupDTO);
+
+            int deletedCount = jdbcTemplate.update(sql.toString(), params.toArray());
+            logger.info("成功删除 {} 条日志记录", deletedCount);
+            return deletedCount;
+        } catch (Exception e) {
+            logger.error("执行日志清理失败: {}", e.getMessage());
+            throw new RuntimeException("执行日志清理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 构建清理条件SQL
+     */
+    private void buildCleanupConditions(StringBuilder sql, List<Object> params, LogCleanupDTO cleanupDTO) {
+        // 根据清理策略添加条件
+        switch (cleanupDTO.getStrategy() != null ? cleanupDTO.getStrategy() : LogCleanupStrategy.TIME_BASED) {
+            case TIME_BASED:
+                if (cleanupDTO.getRetentionDays() != null && cleanupDTO.getRetentionDays() > 0) {
+                    sql.append(" AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)");
+                    params.add(cleanupDTO.getRetentionDays());
+                }
+                break;
+            case LEVEL_BASED:
+                if (cleanupDTO.getLevel() != null) {
+                    sql.append(" AND level = ?");
+                    params.add(cleanupDTO.getLevel().toString());
+                }
+                break;
+            case CATEGORY_BASED:
+                if (cleanupDTO.getCategory() != null) {
+                    sql.append(" AND category = ?");
+                    params.add(cleanupDTO.getCategory());
+                }
+                break;
+        }
+
+        // 添加其他过滤条件
+        if (cleanupDTO.getVmId() != null) {
+            sql.append(" AND vm_id = ?");
+            params.add(cleanupDTO.getVmId());
+        }
+
+        if (cleanupDTO.getTaskId() != null) {
+            sql.append(" AND task_id = ?");
+            params.add(cleanupDTO.getTaskId());
+        }
+
+        if (cleanupDTO.getStartTime() != null) {
+            sql.append(" AND created_at >= ?");
+            params.add(cleanupDTO.getStartTime());
+        }
+
+        if (cleanupDTO.getEndTime() != null) {
+            sql.append(" AND created_at <= ?");
+            params.add(cleanupDTO.getEndTime());
+        }
+    }
+
+    /**
+     * 计算实际释放的空间大小
+     */
+    private long estimateFreedSpace(long deletedRecords) {
+        try {
+            // 查询数据库以获取实际的表大小信息
+            String tableSizeQuery = "SELECT (data_length + index_length) as table_size " +
+                                  "FROM information_schema.TABLES " +
+                                  "WHERE table_schema = DATABASE() AND table_name = 'system_logs'";
+
+            Long tableSizeBytes = jdbcTemplate.queryForObject(tableSizeQuery, Long.class);
+
+            if (tableSizeBytes != null && tableSizeBytes > 0) {
+                // 获取总记录数
+                String countQuery = "SELECT COUNT(*) FROM system_logs";
+                Long totalRecords = jdbcTemplate.queryForObject(countQuery, Long.class);
+
+                if (totalRecords != null && totalRecords > 0) {
+                    // 计算平均每条记录的实际存储大小
+                    long avgRecordSize = tableSizeBytes / totalRecords;
+                    return deletedRecords * avgRecordSize;
+                }
+            }
+
+            // 如果无法获取实际大小，返回保守估算（基于字段长度的理论最小值）
+            logger.warn("无法获取实际表大小，使用保守估算");
+            return deletedRecords * 512; // 保守估算：每条记录最少512字节
+
+        } catch (Exception e) {
+            logger.error("计算释放空间失败: {}", e.getMessage());
+            return deletedRecords * 512; // 发生错误时返回保守估算
+        }
+    }
+
     // ==================== 辅助方法 ====================
-    
-    
+
+
     private LogCleanupTaskVO convertToLogCleanupTaskVO(LogCleanupTask task) {
         return LogCleanupTaskVO.builder()
                 .cleanupId(task.getCleanupId())

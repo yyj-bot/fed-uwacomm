@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LogCleanupTask {
-    
+
+    private String id;
     private String cleanupId;
     private TaskStatus status;
     private LogCleanupStrategy strategy;
@@ -26,6 +27,7 @@ public class LogCleanupTask {
     private Long freedSpace;
     private Boolean dryRun;
     private LocalDateTime createdAt;
+    private LocalDateTime startedAt;
     private LocalDateTime completedAt;
     private String createdBy;
     private String errorMessage;
