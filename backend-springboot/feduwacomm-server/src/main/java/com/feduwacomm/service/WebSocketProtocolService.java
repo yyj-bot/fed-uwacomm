@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,18 +85,28 @@ public class WebSocketProtocolService {
                 return onVmStop(msg);
             case TRAINING_START:
                 return onTrainingStart(msg);
+            case TRAINING_START_RESPONSE:
+                return onTrainingStartResponse(msg);
             case TRAINING_STOP:
                 return onTrainingStop(msg);
             case TRAINING_PROGRESS:
                 return onTrainingProgress(msg);
+            case TRAINING_PROGRESS_RESPONSE:
+                return onTrainingProgressResponse(msg);
             case MODEL_UPLOAD:
                 return onModelUpload(msg);
             case MODEL_DOWNLOAD:
                 return onModelDownload(msg);
+            case GLOBAL_MODEL_UPDATE:
+                return onGlobalModelUpdate(msg);
             case STATUS_QUERY:
                 return onStatusQuery(msg);
             case STATUS_RESPONSE:
                 return onStatusResponse(msg);
+            case BATCH_STATUS_QUERY:
+                return onBatchStatusQuery(msg);
+            case BATCH_STATUS_RESPONSE:
+                return onBatchStatusResponse(msg);
             case ERROR:
             case CONNECTION_ERROR:
             case MESSAGE_ERROR:
@@ -118,18 +129,32 @@ public class WebSocketProtocolService {
         );
         // 尝试更新 VM 连接状态为 CONNECTED
         if (msg.getVmId() != null) {
-            vmInstancesMapper.updateConnection(msg.getVmId(), "CONNECTED", Instant.now().toString());
+            vmInstancesMapper.updateConnection(msg.getVmId(), "CONNECTED", LocalDateTime.now().toString());
         }
         sendToVmTopic(msg.getVmId(), mapOf("event", "CONNECTED", "vmId", msg.getVmId()));
         return ackFor(msg, ProtocolType.CONNECT_ACK, data);
     }
 
     private ProtocolAck onHeartbeat(ProtocolMessage msg) {
-        if (msg.getVmId() != null) {
-            vmInstancesMapper.updateConnection(msg.getVmId(), "CONNECTED", Instant.now().toString());
+        String vmId = msg.getVmId();
+        String heartbeatTime = LocalDateTime.now().toString();
+
+        System.out.println("【心跳处理】收到心跳消息 - VmId: " + vmId + ", Time: " + heartbeatTime);
+
+        if (vmId != null) {
+            try {
+                int result = vmInstancesMapper.updateConnection(vmId, "CONNECTED", heartbeatTime);
+                System.out.println("【心跳处理】数据库更新结果 - VmId: " + vmId + ", UpdateResult: " + result + ", HeartbeatTime: " + heartbeatTime);
+            } catch (Exception e) {
+                System.err.println("【心跳处理】数据库更新失败 - VmId: " + vmId + ", Error: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            System.out.println("【心跳处理】警告：心跳消息中缺少VmId");
         }
+
         Map<String, Object> data = mapOf(
-                "serverTime", Instant.now().toString(),
+                "serverTime", Instant.now().toString(), // 返回给客户端的时间可以保持ISO格式
                 "nextHeartbeat", 30,
                 "systemStatus", "NORMAL");
         return ackFor(msg, ProtocolType.HEARTBEAT_ACK, data);
@@ -168,6 +193,17 @@ public class WebSocketProtocolService {
         String name = description != null ? description : ("dataset-" + datasetId.substring(0, Math.min(datasetId.length(), 8)));
         String metadataJson = toJsonSafe(valueAsObject(msg.getData(), "metadata"));
         trainingDatasetMapper.upsertDataset(datasetId, vmId, name, description, dataType, "READY", metadataJson);
+
+        // 转发消息到VM专属频道
+        sendToVmTopic(vmId, mapOf(
+                "type", "DATASET_CREATED",
+                "vmId", vmId,
+                "datasetId", datasetId,
+                "description", description,
+                "dataType", dataType,
+                "status", "READY"
+        ));
+
         Map<String, Object> ackData = mapOf(
                 "datasetId", datasetId,
                 "status", "READY");
@@ -183,6 +219,16 @@ public class WebSocketProtocolService {
             List<String> rowsJson = rows.stream().map(this::toJsonSafe).toList();
             trainingDatasetRowMapper.insertRows(datasetId, rowsJson);
         }
+
+        // 转发消息到VM专属频道
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "DATASET_ROWS_APPENDED",
+                "vmId", msg.getVmId(),
+                "datasetId", datasetId,
+                "rowsAdded", rowsCount,
+                "sampleData", rowsCount > 0 ? rows.get(0) : null
+        ));
+
         Map<String, Object> ackData = mapOf(
                 "datasetId", datasetId,
                 "accepted", rowsCount,
@@ -194,6 +240,16 @@ public class WebSocketProtocolService {
         String datasetId = valueAsString(msg.getData(), "datasetId");
         trainingDatasetMapper.updateStatus(datasetId, "READY");
         int rowCount = trainingDatasetRowMapper.countByDataset(datasetId);
+
+        // 转发消息到VM专属频道
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "DATASET_COMPLETED",
+                "vmId", msg.getVmId(),
+                "datasetId", datasetId,
+                "totalRows", rowCount,
+                "status", "READY"
+        ));
+
         Map<String, Object> ackData = mapOf(
                 "datasetId", datasetId,
                 "rowCount", rowCount,
@@ -237,14 +293,14 @@ public class WebSocketProtocolService {
 
     private ProtocolAck onVmStart(ProtocolMessage msg) {
         String vmId = msg.getVmId();
-        vmInstancesMapper.updateConnection(vmId, "CONNECTED", Instant.now().toString());
+        vmInstancesMapper.updateConnection(vmId, "CONNECTED", LocalDateTime.now().toString());
         sendToVmTopic(vmId, msg);
         return ackFor(msg, ProtocolType.VM_START, mapOf("status", "RECEIVED"));
     }
 
     private ProtocolAck onVmStop(ProtocolMessage msg) {
         String vmId = msg.getVmId();
-        vmInstancesMapper.updateConnection(vmId, "DISCONNECTED", Instant.now().toString());
+        vmInstancesMapper.updateConnection(vmId, "DISCONNECTED", LocalDateTime.now().toString());
         sendToVmTopic(vmId, msg);
         return ackFor(msg, ProtocolType.VM_STOP, mapOf("status", "RECEIVED"));
     }
@@ -252,32 +308,129 @@ public class WebSocketProtocolService {
     // ================= 训练控制（持久化任务状态） =================
 
     private ProtocolAck onTrainingStart(ProtocolMessage msg) {
+        // 开始训练：只转发给VM，不立即更新数据库
+        // 等待VM的响应确认后再更新数据库状态
+
         Map<String, Object> d = msg.getData();
         String taskId = valueAsString(d, "taskId");
         String algorithm = valueAsString(d, "algorithm");
         Map<String, Object> config = (Map<String, Object>) valueAsObject(d, "config");
         Integer totalRounds = numberAsInt(config, "totalRounds");
         String configJson = toJsonSafe(config);
-        federatedTasksMapper.upsertTask(taskId, taskId, algorithm, "RUNNING", totalRounds, 0, configJson);
-        sendToVmTopic(msg.getVmId(), msg);
-        return ackFor(msg, ProtocolType.TRAINING_START, mapOf("status", "RECEIVED"));
+
+        // 创建任务记录，状态为PENDING（等待VM确认）
+        federatedTasksMapper.upsertTask(taskId, taskId, algorithm, "PENDING", totalRounds, 0, configJson);
+
+        // 转发训练开始指令给VM
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "TRAINING_START_COMMAND",
+                "vmId", msg.getVmId(),
+                "taskId", taskId,
+                "algorithm", algorithm,
+                "config", config,
+                "message", "请开始训练任务"
+        ));
+
+        return ackFor(msg, ProtocolType.TRAINING_START_ACK, mapOf(
+                "status", "COMMAND_SENT",
+                "message", "训练指令已发送给VM，等待VM确认"));
+    }
+
+    // VM响应训练开始确认
+    private ProtocolAck onTrainingStartResponse(ProtocolMessage msg) {
+        Map<String, Object> d = msg.getData();
+        String taskId = valueAsString(d, "taskId");
+        String status = valueAsString(d, "status");
+        String message = valueAsString(d, "message");
+
+        if ("SUCCESS".equals(status)) {
+            // VM确认训练开始成功，更新数据库状态为RUNNING
+            federatedTasksMapper.updateStatus(taskId, "RUNNING");
+
+            // 通知前端训练已开始
+            sendToVmTopic(msg.getVmId(), mapOf(
+                    "type", "TRAINING_STARTED",
+                    "vmId", msg.getVmId(),
+                    "taskId", taskId,
+                    "status", "RUNNING",
+                    "message", "训练已成功开始"
+            ));
+        } else {
+            // VM确认训练开始失败
+            federatedTasksMapper.updateStatus(taskId, "FAILED");
+
+            sendToVmTopic(msg.getVmId(), mapOf(
+                    "type", "TRAINING_START_FAILED",
+                    "vmId", msg.getVmId(),
+                    "taskId", taskId,
+                    "status", "FAILED",
+                    "error", message
+            ));
+        }
+
+        return ackFor(msg, ProtocolType.TRAINING_START_RESPONSE_ACK, mapOf("status", "PROCESSED"));
     }
 
     private ProtocolAck onTrainingStop(ProtocolMessage msg) {
+        // 训练停止：转发给VM，不立即更新数据库
         String taskId = valueAsString(msg.getData(), "taskId");
-        federatedTasksMapper.updateStatus(taskId, "STOPPED");
-        sendToVmTopic(msg.getVmId(), msg);
-        return ackFor(msg, ProtocolType.TRAINING_STOP, mapOf("status", "RECEIVED"));
+
+        // 转发停止指令给VM
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "TRAINING_STOP_COMMAND",
+                "vmId", msg.getVmId(),
+                "taskId", taskId,
+                "message", "请停止训练任务"
+        ));
+
+        return ackFor(msg, ProtocolType.TRAINING_STOP_ACK, mapOf(
+                "status", "COMMAND_SENT",
+                "message", "停止指令已发送给VM"));
     }
 
     private ProtocolAck onTrainingProgress(ProtocolMessage msg) {
+        // 训练进度查询：发送查询指令给VM，不直接更新数据库
+        Map<String, Object> d = msg.getData();
+        String taskId = valueAsString(d, "taskId");
+
+        // 转发进度查询指令给VM
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "TRAINING_PROGRESS_QUERY",
+                "vmId", msg.getVmId(),
+                "taskId", taskId,
+                "message", "请报告训练进度"
+        ));
+
+        return ackFor(msg, ProtocolType.TRAINING_PROGRESS_ACK, mapOf(
+                "status", "QUERY_SENT",
+                "message", "进度查询指令已发送给VM"));
+    }
+
+    // VM响应训练进度
+    private ProtocolAck onTrainingProgressResponse(ProtocolMessage msg) {
         Map<String, Object> d = msg.getData();
         String taskId = valueAsString(d, "taskId");
         Integer currentRound = numberAsInt(d, "currentRound");
         String status = valueAsString(d, "status");
+        Double accuracy = numberAsDouble(d, "accuracy");
+        Double loss = numberAsDouble(d, "loss");
+
+        // 更新数据库中的进度信息
         federatedTasksMapper.updateProgress(taskId, currentRound, status != null ? status : "RUNNING");
-        sendToVmTopic(msg.getVmId(), msg);
-        return ackFor(msg, ProtocolType.TRAINING_PROGRESS, mapOf("status", "RECEIVED"));
+
+        // 转发进度信息给前端
+        sendToVmTopic(msg.getVmId(), mapOf(
+                "type", "TRAINING_PROGRESS_UPDATE",
+                "vmId", msg.getVmId(),
+                "taskId", taskId,
+                "currentRound", currentRound,
+                "status", status,
+                "accuracy", accuracy,
+                "loss", loss,
+                "message", "训练进度已更新"
+        ));
+
+        return ackFor(msg, ProtocolType.TRAINING_PROGRESS_RESPONSE_ACK, mapOf("status", "PROCESSED"));
     }
 
     // ================= 模型传输（持久化本地轮次模型） =================
@@ -311,8 +464,86 @@ public class WebSocketProtocolService {
     }
 
     private ProtocolAck onModelDownload(ProtocolMessage msg) {
-        sendToVmTopic(msg.getVmId(), msg);
-        return ackFor(msg, ProtocolType.MODEL_DOWNLOAD, mapOf("status", "RECEIVED"));
+        // 模型下载请求 - VM请求下载最新的全局模型
+        String vmId = msg.getVmId();
+        Map<String, Object> d = msg.getData();
+        String taskId = valueAsString(d, "taskId");
+        Integer requestedRound = numberAsInt(d, "round");
+
+        System.out.println("【模型下载】VmId: " + vmId + ", TaskId: " + taskId + ", RequestedRound: " + requestedRound);
+
+        // 从数据库查询最新的全局模型版本
+        try {
+            // 这里可以实现从数据库查询最新模型版本的逻辑
+            // 暂时返回一个模拟的全局模型信息
+            Map<String, Object> globalModelData = mapOf(
+                    "taskId", taskId,
+                    "round", requestedRound != null ? requestedRound : 1,
+                    "parameters", mapOf(
+                            "model", mapOf(
+                                    "framework", "pytorch",
+                                    "format", "state_dict",
+                                    "weights", mapOf(
+                                            "shape", java.util.Arrays.asList(784, 256, 128, 10),
+                                            "dtype", "float32",
+                                            "checksum", "sha256:global_model_" + System.currentTimeMillis()
+                                    )
+                            ),
+                            "aggregation", mapOf(
+                                    "method", "FEDAVG",
+                                    "participation", 5
+                            )
+                    ),
+                    "compression", "gzip",
+                    "downloadTime", new java.util.Date().toString()
+            );
+
+            // 将模型信息发送给请求的VM
+            sendToVmTopic(vmId, mapOf(
+                    "type", "MODEL_DOWNLOAD_RESPONSE",
+                    "vmId", vmId,
+                    "taskId", taskId,
+                    "data", globalModelData,
+                    "message", "全局模型下载数据"
+            ));
+
+            return ackFor(msg, ProtocolType.MODEL_DOWNLOAD, mapOf(
+                    "status", "MODEL_SENT",
+                    "taskId", taskId,
+                    "round", requestedRound != null ? requestedRound : 1,
+                    "message", "全局模型数据已发送"));
+
+        } catch (Exception e) {
+            System.err.println("【模型下载错误】VmId: " + vmId + ", Error: " + e.getMessage());
+            return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+                    "errorCode", "MODEL_DOWNLOAD_FAILED",
+                    "errorMessage", "模型下载失败: " + e.getMessage()));
+        }
+    }
+
+    private ProtocolAck onGlobalModelUpdate(ProtocolMessage msg) {
+        // 全局模型更新 - 这通常是服务端主动推送给客户端的消息
+        // 客户端收到后应该下载并应用新的全局模型
+        String vmId = msg.getVmId();
+        Map<String, Object> d = msg.getData();
+        String taskId = valueAsString(d, "taskId");
+        Integer round = numberAsInt(d, "round");
+
+        System.out.println("【全局模型更新】VmId: " + vmId + ", TaskId: " + taskId + ", Round: " + round);
+
+        // 转发全局模型更新到指定VM
+        sendToVmTopic(vmId, mapOf(
+                "type", "GLOBAL_MODEL_UPDATE",
+                "vmId", vmId,
+                "taskId", taskId,
+                "round", round,
+                "data", d,
+                "message", "全局模型已更新，请下载最新版本"
+        ));
+
+        return ackFor(msg, ProtocolType.GLOBAL_MODEL_UPDATE, mapOf(
+                "status", "BROADCASTED",
+                "message", "全局模型更新已广播"));
     }
 
     // ================= 状态查询 =================
@@ -331,9 +562,71 @@ public class WebSocketProtocolService {
         sendToVmTopic(vmId, mapOf("type", "STATUS_UPDATED", "vmId", vmId, "data", d));
         // 更新最近心跳
         if (vmId != null) {
-            vmInstancesMapper.updateConnection(vmId, "CONNECTED", Instant.now().toString());
+            vmInstancesMapper.updateConnection(vmId, "CONNECTED", LocalDateTime.now().toString());
         }
         return ackFor(msg, ProtocolType.STATUS_RESPONSE, mapOf("status", "UPDATED"));
+    }
+
+    private ProtocolAck onBatchStatusQuery(ProtocolMessage msg) {
+        // 批量状态查询 - 向多个VM并行发送状态查询请求
+        Map<String, Object> d = msg.getData();
+        @SuppressWarnings("unchecked")
+        java.util.List<String> vmIds = (java.util.List<String>) d.get("vmIds");
+        String queryType = valueAsString(d, "queryType");
+        Boolean includeResources = (Boolean) d.get("includeResources");
+        Boolean includeProcesses = (Boolean) d.get("includeProcesses");
+        Boolean includeNetwork = (Boolean) d.get("includeNetwork");
+
+        if (vmIds == null || vmIds.isEmpty()) {
+            return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+                    "errorCode", "INVALID_VM_LIST",
+                    "errorMessage", "VM ID列表不能为空"));
+        }
+
+        System.out.println("【批量状态查询】VmIds: " + vmIds + ", QueryType: " + queryType);
+
+        // 并行向所有指定的VM发送状态查询
+        for (String vmId : vmIds) {
+            Map<String, Object> queryData = mapOf(
+                    "queryType", queryType != null ? queryType : "FULL",
+                    "includeResources", includeResources != null ? includeResources : true,
+                    "includeProcesses", includeProcesses != null ? includeProcesses : true,
+                    "includeNetwork", includeNetwork != null ? includeNetwork : true,
+                    "timeout", 10,
+                    "batchQueryId", msg.getId()
+            );
+
+            sendToVmTopic(vmId, mapOf(
+                    "type", "STATUS_QUERY",
+                    "vmId", vmId,
+                    "queryId", "batch-" + System.currentTimeMillis() + "-" + vmId,
+                    "data", queryData,
+                    "message", "批量状态查询请求"
+            ));
+        }
+
+        return ackFor(msg, ProtocolType.BATCH_STATUS_QUERY, mapOf(
+                "status", "QUERIES_SENT",
+                "queriedVmCount", vmIds.size(),
+                "message", "批量状态查询已发送到 " + vmIds.size() + " 个虚拟机"));
+    }
+
+    private ProtocolAck onBatchStatusResponse(ProtocolMessage msg) {
+        // 批量状态查询的汇总响应
+        String vmId = msg.getVmId();
+        Map<String, Object> data = msg.getData();
+
+        System.out.println("【批量状态响应】VmId: " + vmId + ", Data: " + toJsonSafe(data));
+
+        // 这里可以实现批量状态的汇总和统计分析
+        // 例如生成状态统计报告、更新集群状态等
+
+        // 将单个VM的状态响应存储到缓存
+        if (data != null) {
+            statusCache.put(vmId, new HashMap<>(data));
+        }
+
+        return ackFor(msg, ProtocolType.BATCH_STATUS_RESPONSE, mapOf("status", "PROCESSED"));
     }
 
     // ================= 错误处理 =================

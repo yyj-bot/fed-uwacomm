@@ -20,6 +20,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * STOMP 认证拦截器：
@@ -34,6 +35,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     
     @Autowired
     private VmJwtUtil vmJwtUtil;
+
+    @Autowired
+    private com.feduwacomm.service.VmInstanceService vmInstanceService;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -76,10 +80,13 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                     username = claims.get("username", String.class);
                     role = claims.get("role", String.class);
                     
-                    accessor.getSessionAttributes().put("userId", userId);
-                    accessor.getSessionAttributes().put("username", username);
-                    accessor.getSessionAttributes().put("role", role);
-                    accessor.getSessionAttributes().put("category", "user");
+                    Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+                    if (sessionAttributes != null) {
+                        sessionAttributes.put("userId", userId);
+                        sessionAttributes.put("username", username);
+                        sessionAttributes.put("role", role);
+                        sessionAttributes.put("category", "user");
+                    }
                 }
             } catch (Exception ex) {
                 // 用户JWT验证失败，尝试VM JWT验证
@@ -96,11 +103,22 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                         String vmName = claims.get("vmName", String.class);
                         String status = claims.get("status", String.class);
                         
-                        accessor.getSessionAttributes().put("vmId", vmId);
-                        accessor.getSessionAttributes().put("vmName", vmName);
-                        accessor.getSessionAttributes().put("status", status);
-                        accessor.getSessionAttributes().put("category", "vm");
-                        
+                        Map<String, Object> vmSessionAttributes = accessor.getSessionAttributes();
+                        if (vmSessionAttributes != null) {
+                            vmSessionAttributes.put("vmId", vmId);
+                            vmSessionAttributes.put("vmName", vmName);
+                            vmSessionAttributes.put("status", status);
+                            vmSessionAttributes.put("category", "vm");
+                        }
+
+                        // 直接更新VM连接状态
+                        try {
+                            vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", accessor.getSessionId());
+                            System.out.println("VM认证成功，已更新连接状态: vmId=" + vmId + ", sessionId=" + accessor.getSessionId());
+                        } catch (Exception e) {
+                            System.err.println("更新VM连接状态失败: vmId=" + vmId + ", error=" + e.getMessage());
+                        }
+
                         // 为VM设置默认用户信息
                         username = vmName != null ? vmName : vmId;
                         role = "VM";

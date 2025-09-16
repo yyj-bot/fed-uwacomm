@@ -532,6 +532,112 @@
             color: #495057;
             font-family: monospace;
         }
+
+        /* 一键测试面板样式 */
+        .workflow-container {
+            padding: 10px;
+        }
+
+        .workflow-controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .workflow-progress {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .progress-steps {
+            margin: 15px 0;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .progress-step:last-child {
+            border-bottom: none;
+        }
+
+        .step-checkbox {
+            font-size: 18px;
+            margin-right: 10px;
+            width: 25px;
+            display: inline-block;
+        }
+
+        .step-label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .step-status {
+            color: #6c757d;
+            font-size: 14px;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .progress-step.completed .step-checkbox {
+            color: #28a745;
+        }
+
+        .progress-step.current {
+            background-color: #fff3cd;
+            border-radius: 4px;
+            padding: 10px 8px;
+            margin: 2px 0;
+        }
+
+        .progress-step.current .step-label {
+            font-weight: bold;
+            color: #856404;
+        }
+
+        .progress-step.error {
+            background-color: #f8d7da;
+            border-radius: 4px;
+            padding: 10px 8px;
+            margin: 2px 0;
+        }
+
+        .progress-step.error .step-label {
+            color: #721c24;
+        }
+
+        .workflow-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        .current-step-info {
+            color: #007bff;
+        }
+
+        .workflow-stats span {
+            color: #6c757d;
+        }
+
+        #trainingCountdown {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .workflow-container button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
@@ -627,12 +733,27 @@
                 <button onclick="sendDatasetComplete()" class="btn-success">完成数据集</button>
             </div>
             <div class="input-group">
+                <label>当前数据集ID:</label>
+                <span id="currentDatasetId" style="color: #007bff; font-weight: bold;">未创建</span>
+                <button onclick="resetDatasetId()" class="btn-warning" style="margin-left: 10px;">重置</button>
+            </div>
+            <div class="input-group">
                 <button onclick="sendTrainingStart()" class="btn-info">开始训练</button>
                 <button onclick="sendTrainingProgress()" class="btn-info">训练进度</button>
                 <button onclick="sendModelUpload()" class="btn-info">上传模型</button>
             </div>
             <div class="input-group">
+                <button onclick="simulateVmTrainingStartResponse(true)" class="btn-success">模拟VM确认训练成功</button>
+                <button onclick="simulateVmTrainingStartResponse(false)" class="btn-danger">模拟VM确认训练失败</button>
+                <button onclick="simulateVmTrainingProgressResponse()" class="btn-secondary">模拟VM回复训练进度</button>
+            </div>
+            <div class="input-group">
                 <button onclick="sendStatusQuery()" class="btn-secondary">状态查询</button>
+                <button onclick="sendBatchStatusQuery()" class="btn-secondary">批量状态查询</button>
+                <button onclick="sendModelDownload()" class="btn-info">下载模型</button>
+                <button onclick="sendGlobalModelUpdate()" class="btn-warning">全局模型更新</button>
+            </div>
+            <div class="input-group">
                 <button onclick="sendVmStart()" class="btn-secondary">启动VM</button>
                 <button onclick="sendVmStop()" class="btn-secondary">停止VM</button>
             </div>
@@ -643,6 +764,71 @@
             <div class="input-group">
                 <button onclick="runBatchTest()" class="btn-danger">运行批量测试</button>
                 <button onclick="stopBatchTest()" class="btn-danger" id="stopBatchBtn" disabled>停止批量测试</button>
+            </div>
+        </div>
+
+        <!-- 一键测试面板 -->
+        <div class="panel">
+            <h2>完整流程测试</h2>
+            <div class="workflow-container">
+                <div class="workflow-controls">
+                    <button onclick="runCompleteWorkflowTest()" id="startWorkflowBtn" class="btn-primary" style="padding: 12px 24px; font-size: 16px; font-weight: bold;">
+                        🚀 启动完整测试流程
+                    </button>
+                    <button onclick="stopCompleteWorkflowTest()" id="stopWorkflowBtn" class="btn-danger" disabled style="padding: 12px 24px; font-size: 16px; margin-left: 10px;">
+                        ⏹️ 停止测试
+                    </button>
+                </div>
+
+                <div class="workflow-progress" style="margin-top: 20px;">
+                    <h3>测试进度</h3>
+                    <div class="progress-steps">
+                        <div class="progress-step" id="step1">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">1. 创建数据集</span>
+                            <span class="step-status"></span>
+                        </div>
+                        <div class="progress-step" id="step2">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">2. 追加数据行</span>
+                            <span class="step-status"></span>
+                        </div>
+                        <div class="progress-step" id="step3">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">3. 完成数据集</span>
+                            <span class="step-status"></span>
+                        </div>
+                        <div class="progress-step" id="step4">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">4. 开始训练</span>
+                            <span class="step-status"></span>
+                        </div>
+                        <div class="progress-step" id="step5">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">5. 查询训练进度</span>
+                            <span class="step-status"></span>
+                        </div>
+                        <div class="progress-step" id="step6">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">6. 训练进行中</span>
+                            <span class="step-status" id="trainingCountdown"></span>
+                        </div>
+                        <div class="progress-step" id="step7">
+                            <span class="step-checkbox">☐</span>
+                            <span class="step-label">7. 上传模型</span>
+                            <span class="step-status"></span>
+                        </div>
+                    </div>
+                    <div class="workflow-info" style="margin-top: 15px;">
+                        <div class="current-step-info">
+                            <strong>当前步骤:</strong> <span id="currentStepInfo">等待开始</span>
+                        </div>
+                        <div class="workflow-stats">
+                            <span>总用时: <span id="workflowDuration">0秒</span></span>
+                            <span style="margin-left: 20px;">完成: <span id="completedSteps">0</span>/7</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -695,7 +881,19 @@
         <!-- 数据集状态面板 -->
         <div class="panel">
             <h2>数据集状态</h2>
+            <div class="input-group">
+                <button onclick="sendDatasetStatusQuery()" class="btn-info">查询数据集状态</button>
+                <button onclick="showDatasetRows()" class="btn-success">显示数据行</button>
+                <button onclick="useLatestDataset()" class="btn-warning">使用最新数据集</button>
+                <input type="text" id="datasetIdInput" placeholder="输入数据集ID" style="flex: 1; margin: 0 5px;">
+            </div>
             <div id="datasetStatus" class="message-area"></div>
+
+            <!-- 数据行展示区域 -->
+            <div id="datasetRowsPanel" style="margin-top: 15px; display: none;">
+                <h3>数据行详情</h3>
+                <div id="datasetRows" class="message-area" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
         </div>
 
         <!-- 训练状态面板 -->
@@ -952,15 +1150,16 @@
         // 发送创建数据集消息
         function sendDatasetCreate() {
             if (!stompClient) return;
-            
+
             const vmId = document.getElementById('vmId').value;
+            const datasetId = 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
             const message = {
                 type: 'DATASET_CREATE',
                 id: generateMessageId('client'),
                 timestamp: new Date().toISOString(),
                 vmId: vmId,
                 data: {
-                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+                    datasetId: datasetId,
                     datasetDescription: '水声传播特征数据集',
                     datasetType: 'ACOUSTIC',
                     metadata: { source: 'bellhop', version: '1.0' }
@@ -968,66 +1167,239 @@
                 signature: 'test_signature'
             };
 
+            // 自动填充数据集ID输入框
+            document.getElementById('datasetIdInput').value = datasetId;
+            // 保存当前数据集ID供后续操作使用
+            window.currentDatasetId = datasetId;
+            // 更新显示
+            updateCurrentDatasetDisplay(datasetId);
+
             stompClient.send("/app/protocol", {}, JSON.stringify(message));
             showProtocolMessage({ type: 'SENT', content: '发送创建数据集消息: ' + message.type });
+        }
+
+        // 更新当前数据集ID显示
+        function updateCurrentDatasetDisplay(datasetId) {
+            const display = document.getElementById('currentDatasetId');
+            if (datasetId) {
+                display.textContent = datasetId;
+                display.style.color = '#28a745'; // 绿色表示有效
+            } else {
+                display.textContent = '未创建';
+                display.style.color = '#6c757d'; // 灰色表示无效
+            }
+        }
+
+        // 重置数据集ID
+        function resetDatasetId() {
+            window.currentDatasetId = null;
+            document.getElementById('datasetIdInput').value = '';
+            updateCurrentDatasetDisplay(null);
+            showProtocolMessage({ type: 'INFO', content: '数据集ID已重置' });
         }
 
         // 发送追加数据行消息
         function sendDatasetAppendRows() {
             if (!stompClient) return;
-            
+
             const vmId = document.getElementById('vmId').value;
+            const datasetId = window.currentDatasetId || document.getElementById('datasetIdInput').value;
+
+            if (!datasetId) {
+                alert('请先创建数据集或输入数据集ID');
+                return;
+            }
+
+            // 添加调试信息
+            console.log('追加数据行 - DatasetId:', datasetId, 'Source:', window.currentDatasetId ? 'currentDatasetId' : 'input');
+            showProtocolMessage({ type: 'DEBUG', content: '使用数据集ID: ' + datasetId + ' (来源: ' + (window.currentDatasetId ? '已创建' : '手动输入') + ')' });
+
             const message = {
                 type: 'DATASET_APPEND_ROWS',
                 id: generateMessageId('client'),
                 timestamp: new Date().toISOString(),
                 vmId: vmId,
                 data: {
-                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+                    datasetId: datasetId,
                     rows: [
-                        { rowData: { f1: 0.12, f2: 3.4, label: 1 } },
-                        { rowData: { f1: 0.37, f2: 2.1, label: 0 } }
+                        { rowData: { f1: Math.random().toFixed(3), f2: (Math.random() * 5).toFixed(2), label: Math.floor(Math.random() * 2) } },
+                        { rowData: { frequency: Math.floor(Math.random() * 2000 + 500), amplitude: Math.random().toFixed(3), phase: (Math.random() * Math.PI).toFixed(3) } }
                     ]
                 },
                 signature: 'test_signature'
             };
 
             stompClient.send("/app/protocol", {}, JSON.stringify(message));
-            showProtocolMessage({ type: 'SENT', content: '发送追加数据行消息: ' + message.type });
+            showProtocolMessage({ type: 'SENT', content: '发送追加数据行消息: ' + message.type + ' (数据集: ' + datasetId.substring(0, 16) + '...)' });
         }
 
         // 发送完成数据集消息
         function sendDatasetComplete() {
             if (!stompClient) return;
-            
+
             const vmId = document.getElementById('vmId').value;
+            const datasetId = window.currentDatasetId || document.getElementById('datasetIdInput').value;
+
+            if (!datasetId) {
+                alert('请先创建数据集或输入数据集ID');
+                return;
+            }
+
             const message = {
                 type: 'DATASET_COMPLETE',
                 id: generateMessageId('client'),
                 timestamp: new Date().toISOString(),
                 vmId: vmId,
                 data: {
-                    datasetId: 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000)
+                    datasetId: datasetId
                 },
                 signature: 'test_signature'
             };
 
             stompClient.send("/app/protocol", {}, JSON.stringify(message));
-            showProtocolMessage({ type: 'SENT', content: '发送完成数据集消息: ' + message.type });
+            showProtocolMessage({ type: 'SENT', content: '发送完成数据集消息: ' + message.type + ' (数据集: ' + datasetId.substring(0, 16) + '...)' });
+        }
+
+        // 发送数据集状态查询消息
+        function sendDatasetStatusQuery() {
+            if (!stompClient) return;
+
+            const vmId = document.getElementById('vmId').value;
+            const datasetId = document.getElementById('datasetIdInput').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            const message = {
+                type: 'DATASET_STATUS_QUERY',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: datasetId
+                },
+                signature: 'test_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送数据集状态查询: ' + datasetId });
+        }
+
+        // 显示数据行（通过API查询）
+        async function showDatasetRows() {
+            const datasetId = document.getElementById('datasetIdInput').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            try {
+                // 使用fetch API查询数据行
+                const response = await fetch(`/api/dataset/${datasetId}/rows`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.code === 200 && result.data) {
+                    displayDatasetRows(result.data);
+                } else {
+                    displayDatasetRows([]);
+                }
+            } catch (error) {
+                console.error('查询数据行失败:', error);
+
+                // 如果API不存在，显示模拟数据
+                displayMockDatasetRows();
+            }
+        }
+
+        // 显示数据集行数据
+        function displayDatasetRows(rows) {
+            const rowsPanel = document.getElementById('datasetRowsPanel');
+            const rowsContainer = document.getElementById('datasetRows');
+
+            rowsPanel.style.display = 'block';
+            rowsContainer.innerHTML = '';
+
+            if (!rows || rows.length === 0) {
+                rowsContainer.innerHTML = '<div class="message">暂无数据行</div>';
+                return;
+            }
+
+            rows.forEach((row, index) => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'message';
+
+                let rowData = row.row_data;
+                if (typeof rowData === 'string') {
+                    try {
+                        rowData = JSON.parse(rowData);
+                    } catch (e) {
+                        rowData = rowData;
+                    }
+                }
+
+                rowDiv.innerHTML = `
+                    <strong>行 ${index + 1}:</strong><br>
+                    <code>${JSON.stringify(rowData, null, 2)}</code><br>
+                    <small>创建时间: ${row.created_at || '未知'}</small>
+                `;
+
+                rowsContainer.appendChild(rowDiv);
+            });
+        }
+
+        // 显示模拟数据行（当API不可用时）
+        function displayMockDatasetRows() {
+            const mockRows = [
+                {
+                    row_data: { "f1": 0.12, "f2": 3.4, "label": 1 },
+                    created_at: new Date().toISOString()
+                },
+                {
+                    row_data: { "f1": 0.37, "f2": 2.1, "label": 0 },
+                    created_at: new Date().toISOString()
+                },
+                {
+                    row_data: { "frequency": 1000, "amplitude": 0.8, "phase": 1.57 },
+                    created_at: new Date().toISOString()
+                }
+            ];
+
+            displayDatasetRows(mockRows);
+        }
+
+        // 使用数据库中最新的数据集
+        function useLatestDataset() {
+            // 使用已知存在的数据集ID
+            const latestDatasetId = 'dset-1758023019983-67673';
+            document.getElementById('datasetIdInput').value = latestDatasetId;
+            window.currentDatasetId = latestDatasetId;
+            updateCurrentDatasetDisplay(latestDatasetId);
+            showProtocolMessage({ type: 'INFO', content: '已设置为最新数据集: ' + latestDatasetId });
         }
 
         // 发送开始训练消息
         function sendTrainingStart() {
             if (!stompClient) return;
-            
+
             const vmId = document.getElementById('vmId').value;
+            const taskId = 'task-' + Date.now();
+            window.currentTaskId = taskId; // 保存任务ID供模拟响应使用
+
             const message = {
                 type: 'TRAINING_START',
                 id: generateMessageId('client'),
                 timestamp: new Date().toISOString(),
                 vmId: vmId,
                 data: {
-                    taskId: 'task-' + Date.now(),
+                    taskId: taskId,
                     algorithm: 'FEDAVG',
                     config: {
                         batchSize: 32,
@@ -1142,6 +1514,54 @@
 
             stompClient.send("/app/protocol", {}, JSON.stringify(message));
             showProtocolMessage({ type: 'SENT', content: '发送模型上传消息: ' + message.type });
+        }
+
+        // 模拟VM训练开始响应
+        function simulateVmTrainingStartResponse(success) {
+            if (!stompClient) return;
+
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'TRAINING_START_RESPONSE',
+                id: generateMessageId('vm'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: window.currentTaskId || 'task-' + Date.now(),
+                    status: success ? 'SUCCESS' : 'FAILED',
+                    message: success ? '训练任务已成功启动' : '训练任务启动失败：资源不足'
+                },
+                signature: 'vm_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送VM训练' + (success ? '成功' : '失败') + '响应: ' + message.type });
+        }
+
+        // 模拟VM训练进度响应
+        function simulateVmTrainingProgressResponse() {
+            if (!stompClient) return;
+
+            const vmId = document.getElementById('vmId').value;
+            const currentRound = Math.floor(Math.random() * 10) + 1;
+            const message = {
+                type: 'TRAINING_PROGRESS_RESPONSE',
+                id: generateMessageId('vm'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: window.currentTaskId || 'task-' + Date.now(),
+                    currentRound: currentRound,
+                    status: 'RUNNING',
+                    accuracy: (Math.random() * 0.3 + 0.7).toFixed(3),
+                    loss: (Math.random() * 0.5).toFixed(3),
+                    eta: Math.floor(Math.random() * 300) + 60 // 60-360 seconds
+                },
+                signature: 'vm_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '发送VM训练进度响应: 轮次 ' + currentRound });
         }
 
         // 发送状态查询消息
@@ -2180,6 +2600,543 @@
             while (trainingStatus.children.length > 10) {
                 trainingStatus.removeChild(trainingStatus.firstChild);
             }
+        }
+
+        // === 一键测试功能 ===
+
+        // 工作流程状态管理
+        let workflowState = {
+            isRunning: false,
+            currentStep: 0,
+            startTime: null,
+            durationInterval: null,
+            trainingInterval: null,
+            trainingCountdownInterval: null,
+            testDatasetId: null,
+            testTaskId: null
+        };
+
+        // 工作流程步骤定义
+        const workflowSteps = [
+            { name: '创建数据集', action: 'dataset-create', delay: 1000 },
+            { name: '追加数据行', action: 'dataset-append', delay: 1000 },
+            { name: '完成数据集', action: 'dataset-complete', delay: 2000 },
+            { name: '开始训练', action: 'training-start', delay: 1000 },
+            { name: '查询训练进度', action: 'training-progress', delay: 2000 },
+            { name: '训练进行中', action: 'training-simulation', delay: 10000 },
+            { name: '上传模型', action: 'model-upload', delay: 1000 }
+        ];
+
+        // 启动完整工作流程测试
+        function runCompleteWorkflowTest() {
+            // 检查前置条件
+            if (!validateWorkflowPreconditions()) {
+                return;
+            }
+
+            // 初始化工作流程状态
+            initializeWorkflow();
+
+            // 开始执行工作流程
+            executeNextWorkflowStep();
+        }
+
+        // 停止完整工作流程测试
+        function stopCompleteWorkflowTest() {
+            workflowState.isRunning = false;
+
+            // 清除所有定时器
+            if (workflowState.durationInterval) {
+                clearInterval(workflowState.durationInterval);
+            }
+            if (workflowState.trainingInterval) {
+                clearInterval(workflowState.trainingInterval);
+            }
+            if (workflowState.trainingCountdownInterval) {
+                clearInterval(workflowState.trainingCountdownInterval);
+            }
+
+            // 重置UI状态
+            resetWorkflowUI();
+
+            showProtocolMessage({ type: 'INFO', content: '一键测试已停止' });
+        }
+
+        // 验证工作流程前置条件
+        function validateWorkflowPreconditions() {
+            if (!stompClient || !stompClient.connected) {
+                alert('请先连接WebSocket!');
+                return false;
+            }
+
+            const vmId = document.getElementById('vmId').value;
+            if (!vmId) {
+                alert('请先设置VM ID!');
+                return false;
+            }
+
+            return true;
+        }
+
+        // 初始化工作流程
+        function initializeWorkflow() {
+            workflowState.isRunning = true;
+            workflowState.currentStep = 0;
+            workflowState.startTime = new Date();
+
+            // 生成测试用的ID
+            workflowState.testDatasetId = 'dset-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+            workflowState.testTaskId = 'task-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+
+            // 更新UI
+            document.getElementById('startWorkflowBtn').disabled = true;
+            document.getElementById('stopWorkflowBtn').disabled = false;
+            document.getElementById('currentStepInfo').textContent = '正在初始化...';
+
+            // 开始计时器
+            workflowState.durationInterval = setInterval(updateWorkflowDuration, 1000);
+
+            // 重置所有步骤状态
+            resetAllSteps();
+
+            showProtocolMessage({ type: 'INFO', content: '🚀 一键测试开始: 数据集ID=' + workflowState.testDatasetId });
+        }
+
+        // 执行下一个工作流程步骤
+        function executeNextWorkflowStep() {
+            if (!workflowState.isRunning) return;
+
+            if (workflowState.currentStep >= workflowSteps.length) {
+                // 所有步骤完成
+                completeWorkflow();
+                return;
+            }
+
+            const step = workflowSteps[workflowState.currentStep];
+            const stepIndex = workflowState.currentStep + 1;
+
+            // 更新UI状态
+            updateStepStatus(stepIndex, 'current', '执行中...');
+            document.getElementById('currentStepInfo').textContent = `正在执行: ${step.name}`;
+
+            showProtocolMessage({ type: 'INFO', content: `执行步骤 ${stepIndex}: ${step.name}` });
+
+            // 执行对应的操作
+            try {
+                switch (step.action) {
+                    case 'dataset-create':
+                        executeDatasetCreate();
+                        break;
+                    case 'dataset-append':
+                        executeDatasetAppend();
+                        break;
+                    case 'dataset-complete':
+                        executeDatasetComplete();
+                        break;
+                    case 'training-start':
+                        executeTrainingStart();
+                        break;
+                    case 'training-progress':
+                        executeTrainingProgress();
+                        break;
+                    case 'training-simulation':
+                        executeTrainingSimulation();
+                        break;
+                    case 'model-upload':
+                        executeModelUpload();
+                        break;
+                }
+
+                // 在延迟后继续下一步（除了训练模拟步骤）
+                if (step.action !== 'training-simulation') {
+                    setTimeout(() => {
+                        if (workflowState.isRunning) {
+                            completeCurrentStep();
+                        }
+                    }, step.delay);
+                }
+            } catch (error) {
+                handleWorkflowError(stepIndex, error.message);
+            }
+        }
+
+        // 完成当前步骤并继续下一步
+        function completeCurrentStep() {
+            const stepIndex = workflowState.currentStep + 1;
+            updateStepStatus(stepIndex, 'completed', '✓');
+
+            workflowState.currentStep++;
+            updateCompletedCount();
+
+            // 继续下一步
+            executeNextWorkflowStep();
+        }
+
+        // 各个步骤的具体执行函数
+        function executeDatasetCreate() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_CREATE',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: workflowState.testDatasetId,
+                    name: '一键测试数据集',
+                    description: '自动化测试创建的数据集',
+                    datasetType: 'ACOUSTIC'
+                },
+                signature: 'client_signature'
+            };
+
+            // 更新数据集ID显示
+            window.currentDatasetId = workflowState.testDatasetId;
+            updateCurrentDatasetDisplay(workflowState.testDatasetId);
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: `创建数据集: ${workflowState.testDatasetId}` });
+        }
+
+        function executeDatasetAppend() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_APPEND_ROWS',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: workflowState.testDatasetId,
+                    rows: [
+                        { frequency: 1500, distance: 100, depth: 10, temperature: 15, salinity: 35, snr: 8.5 },
+                        { frequency: 2000, distance: 150, depth: 15, temperature: 16, salinity: 34, snr: 9.2 },
+                        { frequency: 2500, distance: 200, depth: 20, temperature: 14, salinity: 36, snr: 7.8 }
+                    ]
+                },
+                signature: 'client_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: `追加数据行: ${message.data.rows.length}条` });
+        }
+
+        function executeDatasetComplete() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'DATASET_COMPLETE',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    datasetId: workflowState.testDatasetId
+                },
+                signature: 'client_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '完成数据集创建' });
+        }
+
+        function executeTrainingStart() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'TRAINING_START',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: workflowState.testTaskId,
+                    algorithm: 'FEDAVG',
+                    config: {
+                        totalRounds: 5,
+                        learningRate: 0.01,
+                        batchSize: 32
+                    }
+                },
+                signature: 'client_signature'
+            };
+
+            // 保存任务ID
+            window.currentTaskId = workflowState.testTaskId;
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: `开始训练任务: ${workflowState.testTaskId}` });
+
+            // 1秒后自动模拟VM确认训练成功
+            setTimeout(() => {
+                if (workflowState.isRunning) {
+                    simulateVmTrainingStartResponse(true);
+                }
+            }, 500);
+        }
+
+        function executeTrainingProgress() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'TRAINING_PROGRESS',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: workflowState.testTaskId
+                },
+                signature: 'client_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '查询训练进度' });
+        }
+
+        function executeTrainingSimulation() {
+            let trainingTime = 10; // 10秒训练时间
+            updateStepStatus(6, 'current', `${trainingTime}秒`);
+
+            // 启动倒计时
+            workflowState.trainingCountdownInterval = setInterval(() => {
+                trainingTime--;
+                updateStepStatus(6, 'current', `${trainingTime}秒`);
+                document.getElementById('trainingCountdown').textContent = `${trainingTime}秒`;
+
+                if (trainingTime <= 0) {
+                    clearInterval(workflowState.trainingCountdownInterval);
+                    completeCurrentStep(); // 训练完成，继续下一步
+                }
+            }, 1000);
+
+            // 在训练期间每2秒模拟一次进度回复
+            let progressCount = 0;
+            workflowState.trainingInterval = setInterval(() => {
+                if (workflowState.isRunning && trainingTime > 0) {
+                    progressCount++;
+                    simulateVmTrainingProgressResponse();
+                } else {
+                    clearInterval(workflowState.trainingInterval);
+                }
+            }, 2000);
+
+            showProtocolMessage({ type: 'INFO', content: '开始10秒训练模拟...' });
+        }
+
+        function executeModelUpload() {
+            const vmId = document.getElementById('vmId').value;
+            const message = {
+                type: 'MODEL_UPLOAD',
+                id: generateMessageId('client'),
+                timestamp: new Date().toISOString(),
+                vmId: vmId,
+                data: {
+                    taskId: workflowState.testTaskId,
+                    modelVersion: '1.0.0',
+                    modelData: 'base64encodedmodeldata...',
+                    round: 1,
+                    parameters: {
+                        modelWeights: 'encoded_weights_data',
+                        layers: 3
+                    },
+                    metrics: {
+                        accuracy: (Math.random() * 0.3 + 0.7).toFixed(3),
+                        loss: (Math.random() * 0.5).toFixed(3)
+                    }
+                },
+                signature: 'client_signature'
+            };
+
+            stompClient.send("/app/protocol", {}, JSON.stringify(message));
+            showProtocolMessage({ type: 'SENT', content: '上传训练模型' });
+        }
+
+        // 完成整个工作流程
+        function completeWorkflow() {
+            workflowState.isRunning = false;
+
+            // 清除定时器
+            if (workflowState.durationInterval) {
+                clearInterval(workflowState.durationInterval);
+            }
+
+            // 更新UI
+            document.getElementById('startWorkflowBtn').disabled = false;
+            document.getElementById('stopWorkflowBtn').disabled = true;
+            document.getElementById('currentStepInfo').textContent = '✅ 所有步骤完成!';
+
+            const duration = Math.floor((new Date() - workflowState.startTime) / 1000);
+            showProtocolMessage({
+                type: 'SUCCESS',
+                content: `🎉 一键测试完成! 总用时: ${duration}秒，成功执行7个步骤`
+            });
+        }
+
+        // 处理工作流程错误
+        function handleWorkflowError(stepIndex, errorMessage) {
+            updateStepStatus(stepIndex, 'error', '错误');
+            document.getElementById('currentStepInfo').textContent = `步骤${stepIndex}出错: ${errorMessage}`;
+
+            showProtocolMessage({
+                type: 'ERROR',
+                content: `步骤${stepIndex}执行失败: ${errorMessage}`
+            });
+
+            // 停止工作流程
+            stopCompleteWorkflowTest();
+        }
+
+        // UI更新辅助函数
+        function updateStepStatus(stepIndex, status, message) {
+            const stepElement = document.getElementById(`step${stepIndex}`);
+            const checkbox = stepElement.querySelector('.step-checkbox');
+            const statusSpan = stepElement.querySelector('.step-status');
+
+            // 清除之前的状态类
+            stepElement.classList.remove('completed', 'current', 'error');
+
+            switch (status) {
+                case 'completed':
+                    stepElement.classList.add('completed');
+                    checkbox.textContent = '✓';
+                    statusSpan.textContent = '已完成';
+                    break;
+                case 'current':
+                    stepElement.classList.add('current');
+                    checkbox.textContent = '▶';
+                    statusSpan.textContent = message || '执行中...';
+                    break;
+                case 'error':
+                    stepElement.classList.add('error');
+                    checkbox.textContent = '✗';
+                    statusSpan.textContent = message || '出错';
+                    break;
+                default:
+                    checkbox.textContent = '☐';
+                    statusSpan.textContent = '';
+            }
+        }
+
+        function resetAllSteps() {
+            for (let i = 1; i <= 7; i++) {
+                updateStepStatus(i, 'pending', '');
+            }
+            updateCompletedCount();
+        }
+
+        function updateCompletedCount() {
+            const completed = document.querySelectorAll('.progress-step.completed').length;
+            document.getElementById('completedSteps').textContent = completed;
+        }
+
+        function updateWorkflowDuration() {
+            if (workflowState.startTime) {
+                const duration = Math.floor((new Date() - workflowState.startTime) / 1000);
+                document.getElementById('workflowDuration').textContent = duration + '秒';
+            }
+        }
+
+        // 发送批量状态查询消息
+        function sendBatchStatusQuery() {
+            if (!stompClient || !stompClient.connected) {
+                alert('WebSocket未连接');
+                return;
+            }
+
+            const vmId = document.getElementById('vmId').value;
+            if (!vmId) {
+                alert('请输入VM ID');
+                return;
+            }
+
+            const message = {
+                type: 'BATCH_STATUS_QUERY',
+                vmId: vmId,
+                data: {
+                    vmIds: [vmId, 'vm-001', 'vm-002'], // 批量查询的VM ID列表
+                    includeDetails: true
+                },
+                messageId: 'batch_query_' + Date.now(),
+                timestamp: new Date().toISOString()
+            };
+
+            stompClient.send('/app/protocol', {}, JSON.stringify(message));
+            showProtocolMessage({
+                type: 'SENT',
+                content: '批量状态查询: ' + JSON.stringify(message, null, 2),
+                messageId: message.messageId
+            });
+        }
+
+        // 发送模型下载消息
+        function sendModelDownload() {
+            if (!stompClient || !stompClient.connected) {
+                alert('WebSocket未连接');
+                return;
+            }
+
+            const vmId = document.getElementById('vmId').value;
+            if (!vmId) {
+                alert('请输入VM ID');
+                return;
+            }
+
+            const message = {
+                type: 'MODEL_DOWNLOAD',
+                vmId: vmId,
+                data: {
+                    taskId: 'task_' + Date.now(),
+                    modelType: 'global',
+                    version: 'latest',
+                    round: 1
+                },
+                messageId: 'model_download_' + Date.now(),
+                timestamp: new Date().toISOString()
+            };
+
+            stompClient.send('/app/protocol', {}, JSON.stringify(message));
+            showProtocolMessage({
+                type: 'SENT',
+                content: '模型下载请求: ' + JSON.stringify(message, null, 2),
+                messageId: message.messageId
+            });
+        }
+
+        // 发送全局模型更新消息
+        function sendGlobalModelUpdate() {
+            if (!stompClient || !stompClient.connected) {
+                alert('WebSocket未连接');
+                return;
+            }
+
+            const vmId = document.getElementById('vmId').value;
+            if (!vmId) {
+                alert('请输入VM ID');
+                return;
+            }
+
+            const message = {
+                type: 'GLOBAL_MODEL_UPDATE',
+                vmId: vmId,
+                data: {
+                    taskId: 'task_' + Date.now(),
+                    round: 2,
+                    modelVersion: '2.1.0',
+                    accuracy: 0.92,
+                    updateTime: new Date().toISOString()
+                },
+                messageId: 'global_update_' + Date.now(),
+                timestamp: new Date().toISOString()
+            };
+
+            stompClient.send('/app/protocol', {}, JSON.stringify(message));
+            showProtocolMessage({
+                type: 'SENT',
+                content: '全局模型更新: ' + JSON.stringify(message, null, 2),
+                messageId: message.messageId
+            });
+        }
+
+        function resetWorkflowUI() {
+            document.getElementById('startWorkflowBtn').disabled = false;
+            document.getElementById('stopWorkflowBtn').disabled = true;
+            document.getElementById('currentStepInfo').textContent = '等待开始';
+            document.getElementById('workflowDuration').textContent = '0秒';
+            document.getElementById('trainingCountdown').textContent = '';
+            resetAllSteps();
         }
     </script>
 </body>

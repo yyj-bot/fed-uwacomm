@@ -117,6 +117,53 @@
             margin-top: 15px;
         }
 
+        /* API响应区域样式 */
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            min-height: 80px;
+            display: block !important; /* 始终显示 */
+        }
+
+        .response-area h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .response-content {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 12px;
+            min-height: 60px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #333;
+        }
+
+        .response-content.success {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .response-content.error {
+            border-color: #dc3545;
+            background: #fff8f8;
+        }
+
+        .response-content.loading {
+            color: #666;
+            font-style: italic;
+        }
+
         .result-item {
             margin-bottom: 15px;
             padding: 10px;
@@ -231,13 +278,88 @@
             padding: 5px 10px;
             font-size: 12px;
         }
+
+        .status-unauthenticated {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-authenticated {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
     </style>
 </head>
 
 <body>
     <h1>FedUWAComm VM API完整测试页面</h1>
     <p>测试虚拟机注册、Token刷新、CRUD操作、控制命令等所有API接口</p>
-    
+
+    <!-- API路径说明区域 -->
+    <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #b3d9ff;">
+        <h3 style="margin: 0 0 15px 0; color: #0066cc;">📋 API路径设计说明</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #ccc;">
+                <h4 style="margin: 0 0 10px 0; color: #28a745;">🤖 VM自身操作接口 (v1路径)</h4>
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">这些接口由虚拟机自己调用，无需用户JWT认证：</p>
+                <ul style="margin: 0; padding-left: 20px; font-family: monospace; font-size: 13px;">
+                    <li><code>POST /api/v1/vm/register</code> - VM注册</li>
+                    <li><code>POST /api/v1/vm/token/refresh</code> - Token刷新</li>
+                    <li><code>POST /api/v1/vm/{vmId}/heartbeat</code> - 心跳上报</li>
+                    <li><code>GET /api/v1/vm/health</code> - 健康检查</li>
+                </ul>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #ccc;">
+                <h4 style="margin: 0 0 10px 0; color: #007bff;">👤 用户管理操作接口 (无v1路径)</h4>
+                <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">这些接口由用户调用，需要用户JWT认证：</p>
+                <ul style="margin: 0; padding-left: 20px; font-family: monospace; font-size: 13px;">
+                    <li><code>GET /api/vm/list</code> - VM列表查询</li>
+                    <li><code>GET /api/vm/{vmId}</code> - VM详情查询</li>
+                    <li><code>PUT /api/vm/{vmId}</code> - VM信息更新</li>
+                    <li><code>DELETE /api/vm/{vmId}</code> - VM删除</li>
+                    <li><code>POST /api/vm/{vmId}/start</code> - VM启动</li>
+                    <li><code>POST /api/vm/{vmId}/stop</code> - VM停止</li>
+                    <li><code>POST /api/vm/{vmId}/restart</code> - VM重启</li>
+                    <li><code>GET /api/vm/{vmId}/status</code> - VM状态查询</li>
+                </ul>
+            </div>
+        </div>
+        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffeaa7;">
+            <strong>💡 设计原理：</strong>
+            VM自身操作使用 <code>/api/v1/vm</code> 路径，由VM拦截器处理；用户管理操作使用 <code>/api/vm</code> 路径，由用户JWT拦截器处理。
+            这样可以避免认证混乱，确保不同性质的操作使用正确的认证方式。
+        </div>
+    </div>
+
+    <!-- 用户认证区域 -->
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+        <h3 style="margin: 0 0 15px 0; color: #2c3e50;">🔐 用户认证管理</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #495057;">用户名或邮箱:</label>
+                <input type="text" id="userLoginIdentifier" placeholder="输入用户名或邮箱" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #495057;">密码:</label>
+                <input type="password" id="userPassword" placeholder="输入密码" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #495057;">用户Token:</label>
+                <input type="text" id="userToken" placeholder="JWT Token (登录后自动填充)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <button onclick="loginUser()" class="btn-primary">用户登录</button>
+                <button onclick="fillUserToken()" class="btn-secondary">填充到API</button>
+                <button onclick="testCurrentToken()" class="btn-warning">测试Token</button>
+            </div>
+        </div>
+        <div id="userAuthStatus" style="margin-top: 10px; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: 500;" class="status-unauthenticated">
+            <span id="userAuthText">未登录</span>
+        </div>
+    </div>
+
     <!-- Tab导航 -->
     <div style="margin-bottom: 20px; border-bottom: 2px solid #007bff;">
         <button class="tab-btn active" onclick="showTab('basic-ops')">基础操作</button>
@@ -312,6 +434,12 @@
             </div>
             <button onclick="registerVm()" class="btn-primary">注册虚拟机</button>
             <button onclick="registerMultipleVm()" class="btn-success">批量注册测试</button>
+
+            <!-- API响应区域 -->
+            <div class="response-area">
+                <h4>📝 VM注册 API响应</h4>
+                <div class="response-content" id="registerVmResponse">等待API调用...</div>
+            </div>
         </div>
 
         <!-- Token刷新面板 -->
@@ -333,6 +461,12 @@
             <button onclick="refreshToken()" class="btn-warning">刷新Token</button>
             <button onclick="useLastRegisteredVm()" class="btn-secondary">使用最新注册的VM</button>
             <button onclick="validateCurrentToken()" class="btn-success">验证当前Token</button>
+
+            <!-- API响应区域 -->
+            <div class="response-area">
+                <h4>🔄 Token刷新 API响应</h4>
+                <div class="response-content" id="tokenRefreshResponse">等待API调用...</div>
+            </div>
             
             <div id="currentToken" class="token-display" style="display: none;">
                 <strong>当前Token:</strong><br>
@@ -410,6 +544,12 @@
                 </div>
                 <button onclick="queryVmList()" class="btn-primary">查询VM列表</button>
                 <button onclick="fillTestToken()" class="btn-secondary">填充测试Token</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>📋 VM列表查询 API响应</h4>
+                    <div class="response-content" id="vmListResponse">等待API调用...</div>
+                </div>
             </div>
 
             <!-- VM详情查询面板 -->
@@ -421,6 +561,12 @@
                 </div>
                 <button onclick="getVmDetail()" class="btn-primary">查询VM详情</button>
                 <button onclick="useRegisteredVmId('detailVmId')" class="btn-secondary">使用已注册VM</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>🔍 VM详情查询 API响应</h4>
+                    <div class="response-content" id="vmDetailResponse">等待API调用...</div>
+                </div>
             </div>
 
             <!-- VM更新面板 -->
@@ -448,6 +594,12 @@
                 </div>
                 <button onclick="updateVm()" class="btn-warning">更新VM信息</button>
                 <button onclick="useRegisteredVmId('updateVmId')" class="btn-secondary">使用已注册VM</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>📝 VM更新 API响应</h4>
+                    <div class="response-content" id="vmUpdateResponse">等待API调用...</div>
+                </div>
             </div>
 
             <!-- VM删除面板 -->
@@ -464,6 +616,12 @@
                 </div>
                 <button onclick="deleteVm()" class="btn-danger">删除VM</button>
                 <button onclick="useRegisteredVmId('deleteVmId')" class="btn-secondary">使用已注册VM</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>🗑️ VM删除 API响应</h4>
+                    <div class="response-content" id="vmDeleteResponse">等待API调用...</div>
+                </div>
             </div>
         </div>
     </div>
@@ -480,6 +638,12 @@
                 </div>
                 <button onclick="getVmStatus()" class="btn-primary">查询VM状态</button>
                 <button onclick="useRegisteredVmId('statusVmId')" class="btn-secondary">使用已注册VM</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>📊 VM状态查询 API响应</h4>
+                    <div class="response-content" id="vmStatusResponse">等待API调用...</div>
+                </div>
             </div>
 
             <!-- VM控制面板 -->
@@ -508,6 +672,12 @@
                     <button onclick="restartVm()" class="btn-danger">重启VM</button>
                 </div>
                 <button onclick="useRegisteredVmId('controlVmId')" class="btn-secondary" style="margin-top: 10px;">使用已注册VM</button>
+
+                <!-- API响应区域 -->
+                <div class="response-area">
+                    <h4>🎮 VM控制操作 API响应</h4>
+                    <div class="response-content" id="vmControlResponse">等待API调用...</div>
+                </div>
             </div>
 
             <!-- 批量操作面板 -->
@@ -549,6 +719,220 @@
     <script>
         let lastRegisteredVm = null;
         let currentToken = null;
+        let userToken = localStorage.getItem('userToken') || '';
+
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', function() {
+            // 恢复保存的用户Token
+            if (userToken) {
+                try {
+                    const cleanedToken = cleanToken(userToken);
+                    userToken = cleanedToken;
+                    localStorage.setItem('userToken', cleanedToken);
+                    document.getElementById('userToken').value = cleanedToken;
+                    updateUserAuthStatus(true, '已登录 (从本地存储恢复)');
+                } catch (error) {
+                    // 如果本地存储的Token无效，清除它
+                    localStorage.removeItem('userToken');
+                    userToken = '';
+                    updateUserAuthStatus(false, 'Token已过期或格式错误');
+                    addResult('警告', 'Token恢复', '本地存储的Token无效已清除: ' + error.message, 'warning');
+                }
+            }
+        });
+
+        // 显示API响应的通用函数
+        function showResponse(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            element.className = `response-content ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        // 用户登录函数
+        async function loginUser() {
+            const loginIdentifier = document.getElementById('userLoginIdentifier').value;
+            const password = document.getElementById('userPassword').value;
+
+            if (!loginIdentifier || !password) {
+                alert('请填写用户名和密码');
+                return;
+            }
+
+            updateUserAuthStatus(false, '正在登录...');
+
+            try {
+                const response = await fetch('/api/user/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        loginIdentifier: loginIdentifier,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.code === 200 && result.data && result.data.token) {
+                    try {
+                        // 清理和验证返回的Token
+                        const cleanedToken = cleanToken(result.data.token);
+                        userToken = cleanedToken;
+                        localStorage.setItem('userToken', cleanedToken);
+                        document.getElementById('userToken').value = cleanedToken;
+                        updateUserAuthStatus(true, `登录成功 - ${result.data.username || '用户'}`);
+                        addResult('成功', 'POST /api/user/login', '用户登录成功，Token已验证', 'success');
+                    } catch (tokenError) {
+                        updateUserAuthStatus(false, 'Token格式错误');
+                        addResult('错误', 'Token验证', '服务器返回的Token格式无效: ' + tokenError.message, 'error');
+                        alert('Token格式错误: ' + tokenError.message);
+                    }
+                } else {
+                    updateUserAuthStatus(false, '登录失败');
+                    addResult('失败', 'POST /api/user/login', result.message || '登录失败', 'error');
+                    alert('登录失败: ' + (result.message || '未知错误'));
+                }
+            } catch (error) {
+                updateUserAuthStatus(false, '网络错误');
+                addResult('错误', 'POST /api/user/login', '网络错误: ' + error.message, 'error');
+                alert('登录请求失败: ' + error.message);
+            }
+        }
+
+        // 更新用户认证状态
+        function updateUserAuthStatus(isAuthenticated, message) {
+            const statusElement = document.getElementById('userAuthStatus');
+            const textElement = document.getElementById('userAuthText');
+
+            if (isAuthenticated) {
+                statusElement.className = 'status-authenticated';
+                textElement.textContent = message || '已登录';
+            } else {
+                statusElement.className = 'status-unauthenticated';
+                textElement.textContent = message || '未登录';
+            }
+        }
+
+        // 清理和验证Token格式
+        function cleanToken(token) {
+            if (!token) return '';
+
+            // 移除所有空白字符(空格、换行符、制表符等)
+            const cleanedToken = token.replace(/\s+/g, '');
+
+            // 验证JWT Token格式 (应该有两个点分隔三部分)
+            const parts = cleanedToken.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Token格式无效，JWT应该包含3个由点分隔的部分');
+            }
+
+            // 验证每部分都是有效的base64url编码
+            for (let i = 0; i < parts.length; i++) {
+                if (!/^[A-Za-z0-9_-]+$/.test(parts[i])) {
+                    throw new Error(`Token第${i+1}部分包含无效字符，应该只包含字母、数字、下划线和短横线`);
+                }
+            }
+
+            return cleanedToken;
+        }
+
+        // 安全获取清理后的Token
+        function getSafeToken(token) {
+            try {
+                return cleanToken(token);
+            } catch (error) {
+                addResult('警告', 'Token验证', `Token格式错误: ${error.message}`, 'warning');
+                return '';
+            }
+        }
+
+        // 填充用户Token到API调用
+        function fillUserToken() {
+            const tokenInput = document.getElementById('userToken');
+            const rawToken = tokenInput.value;
+
+            if (!rawToken) {
+                alert('请先登录或手动输入Token');
+                return;
+            }
+
+            try {
+                // 清理和验证Token
+                const cleanedToken = cleanToken(rawToken);
+
+                // 更新输入框显示清理后的Token
+                tokenInput.value = cleanedToken;
+
+                // 更新当前使用的Token
+                userToken = cleanedToken;
+                currentToken = cleanedToken;
+                localStorage.setItem('userToken', cleanedToken);
+
+                // 填充到所有相关输入框
+                const wsTokenField = document.getElementById('wsToken');
+                if (wsTokenField) {
+                    wsTokenField.value = cleanedToken;
+                }
+
+                addResult('成功', 'Token管理', '用户Token已清理并填充到API调用中', 'success');
+                alert('Token已清理并填充到API调用中');
+            } catch (error) {
+                addResult('错误', 'Token验证', error.message, 'error');
+                alert('Token验证失败: ' + error.message);
+            }
+        }
+
+        // 测试当前Token的有效性
+        async function testCurrentToken() {
+            const token = document.getElementById('userToken').value;
+            if (!token) {
+                alert('请先输入Token');
+                return;
+            }
+
+            try {
+                const cleanedToken = cleanToken(token);
+                updateUserAuthStatus(false, '正在测试Token...');
+
+                // 调用一个简单的API来测试Token有效性
+                const response = await fetch('/api/vm/list?page=1&size=1', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + cleanedToken,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.code === 200) {
+                    updateUserAuthStatus(true, 'Token有效');
+                    addResult('成功', 'Token测试', 'Token验证成功，可以正常访问API', 'success');
+                    alert('Token验证成功!');
+                } else if (response.status === 401) {
+                    updateUserAuthStatus(false, 'Token无效或已过期');
+                    addResult('失败', 'Token测试', 'Token无效或已过期，请重新登录', 'error');
+                    alert('Token无效或已过期，请重新登录');
+                } else {
+                    updateUserAuthStatus(false, 'Token测试失败');
+                    addResult('失败', 'Token测试', `服务器错误: ${result.message}`, 'error');
+                    alert(`Token测试失败: ${result.message}`);
+                }
+            } catch (error) {
+                if (error.message.includes('Token格式')) {
+                    updateUserAuthStatus(false, 'Token格式错误');
+                    addResult('错误', 'Token测试', error.message, 'error');
+                    alert(error.message);
+                } else {
+                    updateUserAuthStatus(false, '网络错误');
+                    addResult('错误', 'Token测试', `网络错误: ${error.message}`, 'error');
+                    alert(`网络错误: ${error.message}`);
+                }
+            }
+        }
 
         // 填充示例数据
         function fillSampleVmData() {
@@ -594,9 +978,12 @@
             const vmSystemInfoStr = document.getElementById('vmSystemInfo').value;
 
             if (!vmName || !vmDescription) {
+                showResponse('registerVmResponse', '请填写虚拟机名称和描述', false);
                 addResult('错误', 'POST /api/v1/vm/register', '请填写虚拟机名称和描述', 'error');
                 return;
             }
+
+            showResponse('registerVmResponse', '正在注册虚拟机...', true);
 
             let vmCapabilities = [];
             let vmSystemInfo = {};
@@ -609,6 +996,7 @@
                     vmSystemInfo = JSON.parse(vmSystemInfoStr);
                 }
             } catch (error) {
+                showResponse('registerVmResponse', 'JSON格式错误: ' + error.message, false);
                 addResult('错误', 'POST /api/v1/vm/register', 'JSON格式错误: ' + error.message, 'error');
                 return;
             }
@@ -652,11 +1040,14 @@
                 if (response.ok) {
                     lastRegisteredVm = result.data;
                     updateVmInfo(result.data);
+                    showResponse('registerVmResponse', result, true);
                     addResult('成功', 'POST /api/v1/vm/register', JSON.stringify(result, null, 2), 'success');
                 } else {
+                    showResponse('registerVmResponse', result, false);
                     addResult('失败', 'POST /api/v1/vm/register', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
+                showResponse('registerVmResponse', `网络错误: ${error.message}`, false);
                 addResult('错误', 'POST /api/v1/vm/register', '网络错误: ' + error.message, 'error');
             }
         }
@@ -730,9 +1121,12 @@
             const secretId = document.getElementById('refreshSecretId').value;
 
             if (!vmId || !secretId) {
+                showResponse('tokenRefreshResponse', '请填写虚拟机ID和Secret ID', false);
                 addResult('错误', 'POST /api/v1/vm/token/refresh', '请填写虚拟机ID和Secret ID', 'error');
                 return;
             }
+
+            showResponse('tokenRefreshResponse', '正在刷新Token...', true);
 
             const requestData = {
                 vmId: vmId,
@@ -756,8 +1150,9 @@
                     currentToken = result.data.accessToken;
                     updateTokenDisplay(result.data.accessToken);
                     document.getElementById('tokenStatus').textContent = '有效';
+                    showResponse('tokenRefreshResponse', result, true);
                     addResult('成功', 'POST /api/v1/vm/token/refresh', JSON.stringify(result, null, 2), 'success');
-                    
+
                     // 如果有新的secretId，更新显示
                     if (result.data.secretId) {
                         document.getElementById('currentSecretId').textContent = result.data.secretId;
@@ -766,9 +1161,11 @@
                 } else {
                     currentToken = null;
                     document.getElementById('tokenStatus').textContent = '无效';
+                    showResponse('tokenRefreshResponse', result, false);
                     addResult('失败', 'POST /api/v1/vm/token/refresh', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
+                showResponse('tokenRefreshResponse', `网络错误: ${error.message}`, false);
                 addResult('错误', 'POST /api/v1/vm/token/refresh', '网络错误: ' + error.message, 'error');
             }
         }
@@ -1001,9 +1398,17 @@
 
         // 查询虚拟机列表
         async function queryVmList() {
+            showResponse('vmListResponse', '正在查询VM列表...', true);
             if (!currentToken) {
-                addResult('错误', 'GET /api/v1/vm/list', '需要JWT Token认证', 'error');
-                return;
+                // 尝试使用用户Token
+                if (userToken) {
+                    currentToken = userToken;
+                    addResult('信息', '自动使用用户Token', '已自动使用用户Token进行API认证', 'success');
+                } else {
+                    showResponse('vmListResponse', '需要JWT Token认证，请先登录或点击“填充测试Token”', false);
+                    addResult('错误', 'GET /api/vm/list', '需要JWT Token认证，请先登录', 'error');
+                    return;
+                }
             }
 
             const page = document.getElementById('listPage').value || 1;
@@ -1022,14 +1427,14 @@
             if (osType) params.append('osType', osType);
             if (keyword) params.append('keyword', keyword);
 
-            const url = `/api/v1/vm/list?${params.toString()}`;
+            const url = `/api/vm/list?${params.toString()}`;
             addResult('请求', 'GET ' + url, '查询虚拟机列表', 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     }
                 });
@@ -1037,37 +1442,49 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'GET /api/v1/vm/list', 
+                    showResponse('vmListResponse', result, true);
+                    addResult('成功', 'GET /api/vm/list',
                         `查询成功，共${result.data.total}条记录\n${JSON.stringify(result, null, 2)}`, 'success');
                 } else {
-                    addResult('失败', 'GET /api/v1/vm/list', JSON.stringify(result, null, 2), 'error');
+                    showResponse('vmListResponse', result, false);
+                    addResult('失败', 'GET /api/vm/list', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'GET /api/v1/vm/list', '网络错误: ' + error.message, 'error');
+                showResponse('vmListResponse', `网络错误: ${error.message}`, false);
+                addResult('错误', 'GET /api/vm/list', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 获取虚拟机详情
         async function getVmDetail() {
+            showResponse('vmDetailResponse', '正在查询VM详情...', true);
             if (!currentToken) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}', '需要JWT Token认证', 'error');
-                return;
+                // 尝试使用用户Token
+                if (userToken) {
+                    currentToken = userToken;
+                    addResult('信息', '自动使用用户Token', '已自动使用用户Token进行API认证', 'success');
+                } else {
+                    showResponse('vmDetailResponse', '需要JWT Token认证，请先登录或点击“填充测试Token”', false);
+                    addResult('错误', 'GET /api/vm/{vmId}', '需要JWT Token认证，请先登录', 'error');
+                    return;
+                }
             }
 
             const vmId = document.getElementById('detailVmId').value;
             if (!vmId) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}', '请输入虚拟机ID', 'error');
+                showResponse('vmDetailResponse', '请输入虚拟机ID', false);
+                addResult('错误', 'GET /api/vm/{vmId}', '请输入虚拟机ID', 'error');
                 return;
             }
 
-            const url = `/api/v1/vm/${vmId}`;
+            const url = `/api/vm/${vmId}`;
             addResult('请求', 'GET ' + url, '查询虚拟机详情', 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     }
                 });
@@ -1075,25 +1492,26 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'GET /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
+                    addResult('成功', 'GET /api/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'GET /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
+                    addResult('失败', 'GET /api/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}', '网络错误: ' + error.message, 'error');
+                addResult('错误', 'GET /api/vm/{vmId}', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 更新虚拟机信息
         async function updateVm() {
+            showResponse('vmUpdateResponse', '正在更新VM信息...', true);
             if (!currentToken) {
-                addResult('错误', 'PUT /api/v1/vm/{vmId}', '需要JWT Token认证', 'error');
+                addResult('错误', 'PUT /api/vm/{vmId}', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('updateVmId').value;
             if (!vmId) {
-                addResult('错误', 'PUT /api/v1/vm/{vmId}', '请输入虚拟机ID', 'error');
+                addResult('错误', 'PUT /api/vm/{vmId}', '请输入虚拟机ID', 'error');
                 return;
             }
 
@@ -1113,18 +1531,18 @@
             if (memory) updateData.memoryMb = parseInt(memory);
 
             if (Object.keys(updateData).length === 0) {
-                addResult('错误', 'PUT /api/v1/vm/{vmId}', '请至少填写一个要更新的字段', 'error');
+                addResult('错误', 'PUT /api/vm/{vmId}', '请至少填写一个要更新的字段', 'error');
                 return;
             }
 
-            const url = `/api/v1/vm/${vmId}`;
+            const url = `/api/vm/${vmId}`;
             addResult('请求', 'PUT ' + url, JSON.stringify(updateData, null, 2), 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'PUT',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(updateData)
@@ -1133,30 +1551,36 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'PUT /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
+                    showResponse('vmUpdateResponse', result, true);
+                    addResult('成功', 'PUT /api/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'PUT /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
+                    showResponse('vmUpdateResponse', result, false);
+                    addResult('失败', 'PUT /api/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'PUT /api/v1/vm/{vmId}', '网络错误: ' + error.message, 'error');
+                showResponse('vmUpdateResponse', '网络错误: ' + error.message, false);
+                addResult('错误', 'PUT /api/vm/{vmId}', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 删除虚拟机
         async function deleteVm() {
+            showResponse('vmDeleteResponse', '正在删除VM...', true);
             if (!currentToken) {
-                addResult('错误', 'DELETE /api/v1/vm/{vmId}', '需要JWT Token认证', 'error');
+                showResponse('vmDeleteResponse', '需要JWT Token认证', false);
+                addResult('错误', 'DELETE /api/vm/{vmId}', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('deleteVmId').value;
             if (!vmId) {
-                addResult('错误', 'DELETE /api/v1/vm/{vmId}', '请输入虚拟机ID', 'error');
+                showResponse('vmDeleteResponse', '请输入虚拟机ID', false);
+                addResult('错误', 'DELETE /api/vm/{vmId}', '请输入虚拟机ID', 'error');
                 return;
             }
 
             const force = document.getElementById('forceDelete').checked;
-            const url = `/api/v1/vm/${vmId}${force ? '?force=true' : ''}`;
+            const url = `/api/vm/${vmId}${force ? '?force=true' : ''}`;
             
             addResult('请求', 'DELETE ' + url, `删除虚拟机，强制删除: ${force}`, 'info');
 
@@ -1164,7 +1588,7 @@
                 const response = await fetch(url, {
                     method: 'DELETE',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     }
                 });
@@ -1172,12 +1596,15 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'DELETE /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
+                    showResponse('vmDeleteResponse', result, true);
+                    addResult('成功', 'DELETE /api/vm/{vmId}', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'DELETE /api/v1/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
+                    showResponse('vmDeleteResponse', result, false);
+                    addResult('失败', 'DELETE /api/vm/{vmId}', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'DELETE /api/v1/vm/{vmId}', '网络错误: ' + error.message, 'error');
+                showResponse('vmDeleteResponse', '网络错误: ' + error.message, false);
+                addResult('错误', 'DELETE /api/vm/{vmId}', '网络错误: ' + error.message, 'error');
             }
         }
 
@@ -1186,13 +1613,13 @@
         // 启动虚拟机
         async function startVm() {
             if (!currentToken) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/start', '需要JWT Token认证', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/start', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('controlVmId').value;
             if (!vmId) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/start', '请输入虚拟机ID', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/start', '请输入虚拟机ID', 'error');
                 return;
             }
 
@@ -1207,14 +1634,14 @@
             if (reason) requestData.reason = reason;
             if (force) requestData.force = true;
 
-            const url = `/api/v1/vm/${vmId}/start`;
+            const url = `/api/vm/${vmId}/start`;
             addResult('请求', 'POST ' + url, JSON.stringify(requestData, null, 2), 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(requestData)
@@ -1223,25 +1650,25 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'POST /api/v1/vm/{vmId}/start', JSON.stringify(result, null, 2), 'success');
+                    addResult('成功', 'POST /api/vm/{vmId}/start', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'POST /api/v1/vm/{vmId}/start', JSON.stringify(result, null, 2), 'error');
+                    addResult('失败', 'POST /api/vm/{vmId}/start', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/start', '网络错误: ' + error.message, 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/start', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 停止虚拟机
         async function stopVm() {
             if (!currentToken) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/stop', '需要JWT Token认证', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/stop', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('controlVmId').value;
             if (!vmId) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/stop', '请输入虚拟机ID', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/stop', '请输入虚拟机ID', 'error');
                 return;
             }
 
@@ -1254,14 +1681,14 @@
                 saveState: true
             };
 
-            const url = `/api/v1/vm/${vmId}/stop`;
+            const url = `/api/vm/${vmId}/stop`;
             addResult('请求', 'POST ' + url, JSON.stringify(requestData, null, 2), 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(requestData)
@@ -1270,25 +1697,25 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'POST /api/v1/vm/{vmId}/stop', JSON.stringify(result, null, 2), 'success');
+                    addResult('成功', 'POST /api/vm/{vmId}/stop', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'POST /api/v1/vm/{vmId}/stop', JSON.stringify(result, null, 2), 'error');
+                    addResult('失败', 'POST /api/vm/{vmId}/stop', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/stop', '网络错误: ' + error.message, 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/stop', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 重启虚拟机
         async function restartVm() {
             if (!currentToken) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/restart', '需要JWT Token认证', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/restart', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('controlVmId').value;
             if (!vmId) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/restart', '请输入虚拟机ID', 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/restart', '请输入虚拟机ID', 'error');
                 return;
             }
 
@@ -1299,14 +1726,14 @@
                 graceful: true
             };
 
-            const url = `/api/v1/vm/${vmId}/restart`;
+            const url = `/api/vm/${vmId}/restart`;
             addResult('请求', 'POST ' + url, JSON.stringify(requestData, null, 2), 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(requestData)
@@ -1315,36 +1742,37 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'POST /api/v1/vm/{vmId}/restart', JSON.stringify(result, null, 2), 'success');
+                    addResult('成功', 'POST /api/vm/{vmId}/restart', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'POST /api/v1/vm/{vmId}/restart', JSON.stringify(result, null, 2), 'error');
+                    addResult('失败', 'POST /api/vm/{vmId}/restart', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'POST /api/v1/vm/{vmId}/restart', '网络错误: ' + error.message, 'error');
+                addResult('错误', 'POST /api/vm/{vmId}/restart', '网络错误: ' + error.message, 'error');
             }
         }
 
         // 查询虚拟机状态
         async function getVmStatus() {
+            showResponse('vmStatusResponse', '正在查询VM状态...', true);
             if (!currentToken) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}/status', '需要JWT Token认证', 'error');
+                addResult('错误', 'GET /api/vm/{vmId}/status', '需要JWT Token认证', 'error');
                 return;
             }
 
             const vmId = document.getElementById('statusVmId').value;
             if (!vmId) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}/status', '请输入虚拟机ID', 'error');
+                addResult('错误', 'GET /api/vm/{vmId}/status', '请输入虚拟机ID', 'error');
                 return;
             }
 
-            const url = `/api/v1/vm/${vmId}/status`;
+            const url = `/api/vm/${vmId}/status`;
             addResult('请求', 'GET ' + url, '查询虚拟机状态', 'info');
 
             try {
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     }
                 });
@@ -1352,12 +1780,12 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    addResult('成功', 'GET /api/v1/vm/{vmId}/status', JSON.stringify(result, null, 2), 'success');
+                    addResult('成功', 'GET /api/vm/{vmId}/status', JSON.stringify(result, null, 2), 'success');
                 } else {
-                    addResult('失败', 'GET /api/v1/vm/{vmId}/status', JSON.stringify(result, null, 2), 'error');
+                    addResult('失败', 'GET /api/vm/{vmId}/status', JSON.stringify(result, null, 2), 'error');
                 }
             } catch (error) {
-                addResult('错误', 'GET /api/v1/vm/{vmId}/status', '网络错误: ' + error.message, 'error');
+                addResult('错误', 'GET /api/vm/{vmId}/status', '网络错误: ' + error.message, 'error');
             }
         }
 
@@ -1379,12 +1807,12 @@
 
         // 填充测试Token（使用当前Token）
         function fillTestToken() {
-            if (!currentToken) {
-                addResult('错误', '填充测试Token', '当前没有有效的Token', 'error');
+            if (!userToken) {
+                alert('请先登录获取用户Token');
                 return;
             }
-
-            addResult('信息', '填充测试Token', 'Token已准备就绪，可以进行API测试', 'success');
+            currentToken = userToken;
+            addResult('成功', '填充测试Token', '已使用用户Token作为API认证', 'success');
         }
 
         // 测试所有API接口
@@ -1404,9 +1832,9 @@
             try {
                 // 1. 测试VM列表查询
                 addResult('测试', '1/8', '测试VM列表查询...', 'info');
-                await fetch(`/api/v1/vm/list?page=1&size=10`, {
+                await fetch(`/api/vm/list?page=1&size=10`, {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                    headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                 }).then(res => res.json()).then(result => {
                     addResult('测试结果', 'VM列表查询', result.message, result.code === 200 ? 'success' : 'error');
                 });
@@ -1414,9 +1842,9 @@
 
                 // 2. 测试VM详情查询
                 addResult('测试', '2/8', '测试VM详情查询...', 'info');
-                await fetch(`/api/v1/vm/${vmId}`, {
+                await fetch(`/api/vm/${vmId}`, {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                    headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                 }).then(res => res.json()).then(result => {
                     addResult('测试结果', 'VM详情查询', result.message, result.code === 200 ? 'success' : 'error');
                 });
@@ -1424,9 +1852,9 @@
 
                 // 3. 测试VM状态查询
                 addResult('测试', '3/8', '测试VM状态查询...', 'info');
-                await fetch(`/api/v1/vm/${vmId}/status`, {
+                await fetch(`/api/vm/${vmId}/status`, {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                    headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                 }).then(res => res.json()).then(result => {
                     addResult('测试结果', 'VM状态查询', result.message, result.code === 200 ? 'success' : 'error');
                 });
@@ -1434,10 +1862,10 @@
 
                 // 4. 测试VM更新
                 addResult('测试', '4/8', '测试VM更新...', 'info');
-                await fetch(`/api/v1/vm/${vmId}`, {
+                await fetch(`/api/vm/${vmId}`, {
                     method: 'PUT',
                     headers: { 
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -1451,10 +1879,10 @@
 
                 // 5. 测试VM启动
                 addResult('测试', '5/8', '测试VM启动...', 'info');
-                await fetch(`/api/v1/vm/${vmId}/start`, {
+                await fetch(`/api/vm/${vmId}/start`, {
                     method: 'POST',
                     headers: { 
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ timeout: 300 })
@@ -1465,10 +1893,10 @@
 
                 // 6. 测试VM停止
                 addResult('测试', '6/8', '测试VM停止...', 'info');
-                await fetch(`/api/v1/vm/${vmId}/stop`, {
+                await fetch(`/api/vm/${vmId}/stop`, {
                     method: 'POST',
                     headers: { 
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ timeout: 60, force: false })
@@ -1479,10 +1907,10 @@
 
                 // 7. 测试VM重启
                 addResult('测试', '7/8', '测试VM重启...', 'info');
-                await fetch(`/api/v1/vm/${vmId}/restart`, {
+                await fetch(`/api/vm/${vmId}/restart`, {
                     method: 'POST',
                     headers: { 
-                        'Authorization': 'Bearer ' + currentToken,
+                        'Authorization': 'Bearer ' + getSafeToken(currentToken),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ timeout: 300, graceful: true })
@@ -1493,9 +1921,9 @@
 
                 // 8. 最后再次查询状态验证
                 addResult('测试', '8/8', '最终状态验证...', 'info');
-                await fetch(`/api/v1/vm/${vmId}/status`, {
+                await fetch(`/api/vm/${vmId}/status`, {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                    headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                 }).then(res => res.json()).then(result => {
                     addResult('测试结果', '最终状态验证', result.message, result.code === 200 ? 'success' : 'error');
                 });
@@ -1555,9 +1983,9 @@
 
             try {
                 // 先查询所有VM
-                const response = await fetch('/api/v1/vm/list?page=1&size=100', {
+                const response = await fetch('/api/vm/list?page=1&size=100', {
                     method: 'GET',
-                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                    headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                 });
 
                 const result = await response.json();
@@ -1572,9 +2000,9 @@
                     // 删除测试VM
                     for (const vm of testVms) {
                         try {
-                            const deleteResponse = await fetch(`/api/v1/vm/${vm.vmId}?force=true`, {
+                            const deleteResponse = await fetch(`/api/vm/${vm.vmId}?force=true`, {
                                 method: 'DELETE',
-                                headers: { 'Authorization': 'Bearer ' + currentToken }
+                                headers: { 'Authorization': 'Bearer ' + getSafeToken(currentToken) }
                             });
 
                             const deleteResult = await deleteResponse.json();
