@@ -4,7 +4,6 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.UserMapper;
-import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.service.impl.UserServiceImpl;
 import com.feduwacomm.testdata.TestDataBuilder;
 import com.feduwacomm.testdata.TestHelper;
@@ -40,8 +39,6 @@ class UserServiceTestSimple {
     @Mock
     private UserMapper userMapper;
 
-    @Mock
-    private UserPermissionMapper userPermissionMapper;
 
     @Mock
     private UserJwtUtil userJwtUtil;

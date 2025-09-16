@@ -27,17 +27,6 @@ CREATE TABLE IF NOT EXISTS users (
     updated_by VARCHAR(32) NULL
 );
 
--- 2. 用户权限表 (user_permissions)
-CREATE TABLE IF NOT EXISTS user_permissions (
-    id VARCHAR(32) PRIMARY KEY,
-    user_id VARCHAR(32) NOT NULL,
-    resource_type VARCHAR(20) NOT NULL,
-    resource_id VARCHAR(32) NULL,
-    permission VARCHAR(20) NOT NULL,
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    granted_by VARCHAR(32) NOT NULL,
-    expires_at TIMESTAMP NULL
-);
 
 -- 3. 虚拟机表 (vm_instances)
 CREATE TABLE IF NOT EXISTS vm_instances (

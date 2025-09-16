@@ -329,57 +329,7 @@ class UserIntegrationTest {
                                 .andExpect(jsonPath("$.data.userId").value(createdUser.getId()));
         }
 
-        @Test
-        void testPermissionManagementFlow() throws Exception {
-                String token = getAdminToken();
-
-                // 1. 创建测试用户
-                UserCreateDTO createDTO = UserCreateDTO.builder()
-                                .username("permissiontest")
-                                .email("permission@test.com")
-                                .password("password123")
-                                .role("VIEWER")
-                                .build();
-
-                mockMvc.perform(post("/api/admin/user/create")
-                                .header("Authorization", getBearerToken(token))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(createDTO)))
-                                .andExpect(status().isOk());
-
-                User createdUser = userMapper.selectByLoginIdentifier("permissiontest");
-                assertNotNull(createdUser, "权限测试用户应该已创建");
-
-                // 2. 授予权限
-                PermissionGrantDTO grantDTO = PermissionGrantDTO.builder()
-                                .resourceType("VM")
-                                .resourceId("vm_1234567890")
-                                .permission("READ")
-                                .expiresAt(java.time.LocalDateTime.now().plusDays(30))
-                                .build();
-
-                String grantResponse = mockMvc.perform(post("/api/admin/user/{userId}/permissions", createdUser.getId())
-                                .header("Authorization", getBearerToken(token))
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(grantDTO)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("权限授予成功"))
-                                .andExpect(jsonPath("$.data.permissionId").exists())
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                // 3. 获取用户权限
-                mockMvc.perform(get("/api/admin/user/{userId}/permissions", createdUser.getId())
-                                .header("Authorization", getBearerToken(token)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("获取成功"))
-                                .andExpect(jsonPath("$.data").isArray())
-                                .andExpect(jsonPath("$.data[0].resourceType").value("SYSTEM"))
-                                .andExpect(jsonPath("$.data[0].permission").value("read"));
-        }
+        // 权限管理已改为基于角色的权限管理，删除原有的权限管理测试
 
         @Test
         void testErrorHandling() throws Exception {
