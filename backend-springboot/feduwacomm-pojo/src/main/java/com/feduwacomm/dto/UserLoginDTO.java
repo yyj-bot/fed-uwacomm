@@ -20,8 +20,4 @@ public class UserLoginDTO {
 
     @NotBlank(message = "密码不能为空")
     private String password;
-
-    private String captcha;
-    private String captchaKey;
-    private Boolean rememberMe;
 }

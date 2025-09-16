@@ -461,16 +461,6 @@
                                 <input type="password" id="loginPassword" placeholder="输入密码" value="password123">
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>验证码:</label>
-                                <input type="text" id="captcha" placeholder="验证码（可选）">
-                            </div>
-                            <div class="form-group">
-                                <label>验证码标识:</label>
-                                <input type="text" id="captchaKey" placeholder="验证码标识（可选）">
-                            </div>
-                        </div>
                         <div class="form-group">
                             <label>
                                 <input type="checkbox" id="rememberMe"> 记住登录状态
@@ -770,8 +760,6 @@
                 const data = {
                     loginIdentifier: document.getElementById('loginIdentifier').value,
                     password: document.getElementById('loginPassword').value,
-                    captcha: document.getElementById('captcha').value || null,
-                    captchaKey: document.getElementById('captchaKey').value || null,
                     rememberMe: document.getElementById('rememberMe').checked
                 };
                 

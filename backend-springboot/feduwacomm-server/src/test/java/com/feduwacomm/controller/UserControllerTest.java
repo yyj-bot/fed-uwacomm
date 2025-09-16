@@ -79,9 +79,6 @@ public class UserControllerTest {
         loginDTO = TestDataBuilder.DTOs.validLoginDTO()
             .loginIdentifier("controlleruser")
             .password(VALID_PASSWORD)
-            .captcha("1234")
-            .captchaKey("key123")
-            .rememberMe(false)
             .build();
 
         // 设置测试用的有效token
@@ -282,13 +279,10 @@ public class UserControllerTest {
     }
 
     @Test
-    void testLoginWithCaptcha() throws Exception {
-        UserLoginDTO loginWithCaptcha = UserLoginDTO.builder()
+    void testLoginWithRememberMe() throws Exception {
+        UserLoginDTO loginWithRememberMe = UserLoginDTO.builder()
             .loginIdentifier("testuser")
             .password("password123")
-            .captcha("1234")
-            .captchaKey("key123")
-            .rememberMe(true)
             .build();
 
         LoginResponseVO response = LoginResponseVO.builder()
@@ -308,7 +302,7 @@ public class UserControllerTest {
 
         mockMvc.perform(post("/api/user/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginWithCaptcha)))
+                .content(objectMapper.writeValueAsString(loginWithRememberMe)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.message").value("登录成功"));
