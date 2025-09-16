@@ -1,21 +1,22 @@
-server:
-  port: 8080
-  servlet:
-    context-path: /api
+# 移除服务器端口配置，由环境特定的配置文件提供
 
 spring:
   application:
     name: feduwacomm-backend
 
   profiles:
-    active: dev # 默认开发环境
+    active: test # 默认开发环境
 
-  # 数据库配置
-  datasource:
-    url: jdbc:mysql://localhost:3306/feduwacomm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
-    username: root
-    password: NBNB
-    driver-class-name: com.mysql.cj.jdbc.Driver
+  # 静态资源配置
+  web:
+    resources:
+      static-locations: classpath:/static/
+      add-mappings: true
+
+  # 禁用 Spring Boot 默认的数据库初始化（使用自定义初始化）
+  sql:
+    init:
+      mode: never
 
   # Jackson配置
   jackson:
@@ -29,17 +30,44 @@ mybatis:
     map-underscore-to-camel-case: true
   mapper-locations: classpath:mapper/*.xml
 
-# 日志配置
+# 日志配置 - 公共配置
 logging:
-  level:
-    com.feduwacomm: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-  # 数据库日志配置
-  db:
-    enabled: false # 默认不启用数据库日志，可通过环境变量覆盖
 
 # FedUWAComm模块配置
 feduwacomm:
   module:
     name: feduwacomm # 模块名称，用于UUID前缀
+
+# JWT配置 - 双套配置（用户JWT和VM JWT）
+jwt:
+  user:
+    secret: ${JWT_USER_SECRET:feduwacomm_user_jwt_secret_key_2024_water_acoustic_federated_learning_user_auth}
+    expiration: ${JWT_USER_EXPIRATION:86400} # 用户Token 24小时，单位：秒
+    refresh-expiration: ${JWT_USER_REFRESH_EXPIRATION:2592000} # 用户刷新Token 30天，单位：秒
+  vm:
+    secret: ${JWT_VM_SECRET:feduwacomm_vm_jwt_secret_key_2024_water_acoustic_federated_learning_vm_machine_auth}
+    expiration: ${JWT_VM_EXPIRATION:86400} # VM Token 24小时，单位：秒
+    refresh-expiration: ${JWT_VM_REFRESH_EXPIRATION:864000} # VM刷新Token 240小时，单位：秒
+    
+federated:
+  aggregation:
+    min-participants: 2
+    max-wait-time-seconds: 300
+    participation-rate: 0.8
+    enable-timeout-aggregation: true
+    check-interval-seconds: 30
+    
+    fed-avg:
+      enable-weight-normalization: true
+      decimal-scale: 8
+    
+    fed-prox:
+      default-mu: 0.01
+      enable-adaptive-mu: false
+    
+    model-distribution:
+      enable-compression: false
+      parallel-distribution-count: 10
+      distribution-timeout-seconds: 60

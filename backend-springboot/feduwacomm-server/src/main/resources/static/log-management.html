@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统日志管理测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 10px;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+            transition: background 0.2s;
+        }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .log-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .log-level.DEBUG { background: #6c757d; color: white; }
+        .log-level.INFO { background: #007bff; color: white; }
+        .log-level.WARN { background: #ffc107; color: black; }
+        .log-level.ERROR { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>水声联邦学习系统 - 日志管理 API 测试</h1>
+        <p>测试所有日志管理相关的API接口</p>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab(event, 'query')">日志查询</button>
+            <button class="tab" onclick="showTab(event, 'export')">日志导出</button>
+            <button class="tab" onclick="showTab(event, 'cleanup')">日志清理</button>
+            <button class="tab" onclick="showTab(event, 'monitor')">系统监控</button>
+            <button class="tab" onclick="showTab(event, 'config')">日志配置</button>
+        </div>
+
+        <!-- 日志查询 -->
+        <div id="query" class="tab-content active">
+            <div class="section">
+                <h2>📋 日志查询测试</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>日志级别:</label>
+                        <select id="queryLevel">
+                            <option value="">全部</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>日志类别:</label>
+                        <select id="queryCategory">
+                            <option value="">全部</option>
+                            <option value="SYSTEM">SYSTEM</option>
+                            <option value="USER">USER</option>
+                            <option value="VM">VM</option>
+                            <option value="TASK">TASK</option>
+                            <option value="DATA">DATA</option>
+                            <option value="MODEL">MODEL</option>
+                            <option value="SECURITY">SECURITY</option>
+                            <option value="PERFORMANCE">PERFORMANCE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>关键词搜索:</label>
+                        <input type="text" id="queryKeyword" placeholder="输入搜索关键词">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>虚拟机ID:</label>
+                        <input type="text" id="queryVmId" placeholder="输入虚拟机ID">
+                    </div>
+                    <div class="form-group">
+                        <label>任务ID:</label>
+                        <input type="text" id="queryTaskId" placeholder="输入任务ID">
+                    </div>
+                    <div class="form-group">
+                        <label>页码/大小:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="number" id="queryPage" value="1" min="1" style="width: 50%;">
+                            <input type="number" id="querySize" value="10" min="1" max="100" style="width: 50%;">
+                        </div>
+                    </div>
+                </div>
+                <button class="btn" onclick="testLogList()">📊 查询日志列表</button>
+                <button class="btn" onclick="testLogDetail()">🔍 查询日志详情</button>
+                <button class="btn" onclick="testRealtimeLogs()">⚡ 实时日志查询</button>
+                <button class="btn btn-success" onclick="testLogStatistics()">📈 统计查询</button>
+                <div class="response" id="queryResponse"></div>
+            </div>
+        </div>
+
+        <!-- 日志导出 -->
+        <div id="export" class="tab-content">
+            <div class="section">
+                <h2>💾 日志导出测试</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>导出格式:</label>
+                        <select id="exportFormat">
+                            <option value="CSV">CSV</option>
+                            <option value="JSON">JSON</option>
+                            <option value="EXCEL">EXCEL</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>包含详情:</label>
+                        <select id="exportIncludeDetails">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>级别过滤:</label>
+                        <select id="exportLevel">
+                            <option value="">全部</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>导出任务ID（用于查询状态）:</label>
+                    <input type="text" id="exportTaskId" placeholder="导出任务ID">
+                </div>
+                <button class="btn btn-success" onclick="testLogExport()">📤 创建导出任务</button>
+                <button class="btn" onclick="testExportStatus()">📋 查询导出状态</button>
+                <button class="btn btn-warning" onclick="testExportHistory()">📜 导出历史</button>
+                <div class="response" id="exportResponse"></div>
+            </div>
+        </div>
+
+        <!-- 日志清理 -->
+        <div id="cleanup" class="tab-content">
+            <div class="section">
+                <h2>🧹 日志清理测试</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>清理策略:</label>
+                        <select id="cleanupStrategy">
+                            <option value="TIME_BASED">基于时间</option>
+                            <option value="LEVEL_BASED">基于级别</option>
+                            <option value="SIZE_BASED">基于大小</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>保留天数:</label>
+                        <input type="number" id="cleanupRetentionDays" value="30" min="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>清理任务ID（用于查询状态）:</label>
+                    <input type="text" id="cleanupTaskId" placeholder="清理任务ID">
+                </div>
+                <button class="btn btn-danger" onclick="testLogCleanup()">🗑️ 创建清理任务</button>
+                <button class="btn" onclick="testCleanupStatus()">📋 查询清理状态</button>
+                <button class="btn btn-warning" onclick="testCleanupHistory()">📜 清理历史</button>
+                <div class="response" id="cleanupResponse"></div>
+            </div>
+        </div>
+
+        <!-- 系统监控 -->
+        <div id="monitor" class="tab-content">
+            <div class="section">
+                <h2>📊 系统监控测试</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>时间范围:</label>
+                        <select id="monitorTimeRange">
+                            <option value="1h">1小时</option>
+                            <option value="6h">6小时</option>
+                            <option value="24h">24小时</option>
+                            <option value="7d">7天</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>监控级别:</label>
+                        <select id="monitorLevel">
+                            <option value="">全部</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="WARN">WARN</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>API端点:</label>
+                        <input type="text" id="monitorEndpoint" placeholder="如：/api/user/login">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="testSystemMonitor()">🖥️ 系统状态监控</button>
+                <button class="btn" onclick="testLogMonitor()">📈 日志监控</button>
+                <button class="btn btn-warning" onclick="testPerformanceMonitor()">⚡ 性能监控</button>
+                <button class="btn btn-danger" onclick="testAlerts()">🚨 告警查询</button>
+                <div class="response" id="monitorResponse"></div>
+            </div>
+        </div>
+
+        <!-- 日志配置 -->
+        <div id="config" class="tab-content">
+            <div class="section">
+                <h2>⚙️ 日志配置测试</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>全局日志级别:</label>
+                        <select id="configLogLevel">
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>保留天数:</label>
+                        <input type="number" id="configRetentionDays" value="30" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>最大文件大小(MB):</label>
+                        <input type="number" id="configMaxFileSize" value="100" min="1">
+                    </div>
+                </div>
+                <button class="btn" onclick="testGetLogConfig()">📋 查询日志配置</button>
+                <button class="btn btn-success" onclick="testUpdateLogConfig()">💾 更新日志配置</button>
+                <div class="response" id="configResponse"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = 'http://localhost:8080/api/log';
+
+        function showTab(evt, tabName) {
+            const tabContents = document.getElementsByClassName('tab-content');
+            const tabs = document.getElementsByClassName('tab');
+            
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+            }
+            
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        function displayResponse(elementId, response) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(response, null, 2);
+        }
+
+        async function apiCall(method, url, data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                };
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                const response = await fetch(url, options);
+                return await response.json();
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        // 日志查询相关测试
+        async function testLogList() {
+            const params = new URLSearchParams({
+                level: document.getElementById('queryLevel').value,
+                category: document.getElementById('queryCategory').value,
+                keyword: document.getElementById('queryKeyword').value,
+                vmId: document.getElementById('queryVmId').value,
+                taskId: document.getElementById('queryTaskId').value,
+                page: document.getElementById('queryPage').value,
+                size: document.getElementById('querySize').value
+            });
+            const response = await apiCall('GET', `${baseUrl}/list?${params}`);
+            displayResponse('queryResponse', response);
+        }
+
+        async function testLogDetail() {
+            const logId = 'test-log-id-12345';
+            const response = await apiCall('GET', `${baseUrl}/detail/${logId}`);
+            displayResponse('queryResponse', response);
+        }
+
+        async function testRealtimeLogs() {
+            const params = new URLSearchParams({
+                level: document.getElementById('queryLevel').value,
+                category: document.getElementById('queryCategory').value,
+                tail: 100
+            });
+            const response = await apiCall('GET', `${baseUrl}/realtime?${params}`);
+            displayResponse('queryResponse', response);
+        }
+
+        async function testLogStatistics() {
+            const params = new URLSearchParams({
+                startTime: '2024-01-01T00:00:00',
+                endTime: '2024-01-02T00:00:00'
+            });
+            const response = await apiCall('GET', `${baseUrl}/statistics?${params}`);
+            displayResponse('queryResponse', response);
+        }
+
+        // 日志导出相关测试
+        async function testLogExport() {
+            const data = {
+                format: document.getElementById('exportFormat').value,
+                includeDetails: document.getElementById('exportIncludeDetails').value === 'true',
+                level: document.getElementById('exportLevel').value || null,
+                startTime: '2024-01-01T00:00:00',
+                endTime: '2024-01-02T00:00:00'
+            };
+            const response = await apiCall('POST', `${baseUrl}/export`, data);
+            displayResponse('exportResponse', response);
+            if (response.data && response.data.exportId) {
+                document.getElementById('exportTaskId').value = response.data.exportId;
+            }
+        }
+
+        async function testExportStatus() {
+            const exportId = document.getElementById('exportTaskId').value || 'export_1234567890';
+            const response = await apiCall('GET', `${baseUrl}/export/status/${exportId}`);
+            displayResponse('exportResponse', response);
+        }
+
+        async function testExportHistory() {
+            const params = new URLSearchParams({ page: 1, size: 10 });
+            const response = await apiCall('GET', `${baseUrl}/export/history?${params}`);
+            displayResponse('exportResponse', response);
+        }
+
+        // 日志清理相关测试
+        async function testLogCleanup() {
+            const data = {
+                strategy: document.getElementById('cleanupStrategy').value,
+                retentionDays: parseInt(document.getElementById('cleanupRetentionDays').value)
+            };
+            const response = await apiCall('POST', `${baseUrl}/cleanup`, data);
+            displayResponse('cleanupResponse', response);
+            if (response.data && response.data.cleanupId) {
+                document.getElementById('cleanupTaskId').value = response.data.cleanupId;
+            }
+        }
+
+        async function testCleanupStatus() {
+            const cleanupId = document.getElementById('cleanupTaskId').value || 'cleanup_1234567890';
+            const response = await apiCall('GET', `${baseUrl}/cleanup/status/${cleanupId}`);
+            displayResponse('cleanupResponse', response);
+        }
+
+        async function testCleanupHistory() {
+            const params = new URLSearchParams({ page: 1, size: 10 });
+            const response = await apiCall('GET', `${baseUrl}/cleanup/history?${params}`);
+            displayResponse('cleanupResponse', response);
+        }
+
+        // 系统监控相关测试
+        async function testSystemMonitor() {
+            const response = await apiCall('GET', `${baseUrl}/monitor/system`);
+            displayResponse('monitorResponse', response);
+        }
+
+        async function testLogMonitor() {
+            const params = new URLSearchParams({
+                timeRange: document.getElementById('monitorTimeRange').value,
+                level: document.getElementById('monitorLevel').value
+            });
+            const response = await apiCall('GET', `${baseUrl}/monitor/logs?${params}`);
+            displayResponse('monitorResponse', response);
+        }
+
+        async function testPerformanceMonitor() {
+            const params = new URLSearchParams({
+                timeRange: document.getElementById('monitorTimeRange').value,
+                endpoint: document.getElementById('monitorEndpoint').value
+            });
+            const response = await apiCall('GET', `${baseUrl}/monitor/performance?${params}`);
+            displayResponse('monitorResponse', response);
+        }
+
+        async function testAlerts() {
+            const response = await apiCall('GET', `${baseUrl}/monitor/alerts`);
+            displayResponse('monitorResponse', response);
+        }
+
+        // 日志配置相关测试
+        async function testGetLogConfig() {
+            const response = await apiCall('GET', `${baseUrl}/config`);
+            displayResponse('configResponse', response);
+        }
+
+        async function testUpdateLogConfig() {
+            const data = {
+                logLevel: document.getElementById('configLogLevel').value,
+                retentionDays: parseInt(document.getElementById('configRetentionDays').value),
+                maxFileSize: parseInt(document.getElementById('configMaxFileSize').value) * 1024 * 1024
+            };
+            const response = await apiCall('PUT', `${baseUrl}/config`, data);
+            displayResponse('configResponse', response);
+        }
+
+        // 页面加载完成后自动测试日志列表查询
+        window.addEventListener('load', () => {
+            setTimeout(testLogList, 500);
+        });
+    </script>
+</body>
+</html>

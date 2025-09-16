@@ -137,9 +137,21 @@ mvn test -Dtest=UserModuleTestSuite
 ## 注意事项
 
 1. **测试隔离**: 每个测试方法都是独立的，不会相互影响
-2. **数据清理**: 使用@Transactional注解自动回滚测试数据
-3. **性能考虑**: 集成测试可能较慢，建议单独运行
-4. **环境要求**: 需要Java 17和Maven 3.6+
+2. **数据清理**: 使用@Transactional注解自动回滚测试数据（仅对DML操作有效）
+3. **DDL事务限制**: ⚠️ **重要** - DDL操作（CREATE、DROP、ALTER TABLE）在MySQL和H2中都会隐式提交事务，无法通过@Transactional回滚
+4. **测试数据库策略**: 使用H2内存数据库避免DDL事务问题，每个测试类使用@DirtiesContext确保上下文清理
+5. **性能考虑**: 集成测试可能较慢，建议单独运行
+6. **环境要求**: 需要Java 17和Maven 3.6+
+
+### DDL操作的测试处理策略
+
+- **数据库初始化**: DatabaseInitService中的CREATE TABLE操作不能在@Transactional中回滚
+- **测试环境**: 使用H2内存数据库，在`application-test.yml`中配置自动初始化
+- **测试清理**: 使用@DirtiesContext而非@Transactional来确保测试后的环境清理
+- **最佳实践**: 
+  - DDL相关的服务类不应使用类级别的@Transactional注解
+  - 只对DML操作（INSERT、UPDATE、DELETE、SELECT）使用@Transactional
+  - 在需要DDL操作的测试中使用@DirtiesContext确保测试隔离
 
 ## 故障排除
 

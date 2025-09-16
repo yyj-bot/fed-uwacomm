@@ -50,13 +50,18 @@ DELETE FROM users;
 
 /*
 -- 删除外键约束
+ALTER TABLE vm_secrets DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
+ALTER TABLE vm_round_models DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
+ALTER TABLE vm_round_models DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
+ALTER TABLE vm_runtime_logs DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_vm_id;
+ALTER TABLE vm_runtime_logs DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_task_id;
+ALTER TABLE model_versions DROP FOREIGN KEY IF EXISTS fk_model_versions_task_id;
+ALTER TABLE training_dataset_row DROP FOREIGN KEY IF EXISTS fk_training_dataset_row_dataset_id;
+ALTER TABLE training_dataset DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
 ALTER TABLE user_permissions DROP FOREIGN KEY IF EXISTS fk_user_permissions_user_id;
 ALTER TABLE user_permissions DROP FOREIGN KEY IF EXISTS fk_user_permissions_granted_by;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_created_by;
 ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_updated_by;
-ALTER TABLE training_dataset DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
--- 删除模型版本表外键约束
-ALTER TABLE model_versions DROP FOREIGN KEY IF EXISTS fk_model_versions_task_id;
 
 -- 删除表（按依赖关系顺序）
 DROP TABLE IF EXISTS vm_secrets;
@@ -109,23 +114,56 @@ SELECT
     COUNT(*) AS '表数量',
     CASE
         WHEN COUNT(*) = 0 THEN '已清空'
-        ELSE '还有表存在'
+        WHEN COUNT(*) = 11 THEN '完整'
+        ELSE '部分存在'
     END AS '状态'
 FROM information_schema.tables
 WHERE
     table_schema = 'feduwacomm'
     AND table_type = 'BASE TABLE';
 
--- 列出剩余的表
+-- 列出所有表
 SELECT
-    '剩余表列表' AS '检查项目',
+    '表列表' AS '检查项目',
     table_name AS '表名',
-    table_comment AS '表注释'
+    table_comment AS '表注释',
+    ROUND((data_length + index_length) / 1024 / 1024, 2) AS '大小(MB)'
 FROM information_schema.tables
 WHERE
     table_schema = 'feduwacomm'
     AND table_type = 'BASE TABLE'
 ORDER BY table_name;
+
+-- 检查每个表的数据行数
+SELECT
+    '表数据统计' AS '检查项目',
+    table_name AS '表名',
+    table_rows AS '估计行数',
+    CASE
+        WHEN table_rows = 0 THEN '空表'
+        WHEN table_rows < 100 THEN '少量数据'
+        WHEN table_rows < 1000 THEN '中量数据'
+        ELSE '大量数据'
+    END AS '数据状态'
+FROM information_schema.tables
+WHERE
+    table_schema = 'feduwacomm'
+    AND table_type = 'BASE TABLE'
+ORDER BY table_rows DESC;
+
+-- 检查外键约束
+SELECT
+    '外键约束统计' AS '检查项目',
+    COUNT(*) AS '外键数量',
+    CASE
+        WHEN COUNT(*) = 12 THEN '完整'
+        WHEN COUNT(*) = 0 THEN '已清理'
+        ELSE '部分存在'
+    END AS '状态'
+FROM information_schema.key_column_usage
+WHERE
+    table_schema = 'feduwacomm'
+    AND referenced_table_name IS NOT NULL;
 
 -- =====================================================
 -- 使用说明
@@ -154,52 +192,9 @@ ORDER BY table_name;
 -- 外键约束: 共 12 个，确保数据完整性和关联性
 -- =====================================================
 
--- 删除外键约束
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
-
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
-
--- 删除表结构
-DROP TABLE IF EXISTS vm_round_models;
-
--- 删除 vm_secrets 表
-ALTER TABLE vm_secrets
-DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
-
-DROP TABLE IF EXISTS vm_secrets;
-
--- 删除所有表数据（保留表结构）
-DELETE FROM vm_secrets;
-
-DELETE FROM vm_round_models;
-
-DELETE FROM training_dataset_row;
-
-DELETE FROM training_dataset;
-
--- 删除外键约束
-ALTER TABLE vm_secrets
-DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
-
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
-
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
-
-ALTER TABLE training_dataset_row
-DROP FOREIGN KEY IF EXISTS fk_training_dataset_row_dataset_id;
-
-ALTER TABLE training_dataset
-DROP FOREIGN KEY IF EXISTS fk_training_dataset_vm_id;
-
--- 删除表结构
-DROP TABLE IF EXISTS vm_secrets;
-
-DROP TABLE IF EXISTS vm_round_models;
-
-DROP TABLE IF EXISTS training_dataset_row;
-
-DROP TABLE IF EXISTS training_dataset;
+-- =====================================================
+-- 数据备份提醒
+-- =====================================================
+-- 在执行任何删除操作之前，建议执行以下备份命令:
+-- mysqldump -u root -p feduwacomm > feduwacomm_backup_$(date +%Y%m%d_%H%M%S).sql
+-- =====================================================

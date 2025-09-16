@@ -58,20 +58,11 @@ public interface AdminMapper {
     int deleteById(@Param("id") String id);
 
     /**
-     * 锁定用户
-     */
-    int lockUser(@Param("id") String id, @Param("lockedUntil") String lockedUntil);
-
-    /**
-     * 解锁用户
-     */
-    int unlockUser(@Param("id") String id);
-
-    /**
      * 更新用户密码
      */
     int updatePassword(@Param("id") String id, @Param("passwordHash") String passwordHash);
 
+    // 统计查询
     /**
      * 统计用户总数
      */

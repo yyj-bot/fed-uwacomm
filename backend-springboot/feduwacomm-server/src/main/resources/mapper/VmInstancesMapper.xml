@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.VmInstancesMapper">
+
+    <!-- 插入虚拟机实例 -->
+    <insert id="insert" parameterType="com.feduwacomm.entity.VmInstance">
+        INSERT INTO vm_instances (
+            id, name, ip_address, port, os_type, cpu_cores, memory_mb, disk_gb,
+            status, connection_status, ws_session_id, last_heartbeat,
+            secret_id, secret_expire_time,
+            system_info, capabilities, network_config, metadata,
+            created_at, updated_at, created_by, updated_by
+        ) VALUES (
+            #{id}, #{name}, #{ipAddress}, #{port}, #{osType}, #{cpuCores}, #{memoryMb}, #{diskGb},
+            #{status}, #{connectionStatus}, #{wsSessionId}, #{lastHeartbeat},
+            #{secretId}, #{secretExpireTime},
+            #{systemInfo}, #{capabilities}, #{networkConfig}, #{metadata},
+            #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
+        )
+    </insert>
+
+    <!-- 根据id查询虚拟机实例 -->
+    <select id="selectByVmId" parameterType="string" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT 
+            id, name, ip_address as ipAddress, port, os_type as osType, 
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据secretId查询虚拟机实例 -->
+    <select id="selectBySecretId" parameterType="string" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT 
+            id, name, ip_address as ipAddress, port, os_type as osType, 
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE secret_id = #{secretId}
+    </select>
+
+    <!-- 更新虚拟机实例 -->
+    <update id="update" parameterType="com.feduwacomm.entity.VmInstance">
+        UPDATE vm_instances SET
+            name = #{name},
+            ip_address = #{ipAddress},
+            port = #{port},
+            os_type = #{osType},
+            cpu_cores = #{cpuCores},
+            memory_mb = #{memoryMb},
+            disk_gb = #{diskGb},
+            status = #{status},
+            connection_status = #{connectionStatus},
+            ws_session_id = #{wsSessionId},
+            last_heartbeat = #{lastHeartbeat},
+            secret_id = #{secretId},
+            secret_expire_time = #{secretExpireTime},
+            system_info = #{systemInfo},
+            capabilities = #{capabilities},
+            network_config = #{networkConfig},
+            metadata = #{metadata},
+            updated_at = #{updatedAt},
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新连接状态 -->
+    <update id="updateConnection">
+        UPDATE vm_instances SET
+            connection_status = #{connectionStatus},
+            last_heartbeat = #{lastHeartbeat},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新WebSocket会话信息 -->
+    <update id="updateWebSocketSession">
+        UPDATE vm_instances SET
+            ws_session_id = #{wsSessionId},
+            connection_status = #{connectionStatus},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新刷新凭证 -->
+    <update id="updateSecretId">
+        UPDATE vm_instances SET
+            secret_id = #{secretId},
+            secret_expire_time = #{secretExpireTime},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除虚拟机实例 -->
+    <delete id="deleteByVmId" parameterType="string">
+        DELETE FROM vm_instances WHERE id = #{id}
+    </delete>
+
+    <!-- 查询所有虚拟机实例 -->
+    <select id="selectAll" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT 
+            id, name, ip_address as ipAddress, port, os_type as osType, 
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 根据连接状态查询虚拟机实例 -->
+    <select id="selectByConnectionStatus" parameterType="string" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT 
+            id, name, ip_address as ipAddress, port, os_type as osType, 
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE connection_status = #{connectionStatus}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 根据虚拟机状态查询虚拟机实例 -->
+    <select id="selectByStatus" parameterType="string" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT 
+            id, name, ip_address as ipAddress, port, os_type as osType, 
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 检查虚拟机ID是否存在 -->
+    <select id="existsByVmId" parameterType="string" resultType="int">
+        SELECT COUNT(1) FROM vm_instances WHERE id = #{id}
+    </select>
+
+</mapper>

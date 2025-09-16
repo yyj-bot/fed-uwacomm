@@ -28,8 +28,7 @@ public class BaseContextConfig {
      */
     @PostConstruct
     public void initBaseContext() {
-        // 设置Spring管理的BaseContext实例
-        baseContext.setSpringInstance(baseContext);
-        log.info("BaseContext已成功注册为Spring Bean并设置为全局单例");
+        // BaseContext已由Spring管理，无需额外初始化
+        log.info("BaseContext已成功注册为Spring Bean");
     }
 }

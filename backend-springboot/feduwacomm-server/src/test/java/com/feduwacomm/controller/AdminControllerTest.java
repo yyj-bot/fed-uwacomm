@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 根据admin-api-reference.md文档实现
  */
 @ExtendWith(MockitoExtension.class)
-class AdminControllerTest {
+public class AdminControllerTest {
 
         @Mock
         private AdminService adminService;
@@ -62,14 +62,6 @@ class AdminControllerTest {
         @Test
         void testGetUserList_Success() throws Exception {
                 // 准备测试数据
-                UserQueryDTO queryDTO = UserQueryDTO.builder()
-                                .page(1)
-                                .size(10)
-                                .role("ADMIN")
-                                .status("ACTIVE")
-                                .keyword("admin")
-                                .build();
-
                 List<UserListVO> userList = Arrays.asList(
                                 UserListVO.builder()
                                                 .userId("a1b2c3d4e5f678901234567890123456")
@@ -315,101 +307,9 @@ class AdminControllerTest {
                 verify(adminService, times(1)).resetPassword(eq(userId), any(PasswordResetDTO.class));
         }
 
-        // 权限管理接口测试
+        // 权限管理已改为基于角色的权限管理，不再需要单独的权限接口测试
 
-        @Test
-        void testGetUserPermissions_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                List<UserPermissionVO> permissions = Arrays.asList(
-                                UserPermissionVO.builder()
-                                                .permissionId("p1b2c3d4e5f678901234567890123456")
-                                                .resourceType("DATA")
-                                                .resourceId("data_123")
-                                                .permission("READ")
-                                                .grantedAt(LocalDateTime.now())
-                                                .grantedBy("admin")
-                                                .expiresAt(null)
-                                                .build(),
-                                UserPermissionVO.builder()
-                                                .permissionId("p2b3c4d5e6f789012345678901234567")
-                                                .resourceType("VM")
-                                                .resourceId("vm_456")
-                                                .permission("WRITE")
-                                                .grantedAt(LocalDateTime.now())
-                                                .grantedBy("admin")
-                                                .expiresAt(LocalDateTime.now().plusDays(30))
-                                                .build());
 
-                when(adminService.getUserPermissions(userId)).thenReturn(permissions);
-
-                // 执行测试
-                mockMvc.perform(get("/api/admin/user/{userId}/permissions", userId))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("获取成功"))
-                                .andExpect(jsonPath("$.data").isArray())
-                                .andExpect(jsonPath("$.data.length()").value(2))
-                                .andExpect(jsonPath("$.data[0].permissionId").value("p1b2c3d4e5f678901234567890123456"))
-                                .andExpect(jsonPath("$.data[0].resourceType").value("DATA"))
-                                .andExpect(jsonPath("$.data[0].resourceId").value("data_123"))
-                                .andExpect(jsonPath("$.data[0].permission").value("READ"))
-                                .andExpect(jsonPath("$.data[1].permissionId").value("p2b3c4d5e6f789012345678901234567"))
-                                .andExpect(jsonPath("$.data[1].resourceType").value("VM"))
-                                .andExpect(jsonPath("$.data[1].resourceId").value("vm_456"))
-                                .andExpect(jsonPath("$.data[1].permission").value("WRITE"));
-
-                verify(adminService, times(1)).getUserPermissions(userId);
-        }
-
-        @Test
-        void testGrantPermission_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                PermissionGrantDTO grantDTO = PermissionGrantDTO.builder()
-                                .resourceType("DATA")
-                                .resourceId("data_123")
-                                .permission("READ")
-                                .expiresAt(LocalDateTime.now().plusDays(30))
-                                .build();
-
-                PermissionGrantResponseVO responseVO = PermissionGrantResponseVO.builder()
-                                .permissionId("p1b2c3d4e5f678901234567890123456")
-                                .grantedAt(LocalDateTime.now())
-                                .build();
-
-                when(adminService.grantPermission(eq(userId), any(PermissionGrantDTO.class))).thenReturn(responseVO);
-
-                // 执行测试
-                mockMvc.perform(post("/api/admin/user/{userId}/permissions", userId)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(grantDTO)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("权限授予成功"))
-                                .andExpect(jsonPath("$.data.permissionId").value("p1b2c3d4e5f678901234567890123456"))
-                                .andExpect(jsonPath("$.data.grantedAt").exists());
-
-                verify(adminService, times(1)).grantPermission(eq(userId), any(PermissionGrantDTO.class));
-        }
-
-        @Test
-        void testRevokePermission_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                String permissionId = "p1b2c3d4e5f678901234567890123456";
-
-                doNothing().when(adminService).revokePermission(userId, permissionId);
-
-                // 执行测试
-                mockMvc.perform(delete("/api/admin/user/{userId}/permissions/{permissionId}", userId, permissionId))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("权限撤销成功"))
-                                .andExpect(jsonPath("$.data").isEmpty());
-
-                verify(adminService, times(1)).revokePermission(userId, permissionId);
-        }
 
         // 错误处理测试
 
@@ -536,58 +436,7 @@ class AdminControllerTest {
                 System.out.println("=========================");
         }
 
-        @Test
-        void testGrantPermission_UserNotFound() throws Exception {
-                // 准备测试数据
-                String userId = "nonexistent_user";
-                PermissionGrantDTO grantDTO = PermissionGrantDTO.builder()
-                                .resourceType("DATA")
-                                .resourceId("data_123")
-                                .permission("READ")
-                                .build();
 
-                when(adminService.grantPermission(eq(userId), any(PermissionGrantDTO.class)))
-                                .thenThrow(new RuntimeException("用户不存在"));
-
-                // 执行测试并打印响应
-                String response = mockMvc.perform(post("/api/admin/user/{userId}/permissions", userId)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(grantDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 授权用户不存在测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-        }
-
-        @Test
-        void testRevokePermission_PermissionNotFound() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                String permissionId = "nonexistent_permission";
-
-                doThrow(new RuntimeException("权限不存在")).when(adminService).revokePermission(userId, permissionId);
-
-                // 执行测试并打印响应
-                String response = mockMvc
-                                .perform(delete("/api/admin/user/{userId}/permissions/{permissionId}", userId,
-                                                permissionId))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 撤销权限不存在测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-        }
 
         // 边界条件测试
 

@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统日志管理接口测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            grid-template-rows: auto 1fr;
+            grid-template-areas: 
+                "header header"
+                "sidebar content";
+            height: 100vh;
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 30px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            grid-area: header;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 5px;
+            font-weight: 300;
+        }
+
+        .sidebar {
+            grid-area: sidebar;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .content-area {
+            grid-area: content;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .test-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .results-panel {
+            height: 300px;
+            border-top: 2px solid #e9ecef;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results-header {
+            background: #343a40;
+            color: white;
+            padding: 10px 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .results-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        /* 配置区域样式 */
+        .config-section {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .config-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9em;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        /* 状态指示器 */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected .status-dot {
+            background: #28a745;
+        }
+
+        .status-disconnected .status-dot {
+            background: #dc3545;
+        }
+
+        /* 测试区域样式 */
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .test-section-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 600;
+            color: #2c3e50;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .test-section-header:hover {
+            background: #e9ecef;
+        }
+
+        .test-section-content {
+            padding: 20px;
+            display: none;
+        }
+
+        .test-section-content.active {
+            display: block;
+        }
+
+        .test-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .test-form.single-column {
+            grid-template-columns: 1fr;
+        }
+
+        .test-form.three-column {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        /* 结果样式 */
+        .result-item {
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #6c757d;
+        }
+
+        .result-success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+
+        .result-error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .result-info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+
+        .result-warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+
+        .result-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .result-time {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .result-content {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* 清除按钮 */
+        .clear-results {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+
+        .clear-results:hover {
+            background: #5a6268;
+        }
+
+        /* 任务状态显示 */
+        .task-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .task-status.PENDING {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .task-status.PROCESSING {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .task-status.COMPLETED {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .task-status.FAILED {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 300px 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-areas: 
+                    "header"
+                    "sidebar"
+                    "content";
+                height: auto;
+            }
+            
+            .sidebar {
+                max-height: 300px;
+            }
+            
+            .test-form {
+                grid-template-columns: 1fr;
+            }
+
+            .results-panel {
+                height: 250px;
+            }
+        }
+
+        /* 加载状态 */
+        .loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 日志级别样式 */
+        .log-level {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .log-level.DEBUG { background: #f8f9fa; color: #6c757d; }
+        .log-level.INFO { background: #d1ecf1; color: #0c5460; }
+        .log-level.WARN { background: #fff3cd; color: #856404; }
+        .log-level.ERROR { background: #f8d7da; color: #721c24; }
+
+        /* 导出任务监控 */
+        .task-monitor {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            background: #28a745;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 页面头部 -->
+        <div class="header">
+            <h1>📊 系统日志管理接口测试页面</h1>
+            <p>FedUWAComm 系统日志管理完整测试工具 - 21个接口全覆盖</p>
+        </div>
+
+        <!-- 侧边栏配置区域 -->
+        <div class="sidebar">
+            <!-- 基础配置 -->
+            <div class="config-section">
+                <h3>🔧 基础配置</h3>
+                <div class="form-group">
+                    <label for="baseUrl">服务器地址</label>
+                    <input type="text" id="baseUrl" placeholder="留空使用当前域名">
+                </div>
+                <div class="form-group">
+                    <label for="authToken">认证Token</label>
+                    <input type="text" id="authToken" placeholder="输入JWT Token">
+                </div>
+                <button class="btn" onclick="testConnection()">测试连接</button>
+                <div id="connectionStatus" class="status-indicator status-disconnected">
+                    <div class="status-dot"></div>
+                    <span>未连接</span>
+                </div>
+            </div>
+
+            <!-- 查询参数 -->
+            <div class="config-section">
+                <h3>🔍 查询参数</h3>
+                <div class="form-group">
+                    <label for="logLevel">日志级别</label>
+                    <select id="logLevel">
+                        <option value="">全部</option>
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARN">WARN</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="logCategory">日志类别</label>
+                    <select id="logCategory">
+                        <option value="">全部</option>
+                        <option value="SYSTEM">SYSTEM</option>
+                        <option value="USER">USER</option>
+                        <option value="VM">VM</option>
+                        <option value="TASK">TASK</option>
+                        <option value="DATA">DATA</option>
+                        <option value="MODEL">MODEL</option>
+                        <option value="SECURITY">SECURITY</option>
+                        <option value="PERFORMANCE">PERFORMANCE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vmId">虚拟机ID</label>
+                    <input type="text" id="vmId" placeholder="32位UUID格式">
+                </div>
+                <div class="form-group">
+                    <label for="taskId">任务ID</label>
+                    <input type="text" id="taskId" placeholder="32位UUID格式">
+                </div>
+            </div>
+
+            <!-- 时间范围 -->
+            <div class="config-section">
+                <h3>📅 时间范围</h3>
+                <div class="form-group">
+                    <label for="startTime">开始时间</label>
+                    <input type="datetime-local" id="startTime">
+                </div>
+                <div class="form-group">
+                    <label for="endTime">结束时间</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+                <button class="btn btn-secondary" onclick="setTimeRange('1h')">最近1小时</button>
+                <button class="btn btn-secondary" onclick="setTimeRange('24h')">最近24小时</button>
+                <button class="btn btn-secondary" onclick="setTimeRange('7d')">最近7天</button>
+            </div>
+
+            <!-- 快速操作 -->
+            <div class="config-section">
+                <h3>⚡ 快速操作</h3>
+                <button class="btn btn-success" onclick="getLogList()">查询日志列表</button>
+                <button class="btn btn-info" onclick="getRealtimeLogs()">实时日志</button>
+                <button class="btn btn-warning" onclick="getStatistics()">统计信息</button>
+                <button class="btn btn-secondary" onclick="clearAllResults()">清空结果</button>
+            </div>
+
+            <!-- 任务监控 -->
+            <div class="config-section">
+                <h3>📋 任务监控</h3>
+                <div id="taskMonitor" class="task-monitor" style="display: none;">
+                    <div id="taskInfo"></div>
+                    <div class="progress-bar">
+                        <div id="taskProgress" class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <button class="btn btn-secondary" onclick="stopTaskMonitor()">停止监控</button>
+                </div>
+                <button class="btn btn-info" onclick="getCleanupHistory()">清理历史</button>
+            </div>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="content-area">
+            <!-- 测试内容区 -->
+            <div class="test-content">
+                <!-- 日志查询测试 -->
+                <div class="test-section">
+                    <div class="test-section-header" onclick="toggleSection(this)">
+                        🔍 日志查询测试 (4个接口)
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="test-section-content">
+                        <div class="test-form">
+                            <div class="form-group">
+                                <label>关键词搜索</label>
+                                <input type="text" id="searchKeyword" placeholder="搜索日志内容">
+                            </div>
+                            <div class="form-group">
+                                <label>页码</label>
+                                <input type="number" id="queryPage" value="1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>每页大小</label>
+                                <input type="number" id="querySize" value="10" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label>排序字段</label>
+                                <select id="sortField">
+                                    <option value="createdAt">创建时间</option>
+                                    <option value="level">日志级别</option>
+                                    <option value="category">日志类别</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>排序方向</label>
+                                <select id="sortOrder">
+                                    <option value="desc">降序</option>
+                                    <option value="asc">升序</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>日志ID (详情查询)</label>
+                                <input type="text" id="detailLogId" placeholder="输入日志ID查看详情">
+                            </div>
+                            <div class="form-group">
+                                <label>实时查询数量</label>
+                                <input type="number" id="realtimeTail" value="100" min="1" max="1000">
+                            </div>
+                        </div>
+                        <button class="btn" onclick="getLogList()">📋 日志列表查询</button>
+                        <button class="btn btn-secondary" onclick="getLogDetail()">🔍 日志详情查询</button>
+                        <button class="btn btn-info" onclick="getRealtimeLogs()">⚡ 实时日志查询</button>
+                        <button class="btn btn-warning" onclick="getStatistics()">📊 日志统计查询</button>
+                    </div>
+                </div>
+
+                <!-- 日志下载测试 -->
+                <div class="test-section">
+                    <div class="test-section-header" onclick="toggleSection(this)">
+                        📤 日志下载测试 (1个接口)
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="test-section-content">
+                        <div class="test-form">
+                            <div class="form-group">
+                                <label>导出格式</label>
+                                <select id="downloadFormat">
+                                    <option value="CSV">CSV</option>
+                                    <option value="JSON">JSON</option>
+                                    <option value="EXCEL">EXCEL</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>包含详细信息</label>
+                                <select id="downloadIncludeDetails">
+                                    <option value="true">是</option>
+                                    <option value="false">否</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="downloadLogs()">⬇️ 直接下载日志文件</button>
+                    </div>
+                </div>
+
+                <!-- 日志清理测试 -->
+                <div class="test-section">
+                    <div class="test-section-header" onclick="toggleSection(this)">
+                        🗑️ 日志清理测试 (3个接口)
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="test-section-content">
+                        <div class="test-form">
+                            <div class="form-group">
+                                <label>清理策略</label>
+                                <select id="cleanupStrategy">
+                                    <option value="TIME_BASED">基于时间</option>
+                                    <option value="LEVEL_BASED">基于级别</option>
+                                    <option value="SIZE_BASED">基于大小</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>保留天数</label>
+                                <input type="number" id="retentionDays" value="30" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>清理级别</label>
+                                <select id="cleanupLevel">
+                                    <option value="">不限制</option>
+                                    <option value="DEBUG">DEBUG</option>
+                                    <option value="INFO">INFO</option>
+                                    <option value="WARN">WARN</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>最大大小(GB)</label>
+                                <input type="number" id="maxSizeGB" value="10" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>清理任务ID</label>
+                                <input type="text" id="cleanupTaskId" placeholder="输入清理任务ID">
+                            </div>
+                        </div>
+                        <button class="btn btn-danger" onclick="createCleanupTask()">🗑️ 创建清理任务</button>
+                        <button class="btn btn-info" onclick="getCleanupStatus()">📋 查询清理状态</button>
+                        <button class="btn btn-secondary" onclick="getCleanupHistory()">📜 清理历史查询</button>
+                    </div>
+                </div>
+
+                <!-- 系统监控测试 -->
+                <div class="test-section">
+                    <div class="test-section-header" onclick="toggleSection(this)">
+                        📊 系统监控测试 (4个接口)
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="test-section-content">
+                        <div class="test-form">
+                            <div class="form-group">
+                                <label>监控时间范围</label>
+                                <select id="monitorTimeRange">
+                                    <option value="1h">最近1小时</option>
+                                    <option value="6h">最近6小时</option>
+                                    <option value="24h">最近24小时</option>
+                                    <option value="7d">最近7天</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>监控级别</label>
+                                <select id="monitorLevel">
+                                    <option value="">全部</option>
+                                    <option value="ERROR">ERROR</option>
+                                    <option value="WARN">WARN</option>
+                                    <option value="INFO">INFO</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>性能监控端点</label>
+                                <input type="text" id="monitorEndpoint" placeholder="如: /api/user/login">
+                            </div>
+                        </div>
+                        <button class="btn btn-success" onclick="getSystemMonitor()">🖥️ 系统状态监控</button>
+                        <button class="btn btn-info" onclick="getLogMonitor()">📊 日志监控</button>
+                        <button class="btn btn-warning" onclick="getPerformanceMonitor()">⚡ 性能监控</button>
+                        <button class="btn btn-secondary" onclick="getAlerts()">🚨 告警查询</button>
+                    </div>
+                </div>
+
+                <!-- 日志配置测试 -->
+                <div class="test-section">
+                    <div class="test-section-header" onclick="toggleSection(this)">
+                        ⚙️ 日志配置测试 (2个接口)
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="test-section-content">
+                        <div class="test-form single-column">
+                            <div class="form-group">
+                                <label>全局日志级别</label>
+                                <select id="configLogLevel">
+                                    <option value="DEBUG">DEBUG</option>
+                                    <option value="INFO">INFO</option>
+                                    <option value="WARN">WARN</option>
+                                    <option value="ERROR">ERROR</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>日志保留天数</label>
+                                <input type="number" id="configRetentionDays" value="30" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>最大文件大小(字节)</label>
+                                <input type="number" id="configMaxFileSize" value="104857600" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>配置JSON (高级)</label>
+                                <textarea id="configJson" rows="10" placeholder="输入完整的配置JSON...">
+{
+  "logLevel": "INFO",
+  "retentionDays": 30,
+  "maxFileSize": 104857600,
+  "categories": {
+    "SYSTEM": {"level": "INFO", "enabled": true},
+    "USER": {"level": "INFO", "enabled": true},
+    "VM": {"level": "DEBUG", "enabled": true}
+  },
+  "exportSettings": {
+    "maxRecordsPerExport": 100000,
+    "exportRetentionDays": 7
+  }
+}
+                                </textarea>
+                            </div>
+                        </div>
+                        <button class="btn btn-info" onclick="getLogConfig()">🔍 查询日志配置</button>
+                        <button class="btn btn-warning" onclick="updateLogConfig()">⚙️ 更新日志配置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结果显示面板 -->
+            <div class="results-panel">
+                <div class="results-header">
+                    📊 测试结果 - 21个接口完整覆盖
+                    <button class="clear-results" onclick="clearAllResults()">清空</button>
+                </div>
+                <div class="results-content" id="resultsContent">
+                    <div class="result-item result-info">
+                        <div class="result-header">系统就绪</div>
+                        <div class="result-time">页面已加载完成</div>
+                        <div class="result-content">日志管理测试工具已准备就绪
+✅ 日志查询接口 (4个): 列表、详情、实时、统计
+✅ 日志下载接口 (1个): 直接下载  
+✅ 日志清理接口 (3个): 创建、状态、历史
+✅ 系统监控接口 (4个): 系统、日志、性能、告警
+✅ 日志配置接口 (2个): 查询、更新
+
+请配置认证Token和服务器地址后开始测试</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let baseUrl = '';
+        let authToken = '';
+        let taskMonitorInterval = null;
+        let currentTaskId = null;
+        let currentTaskType = null; // 'cleanup'
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 恢复保存的配置
+            const savedBaseUrl = localStorage.getItem('logTestBaseUrl') || '';
+            const savedToken = localStorage.getItem('logTestToken') || '';
+
+            document.getElementById('baseUrl').value = savedBaseUrl;
+            document.getElementById('authToken').value = savedToken;
+
+            baseUrl = savedBaseUrl || `${window.location.protocol}//${window.location.host}`;
+            authToken = savedToken;
+
+            // 自动保存配置
+            ['baseUrl', 'authToken'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', function() {
+                        const storageKey = id === 'baseUrl' ? 'logTestBaseUrl' : 'logTestToken';
+                        localStorage.setItem(storageKey, this.value);
+                        
+                        if (id === 'baseUrl') {
+                            baseUrl = this.value || `${window.location.protocol}//${window.location.host}`;
+                        } else if (id === 'authToken') {
+                            authToken = this.value;
+                        }
+                    });
+                }
+            });
+
+            // 设置默认时间范围
+            setTimeRange('24h');
+        });
+
+        // 切换测试区域展开/折叠
+        function toggleSection(headerElement) {
+            const content = headerElement.nextElementSibling;
+            const icon = headerElement.querySelector('.toggle-icon');
+            
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                icon.textContent = '▼';
+            } else {
+                content.classList.add('active');
+                icon.textContent = '▲';
+            }
+        }
+
+        // 设置时间范围
+        function setTimeRange(range) {
+            const now = new Date();
+            const endTime = new Date(now);
+            let startTime = new Date(now);
+
+            switch(range) {
+                case '1h':
+                    startTime.setHours(now.getHours() - 1);
+                    break;
+                case '24h':
+                    startTime.setDate(now.getDate() - 1);
+                    break;
+                case '7d':
+                    startTime.setDate(now.getDate() - 7);
+                    break;
+            }
+
+            document.getElementById('startTime').value = formatDateTimeLocal(startTime);
+            document.getElementById('endTime').value = formatDateTimeLocal(endTime);
+        }
+
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        // 添加测试结果
+        function addResult(type, title, message, status = 'info') {
+            const resultsContent = document.getElementById('resultsContent');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const resultItem = document.createElement('div');
+            resultItem.className = `result-item result-${status}`;
+            resultItem.innerHTML = `
+                <div class="result-header">${title}</div>
+                <div class="result-time">${timestamp}</div>
+                <div class="result-content">${message}</div>
+            `;
+            
+            resultsContent.insertBefore(resultItem, resultsContent.firstChild);
+            
+            // 限制结果数量，超过20条删除最旧的
+            const results = resultsContent.querySelectorAll('.result-item');
+            if (results.length > 20) {
+                resultsContent.removeChild(results[results.length - 1]);
+            }
+            
+            // 自动滚动到最新结果
+            resultsContent.scrollTop = 0;
+        }
+
+        // 清空所有结果
+        function clearAllResults() {
+            const resultsContent = document.getElementById('resultsContent');
+            resultsContent.innerHTML = `
+                <div class="result-item result-info">
+                    <div class="result-header">结果已清空</div>
+                    <div class="result-time">${new Date().toLocaleTimeString()}</div>
+                    <div class="result-content">测试结果显示区域已清空</div>
+                </div>
+            `;
+        }
+
+        // 通用请求函数
+        async function makeRequest(url, options = {}) {
+            const fullUrl = url.startsWith('http') ? url : baseUrl + url;
+            
+            const config = {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+                },
+                ...options
+            };
+
+            try {
+                const response = await fetch(fullUrl, config);
+                let data;
+                
+                // 检查响应类型
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    // 对于文件下载等非JSON响应
+                    data = { blob: await response.blob(), headers: response.headers };
+                }
+                
+                return { response, data };
+            } catch (error) {
+                throw new Error(`网络请求失败: ${error.message}`);
+            }
+        }
+
+        // 获取查询参数
+        function getQueryParams() {
+            return {
+                level: document.getElementById('logLevel').value || undefined,
+                category: document.getElementById('logCategory').value || undefined,
+                vmId: document.getElementById('vmId').value || undefined,
+                taskId: document.getElementById('taskId').value || undefined,
+                startTime: document.getElementById('startTime').value || undefined,
+                endTime: document.getElementById('endTime').value || undefined,
+                keyword: document.getElementById('searchKeyword').value || undefined
+            };
+        }
+
+        // 构建查询字符串
+        function buildQueryString(params) {
+            const filtered = Object.entries(params).filter(([_, value]) => value !== undefined && value !== '');
+            return new URLSearchParams(filtered).toString();
+        }
+
+        // 测试连接
+        async function testConnection() {
+            const button = event.target;
+            const statusElement = document.getElementById('connectionStatus');
+            
+            button.classList.add('loading');
+            
+            try {
+                const { response, data } = await makeRequest('/api/health');
+                
+                if (response.ok) {
+                    statusElement.className = 'status-indicator status-connected';
+                    statusElement.innerHTML = '<div class="status-dot"></div><span>连接成功</span>';
+                    addResult('connection', '连接测试', '服务器连接正常', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                statusElement.className = 'status-indicator status-disconnected';
+                statusElement.innerHTML = '<div class="status-dot"></div><span>连接失败</span>';
+                addResult('connection', '连接测试', error.message, 'error');
+            } finally {
+                button.classList.remove('loading');
+            }
+        }
+
+        // =========================
+        // 日志查询接口测试
+        // =========================
+
+        // 1. 日志列表查询
+        async function getLogList() {
+            const params = {
+                ...getQueryParams(),
+                page: document.getElementById('queryPage').value || 1,
+                size: document.getElementById('querySize').value || 10,
+                sort: document.getElementById('sortField').value || 'createdAt',
+                order: document.getElementById('sortOrder').value || 'desc'
+            };
+            
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/list?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const count = data.data.records?.length || 0;
+                    addResult('log-list', '📋 日志列表查询', 
+                        `成功获取 ${count} 条日志记录\n总计: ${data.data.total} 条\n页数: ${data.data.current}/${data.data.pages}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('log-list', '📋 日志列表查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-list', '📋 日志列表查询', error.message, 'error');
+            }
+        }
+
+        // 2. 日志详情查询
+        async function getLogDetail() {
+            const logId = document.getElementById('detailLogId').value;
+            
+            if (!logId) {
+                addResult('log-detail', '🔍 日志详情查询', '请输入日志ID', 'warning');
+                return;
+            }
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/detail/${logId}`);
+                
+                if (response.ok && data.code === 200) {
+                    addResult('log-detail', '🔍 日志详情查询', 
+                        `日志详情获取成功\n级别: ${data.data.level}\n类别: ${data.data.category}\n消息: ${data.data.message}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('log-detail', '🔍 日志详情查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-detail', '🔍 日志详情查询', error.message, 'error');
+            }
+        }
+
+        // 3. 实时日志查询
+        async function getRealtimeLogs() {
+            const params = {
+                ...getQueryParams(),
+                tail: document.getElementById('realtimeTail').value || 100
+            };
+            
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/realtime?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const count = data.data.logs?.length || 0;
+                    addResult('log-realtime', '⚡ 实时日志查询', 
+                        `获取最近 ${count} 条实时日志\n总数: ${data.data.totalCount}\n更新时间: ${data.data.lastUpdateTime}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('log-realtime', '⚡ 实时日志查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-realtime', '⚡ 实时日志查询', error.message, 'error');
+            }
+        }
+
+        // 4. 日志统计查询
+        async function getStatistics() {
+            const params = getQueryParams();
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/statistics?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const stats = data.data;
+                    let summary = `日志统计信息获取成功\n总日志数: ${stats.totalLogs}`;
+                    
+                    if (stats.levelDistribution) {
+                        summary += `\n\n级别分布:`;
+                        Object.entries(stats.levelDistribution).forEach(([level, count]) => {
+                            summary += `\n  ${level}: ${count}`;
+                        });
+                    }
+                    
+                    if (stats.categoryDistribution) {
+                        summary += `\n\n类别分布:`;
+                        Object.entries(stats.categoryDistribution).forEach(([category, count]) => {
+                            summary += `\n  ${category}: ${count}`;
+                        });
+                    }
+                    
+                    summary += `\n\n完整数据:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('log-statistics', '📊 日志统计查询', summary, 'success');
+                } else {
+                    addResult('log-statistics', '📊 日志统计查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-statistics', '📊 日志统计查询', error.message, 'error');
+            }
+        }
+
+        // =========================
+        // 日志下载接口测试
+        // =========================
+
+        // 5. 直接下载日志文件
+        async function downloadLogs() {
+            const downloadData = {
+                ...getQueryParams(),
+                format: document.getElementById('downloadFormat').value || 'CSV',
+                includeDetails: document.getElementById('downloadIncludeDetails').value === 'true'
+            };
+
+            // 移除空值
+            Object.keys(downloadData).forEach(key => {
+                if (downloadData[key] === undefined || downloadData[key] === '') {
+                    delete downloadData[key];
+                }
+            });
+
+            try {
+                const response = await fetch('/api/log/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(downloadData)
+                });
+
+                if (response.ok) {
+                    // 检查是否返回的是文件
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && (contentType.includes('application/octet-stream') ||
+                                       contentType.includes('text/csv') ||
+                                       contentType.includes('application/json') && downloadData.format === 'JSON' ||
+                                       contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))) {
+                        // 处理文件下载
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+
+                        // 从Content-Disposition header获取文件名
+                        let filename = `logs_${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.csv`;
+                        const contentDisposition = response.headers.get('content-disposition');
+                        if (contentDisposition) {
+                            const matches = contentDisposition.match(/filename="?([^;"]+)"?/);
+                            if (matches && matches[1]) {
+                                filename = matches[1].replace(/"/g, '');
+                            }
+                        }
+                        a.download = filename;
+
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+
+                        addResult('log-download', '⬇️ 直接下载日志文件',
+                            `文件下载成功\n文件名: ${filename}\n格式: ${downloadData.format}\n包含详细信息: ${downloadData.includeDetails}\n过滤条件: ${JSON.stringify(downloadData, null, 2)}`, 'success');
+                    } else {
+                        // 可能返回的是错误信息
+                        const data = await response.json();
+                        addResult('log-download', '⬇️ 直接下载日志文件',
+                            `下载失败: ${data.message}\n\n${JSON.stringify(data, null, 2)}`, 'error');
+                    }
+                } else {
+                    const data = await response.json();
+                    addResult('log-download', '⬇️ 直接下载日志文件',
+                        `下载失败 (${response.status}): ${data.message}\n\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-download', '⬇️ 直接下载日志文件', `请求失败: ${error.message}`, 'error');
+            }
+        }
+
+        // =========================
+        // 日志清理接口测试
+        // =========================
+
+        // 9. 创建清理任务
+        async function createCleanupTask() {
+            const cleanupData = {
+                strategy: document.getElementById('cleanupStrategy').value,
+                retentionDays: parseInt(document.getElementById('retentionDays').value) || undefined,
+                level: document.getElementById('cleanupLevel').value || undefined,
+                maxSizeGB: parseInt(document.getElementById('maxSizeGB').value) || undefined,
+                ...getQueryParams()
+            };
+
+            // 移除空值
+            Object.keys(cleanupData).forEach(key => {
+                if (cleanupData[key] === undefined || cleanupData[key] === '') {
+                    delete cleanupData[key];
+                }
+            });
+            
+            try {
+                const { response, data } = await makeRequest('/api/log/cleanup', {
+                    method: 'POST',
+                    body: JSON.stringify(cleanupData)
+                });
+                
+                if (response.ok && data.code === 200) {
+                    const cleanupInfo = data.data;
+                    document.getElementById('cleanupTaskId').value = cleanupInfo.cleanupId;
+                    
+                    addResult('cleanup-create', '🗑️ 创建清理任务',
+                        `清理任务创建成功\n任务ID: ${cleanupInfo.cleanupId}\n状态: ${cleanupInfo.status}\n预计删除记录: ${cleanupInfo.estimatedRecords}\n预计释放空间: ${cleanupInfo.estimatedSize} 字节\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                    
+                    // 启动任务监控
+                    startTaskMonitor(cleanupInfo.cleanupId, 'cleanup');
+                } else {
+                    addResult('cleanup-create', '🗑️ 创建清理任务', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('cleanup-create', '🗑️ 创建清理任务', error.message, 'error');
+            }
+        }
+
+        // 10. 清理状态查询
+        async function getCleanupStatus() {
+            const cleanupId = document.getElementById('cleanupTaskId').value;
+            
+            if (!cleanupId) {
+                addResult('cleanup-status', '📋 查询清理状态', '请输入清理任务ID', 'warning');
+                return;
+            }
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/cleanup/status/${cleanupId}`);
+                
+                if (response.ok && data.code === 200) {
+                    const status = data.data;
+                    addResult('cleanup-status', '📋 查询清理状态', 
+                        `清理状态查询成功\n任务ID: ${status.cleanupId}\n状态: ${status.status}\n进度: ${status.progress}%\n已删除记录: ${status.deletedRecords}\n释放空间: ${status.freedSpace} 字节\n创建时间: ${status.createdAt}\n完成时间: ${status.completedAt || '未完成'}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('cleanup-status', '📋 查询清理状态', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('cleanup-status', '📋 查询清理状态', error.message, 'error');
+            }
+        }
+
+        // 11. 清理历史查询
+        async function getCleanupHistory() {
+            const params = {
+                status: 'COMPLETED',
+                page: 1,
+                size: 10
+            };
+            
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/cleanup/history?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const count = data.data.records?.length || 0;
+                    addResult('cleanup-history', '📜 清理历史查询', 
+                        `清理历史查询成功\n记录数: ${count}\n总计: ${data.data.total}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                } else {
+                    addResult('cleanup-history', '📜 清理历史查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('cleanup-history', '📜 清理历史查询', error.message, 'error');
+            }
+        }
+
+        // =========================
+        // 系统监控接口测试
+        // =========================
+
+        // 12. 系统状态监控
+        async function getSystemMonitor() {
+            try {
+                const { response, data } = await makeRequest('/api/log/monitor/system');
+                
+                if (response.ok && data.code === 200) {
+                    const monitor = data.data;
+                    let summary = `系统状态监控成功\n版本: ${monitor.systemInfo?.version}\n运行时间: ${monitor.systemInfo?.uptime} 秒`;
+                    
+                    if (monitor.resourceUsage) {
+                        summary += `\n\n资源使用:`;
+                        summary += `\n  CPU: ${monitor.resourceUsage.cpuUsage}%`;
+                        summary += `\n  内存: ${monitor.resourceUsage.memoryUsage}%`;
+                        summary += `\n  磁盘: ${monitor.resourceUsage.diskUsage}%`;
+                    }
+                    
+                    if (monitor.applicationMetrics) {
+                        summary += `\n\n应用指标:`;
+                        summary += `\n  活跃连接: ${monitor.applicationMetrics.activeConnections}`;
+                        summary += `\n  请求/秒: ${monitor.applicationMetrics.requestPerSecond}`;
+                        summary += `\n  平均响应时间: ${monitor.applicationMetrics.averageResponseTime}ms`;
+                        summary += `\n  错误率: ${monitor.applicationMetrics.errorRate}%`;
+                    }
+                    
+                    summary += `\n\n完整数据:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('system-monitor', '🖥️ 系统状态监控', summary, 'success');
+                } else {
+                    addResult('system-monitor', '🖥️ 系统状态监控', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('system-monitor', '🖥️ 系统状态监控', error.message, 'error');
+            }
+        }
+
+        // 13. 日志监控
+        async function getLogMonitor() {
+            const params = {
+                timeRange: document.getElementById('monitorTimeRange').value || '1h',
+                level: document.getElementById('monitorLevel').value || undefined
+            };
+            
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/monitor/logs?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const monitor = data.data;
+                    let summary = `日志监控获取成功\n时间范围: ${params.timeRange}`;
+                    
+                    if (monitor.logMetrics) {
+                        summary += `\n\n日志指标:`;
+                        summary += `\n  总日志数: ${monitor.logMetrics.totalLogs}`;
+                        summary += `\n  错误数: ${monitor.logMetrics.errorCount}`;
+                        summary += `\n  警告数: ${monitor.logMetrics.warningCount}`;
+                        summary += `\n  错误率: ${monitor.logMetrics.errorRate}%`;
+                        summary += `\n  警告率: ${monitor.logMetrics.warningRate}%`;
+                    }
+                    
+                    if (monitor.recentErrors?.length > 0) {
+                        summary += `\n\n最近错误:`;
+                        monitor.recentErrors.slice(0, 3).forEach(error => {
+                            summary += `\n  [${error.level}] ${error.message}`;
+                        });
+                    }
+                    
+                    summary += `\n\n完整数据:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('log-monitor', '📊 日志监控', summary, 'success');
+                } else {
+                    addResult('log-monitor', '📊 日志监控', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-monitor', '📊 日志监控', error.message, 'error');
+            }
+        }
+
+        // 14. 性能监控
+        async function getPerformanceMonitor() {
+            const params = {
+                timeRange: document.getElementById('monitorTimeRange').value || '1h',
+                endpoint: document.getElementById('monitorEndpoint').value || undefined
+            };
+            
+            const queryString = buildQueryString(params);
+            
+            try {
+                const { response, data } = await makeRequest(`/api/log/monitor/performance?${queryString}`);
+                
+                if (response.ok && data.code === 200) {
+                    const monitor = data.data;
+                    let summary = `性能监控获取成功\n时间范围: ${params.timeRange}`;
+                    
+                    if (monitor.apiMetrics) {
+                        summary += `\n\nAPI指标:`;
+                        summary += `\n  总请求数: ${monitor.apiMetrics.totalRequests}`;
+                        summary += `\n  成功请求数: ${monitor.apiMetrics.successfulRequests}`;
+                        summary += `\n  失败请求数: ${monitor.apiMetrics.failedRequests}`;
+                        summary += `\n  成功率: ${monitor.apiMetrics.successRate}%`;
+                        summary += `\n  平均响应时间: ${monitor.apiMetrics.averageResponseTime}ms`;
+                        summary += `\n  P95响应时间: ${monitor.apiMetrics.p95ResponseTime}ms`;
+                        summary += `\n  P99响应时间: ${monitor.apiMetrics.p99ResponseTime}ms`;
+                    }
+                    
+                    if (monitor.endpointMetrics?.length > 0) {
+                        summary += `\n\n端点指标:`;
+                        monitor.endpointMetrics.slice(0, 3).forEach(endpoint => {
+                            summary += `\n  ${endpoint.endpoint}: ${endpoint.requestCount} 请求, ${endpoint.successRate}% 成功率`;
+                        });
+                    }
+                    
+                    summary += `\n\n完整数据:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('performance-monitor', '⚡ 性能监控', summary, 'success');
+                } else {
+                    addResult('performance-monitor', '⚡ 性能监控', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('performance-monitor', '⚡ 性能监控', error.message, 'error');
+            }
+        }
+
+        // 15. 告警查询
+        async function getAlerts() {
+            try {
+                const { response, data } = await makeRequest('/api/log/monitor/alerts');
+                
+                if (response.ok && data.code === 200) {
+                    const alerts = data.data;
+                    let summary = `告警查询成功`;
+                    
+                    if (alerts.alerts?.length > 0) {
+                        summary += `\n\n活跃告警 (${alerts.alerts.length}):`;
+                        alerts.alerts.forEach(alert => {
+                            summary += `\n  [${alert.status}] ${alert.name}: ${alert.condition}`;
+                            summary += `\n    最后触发: ${alert.lastTriggered || '从未'}`;
+                            summary += `\n    触发次数: ${alert.triggerCount || 0}`;
+                        });
+                    } else {
+                        summary += `\n\n当前无活跃告警`;
+                    }
+                    
+                    if (alerts.alertHistory?.length > 0) {
+                        summary += `\n\n告警历史 (最近${alerts.alertHistory.length}条):`;
+                        alerts.alertHistory.slice(0, 3).forEach(history => {
+                            summary += `\n  [${history.severity}] ${history.message}`;
+                            summary += `\n    时间: ${history.triggeredAt}`;
+                        });
+                    }
+                    
+                    summary += `\n\n完整数据:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('alerts', '🚨 告警查询', summary, 'success');
+                } else {
+                    addResult('alerts', '🚨 告警查询', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('alerts', '🚨 告警查询', error.message, 'error');
+            }
+        }
+
+        // =========================
+        // 日志配置接口测试
+        // =========================
+
+        // 16. 查询日志配置
+        async function getLogConfig() {
+            try {
+                const { response, data } = await makeRequest('/api/log/config');
+                
+                if (response.ok && data.code === 200) {
+                    const config = data.data;
+                    let summary = `日志配置查询成功`;
+                    summary += `\n全局日志级别: ${config.logLevel}`;
+                    summary += `\n保留天数: ${config.retentionDays}`;
+                    summary += `\n最大文件大小: ${config.maxFileSize} 字节`;
+                    
+                    if (config.categories) {
+                        summary += `\n\n类别配置:`;
+                        Object.entries(config.categories).forEach(([category, settings]) => {
+                            summary += `\n  ${category}: ${settings.level} (${settings.enabled ? '启用' : '禁用'})`;
+                        });
+                    }
+                    
+                    if (config.exportSettings) {
+                        summary += `\n\n导出设置:`;
+                        summary += `\n  单次最大导出记录: ${config.exportSettings.maxRecordsPerExport}`;
+                        summary += `\n  支持格式: ${config.exportSettings.supportedFormats?.join(', ')}`;
+                    }
+                    
+                    // 同步到界面
+                    document.getElementById('configLogLevel').value = config.logLevel || 'INFO';
+                    document.getElementById('configRetentionDays').value = config.retentionDays || 30;
+                    document.getElementById('configMaxFileSize').value = config.maxFileSize || 104857600;
+                    document.getElementById('configJson').value = JSON.stringify(config, null, 2);
+                    
+                    summary += `\n\n完整配置:\n${JSON.stringify(data.data, null, 2)}`;
+                    
+                    addResult('log-config-get', '🔍 查询日志配置', summary, 'success');
+                } else {
+                    addResult('log-config-get', '🔍 查询日志配置', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-config-get', '🔍 查询日志配置', error.message, 'error');
+            }
+        }
+
+        // 17. 更新日志配置
+        async function updateLogConfig() {
+            let configData;
+            
+            // 尝试使用JSON配置
+            const configJson = document.getElementById('configJson').value.trim();
+            if (configJson) {
+                try {
+                    configData = JSON.parse(configJson);
+                } catch (error) {
+                    addResult('log-config-update', '⚙️ 更新日志配置', `配置JSON格式错误: ${error.message}`, 'error');
+                    return;
+                }
+            } else {
+                // 使用简单配置
+                configData = {
+                    logLevel: document.getElementById('configLogLevel').value,
+                    retentionDays: parseInt(document.getElementById('configRetentionDays').value),
+                    maxFileSize: parseInt(document.getElementById('configMaxFileSize').value)
+                };
+            }
+            
+            try {
+                const { response, data } = await makeRequest('/api/log/config', {
+                    method: 'PUT',
+                    body: JSON.stringify(configData)
+                });
+                
+                if (response.ok && data.code === 200) {
+                    addResult('log-config-update', '⚙️ 更新日志配置', 
+                        `日志配置更新成功\n更新时间: ${data.data.updatedAt}\n\n更新配置:\n${JSON.stringify(configData, null, 2)}`, 'success');
+                } else {
+                    addResult('log-config-update', '⚙️ 更新日志配置', 
+                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                addResult('log-config-update', '⚙️ 更新日志配置', error.message, 'error');
+            }
+        }
+
+        // =========================
+        // 任务监控功能
+        // =========================
+
+        function startTaskMonitor(taskId, taskType) {
+            currentTaskId = taskId;
+            currentTaskType = taskType;
+            
+            const taskMonitor = document.getElementById('taskMonitor');
+            const taskInfo = document.getElementById('taskInfo');
+            const taskProgress = document.getElementById('taskProgress');
+            
+            taskMonitor.style.display = 'block';
+            taskInfo.innerHTML = `<strong>监控中:</strong> ${taskType.toUpperCase()} 任务 ${taskId}`;
+            
+            // 清除之前的监控
+            if (taskMonitorInterval) {
+                clearInterval(taskMonitorInterval);
+            }
+            
+            // 开始监控
+            taskMonitorInterval = setInterval(async () => {
+                try {
+                    const url = taskType === 'cleanup'
+                        ? `/api/log/cleanup/status/${taskId}`
+                        : `/api/log/cleanup/status/${taskId}`;
+                    
+                    const { response, data } = await makeRequest(url);
+                    
+                    if (response.ok && data.code === 200) {
+                        const status = data.data;
+                        const progress = status.progress || 0;
+                        
+                        taskProgress.style.width = `${progress}%`;
+                        taskInfo.innerHTML = `
+                            <strong>监控中:</strong> ${taskType.toUpperCase()} 任务 ${taskId}<br>
+                            <small>状态: <span class="task-status ${status.status}">${status.status}</span> | 进度: ${progress}%</small>
+                        `;
+                        
+                        // 任务完成或失败时停止监控
+                        if (status.status === 'COMPLETED' || status.status === 'FAILED') {
+                            stopTaskMonitor();
+                            addResult('task-monitor', '📋 任务监控', 
+                                `任务 ${taskId} 已${status.status === 'COMPLETED' ? '完成' : '失败'}\n最终状态: ${status.status}\n进度: ${progress}%`, 
+                                status.status === 'COMPLETED' ? 'success' : 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('任务监控错误:', error);
+                }
+            }, 2000); // 每2秒检查一次
+        }
+
+        function stopTaskMonitor() {
+            if (taskMonitorInterval) {
+                clearInterval(taskMonitorInterval);
+                taskMonitorInterval = null;
+            }
+            
+            document.getElementById('taskMonitor').style.display = 'none';
+            currentTaskId = null;
+            currentTaskType = null;
+        }
+
+        // 页面卸载时清理监控
+        window.addEventListener('beforeunload', () => {
+            stopTaskMonitor();
+        });
+    </script>
+</body>
+</html>

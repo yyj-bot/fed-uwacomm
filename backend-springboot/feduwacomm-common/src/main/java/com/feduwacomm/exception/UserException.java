@@ -105,4 +105,93 @@ public class UserException extends RuntimeException {
     public static UserException usernameFormatError() {
         return new UserException(400, "用户名格式错误");
     }
+
+    public static UserException permissionAlreadyGranted() {
+        return new UserException(409, "权限已授权");
+    }
+
+    public static UserException permissionNotFound() {
+        return new UserException(404, "权限不存在");
+    }
+
+    public static UserException permissionNotOwned() {
+        return new UserException(403, "权限不属于该用户");
+    }
+
+    /**
+     * 密码格式错误（通用）
+     */
+    public static UserException passwordFormatError(String message) {
+        return new UserException(400, message);
+    }
+
+    /**
+     * 密码缺少字母
+     */
+    public static UserException passwordMissingLetter() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少数字
+     */
+    public static UserException passwordMissingDigit() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码长度太短
+     */
+    public static UserException passwordTooShort(int minLength) {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码长度太长
+     */
+    public static UserException passwordTooLong(int maxLength) {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少特殊字符
+     */
+    public static UserException passwordMissingSpecialChar() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少大写字母
+     */
+    public static UserException passwordMissingUppercase() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码缺少小写字母
+     */
+    public static UserException passwordMissingLowercase() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码包含不允许的字符
+     */
+    public static UserException passwordInvalidCharacters() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码强度不够
+     */
+    public static UserException passwordTooWeak() {
+        return new UserException(400, "密码格式不正确");
+    }
+
+    /**
+     * 密码为空
+     */
+    public static UserException passwordEmpty() {
+        return new UserException(400, "密码不能为空");
+    }
 }

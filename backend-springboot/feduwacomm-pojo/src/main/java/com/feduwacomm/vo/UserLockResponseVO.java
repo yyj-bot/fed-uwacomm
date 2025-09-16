@@ -17,5 +17,9 @@ import java.time.LocalDateTime;
 public class UserLockResponseVO {
 
     private String userId;
+    private String status;
     private LocalDateTime lockedUntil;
+    private String lockReason;
+    private String lockedBy;
+    private LocalDateTime lockedAt;
 }

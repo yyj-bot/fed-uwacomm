@@ -107,6 +107,91 @@
         WHERE id = #{id}
     </update>
 
+    <!-- 分页查询用户列表 -->
+    <select id="selectByPage" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        <where>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') 
+                     OR email LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY created_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 条件查询用户总数 -->
+    <select id="countByCondition" resultType="int">
+        SELECT COUNT(*)
+        FROM users
+        <where>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (username LIKE CONCAT('%', #{keyword}, '%') 
+                     OR email LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <!-- 锁定用户 -->
+    <update id="lockUser">
+        UPDATE users
+        SET status = 'LOCKED',
+            locked_until = #{lockedUntil},
+            updated_at = NOW(),
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 解锁用户 -->
+    <update id="unlockUser">
+        UPDATE users
+        SET status = 'ACTIVE',
+            locked_until = NULL,
+            login_attempts = 0,
+            updated_at = NOW(),
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除用户 -->
+    <update id="deleteById">
+        UPDATE users
+        SET status = 'DELETED',
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新用户状态 -->
+    <update id="updateStatus">
+        UPDATE users
+        SET status = #{status},
+            updated_at = NOW(),
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新用户角色 -->
+    <update id="updateRole">
+        UPDATE users
+        SET role = #{role},
+            updated_at = NOW(),
+            updated_by = #{updatedBy}
+        WHERE id = #{id}
+    </update>
+
     <!-- 统计用户总数 -->
     <select id="countAll" resultType="int">
         SELECT COUNT(*) FROM users

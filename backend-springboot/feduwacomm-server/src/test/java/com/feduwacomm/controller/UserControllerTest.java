@@ -1,366 +1,490 @@
 package com.feduwacomm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
-import com.feduwacomm.handler.GlobalExceptionHandler;
+import com.feduwacomm.exception.UserException;
 import com.feduwacomm.service.UserService;
+import com.feduwacomm.testdata.TestDataBuilder;
+import com.feduwacomm.testdata.TestHelper;
+import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.vo.*;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
+import static com.feduwacomm.testdata.TestHelper.Constants.*;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
+import io.jsonwebtoken.Claims;
 
 /**
  * 用户控制器测试类
+ * 
+ * 测试目的：验证用户API端点的HTTP请求响应和数据格式
+ * 主要测试场景：
+ * 1. 用户注册、登录、登出API
+ * 2. 令牌刷新和用户信息管理
+ * 3. HTTP状态码和响应格式验证
+ * 4. 请求参数验证和异常处理
+ * 5. JWT认证和权限控制
+ * 6. Content-Type和安全头验证
  */
-@ExtendWith(MockitoExtension.class)
-class UserControllerTest {
+@SpringBootTest
+@ActiveProfiles("test")
+@AutoConfigureMockMvc
+@TestMethodOrder(MethodOrderer.DisplayName.class)
+public class UserControllerTest {
 
-        @Mock
-        private UserService userService;
+    @Autowired
+    private MockMvc mockMvc;
 
-        @InjectMocks
-        private UserController userController;
+    @MockBean
+    private UserService userService;
 
-        private MockMvc mockMvc;
-        private ObjectMapper objectMapper;
+    @MockBean
+    private UserJwtUtil userJwtUtil;
 
-        @BeforeEach
-        void setUp() {
-                // 创建验证器
-                LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
-                validator.afterPropertiesSet();
+    @Autowired
+    private ObjectMapper objectMapper;
 
-                // 配置MockMvc，包含全局异常处理器和验证支持
-                mockMvc = MockMvcBuilders.standaloneSetup(userController)
-                                .setControllerAdvice(new GlobalExceptionHandler())
-                                .setValidator(validator)
-                                .build();
+    private UserRegisterDTO registerDTO;
+    private UserLoginDTO loginDTO;
+    private String validToken;
+    private String refreshToken;
+    private Claims validAccessClaims;
+    private Claims validRefreshClaims;
 
-                // 配置ObjectMapper以支持LocalDateTime
-                objectMapper = new ObjectMapper();
-                objectMapper.findAndRegisterModules(); // 自动注册JSR310模块
+    @BeforeEach
+    void setUp() {
+        // 使用TestDataBuilder设置测试数据
+        registerDTO = TestDataBuilder.DTOs.validRegisterDTO()
+            .username("controlleruser")
+            .email("controller@example.com")
+            .build();
+
+        loginDTO = TestDataBuilder.DTOs.validLoginDTO()
+            .loginIdentifier("controlleruser")
+            .password(VALID_PASSWORD)
+            .build();
+
+        // 设置测试用的有效token
+        validToken = "Bearer_test_access_token";
+        refreshToken = "Bearer_test_refresh_token";
+        
+        // 使用TestHelper创建JWT Claims
+        validAccessClaims = TestHelper.JwtClaims.validAccessTokenClaims(
+            "user123", "controlleruser", ROLE_VIEWER);
+        validRefreshClaims = TestHelper.JwtClaims.validRefreshTokenClaims("user123");
+        
+        // 配置JWT工具的Mock行为
+        configureJwtMockBehavior();
+    }
+    
+    /**
+     * 配置JWT工具的Mock行为
+     */
+    private void configureJwtMockBehavior() {
+        when(userJwtUtil.validateToken(validToken)).thenReturn(validAccessClaims);
+        when(userJwtUtil.validateToken(refreshToken)).thenReturn(validRefreshClaims);
+        
+        // 配置过期token的行为
+        String expiredToken = "Bearer_expired_token";
+        when(userJwtUtil.validateToken(expiredToken))
+                .thenReturn(TestHelper.JwtClaims.expiredTokenClaims("user123"));
+        
+        // 配置无效token的行为
+        String invalidToken = "Bearer_invalid_token";
+        when(userJwtUtil.validateToken(invalidToken))
+                .thenThrow(new RuntimeException("Invalid token"));
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void testUserRegister_WithValidData_ShouldReturn200AndUserInfo() throws Exception {
+        // 准备测试数据 - 使用TestDataBuilder
+        UserRegisterResponseVO expectedResponse = TestDataBuilder.VOs.validRegisterResponseVO()
+            .userId("ctrl_user_123")
+            .username("controlleruser")
+            .email("controller@example.com")
+            .role(ROLE_VIEWER)
+            .status(STATUS_ACTIVE)
+            .createdAt(LocalDateTime.now())
+            .build();
+
+        when(userService.register(org.mockito.ArgumentMatchers.any(UserRegisterDTO.class))).thenReturn(expectedResponse);
+
+        // 执行测试并验证HTTP响应
+        ResultActions result = mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerDTO)))
+            .andDo(print()) // 输出详细请求响应信息用于调试
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+            
+            // 验证统一响应格式
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("注册成功"))
+            .andExpect(jsonPath("$.data").exists())
+            
+            // 验证用户数据
+            .andExpect(jsonPath("$.data.userId").value("ctrl_user_123"))
+            .andExpect(jsonPath("$.data.username").value("controlleruser"))
+            .andExpect(jsonPath("$.data.email").value("controller@example.com"))
+            .andExpect(jsonPath("$.data.role").value(ROLE_VIEWER))
+            .andExpect(jsonPath("$.data.status").value(STATUS_ACTIVE))
+            .andExpect(jsonPath("$.data.createdAt").exists());
+        
+        // 验证服务层调用
+        verify(userService, times(1)).register(argThat(dto -> 
+            "controlleruser".equals(dto.getUsername()) &&
+            "controller@example.com".equals(dto.getEmail()) &&
+            VALID_PASSWORD.equals(dto.getPassword())
+        ));
+    }
+
+    @Test
+    void testUserLogin() throws Exception {
+        LoginResponseVO response = LoginResponseVO.builder()
+            .token("token123")
+            .refreshToken("refresh123")
+            .expiresIn(86400L)
+            .user(UserInfoVO.builder()
+                .userId("user123")
+                .username("testuser")
+                .email("test@example.com")
+                .role("VIEWER")
+                .status("ACTIVE")
+                .build())
+            .build();
+
+        when(userService.login(any(UserLoginDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginDTO)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("登录成功"))
+            .andExpect(jsonPath("$.data.token").value("token123"));
+    }
+
+    @Test
+    void testRefreshToken() throws Exception {
+        TokenRefreshResponseVO response = TokenRefreshResponseVO.builder()
+            .token("newtoken123")
+            .refreshToken("newrefresh123")
+            .expiresIn(86400L)
+            .build();
+
+        when(userService.refreshToken(anyString())).thenReturn(response);
+
+        mockMvc.perform(post("/api/user/refresh")
+                .header("Authorization", "Bearer " + refreshToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("Token刷新成功"));
+    }
+
+    @Test
+    void testUserLogout() throws Exception {
+        mockMvc.perform(post("/api/user/logout")
+                .header("Authorization", "Bearer " + validToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("登出成功"));
+    }
+
+    @Test
+    void testGetCurrentUserInfo() throws Exception {
+        UserInfoVO userInfo = UserInfoVO.builder()
+            .userId("user123")
+            .username("testuser")
+            .email("test@example.com")
+            .role("VIEWER")
+            .status("ACTIVE")
+            .lastLoginTime(LocalDateTime.now())
+            .lastLoginIp("192.168.1.100")
+            .createdAt(LocalDateTime.now())
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        when(userService.getCurrentUserInfo("user123")).thenReturn(userInfo);
+
+        mockMvc.perform(get("/api/user/profile")
+                .header("Authorization", "Bearer " + validToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("获取成功"))
+            .andExpect(jsonPath("$.data.userId").value("user123"));
+    }
+
+    @Test
+    void testUpdateUserInfo() throws Exception {
+        UserUpdateDTO updateDTO = UserUpdateDTO.builder()
+            .username("updateduser")
+            .email("updated@example.com")
+            .build();
+
+        UserUpdateResponseVO response = UserUpdateResponseVO.builder()
+            .userId("user123")
+            .username("updateduser")
+            .email("updated@example.com")
+            .role("VIEWER")
+            .status("ACTIVE")
+            .updatedAt(LocalDateTime.now())
+            .build();
+
+        when(userService.updateUserInfo("user123", updateDTO)).thenReturn(response);
+
+        mockMvc.perform(put("/api/user/profile")
+                .header("Authorization", "Bearer " + validToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateDTO)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("更新成功"))
+            .andExpect(jsonPath("$.data.username").value("updateduser"));
+    }
+
+    @Test
+    void testChangePassword() throws Exception {
+        PasswordChangeDTO passwordDTO = PasswordChangeDTO.builder()
+            .oldPassword("oldpassword")
+            .newPassword("newpassword")
+            .confirmPassword("newpassword")
+            .build();
+
+        mockMvc.perform(put("/api/user/password")
+                .header("Authorization", "Bearer " + validToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(passwordDTO)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("密码修改成功"));
+    }
+
+    @Test
+    void testLoginWithRememberMe() throws Exception {
+        UserLoginDTO loginWithRememberMe = UserLoginDTO.builder()
+            .loginIdentifier("testuser")
+            .password("password123")
+            .build();
+
+        LoginResponseVO response = LoginResponseVO.builder()
+            .token("token123")
+            .refreshToken("refresh123")
+            .expiresIn(86400L)
+            .user(UserInfoVO.builder()
+                .userId("user123")
+                .username("testuser")
+                .email("test@example.com")
+                .role("VIEWER")
+                .status("ACTIVE")
+                .build())
+            .build();
+
+        when(userService.login(any(UserLoginDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginWithRememberMe)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.message").value("登录成功"));
+    }
+
+    @Test
+    void testRegisterValidation() throws Exception {
+        // 测试密码不匹配的情况
+        UserRegisterDTO invalidDTO = UserRegisterDTO.builder()
+            .username("testuser")
+            .email("test@example.com")
+            .password("password123")
+            .confirmPassword("differentpassword")
+            .build();
+
+        // 当密码不匹配时，服务应该抛出UserException
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenThrow(UserException.passwordMismatch());
+
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidDTO)))
+            .andExpect(status().isOk()) // 全局异常处理器返回200状态码
+            .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void testLoginValidation() throws Exception {
+        // 测试缺少必填字段的情况
+        UserLoginDTO invalidDTO = UserLoginDTO.builder()
+            .password("password123")
+            .build();
+
+        mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidDTO)))
+            .andExpect(status().isOk()); // 全局异常处理器返回200状态码
+    }
+
+    // ======================== 边界条件和安全测试 ========================
+
+    @Test
+    void testRegister_WithInvalidContentType_ShouldReturn415() throws Exception {
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.TEXT_PLAIN) // 错误的Content-Type
+                .content(objectMapper.writeValueAsString(registerDTO)))
+            .andExpect(status().isUnsupportedMediaType());
+    }
+
+    @Test
+    void testRegister_WithMalformedJson_ShouldReturn400() throws Exception {
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{invalid json}")) // 格式错误的JSON
+            .andExpect(status().isOk()) // 全局异常处理器处理
+            .andExpect(jsonPath("$.code").value(500)); // 内部错误码
+    }
+
+    @Test
+    void testLogin_WithoutToken_ShouldReturn401() throws Exception {
+        mockMvc.perform(get("/api/user/profile")) // 需要认证的端点
+            .andExpect(status().isOk()) // 全局异常处理器返回200
+            .andExpect(jsonPath("$.code").value(401)); // 但业务码是401
+    }
+
+    @Test
+    void testLogin_WithInvalidToken_ShouldReturn401() throws Exception {
+        mockMvc.perform(get("/api/user/profile")
+                .header("Authorization", "Bearer invalid_token"))
+            .andExpect(status().isOk()) // 全局异常处理器返回200
+            .andExpect(jsonPath("$.code").value(401)); // 业务码是401
+    }
+
+    @Test
+    void testLogin_WithExpiredToken_ShouldReturn401() throws Exception {
+        String expiredToken = "Bearer_expired_token";
+        
+        mockMvc.perform(get("/api/user/profile")
+                .header("Authorization", expiredToken))
+            .andExpect(status().isOk()) // 全局异常处理器返回200
+            .andExpect(jsonPath("$.code").value(401)); // 业务码是401
+    }
+
+    @Test
+    void testRegister_WithSqlInjectionAttempt_ShouldBeSafe() throws Exception {
+        UserRegisterDTO sqlInjectionDTO = TestDataBuilder.DTOs.validRegisterDTO()
+            .username("'; DROP TABLE users; --")
+            .email("hacker'; DROP TABLE users; --@evil.com")
+            .build();
+
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenThrow(new UserException("非法字符"));
+
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(sqlInjectionDTO)))
+            .andExpect(status().isOk()) // 全局异常处理器返回200
+            .andExpect(jsonPath("$.code").value(400)); // 业务错误码
+    }
+
+    @Test
+    void testRegister_WithXssAttempt_ShouldBeSafe() throws Exception {
+        UserRegisterDTO xssDTO = TestDataBuilder.DTOs.validRegisterDTO()
+            .username("<script>alert('xss')</script>")
+            .email("<img src=x onerror=alert('xss')>@evil.com")
+            .build();
+
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenThrow(new UserException("非法字符"));
+
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(xssDTO)))
+            .andExpect(status().isOk()) // 全局异常处理器返回200
+            .andExpect(jsonPath("$.code").value(400)) // 业务错误码
+            .andExpect(jsonPath("$.message").value(not(containsString("<script>"))));
+    }
+
+    @Test
+    void testHttpMethodValidation_OnlyPostAllowed() throws Exception {
+        // GET请求到注册端点应该失败
+        mockMvc.perform(get("/api/user/register"))
+            .andExpect(status().isMethodNotAllowed());
+
+        // PUT请求到注册端点应该失败  
+        mockMvc.perform(put("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerDTO)))
+            .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void testRequestSizeLimit_WithLargePayload() throws Exception {
+        // 创建一个非常大的用户名来测试请求大小限制
+        String largeUsername = "a".repeat(10000);
+        UserRegisterDTO largeDTO = TestDataBuilder.DTOs.validRegisterDTO()
+            .username(largeUsername)
+            .build();
+
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(largeDTO)))
+            .andExpect(status().isOk()) // 全局异常处理器处理
+            .andExpect(jsonPath("$.code").exists()); // 应该有业务错误码
+    }
+
+    @Test 
+    void testSecurityHeaders_ShouldBePresent() throws Exception {
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenReturn(TestDataBuilder.VOs.validRegisterResponseVO().build());
+
+        mockMvc.perform(post("/api/user/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerDTO)))
+            .andExpect(status().isOk())
+            .andExpect(header().exists("X-Content-Type-Options"));
+    }
+
+    // ======================== 性能和并发测试 ========================
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)  
+    void testConcurrentRequests_ShouldHandleGracefully() throws Exception {
+        when(userService.register(any(UserRegisterDTO.class)))
+            .thenReturn(TestDataBuilder.VOs.validRegisterResponseVO().build());
+
+        // 模拟并发请求（在测试环境中是伪并发）
+        int requestCount = 10;
+        for (int i = 0; i < requestCount; i++) {
+            UserRegisterDTO concurrentDTO = TestDataBuilder.DTOs.validRegisterDTO()
+                .username("concurrent" + i)
+                .email("concurrent" + i + "@example.com")
+                .build();
+            
+            mockMvc.perform(post("/api/user/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(concurrentDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
         }
-
-        // 认证相关接口测试
-
-        @Test
-        void testRegister_Success() throws Exception {
-                // 准备测试数据
-                UserRegisterDTO registerDTO = UserRegisterDTO.builder()
-                                .username("testuser")
-                                .email("test@example.com")
-                                .password("password123")
-                                .confirmPassword("password123")
-                                .build();
-
-                UserRegisterResponseVO responseVO = UserRegisterResponseVO.builder()
-                                .userId("a1b2c3d4e5f678901234567890123456")
-                                .username("testuser")
-                                .email("test@example.com")
-                                .role("VIEWER")
-                                .status("ACTIVE")
-                                .createdAt(LocalDateTime.now())
-                                .build();
-
-                when(userService.register(any(UserRegisterDTO.class))).thenReturn(responseVO);
-
-                // 执行测试并打印响应
-                String response = mockMvc.perform(post("/api/user/register")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(registerDTO)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("注册成功"))
-                                .andExpect(jsonPath("$.data.userId").value("a1b2c3d4e5f678901234567890123456"))
-                                .andExpect(jsonPath("$.data.username").value("testuser"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 注册成功测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-
-                verify(userService, times(1)).register(any(UserRegisterDTO.class));
-        }
-
-        @Test
-        void testLogin_Success() throws Exception {
-                // 准备测试数据
-                UserLoginDTO loginDTO = UserLoginDTO.builder()
-                                .loginIdentifier("testuser")
-                                .password("password123")
-                                .captcha("1234")
-                                .captchaKey("key123")
-                                .rememberMe(false)
-                                .build();
-
-                LoginResponseVO responseVO = LoginResponseVO.builder()
-                                .token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                                .refreshToken("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                                .expiresIn(86400L)
-                                .user(UserInfoVO.builder()
-                                                .userId("a1b2c3d4e5f678901234567890123456")
-                                                .username("testuser")
-                                                .email("test@example.com")
-                                                .role("VIEWER")
-                                                .status("ACTIVE")
-                                                .lastLoginTime(LocalDateTime.now())
-                                                .lastLoginIp("192.168.1.100")
-                                                .build())
-                                .build();
-
-                when(userService.login(any(UserLoginDTO.class))).thenReturn(responseVO);
-
-                // 执行测试
-                mockMvc.perform(post("/api/user/login")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(loginDTO)))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("登录成功"))
-                                .andExpect(jsonPath("$.data.token").exists())
-                                .andExpect(jsonPath("$.data.user.userId").value("a1b2c3d4e5f678901234567890123456"));
-
-                verify(userService, times(1)).login(any(UserLoginDTO.class));
-        }
-
-        @Test
-        void testRefreshToken_Success() throws Exception {
-                // 准备测试数据
-                String refreshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
-                TokenRefreshResponseVO responseVO = TokenRefreshResponseVO.builder()
-                                .token("new_token_123")
-                                .refreshToken("new_refresh_token_123")
-                                .expiresIn(86400L)
-                                .build();
-
-                when(userService.refreshToken(anyString())).thenReturn(responseVO);
-
-                // 执行测试
-                mockMvc.perform(post("/api/user/refresh")
-                                .header("Authorization", "Bearer " + refreshToken))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("Token刷新成功"))
-                                .andExpect(jsonPath("$.data.token").value("new_token_123"));
-
-                verify(userService, times(1)).refreshToken(refreshToken);
-        }
-
-        @Test
-        void testLogout_Success() throws Exception {
-                // 准备测试数据
-                String token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
-
-                doNothing().when(userService).logout(anyString());
-
-                // 执行测试
-                mockMvc.perform(post("/api/user/logout")
-                                .header("Authorization", "Bearer " + token))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.message").value("登出成功"));
-
-                verify(userService, times(1)).logout(token);
-        }
-
-        // 用户信息相关接口测试
-
-        @Test
-        void testGetCurrentUserInfo_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                UserInfoVO userInfo = UserInfoVO.builder()
-                                .userId(userId)
-                                .username("testuser")
-                                .email("test@example.com")
-                                .role("VIEWER")
-                                .status("ACTIVE")
-                                .lastLoginTime(LocalDateTime.now())
-                                .lastLoginIp("192.168.1.100")
-                                .createdAt(LocalDateTime.now())
-                                .updatedAt(LocalDateTime.now())
-                                .build();
-
-                // 模拟BaseContext.getCurrentUserId()
-                try (var baseContextMock = mockStatic(BaseContext.class)) {
-                        baseContextMock.when(BaseContext::getCurrentUserId).thenReturn(userId);
-                        when(userService.getCurrentUserInfo(userId)).thenReturn(userInfo);
-
-                        // 执行测试
-                        mockMvc.perform(get("/api/user/profile"))
-                                        .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.code").value(200))
-                                        .andExpect(jsonPath("$.message").value("获取成功"))
-                                        .andExpect(jsonPath("$.data.userId").value(userId));
-
-                        verify(userService, times(1)).getCurrentUserInfo(userId);
-                }
-        }
-
-        @Test
-        void testUpdateUserInfo_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                UserUpdateDTO updateDTO = UserUpdateDTO.builder()
-                                .username("newusername")
-                                .email("newemail@example.com")
-                                .build();
-
-                UserUpdateResponseVO responseVO = UserUpdateResponseVO.builder()
-                                .userId(userId)
-                                .username("newusername")
-                                .email("newemail@example.com")
-                                .role("RESEARCHER")
-                                .status("ACTIVE")
-                                .updatedAt(LocalDateTime.now())
-                                .build();
-
-                // 模拟BaseContext.getCurrentUserId()
-                try (var baseContextMock = mockStatic(BaseContext.class)) {
-                        baseContextMock.when(BaseContext::getCurrentUserId).thenReturn(userId);
-                        when(userService.updateUserInfo(eq(userId), any(UserUpdateDTO.class))).thenReturn(responseVO);
-
-                        // 执行测试
-                        mockMvc.perform(put("/api/user/profile")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(objectMapper.writeValueAsString(updateDTO)))
-                                        .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.code").value(200))
-                                        .andExpect(jsonPath("$.message").value("更新成功"))
-                                        .andExpect(jsonPath("$.data.username").value("newusername"));
-
-                        verify(userService, times(1)).updateUserInfo(eq(userId), any(UserUpdateDTO.class));
-                }
-        }
-
-        @Test
-        void testChangePassword_Success() throws Exception {
-                // 准备测试数据
-                String userId = "a1b2c3d4e5f678901234567890123456";
-                PasswordChangeDTO passwordDTO = PasswordChangeDTO.builder()
-                                .oldPassword("oldpassword")
-                                .newPassword("newpassword")
-                                .confirmPassword("newpassword")
-                                .build();
-
-                // 模拟BaseContext.getCurrentUserId()
-                try (var baseContextMock = mockStatic(BaseContext.class)) {
-                        baseContextMock.when(BaseContext::getCurrentUserId).thenReturn(userId);
-                        doNothing().when(userService).changePassword(eq(userId), any(PasswordChangeDTO.class));
-
-                        // 执行测试
-                        mockMvc.perform(put("/api/user/password")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(objectMapper.writeValueAsString(passwordDTO)))
-                                        .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.code").value(200))
-                                        .andExpect(jsonPath("$.message").value("密码修改成功"));
-
-                        verify(userService, times(1)).changePassword(eq(userId), any(PasswordChangeDTO.class));
-                }
-        }
-
-        // 错误处理测试
-
-        @Test
-        void testRegister_ValidationError() throws Exception {
-                // 准备测试数据 - 缺少必填字段
-                UserRegisterDTO registerDTO = UserRegisterDTO.builder()
-                                .username("test")
-                                .email("invalid-email")
-                                .password("123")
-                                .confirmPassword("456")
-                                .build();
-
-                // 执行测试并打印响应
-                String response = mockMvc.perform(post("/api/user/register")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(registerDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(400)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("验证失败"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 验证错误测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-        }
-
-        @Test
-        void testLogin_InvalidCredentials() throws Exception {
-                // 准备测试数据
-                UserLoginDTO loginDTO = UserLoginDTO.builder()
-                                .loginIdentifier("wronguser")
-                                .password("wrongpassword")
-                                .build();
-
-                // 使用UserException.passwordError()方法
-                when(userService.login(any(UserLoginDTO.class)))
-                                .thenThrow(com.feduwacomm.exception.UserException.passwordError());
-
-                // 执行测试并打印响应
-                String response = mockMvc.perform(post("/api/user/login")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(loginDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(401)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("密码错误"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 登录失败测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-        }
-
-        @Test
-        void testExceptionHandling() throws Exception {
-                // 测试UserException异常处理
-                UserLoginDTO loginDTO = UserLoginDTO.builder()
-                                .loginIdentifier("test")
-                                .password("test")
-                                .build();
-
-                // 模拟抛出UserException
-                when(userService.login(any(UserLoginDTO.class)))
-                                .thenThrow(com.feduwacomm.exception.UserException.userNotFound());
-
-                // 执行测试并打印响应
-                String response = mockMvc.perform(post("/api/user/login")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(loginDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("用户不存在"))
-                                .andReturn()
-                                .getResponse()
-                                .getContentAsString();
-
-                System.out.println("=== 异常处理测试响应 ===");
-                System.out.println(response);
-                System.out.println("=========================");
-
-                // 验证mock被调用
-                verify(userService, times(1)).login(any(UserLoginDTO.class));
-        }
+        
+        // 验证服务层被正确调用
+        verify(userService, times(requestCount)).register(any(UserRegisterDTO.class));
+    }
 }

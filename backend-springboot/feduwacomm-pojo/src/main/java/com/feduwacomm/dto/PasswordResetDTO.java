@@ -15,4 +15,5 @@ import lombok.NoArgsConstructor;
 public class PasswordResetDTO {
 
     private String newPassword;
+    private String password; // 兼容字段
 }

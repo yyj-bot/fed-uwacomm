@@ -4,6 +4,7 @@ import com.feduwacomm.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -60,6 +61,48 @@ public interface UserMapper {
          * 更新用户密码
          */
         int updatePassword(@Param("id") String id, @Param("passwordHash") String passwordHash);
+
+        // 管理员操作
+        /**
+         * 分页查询用户列表
+         */
+        List<User> selectByPage(@Param("offset") int offset, @Param("limit") int limit,
+                               @Param("role") String role, @Param("status") String status,
+                               @Param("keyword") String keyword);
+
+        /**
+         * 条件查询用户总数
+         */
+        int countByCondition(@Param("role") String role, @Param("status") String status,
+                           @Param("keyword") String keyword);
+
+        /**
+         * 锁定用户
+         */
+        int lockUser(@Param("id") String id, @Param("lockedUntil") LocalDateTime lockedUntil,
+                    @Param("lockReason") String lockReason, @Param("updatedBy") String updatedBy);
+
+        /**
+         * 解锁用户
+         */
+        int unlockUser(@Param("id") String id, @Param("updatedBy") String updatedBy);
+
+        /**
+         * 删除用户
+         */
+        int deleteById(@Param("id") String id);
+
+        /**
+         * 更新用户状态
+         */
+        int updateStatus(@Param("id") String id, @Param("status") String status,
+                        @Param("updatedBy") String updatedBy);
+
+        /**
+         * 更新用户角色
+         */
+        int updateRole(@Param("id") String id, @Param("role") String role,
+                      @Param("updatedBy") String updatedBy);
 
         // 统计操作
         /**

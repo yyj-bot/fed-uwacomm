@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.TrainingDatasetMapper">
+
+    <!-- Simplified result mapping - only includes fields that exist in database -->
+    <resultMap id="TrainingDataResultMap" type="com.feduwacomm.entity.TrainingData">
+        <id property="id" column="id"/>
+        <result property="vmId" column="vm_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="dataType" column="data_type"/>
+        <result property="status" column="status"/>
+        <result property="uploadTime" column="upload_time"/>
+    </resultMap>
+
+    <!-- Original methods kept unchanged -->
+    <insert id="upsertDataset">
+        INSERT INTO training_dataset (id, vm_id, name, description, data_type, status, metadata)
+        VALUES (#{id}, #{vmId}, #{name}, #{description}, #{dataType}, #{status}, #{metadata})
+        ON DUPLICATE KEY UPDATE
+            vm_id = VALUES(vm_id),
+            name = VALUES(name),
+            description = VALUES(description),
+            data_type = VALUES(data_type),
+            status = VALUES(status),
+            metadata = VALUES(metadata)
+    </insert>
+
+    <!-- New insert method -->
+    <insert id="insertTrainingData">
+        INSERT INTO training_dataset (
+            id, vm_id, name, description, data_type, status, metadata, upload_time
+        )
+        VALUES (
+            #{id}, #{vmId}, #{name}, #{description}, #{dataType}, #{status}, 
+            #{metadata}, #{uploadTime}
+        )
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE training_dataset SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Update training data -->
+    <update id="updateTrainingData">
+        UPDATE training_dataset 
+        SET description = #{description},
+            metadata = #{metadata}
+        WHERE id = #{id}
+    </update>
+
+    <!-- Note: progress, validation and process related fields don't exist in database -->
+
+    <select id="selectById" resultType="map">
+        SELECT id, vm_id, name, description, data_type, status, metadata, upload_time
+        FROM training_dataset WHERE id = #{id}
+    </select>
+
+    <!-- Query entity object -->
+    <select id="selectByIdEntity" resultMap="TrainingDataResultMap">
+        SELECT * FROM training_dataset WHERE id = #{id}
+    </select>
+
+    <!-- Conditional query -->
+    <select id="selectByQuery" resultMap="TrainingDataResultMap">
+        SELECT * FROM training_dataset
+        <where>
+            <if test="vmId != null and vmId != ''">
+                AND vm_id = #{vmId}
+            </if>
+            <if test="dataType != null and dataType != ''">
+                AND data_type = #{dataType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND upload_time &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND upload_time &lt;= #{endDate}
+            </if>
+        </where>
+        ORDER BY upload_time DESC
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- Count query -->
+    <select id="countByQuery" resultType="long">
+        SELECT COUNT(*) FROM training_dataset
+        <where>
+            <if test="vmId != null and vmId != ''">
+                AND vm_id = #{vmId}
+            </if>
+            <if test="dataType != null and dataType != ''">
+                AND data_type = #{dataType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND upload_time &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND upload_time &lt;= #{endDate}
+            </if>
+        </where>
+    </select>
+
+    <!-- Query by ID list -->
+    <select id="selectByIds" resultMap="TrainingDataResultMap">
+        SELECT * FROM training_dataset
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM training_dataset WHERE id = #{id}
+    </delete>
+
+    <!-- Batch delete -->
+    <delete id="deleteByIds">
+        DELETE FROM training_dataset
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- Statistics query -->
+    <select id="selectStatistics" resultType="map">
+        SELECT 
+            COUNT(*) as totalCount,
+            0 as totalSize
+        FROM training_dataset
+        <where>
+            <if test="vmId != null and vmId != ''">
+                AND vm_id = #{vmId}
+            </if>
+            <if test="dataType != null and dataType != ''">
+                AND data_type = #{dataType}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND upload_time &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND upload_time &lt;= #{endDate}
+            </if>
+        </where>
+    </select>
+
+    <!-- Get total count -->
+    <select id="getTotalCount" resultType="long">
+        SELECT COUNT(*) FROM training_dataset
+    </select>
+
+    <!-- Get total size -->
+    <select id="getTotalSize" resultType="long">
+        SELECT 0 FROM training_dataset LIMIT 1
+    </select>
+
+    <!-- Data type distribution -->
+    <select id="getDataTypeDistribution" resultType="map">
+        SELECT data_type as dataType, COUNT(*) as count
+        FROM training_dataset
+        GROUP BY data_type
+    </select>
+
+    <!-- Status distribution -->
+    <select id="getStatusDistribution" resultType="map">
+        SELECT status, COUNT(*) as count
+        FROM training_dataset
+        GROUP BY status
+    </select>
+
+    <!-- VM distribution -->
+    <select id="getVmDistribution" resultType="map">
+        SELECT vm_id as vmId, 
+               COUNT(*) as count, 
+               0 as size
+        FROM training_dataset
+        GROUP BY vm_id
+    </select>
+
+    <!-- Last 7 days upload trend -->
+    <select id="getUploadTrendLast7Days" resultType="int">
+        SELECT COUNT(*) as count
+        FROM training_dataset
+        WHERE upload_time &gt;= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY DATE(upload_time)
+        ORDER BY DATE(upload_time) DESC
+        LIMIT 7
+    </select>
+
+    <!-- Last 30 days upload trend -->
+    <select id="getUploadTrendLast30Days" resultType="int">
+        SELECT COUNT(*) as count
+        FROM training_dataset
+        WHERE upload_time &gt;= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        GROUP BY DATE(upload_time)
+        ORDER BY DATE(upload_time) DESC
+        LIMIT 30
+    </select>
+
+    <!-- Popular data types -->
+    <select id="getTopDataTypes" resultType="map">
+        SELECT 
+            data_type as dataType,
+            COUNT(*) as count,
+            ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM training_dataset), 1) as percentage
+        FROM training_dataset
+        GROUP BY data_type
+        ORDER BY count DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+</mapper>

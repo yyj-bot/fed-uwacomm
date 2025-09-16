@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>训练数据管理API - 测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .auth-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .auth-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .auth-controls input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .auth-controls button {
+            padding: 12px 24px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .auth-controls button:hover {
+            background: #2980b9;
+        }
+
+        .api-section {
+            margin-bottom: 40px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .api-header {
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .api-method {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .api-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input[type="file"] {
+            padding: 8px;
+        }
+
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .test-button {
+            background: #27ae60;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        .test-button:hover {
+            background: #229954;
+        }
+
+        .clear-button {
+            background: #95a5a6;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .clear-button:hover {
+            background: #7f8c8d;
+        }
+
+        .response-section {
+            margin-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            padding-top: 20px;
+        }
+
+        .response-header {
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .response-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .success {
+            border-left: 4px solid #27ae60;
+        }
+
+        .error {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .loading {
+            color: #f39c12;
+        }
+
+        .status-display {
+            padding: 10px;
+            border-radius: 8px;
+            margin-left: 15px;
+            font-weight: 500;
+        }
+
+        .status-authenticated {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-unauthenticated {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .json-input {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 训练数据管理API测试</h1>
+            <p>FedUWAComm 训练数据管理模块 - API接口测试工具</p>
+        </div>
+
+        <div class="content">
+            <!-- 认证部分 -->
+            <div class="auth-section">
+                <h3>🔐 身份认证</h3>
+                <div class="auth-controls">
+                    <input type="text" id="loginIdentifier" placeholder="用户名或邮箱">
+                    <input type="password" id="password" placeholder="密码">
+                    <button onclick="login()">登录</button>
+                    <div id="authStatus" class="status-unauthenticated">未认证</div>
+                </div>
+            </div>
+
+            <!-- API接口测试 -->
+
+            <!-- 1. 文件上传接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📁 文件上传接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>虚拟机ID *</label>
+                            <input type="text" id="upload_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
+                        </div>
+                        <div class="form-group">
+                            <label>数据类型 *</label>
+                            <select id="upload_dataType">
+                                <option value="ACOUSTIC">声学数据</option>
+                                <option value="ENVIRONMENT">环境数据</option>
+                                <option value="MODEL">模型数据</option>
+                                <option value="FEATURE">特征数据</option>
+                                <option value="OTHER">其他数据</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>数据描述</label>
+                        <input type="text" id="upload_description" placeholder="水声传播特征数据">
+                    </div>
+                    <div class="form-group">
+                        <label>标签 (JSON数组)</label>
+                        <input type="text" id="upload_tags" placeholder='["feature", "acoustic"]'>
+                    </div>
+                    <div class="form-group">
+                        <label>元数据 (JSON对象)</label>
+                        <textarea id="upload_metadata" class="json-input" placeholder='{"source": "bellhop", "version": "1.0"}'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>选择文件 *</label>
+                        <input type="file" id="upload_file">
+                    </div>
+                    <button class="test-button" onclick="testFileUpload()">测试文件上传</button>
+                    <button class="clear-button" onclick="clearForm('upload')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="upload_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 文本上传接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📝 文本信息上传接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>虚拟机ID *</label>
+                            <input type="text" id="text_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
+                        </div>
+                        <div class="form-group">
+                            <label>数据类型 *</label>
+                            <select id="text_dataType">
+                                <option value="ENVIRONMENT">环境数据</option>
+                                <option value="OTHER">其他数据</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>标题 *</label>
+                        <input type="text" id="text_title" placeholder="声学传播环境配置">
+                    </div>
+                    <div class="form-group">
+                        <label>内容 *</label>
+                        <textarea id="text_content" placeholder="声学传播环境配置文件内容..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <input type="text" id="text_description" placeholder="声学传播环境配置描述">
+                    </div>
+                    <button class="test-button" onclick="testTextUpload()">测试文本上传</button>
+                    <button class="clear-button" onclick="clearForm('text')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="text_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 数据列表查询接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📋 数据列表查询接口</span>
+                    <span class="api-method">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>页码</label>
+                            <input type="number" id="query_page" value="1" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>每页大小</label>
+                            <input type="number" id="query_size" value="20" min="1" max="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>虚拟机ID</label>
+                            <input type="text" id="query_vmId" placeholder="过滤特定虚拟机">
+                        </div>
+                        <div class="form-group">
+                            <label>数据类型</label>
+                            <select id="query_dataType">
+                                <option value="">全部类型</option>
+                                <option value="ACOUSTIC">声学数据</option>
+                                <option value="ENVIRONMENT">环境数据</option>
+                                <option value="MODEL">模型数据</option>
+                                <option value="FEATURE">特征数据</option>
+                                <option value="OTHER">其他数据</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>关键词搜索</label>
+                        <input type="text" id="query_keyword" placeholder="搜索名称或描述">
+                    </div>
+                    <button class="test-button" onclick="testDataQuery()">测试列表查询</button>
+                    <button class="clear-button" onclick="clearForm('query')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="query_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 数据详情查询接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>🔍 数据详情查询接口</span>
+                    <span class="api-method">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="detail_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <button class="test-button" onclick="testDataDetail()">测试详情查询</button>
+                    <button class="clear-button" onclick="clearForm('detail')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="detail_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. 数据预处理接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>⚙️ 数据预处理接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="preprocess_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <div class="form-group">
+                        <label>预处理方法 (JSON数组) *</label>
+                        <input type="text" id="preprocess_methods" placeholder='["normalization", "feature_selection"]'>
+                    </div>
+                    <div class="form-group">
+                        <label>参数配置 (JSON对象)</label>
+                        <textarea id="preprocess_parameters" class="json-input" placeholder='{"normalization": {"method": "standard_scaler"}}'></textarea>
+                    </div>
+                    <button class="test-button" onclick="testPreprocess()">测试预处理</button>
+                    <button class="clear-button" onclick="clearForm('preprocess')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="preprocess_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. 数据验证接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>✅ 数据验证接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="validate_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <div class="form-group">
+                        <label>验证规则 (JSON对象)</label>
+                        <textarea id="validate_rules" class="json-input" placeholder='{"validationRules": {"dataType": "ACOUSTIC", "requiredColumns": ["feature_1"]}}'></textarea>
+                    </div>
+                    <button class="test-button" onclick="testValidation()">测试验证</button>
+                    <button class="clear-button" onclick="clearForm('validate')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="validate_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. 数据统计接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📊 数据统计接口</span>
+                    <span class="api-method">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>虚拟机ID</label>
+                            <input type="text" id="stats_vmId" placeholder="过滤特定虚拟机">
+                        </div>
+                        <div class="form-group">
+                            <label>数据类型</label>
+                            <select id="stats_dataType">
+                                <option value="">全部类型</option>
+                                <option value="ACOUSTIC">声学数据</option>
+                                <option value="ENVIRONMENT">环境数据</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="test-button" onclick="testStatistics()">测试统计查询</button>
+                    <button class="clear-button" onclick="clearForm('stats')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="stats_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 8. 数据删除接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>🗑️ 数据删除接口</span>
+                    <span class="api-method">DELETE</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="delete_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <div class="form-group">
+                        <label>删除原因</label>
+                        <input type="text" id="delete_reason" placeholder="数据已过期">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="delete_file" checked> 删除文件
+                        </label>
+                    </div>
+                    <button class="test-button" onclick="testDelete()">测试删除</button>
+                    <button class="clear-button" onclick="clearForm('delete')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="delete_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9. 数据下载接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>💾 数据下载接口</span>
+                    <span class="api-method">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="download_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <button class="test-button" onclick="testDownload()">测试下载</button>
+                    <button class="clear-button" onclick="clearForm('download')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="download_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 10. 数据更新接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📝 数据更新接口</span>
+                    <span class="api-method">PUT</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>数据集ID *</label>
+                        <input type="text" id="update_datasetId" placeholder="输入数据集ID">
+                    </div>
+                    <div class="form-group">
+                        <label>数据描述</label>
+                        <input type="text" id="update_description" placeholder="更新后的数据描述">
+                    </div>
+                    <div class="form-group">
+                        <label>标签 (JSON数组)</label>
+                        <input type="text" id="update_tags" placeholder='["feature", "acoustic", "updated"]'>
+                    </div>
+                    <div class="form-group">
+                        <label>元数据 (JSON对象)</label>
+                        <textarea id="update_metadata" class="json-input" placeholder='{"source": "bellhop", "version": "1.1", "updatedBy": "researcher"}'></textarea>
+                    </div>
+                    <button class="test-button" onclick="testUpdate()">测试更新</button>
+                    <button class="clear-button" onclick="clearForm('update')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="update_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 11. 批量数据操作接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>🔄 批量数据操作接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>操作类型 *</label>
+                        <select id="batch_operation">
+                            <option value="DELETE">删除</option>
+                            <option value="UPDATE">更新</option>
+                            <option value="EXPORT">导出</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>数据集ID列表 (JSON数组) *</label>
+                        <textarea id="batch_datasetIds" class="json-input" placeholder='["e5f67890123456789012345678901234", "f6789012345678901234567890123456"]'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>操作参数 (JSON对象)</label>
+                        <textarea id="batch_parameters" class="json-input" placeholder='{"reason": "批量清理过期数据", "deleteFile": true}'></textarea>
+                    </div>
+                    <button class="test-button" onclick="testBatchOperation()">测试批量操作</button>
+                    <button class="clear-button" onclick="clearForm('batch')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="batch_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 12. 数据导出接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📤 数据导出接口</span>
+                    <span class="api-method">POST</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>导出类型 *</label>
+                            <select id="export_type">
+                                <option value="CSV">CSV</option>
+                                <option value="JSON">JSON</option>
+                                <option value="EXCEL">EXCEL</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>导出格式</label>
+                            <select id="export_format">
+                                <option value="ZIP">ZIP</option>
+                                <option value="TAR">TAR</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>过滤条件 (JSON对象)</label>
+                        <textarea id="export_filters" class="json-input" placeholder='{"dataType": "ACOUSTIC", "vmId": "a1b2c3d4e5f678901234567890123456", "status": "READY"}'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>导出字段 (JSON数组)</label>
+                        <textarea id="export_fields" class="json-input" placeholder='["datasetId", "datasetName", "datasetType", "vmId", "status", "uploadTime"]'></textarea>
+                    </div>
+                    <button class="test-button" onclick="testExport()">测试导出</button>
+                    <button class="clear-button" onclick="clearForm('export')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="export_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 13. 导出文件下载接口 -->
+            <div class="api-section">
+                <div class="api-header">
+                    <span>📥 导出文件下载接口</span>
+                    <span class="api-method">GET</span>
+                </div>
+                <div class="api-body">
+                    <div class="form-group">
+                        <label>任务ID *</label>
+                        <input type="text" id="export_download_taskId" placeholder="export_1234567890">
+                    </div>
+                    <button class="test-button" onclick="testExportDownload()">测试导出下载</button>
+                    <button class="clear-button" onclick="clearForm('export_download')">清空</button>
+                    <div class="response-section">
+                        <div class="response-header">响应结果</div>
+                        <div id="export_download_response" class="response-content"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+        let authToken = localStorage.getItem('authToken') || '';
+
+        // 页面加载时检查认证状态
+        window.onload = function() {
+            updateAuthStatus();
+        };
+
+        // 认证相关函数
+        async function login() {
+            const loginIdentifier = document.getElementById('loginIdentifier').value;
+            const password = document.getElementById('password').value;
+
+            if (!loginIdentifier || !password) {
+                alert('请输入用户名和密码');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/user/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        loginIdentifier: loginIdentifier,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.code === 200 && result.data && result.data.token) {
+                    authToken = result.data.token;
+                    localStorage.setItem('authToken', authToken);
+                    updateAuthStatus();
+                    alert('登录成功！');
+                } else {
+                    alert('登录失败: ' + (result.message || '未知错误'));
+                }
+            } catch (error) {
+                alert('登录请求失败: ' + error.message);
+            }
+        }
+
+        function updateAuthStatus() {
+            const statusElement = document.getElementById('authStatus');
+            if (authToken) {
+                statusElement.textContent = '已认证';
+                statusElement.className = 'status-authenticated';
+            } else {
+                statusElement.textContent = '未认证';
+                statusElement.className = 'status-unauthenticated';
+            }
+        }
+
+        // 通用请求函数
+        async function makeRequest(url, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            const response = await fetch(url, {
+                ...options,
+                headers
+            });
+
+            return response;
+        }
+
+        // API测试函数
+
+        // 1. 文件上传测试
+        async function testFileUpload() {
+            const vmId = document.getElementById('upload_vmId').value;
+            const dataType = document.getElementById('upload_dataType').value;
+            const description = document.getElementById('upload_description').value;
+            const tags = document.getElementById('upload_tags').value;
+            const metadata = document.getElementById('upload_metadata').value;
+            const fileInput = document.getElementById('upload_file');
+
+            if (!vmId || !dataType || !fileInput.files[0]) {
+                alert('请填写必填字段并选择文件');
+                return;
+            }
+
+            const responseDiv = document.getElementById('upload_response');
+            responseDiv.textContent = '上传中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const formData = new FormData();
+                formData.append('vmId', vmId);
+                formData.append('dataType', dataType);
+                if (description) formData.append('description', description);
+                if (tags) formData.append('tags', tags);
+                if (metadata) formData.append('metadata', metadata);
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch(`${API_BASE_URL}/training-data/upload`, {
+                    method: 'POST',
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                    body: formData
+                });
+
+                const result = await response.json();
+                displayResponse('upload_response', result, response.ok);
+            } catch (error) {
+                displayResponse('upload_response', { error: error.message }, false);
+            }
+        }
+
+        // 2. 文本上传测试
+        async function testTextUpload() {
+            const vmId = document.getElementById('text_vmId').value;
+            const dataType = document.getElementById('text_dataType').value;
+            const title = document.getElementById('text_title').value;
+            const content = document.getElementById('text_content').value;
+            const description = document.getElementById('text_description').value;
+
+            if (!vmId || !dataType || !title || !content) {
+                alert('请填写所有必填字段');
+                return;
+            }
+
+            const responseDiv = document.getElementById('text_response');
+            responseDiv.textContent = '上传中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {
+                    vmId,
+                    dataType,
+                    title,
+                    content,
+                    description
+                };
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/text`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('text_response', result, response.ok);
+            } catch (error) {
+                displayResponse('text_response', { error: error.message }, false);
+            }
+        }
+
+        // 3. 数据列表查询测试
+        async function testDataQuery() {
+            const page = document.getElementById('query_page').value;
+            const size = document.getElementById('query_size').value;
+            const vmId = document.getElementById('query_vmId').value;
+            const dataType = document.getElementById('query_dataType').value;
+            const keyword = document.getElementById('query_keyword').value;
+
+            const responseDiv = document.getElementById('query_response');
+            responseDiv.textContent = '查询中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const params = new URLSearchParams();
+                if (page) params.append('page', page);
+                if (size) params.append('size', size);
+                if (vmId) params.append('vmId', vmId);
+                if (dataType) params.append('dataType', dataType);
+                if (keyword) params.append('keyword', keyword);
+
+                const url = `${API_BASE_URL}/training-data?${params.toString()}`;
+                const response = await makeRequest(url, { method: 'GET' });
+
+                const result = await response.json();
+                displayResponse('query_response', result, response.ok);
+            } catch (error) {
+                displayResponse('query_response', { error: error.message }, false);
+            }
+        }
+
+        // 4. 数据详情查询测试
+        async function testDataDetail() {
+            const datasetId = document.getElementById('detail_datasetId').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            const responseDiv = document.getElementById('detail_response');
+            responseDiv.textContent = '查询中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}`, {
+                    method: 'GET'
+                });
+
+                const result = await response.json();
+                displayResponse('detail_response', result, response.ok);
+            } catch (error) {
+                displayResponse('detail_response', { error: error.message }, false);
+            }
+        }
+
+        // 5. 数据预处理测试
+        async function testPreprocess() {
+            const datasetId = document.getElementById('preprocess_datasetId').value;
+            const methods = document.getElementById('preprocess_methods').value;
+            const parameters = document.getElementById('preprocess_parameters').value;
+
+            if (!datasetId || !methods) {
+                alert('请填写必填字段');
+                return;
+            }
+
+            const responseDiv = document.getElementById('preprocess_response');
+            responseDiv.textContent = '处理中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {
+                    methods: JSON.parse(methods)
+                };
+
+                if (parameters) {
+                    requestData.parameters = JSON.parse(parameters);
+                }
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}/preprocess`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('preprocess_response', result, response.ok);
+            } catch (error) {
+                displayResponse('preprocess_response', { error: error.message }, false);
+            }
+        }
+
+        // 6. 数据验证测试
+        async function testValidation() {
+            const datasetId = document.getElementById('validate_datasetId').value;
+            const rules = document.getElementById('validate_rules').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            const responseDiv = document.getElementById('validate_response');
+            responseDiv.textContent = '验证中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                let requestData = {};
+                if (rules) {
+                    requestData = JSON.parse(rules);
+                }
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}/validate`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('validate_response', result, response.ok);
+            } catch (error) {
+                displayResponse('validate_response', { error: error.message }, false);
+            }
+        }
+
+        // 7. 数据统计测试
+        async function testStatistics() {
+            const vmId = document.getElementById('stats_vmId').value;
+            const dataType = document.getElementById('stats_dataType').value;
+
+            const responseDiv = document.getElementById('stats_response');
+            responseDiv.textContent = '统计中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const params = new URLSearchParams();
+                if (vmId) params.append('vmId', vmId);
+                if (dataType) params.append('dataType', dataType);
+
+                const url = `${API_BASE_URL}/training-data/statistics?${params.toString()}`;
+                const response = await makeRequest(url, { method: 'GET' });
+
+                const result = await response.json();
+                displayResponse('stats_response', result, response.ok);
+            } catch (error) {
+                displayResponse('stats_response', { error: error.message }, false);
+            }
+        }
+
+        // 8. 数据删除测试
+        async function testDelete() {
+            const datasetId = document.getElementById('delete_datasetId').value;
+            const reason = document.getElementById('delete_reason').value;
+            const deleteFile = document.getElementById('delete_file').checked;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            if (!confirm('确定要删除这个数据集吗？')) {
+                return;
+            }
+
+            const responseDiv = document.getElementById('delete_response');
+            responseDiv.textContent = '删除中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {
+                    reason: reason || '测试删除',
+                    deleteFile: deleteFile,
+                    deleteMetadata: false
+                };
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}`, {
+                    method: 'DELETE',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('delete_response', result, response.ok);
+            } catch (error) {
+                displayResponse('delete_response', { error: error.message }, false);
+            }
+        }
+
+        // 9. 数据下载测试
+        async function testDownload() {
+            const datasetId = document.getElementById('download_datasetId').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            const responseDiv = document.getElementById('download_response');
+            responseDiv.textContent = '下载中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}/download`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    // 创建下载链接
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `training_data_${datasetId}.data`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    displayResponse('download_response', {
+                        message: '文件下载已开始',
+                        filename: `training_data_${datasetId}.data`,
+                        size: blob.size
+                    }, true);
+                } else {
+                    const result = await response.json();
+                    displayResponse('download_response', result, false);
+                }
+            } catch (error) {
+                displayResponse('download_response', { error: error.message }, false);
+            }
+        }
+
+        // 10. 数据更新测试
+        async function testUpdate() {
+            const datasetId = document.getElementById('update_datasetId').value;
+            const description = document.getElementById('update_description').value;
+            const tags = document.getElementById('update_tags').value;
+            const metadata = document.getElementById('update_metadata').value;
+
+            if (!datasetId) {
+                alert('请输入数据集ID');
+                return;
+            }
+
+            const responseDiv = document.getElementById('update_response');
+            responseDiv.textContent = '更新中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {};
+                
+                if (description) requestData.description = description;
+                if (tags) requestData.tags = JSON.parse(tags);
+                if (metadata) requestData.metadata = JSON.parse(metadata);
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/${datasetId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('update_response', result, response.ok);
+            } catch (error) {
+                displayResponse('update_response', { error: error.message }, false);
+            }
+        }
+
+        // 11. 批量操作测试
+        async function testBatchOperation() {
+            const operation = document.getElementById('batch_operation').value;
+            const datasetIds = document.getElementById('batch_datasetIds').value;
+            const parameters = document.getElementById('batch_parameters').value;
+
+            if (!operation || !datasetIds) {
+                alert('请填写必填字段');
+                return;
+            }
+
+            const responseDiv = document.getElementById('batch_response');
+            responseDiv.textContent = '批量操作中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {
+                    operation: operation,
+                    datasetIds: JSON.parse(datasetIds)
+                };
+
+                if (parameters) {
+                    requestData.parameters = JSON.parse(parameters);
+                }
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/batch`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('batch_response', result, response.ok);
+            } catch (error) {
+                displayResponse('batch_response', { error: error.message }, false);
+            }
+        }
+
+        // 12. 数据导出测试
+        async function testExport() {
+            const exportType = document.getElementById('export_type').value;
+            const format = document.getElementById('export_format').value;
+            const filters = document.getElementById('export_filters').value;
+            const fields = document.getElementById('export_fields').value;
+
+            if (!exportType) {
+                alert('请选择导出类型');
+                return;
+            }
+
+            const responseDiv = document.getElementById('export_response');
+            responseDiv.textContent = '导出中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const requestData = {
+                    exportType: exportType,
+                    format: format || 'ZIP'
+                };
+
+                if (filters) requestData.filters = JSON.parse(filters);
+                if (fields) requestData.fields = JSON.parse(fields);
+
+                const response = await makeRequest(`${API_BASE_URL}/training-data/export`, {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+                displayResponse('export_response', result, response.ok);
+                
+                // 如果导出成功，显示下载链接提示
+                if (response.ok && result.data && result.data.taskId) {
+                    setTimeout(() => {
+                        const currentResponse = document.getElementById('export_response').textContent;
+                        document.getElementById('export_response').textContent = 
+                            currentResponse + '\n\n💡 提示：导出完成后，可使用任务ID "' + result.data.taskId + '" 在导出文件下载接口中下载文件';
+                    }, 1000);
+                }
+            } catch (error) {
+                displayResponse('export_response', { error: error.message }, false);
+            }
+        }
+
+        // 13. 导出文件下载测试
+        async function testExportDownload() {
+            const taskId = document.getElementById('export_download_taskId').value;
+
+            if (!taskId) {
+                alert('请输入任务ID');
+                return;
+            }
+
+            const responseDiv = document.getElementById('export_download_response');
+            responseDiv.textContent = '下载中...';
+            responseDiv.className = 'response-content loading';
+
+            try {
+                const response = await makeRequest(`${API_BASE_URL}/training-data/export/download/${taskId}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    // 创建下载链接
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `training_data_export_${taskId}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    displayResponse('export_download_response', {
+                        message: '导出文件下载已开始',
+                        taskId: taskId,
+                        filename: `training_data_export_${taskId}.zip`,
+                        size: blob.size
+                    }, true);
+                } else {
+                    const result = await response.json();
+                    displayResponse('export_download_response', result, false);
+                }
+            } catch (error) {
+                displayResponse('export_download_response', { error: error.message }, false);
+            }
+        }
+
+        // 辅助函数
+        function displayResponse(elementId, data, success) {
+            const responseDiv = document.getElementById(elementId);
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+            responseDiv.className = success ? 'response-content success' : 'response-content error';
+        }
+
+        function clearForm(prefix) {
+            const inputs = document.querySelectorAll(`[id^="${prefix}_"]`);
+            inputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    input.checked = prefix === 'delete' && input.id === 'delete_file';
+                } else if (input.type === 'number') {
+                    if (input.id.includes('page')) input.value = '1';
+                    else if (input.id.includes('size')) input.value = '20';
+                    else input.value = '';
+                } else {
+                    input.value = '';
+                }
+            });
+            
+            const responseDiv = document.getElementById(`${prefix}_response`);
+            if (responseDiv) {
+                responseDiv.textContent = '';
+                responseDiv.className = 'response-content';
+            }
+        }
+    </script>
+</body>
+</html>

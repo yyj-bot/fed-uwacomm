@@ -1,6 +1,8 @@
 package com.feduwacomm.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -15,9 +17,10 @@ import java.net.UnknownHostException;
  * @author FedUWAComm Team
  * @version 1.0.0
  */
-@Slf4j
 @Component
 public class IpUtil {
+
+    private static final Logger log = LoggerFactory.getLogger(IpUtil.class);
 
     private static final String UNKNOWN = "unknown";
     private static final String LOCALHOST = "127.0.0.1";

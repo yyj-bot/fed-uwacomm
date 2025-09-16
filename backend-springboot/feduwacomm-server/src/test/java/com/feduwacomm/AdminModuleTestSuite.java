@@ -1,7 +1,8 @@
 package com.feduwacomm;
 
-import org.junit.platform.suite.api.IncludeClassNamePatterns;
-import org.junit.platform.suite.api.SelectPackages;
+import com.feduwacomm.controller.AdminControllerTest;
+import com.feduwacomm.service.AdminServiceTest;
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 import org.junit.platform.suite.api.SuiteDisplayName;
 
@@ -19,11 +20,10 @@ import org.junit.platform.suite.api.SuiteDisplayName;
  */
 @Suite
 @SuiteDisplayName("Admin模块测试套件")
-@SelectPackages({
-        "com.feduwacomm.controller",
-        "com.feduwacomm.service"
+@SelectClasses({
+        AdminControllerTest.class,
+        AdminServiceTest.class
 })
-@IncludeClassNamePatterns("Admin.*Test")
 public class AdminModuleTestSuite {
 
     /**

@@ -49,6 +49,16 @@ ALTER TABLE vm_runtime_logs
 DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_task_id;
 -- task_id -> federated_tasks(id)
 
+-- 删除虚拟机轮次模型结果表外键约束
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
+ALTER TABLE vm_round_models
+DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
+
+-- 删除虚拟机刷新凭证表外键约束
+ALTER TABLE vm_secrets
+DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
+
 -- =====================================================
 -- 删除索引
 -- =====================================================
@@ -56,15 +66,9 @@ DROP FOREIGN KEY IF EXISTS fk_vm_runtime_logs_task_id;
 
 -- 删除用户表索引
 DROP INDEX IF EXISTS idx_users_username ON users;
-
-DROP INDEX IF EXISTS idx_users_account ON users;
-
 DROP INDEX IF EXISTS idx_users_email ON users;
-
 DROP INDEX IF EXISTS idx_users_role ON users;
-
 DROP INDEX IF EXISTS idx_users_status ON users;
-
 DROP INDEX IF EXISTS idx_users_created_at ON users;
 
 -- 删除用户权限表索引
@@ -77,8 +81,12 @@ DROP INDEX IF EXISTS idx_user_permissions_resource_id ON user_permissions;
 DROP INDEX IF EXISTS idx_user_permissions_permission ON user_permissions;
 
 -- 删除虚拟机表索引
+DROP INDEX IF EXISTS idx_vm_status ON vm_instances;
+DROP INDEX IF EXISTS idx_vm_connection_status ON vm_instances;
+DROP INDEX IF EXISTS idx_vm_ip_address ON vm_instances;
+DROP INDEX IF EXISTS idx_vm_secret_id ON vm_instances;
+DROP INDEX IF EXISTS idx_vm_created_at ON vm_instances;
 DROP INDEX IF EXISTS idx_vm_instances_connection_status ON vm_instances;
-
 DROP INDEX IF EXISTS idx_vm_instances_last_heartbeat ON vm_instances;
 
 -- 删除联邦学习任务表索引
@@ -100,63 +108,40 @@ DROP INDEX IF EXISTS idx_model_versions_task_id ON model_versions;
 
 DROP INDEX IF EXISTS idx_model_versions_round_number ON model_versions;
 
--- 虚拟机轮次模型结果表索引
+-- 删除虚拟机轮次模型结果表索引
 DROP INDEX IF EXISTS uq_vm_round_models_task_vm_round ON vm_round_models;
-
 DROP INDEX IF EXISTS idx_vm_round_models_task_id ON vm_round_models;
-
 DROP INDEX IF EXISTS idx_vm_round_models_vm_id ON vm_round_models;
-
 DROP INDEX IF EXISTS idx_vm_round_models_round_number ON vm_round_models;
 
--- 虚拟机刷新凭证表索引
+-- 删除虚拟机刷新凭证表索引
 DROP INDEX IF EXISTS uq_vm_secrets_active ON vm_secrets;
-
 DROP INDEX IF EXISTS idx_vm_secrets_vm_id ON vm_secrets;
-
 DROP INDEX IF EXISTS idx_vm_secrets_status ON vm_secrets;
-
--- 删除虚拟机轮次模型结果表外键
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_task_id;
-
-ALTER TABLE vm_round_models
-DROP FOREIGN KEY IF EXISTS fk_vm_round_models_vm_id;
-
--- 删除虚拟机刷新凭证表外键
-ALTER TABLE vm_secrets
-DROP FOREIGN KEY IF EXISTS fk_vm_secrets_vm_id;
-
--- 删除虚拟机轮次模型结果表
-DROP TABLE IF EXISTS vm_round_models;
-
--- 删除虚拟机刷新凭证表
-DROP TABLE IF EXISTS vm_secrets;
 
 -- 删除SpringBoot系统日志表索引
 DROP INDEX IF EXISTS idx_timestamp ON system_logs;
-
 DROP INDEX IF EXISTS idx_level ON system_logs;
-
 DROP INDEX IF EXISTS idx_user_id ON system_logs;
-
 DROP INDEX IF EXISTS idx_request_uri ON system_logs;
 
 -- 删除虚拟机运行日志表索引
 DROP INDEX IF EXISTS idx_level ON vm_runtime_logs;
-
 DROP INDEX IF EXISTS idx_category ON vm_runtime_logs;
-
 DROP INDEX IF EXISTS idx_vm_id ON vm_runtime_logs;
-
 DROP INDEX IF EXISTS idx_task_id ON vm_runtime_logs;
-
 DROP INDEX IF EXISTS idx_created_at ON vm_runtime_logs;
 
 -- =====================================================
 -- 删除表
 -- =====================================================
 -- 按照依赖关系顺序删除表（先删除被引用的表）
+
+-- 删除虚拟机刷新凭证表
+DROP TABLE IF EXISTS vm_secrets;
+
+-- 删除虚拟机轮次模型结果表
+DROP TABLE IF EXISTS vm_round_models;
 
 -- 删除虚拟机运行日志表（依赖vm_instances和federated_tasks）
 DROP TABLE IF EXISTS vm_runtime_logs;

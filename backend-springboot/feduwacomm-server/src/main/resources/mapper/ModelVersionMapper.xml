@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feduwacomm.mapper.ModelVersionMapper">
+
+    <!-- 结果集映射 -->
+    <resultMap id="ModelVersionResultMap" type="com.feduwacomm.entity.ModelVersion">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="round_number" property="roundNumber"/>
+        <result column="aggregation_method" property="aggregationMethod"/>
+        <result column="client_count" property="clientCount"/>
+        <result column="model_json" property="modelJson"/>
+        <result column="accuracy" property="accuracy"/>
+        <result column="loss" property="loss"/>
+        <result column="metrics" property="metrics"/>
+        <result column="status" property="status"/>
+        <result column="description" property="description"/>
+        <result column="file_path" property="filePath"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="file_format" property="fileFormat"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="aggregated_at" property="aggregatedAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="parameters" property="parameters"/>
+    </resultMap>
+
+    <!-- 基础查询SQL -->
+    <sql id="Base_Column_List">
+        id, task_id, round_number, aggregation_method, client_count, model_json,
+        accuracy, loss, metrics, status, description, file_path, file_size,
+        file_format, created_at, aggregated_at, updated_at, created_by,
+        updated_by, parameters
+    </sql>
+
+    <!-- 根据ID查询 -->
+    <select id="selectById" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE id = #{id}
+    </select>
+
+    <!-- 根据任务ID查询 -->
+    <select id="selectByTaskId" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE task_id = #{taskId}
+        ORDER BY round_number ASC, created_at DESC
+    </select>
+
+    <!-- 根据任务ID和轮次查询 -->
+    <select id="selectByTaskIdAndRound" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE task_id = #{taskId} AND round_number = #{roundNumber}
+    </select>
+
+    <!-- 分页查询 -->
+    <select id="selectByPage" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        <where>
+            <if test="taskId != null and taskId != ''">
+                AND task_id = #{taskId}
+            </if>
+            <if test="roundNumber != null">
+                AND round_number = #{roundNumber}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        <choose>
+            <when test="sort != null and sort != ''">
+                ORDER BY ${sort}
+                <choose>
+                    <when test="order == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                ORDER BY created_at DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 条件查询总数 -->
+    <select id="countByCondition" resultType="int">
+        SELECT COUNT(*)
+        FROM model_versions
+        <where>
+            <if test="taskId != null and taskId != ''">
+                AND task_id = #{taskId}
+            </if>
+            <if test="roundNumber != null">
+                AND round_number = #{roundNumber}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <!-- 插入 -->
+    <insert id="insert">
+        INSERT INTO model_versions (
+            id, task_id, round_number, aggregation_method, client_count, model_json,
+            accuracy, loss, metrics, status, description, file_path, file_size,
+            file_format, created_at, aggregated_at, updated_at, created_by,
+            updated_by, parameters
+        ) VALUES (
+            #{id}, #{taskId}, #{roundNumber}, #{aggregationMethod}, #{clientCount}, #{modelJson},
+            #{accuracy}, #{loss}, #{metrics}, #{status}, #{description}, #{filePath}, #{fileSize},
+            #{fileFormat}, #{createdAt}, #{aggregatedAt}, #{updatedAt}, #{createdBy},
+            #{updatedBy}, #{parameters}
+        )
+    </insert>
+
+    <!-- 更新 -->
+    <update id="update">
+        UPDATE model_versions
+        <set>
+            <if test="aggregationMethod != null">aggregation_method = #{aggregationMethod},</if>
+            <if test="clientCount != null">client_count = #{clientCount},</if>
+            <if test="modelJson != null">model_json = #{modelJson},</if>
+            <if test="accuracy != null">accuracy = #{accuracy},</if>
+            <if test="loss != null">loss = #{loss},</if>
+            <if test="metrics != null">metrics = #{metrics},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="fileFormat != null">file_format = #{fileFormat},</if>
+            <if test="aggregatedAt != null">aggregated_at = #{aggregatedAt},</if>
+            <if test="updatedBy != null">updated_by = #{updatedBy},</if>
+            <if test="parameters != null">parameters = #{parameters},</if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新状态 -->
+    <update id="updateStatus">
+        UPDATE model_versions
+        SET status = #{status}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新评估指标 -->
+    <update id="updateMetrics">
+        UPDATE model_versions
+        SET accuracy = #{accuracy}, loss = #{loss}, metrics = #{metrics}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除 -->
+    <delete id="deleteById">
+        DELETE FROM model_versions WHERE id = #{id}
+    </delete>
+
+    <!-- 批量删除 -->
+    <delete id="deleteByIds">
+        DELETE FROM model_versions WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 统计总数 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM model_versions
+    </select>
+
+    <!-- 根据任务ID统计数量 -->
+    <select id="countByTaskId" resultType="int">
+        SELECT COUNT(*) FROM model_versions WHERE task_id = #{taskId}
+    </select>
+
+    <!-- 根据状态统计数量 -->
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM model_versions WHERE status = #{status}
+    </select>
+
+    <!-- 查询最佳准确率模型 -->
+    <select id="selectBestAccuracyByTaskId" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE task_id = #{taskId} AND accuracy IS NOT NULL
+        ORDER BY accuracy DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询最大轮次 -->
+    <select id="selectMaxRoundByTaskId" resultType="int">
+        SELECT MAX(round_number)
+        FROM model_versions
+        WHERE task_id = #{taskId}
+    </select>
+
+    <!-- 查询准确率趋势 -->
+    <select id="selectAccuracyTrendByTaskId" resultMap="ModelVersionResultMap">
+        SELECT round_number, accuracy
+        FROM model_versions
+        WHERE task_id = #{taskId} AND accuracy IS NOT NULL
+        ORDER BY round_number ASC
+    </select>
+
+    <!-- 查询上传趋势统计 -->
+    <select id="selectUploadTrendByDateRange" resultType="map">
+        SELECT DATE(created_at) as date, COUNT(*) as count
+        FROM model_versions
+        WHERE created_at BETWEEN #{startDate} AND #{endDate}
+        <if test="taskId != null and taskId != ''">
+            AND task_id = #{taskId}
+        </if>
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at) ASC
+    </select>
+
+    <!-- 计算平均准确率 -->
+    <select id="selectAverageAccuracy" resultType="string">
+        SELECT AVG(accuracy)
+        FROM model_versions
+        WHERE accuracy IS NOT NULL
+        <if test="taskId != null and taskId != ''">
+            AND task_id = #{taskId}
+        </if>
+    </select>
+
+    <!-- 计算平均损失值 -->
+    <select id="selectAverageLoss" resultType="string">
+        SELECT AVG(loss)
+        FROM model_versions
+        WHERE loss IS NOT NULL
+        <if test="taskId != null and taskId != ''">
+            AND task_id = #{taskId}
+        </if>
+    </select>
+
+    <!-- 查询已部署的模型 -->
+    <select id="selectDeployedModels" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE status = 'DEPLOYED'
+        ORDER BY updated_at DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 查询可回滚的模型版本 -->
+    <select id="selectRollbackCandidates" resultMap="ModelVersionResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM model_versions
+        WHERE task_id = #{taskId} AND id != #{currentModelId} AND status = 'VALIDATED'
+        ORDER BY round_number DESC
+    </select>
+
+</mapper>

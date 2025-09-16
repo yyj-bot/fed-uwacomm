@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 基础上下文类
@@ -37,51 +36,24 @@ public class BaseContext {
 
     private static final Logger log = LoggerFactory.getLogger(BaseContext.class);
 
-    // 使用单例模式保证全局唯一
-    private static final AtomicReference<BaseContext> INSTANCE = new AtomicReference<>();
-
-    private final ThreadLocal<String> userIdHolder = new ThreadLocal<>();
-    private final ThreadLocal<String> usernameHolder = new ThreadLocal<>();
-    private final ThreadLocal<String> userRoleHolder = new ThreadLocal<>();
+    // 使用ThreadLocal存储线程独立的用户信息
+    private static final ThreadLocal<String> userIdHolder = new ThreadLocal<>();
+    private static final ThreadLocal<String> usernameHolder = new ThreadLocal<>();
+    private static final ThreadLocal<String> userRoleHolder = new ThreadLocal<>();
 
     /**
-     * 私有构造函数，防止外部实例化
+     * 构造函数
      */
-    private BaseContext() {
+    public BaseContext() {
         log.debug("BaseContext实例已创建");
     }
 
-    /**
-     * 获取BaseContext单例实例
-     * 如果Spring容器中已有实例，则返回Spring管理的实例
-     * 否则创建新的单例实例
-     */
-    public static BaseContext getInstance() {
-        BaseContext instance = INSTANCE.get();
-        if (instance == null) {
-            instance = new BaseContext();
-            if (INSTANCE.compareAndSet(null, instance)) {
-                log.debug("创建BaseContext单例实例");
-            } else {
-                instance = INSTANCE.get();
-            }
-        }
-        return instance;
-    }
-
-    /**
-     * 设置Spring管理的实例（由Spring容器调用）
-     */
-    public void setSpringInstance(BaseContext instance) {
-        INSTANCE.set(instance);
-        log.debug("设置Spring管理的BaseContext实例");
-    }
 
     /**
      * 设置当前线程的用户ID
      */
     public static void setUserId(String userId) {
-        getInstance().userIdHolder.set(userId);
+        userIdHolder.set(userId);
         log.debug("设置当前线程用户ID: {}", userId);
     }
 
@@ -89,7 +61,7 @@ public class BaseContext {
      * 获取当前线程的用户ID
      */
     public static String getUserId() {
-        String userId = getInstance().userIdHolder.get();
+        String userId = userIdHolder.get();
         log.debug("获取当前线程用户ID: {}", userId);
         return userId;
     }
@@ -98,7 +70,7 @@ public class BaseContext {
      * 设置当前线程的用户名
      */
     public static void setUsername(String username) {
-        getInstance().usernameHolder.set(username);
+        usernameHolder.set(username);
         log.debug("设置当前线程用户名: {}", username);
     }
 
@@ -106,7 +78,7 @@ public class BaseContext {
      * 获取当前线程的用户名
      */
     public static String getUsername() {
-        String username = getInstance().usernameHolder.get();
+        String username = usernameHolder.get();
         log.debug("获取当前线程用户名: {}", username);
         return username;
     }
@@ -115,7 +87,7 @@ public class BaseContext {
      * 设置当前线程的用户角色
      */
     public static void setUserRole(String userRole) {
-        getInstance().userRoleHolder.set(userRole);
+        userRoleHolder.set(userRole);
         log.debug("设置当前线程用户角色: {}", userRole);
     }
 
@@ -123,7 +95,7 @@ public class BaseContext {
      * 获取当前线程的用户角色
      */
     public static String getUserRole() {
-        String userRole = getInstance().userRoleHolder.get();
+        String userRole = userRoleHolder.get();
         log.debug("获取当前线程用户角色: {}", userRole);
         return userRole;
     }
@@ -143,9 +115,9 @@ public class BaseContext {
      * 清除当前线程的所有用户信息
      */
     public static void clear() {
-        getInstance().userIdHolder.remove();
-        getInstance().usernameHolder.remove();
-        getInstance().userRoleHolder.remove();
+        userIdHolder.remove();
+        usernameHolder.remove();
+        userRoleHolder.remove();
         log.debug("清除当前线程所有用户信息");
     }
 
@@ -168,6 +140,13 @@ public class BaseContext {
      * 获取当前用户ID（别名方法）
      */
     public static String getCurrentUserId() {
+        return getUserId();
+    }
+    
+    /**
+     * 获取当前用户ID（另一个别名方法）
+     */
+    public static String getCurrentId() {
         return getUserId();
     }
 }

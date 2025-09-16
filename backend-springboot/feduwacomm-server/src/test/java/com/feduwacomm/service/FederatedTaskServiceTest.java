@@ -1,0 +1,604 @@
+package com.feduwacomm.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.feduwacomm.dto.*;
+import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.exception.UserException;
+import com.feduwacomm.mapper.FederatedTasksMapper;
+import com.feduwacomm.service.impl.FederatedTaskServiceImpl;
+import com.feduwacomm.vo.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.time.LocalDateTime;
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * 联邦任务服务测试类
+ * 测试任务生命周期管理、参与者管理等核心功能
+ */
+@SpringBootTest
+@SpringJUnitConfig
+@ActiveProfiles("test")
+public class FederatedTaskServiceTest {
+
+    @MockBean
+    private FederatedTasksMapper tasksMapper;
+
+    @MockBean
+    private LogService logService;
+
+    @MockBean
+    private ObjectMapper objectMapper;
+
+    private FederatedTaskService federatedTaskService;
+
+    private TaskCreateDTO sampleCreateDTO;
+    private TaskConfigDTO sampleConfigDTO;
+    private FederatedTask sampleTask;
+    private TaskParticipant sampleParticipant;
+
+    @BeforeEach
+    void setUp() {
+        // 重置mock对象
+        reset(tasksMapper, logService, objectMapper);
+
+        // 创建服务实例
+        federatedTaskService = new FederatedTaskServiceImpl();
+        
+        // 通过反射或其他方式注入mock对象（在实际环境中Spring会自动注入）
+        injectMocks();
+
+        // 准备测试数据
+        setupTestData();
+    }
+
+    private void injectMocks() {
+        try {
+            // 使用反射注入mock对象
+            var tasksMapperField = FederatedTaskServiceImpl.class.getDeclaredField("tasksMapper");
+            tasksMapperField.setAccessible(true);
+            tasksMapperField.set(federatedTaskService, tasksMapper);
+
+            var logServiceField = FederatedTaskServiceImpl.class.getDeclaredField("logService");
+            logServiceField.setAccessible(true);
+            logServiceField.set(federatedTaskService, logService);
+
+            var objectMapperField = FederatedTaskServiceImpl.class.getDeclaredField("objectMapper");
+            objectMapperField.setAccessible(true);
+            objectMapperField.set(federatedTaskService, objectMapper);
+        } catch (Exception e) {
+            // 在实际测试中，Spring会自动处理依赖注入
+        }
+    }
+
+    private void setupTestData() {
+        // 准备参与者数据
+        List<TaskCreateDTO.ParticipantDTO> participants = Arrays.asList(
+                TaskCreateDTO.ParticipantDTO.builder()
+                        .vmId("vm-001")
+                        .dataSource("/data/vm001/dataset")
+                        .role("PARTICIPANT")
+                        .build(),
+                TaskCreateDTO.ParticipantDTO.builder()
+                        .vmId("vm-002")
+                        .dataSource("/data/vm002/dataset")
+                        .role("PARTICIPANT")
+                        .build()
+        );
+
+        // 准备创建任务DTO
+        sampleCreateDTO = TaskCreateDTO.builder()
+                .taskName("联邦学习测试任务")
+                .taskType("CLASSIFICATION")
+                .description("用于测试的联邦学习任务")
+                .algorithm("FedAvg")
+                .participants(participants)
+                .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
+                        .learningRate(0.01)
+                        .batchSize(32)
+                        .epochs(5)
+                        .rounds(10)
+                        .minParticipants(2)
+                        .build())
+                .modelConfig(TaskCreateDTO.ModelConfigDTO.builder()
+                        .modelType("CNN")
+                        .build())
+                .build();
+
+        // 准备配置任务DTO
+        sampleConfigDTO = TaskConfigDTO.builder()
+                .algorithm("FedAvg")
+                .hyperparameters(TaskConfigDTO.HyperparametersDTO.builder()
+                        .learningRate(0.001)
+                        .batchSize(64)
+                        .epochs(8)
+                        .rounds(15)
+                        .build())
+                .build();
+
+        // 准备任务实体
+        sampleTask = FederatedTask.builder()
+                .id("task-12345")
+                .taskName("联邦学习测试任务")
+                .taskType("CLASSIFICATION")
+                .description("用于测试的联邦学习任务")
+                .status("CREATED")
+                .algorithm("FedAvg")
+                .modelType("CNN")
+                .totalRounds(10)
+                .currentRound(0)
+                .minParticipants(2)
+                .createdBy("admin")
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        // 准备参与者实体
+        sampleParticipant = TaskParticipant.builder()
+                .taskId("task-12345")
+                .vmId("vm-001")
+                .status("CONNECTED")
+                .dataSource("/data/vm001/dataset")
+                .role("PARTICIPANT")
+                .joinedAt(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * 测试创建任务 - 成功场景
+     */
+    @Test
+    void testCreateTask_Success() {
+        // Mock mapper操作成功
+        when(tasksMapper.insertTask(any(FederatedTask.class))).thenReturn(1);
+        when(tasksMapper.insertParticipant(any(TaskParticipant.class))).thenReturn(1);
+        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+
+        // 调用服务方法
+        TaskOperationVO result = federatedTaskService.createTask(sampleCreateDTO, "admin");
+
+        // 验证结果
+        assertNotNull(result);
+        assertNotNull(result.getTaskId());
+        assertEquals("联邦学习测试任务", result.getTaskName());
+        assertEquals("CREATED", result.getStatus());
+        assertEquals("admin", result.getCreatedBy());
+        assertEquals(2, result.getParticipantCount());
+        assertTrue(result.getEstimatedDuration() > 0);
+
+        // 验证mapper调用
+        verify(tasksMapper).insertTask(any(FederatedTask.class));
+        verify(tasksMapper, times(2)).insertParticipant(any(TaskParticipant.class));
+
+        // 验证日志记录
+        verify(logService).logTask(anyString(), eq("INFO"), eq("任务创建成功"), eq("TASK_MANAGER"), isNull(), any());
+    }
+
+    /**
+     * 测试创建任务 - 无效配置
+     */
+    @Test
+    void testCreateTask_InvalidConfig() {
+        // 准备无效的创建DTO
+        TaskCreateDTO invalidCreateDTO = TaskCreateDTO.builder()
+                .taskName("")  // 空名称
+                .taskType("CLASSIFICATION")
+                .algorithm("FedAvg")
+                .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
+                        .rounds(-1)  // 无效轮数
+                        .minParticipants(0)  // 无效最小参与者数
+                        .build())
+                .participants(new ArrayList<>())  // 空参与者列表
+                .build();
+
+        // 调用服务方法应该抛出异常
+        assertThrows(UserException.class, () -> {
+            federatedTaskService.createTask(invalidCreateDTO, "admin");
+        });
+
+        // 验证不会调用数据库操作
+        verify(tasksMapper, never()).insertTask(any(FederatedTask.class));
+        verify(tasksMapper, never()).insertParticipant(any(TaskParticipant.class));
+    }
+
+    /**
+     * 测试创建任务 - 数据库插入失败
+     */
+    @Test
+    void testCreateTask_DatabaseInsertFailure() {
+        // Mock mapper操作失败
+        when(tasksMapper.insertTask(any(FederatedTask.class))).thenReturn(0);
+
+        // 调用服务方法应该抛出异常
+        assertThrows(UserException.class, () -> {
+            federatedTaskService.createTask(sampleCreateDTO, "admin");
+        });
+
+        // 验证mapper调用
+        verify(tasksMapper).insertTask(any(FederatedTask.class));
+        verify(tasksMapper, never()).insertParticipant(any(TaskParticipant.class));
+    }
+
+    /**
+     * 测试配置任务 - 成功场景
+     */
+    @Test
+    void testConfigureTask_Success() {
+        String taskId = "task-12345";
+        
+        // Mock任务存在且状态为CREATED
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(sampleTask);
+        when(tasksMapper.updateTask(any(FederatedTask.class))).thenReturn(1);
+        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+
+        // 调用服务方法
+        TaskOperationVO result = federatedTaskService.configureTask(taskId, sampleConfigDTO, "admin");
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(taskId, result.getTaskId());
+        assertEquals("CONFIGURED", result.getStatus());
+        assertNotNull(result.getUpdatedAt());
+        assertEquals("v1.1", result.getConfigVersion());
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper).updateTask(any(FederatedTask.class));
+
+        // 验证日志记录
+        verify(logService).logTask(anyString(), eq("INFO"), eq("任务配置更新"), eq("TASK_MANAGER"), isNull(), isNull());
+    }
+
+    /**
+     * 测试配置任务 - 任务不存在
+     */
+    @Test
+    void testConfigureTask_TaskNotFound() {
+        String taskId = "non-existent-task";
+        
+        // Mock任务不存在
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(null);
+
+        // 调用服务方法应该抛出异常
+        assertThrows(UserException.class, () -> {
+            federatedTaskService.configureTask(taskId, sampleConfigDTO, "admin");
+        });
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper, never()).updateTask(any(FederatedTask.class));
+    }
+
+    /**
+     * 测试配置任务 - 任务状态不允许配置
+     */
+    @Test
+    void testConfigureTask_InvalidStatus() {
+        String taskId = "task-12345";
+        
+        // 创建状态为RUNNING的任务（不允许配置）
+        FederatedTask runningTask = FederatedTask.builder()
+                .id(taskId)
+                .status("RUNNING")
+                .build();
+        
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(runningTask);
+
+        // 调用服务方法应该抛出异常
+        assertThrows(UserException.class, () -> {
+            federatedTaskService.configureTask(taskId, sampleConfigDTO, "admin");
+        });
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper, never()).updateTask(any(FederatedTask.class));
+    }
+
+    /**
+     * 测试启动任务 - 成功场景
+     */
+    @Test
+    void testStartTask_Success() {
+        String taskId = "task-12345";
+        
+        // Mock任务存在且状态为CONFIGURED
+        FederatedTask configuredTask = FederatedTask.builder()
+                .id(taskId)
+                .status("CONFIGURED")
+                .build();
+        
+        List<TaskParticipant> participants = Arrays.asList(
+                TaskParticipant.builder().vmId("vm-001").dataSource("/data/vm001").build(),
+                TaskParticipant.builder().vmId("vm-002").dataSource("/data/vm002").build()
+        );
+
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(configuredTask);
+        when(tasksMapper.selectParticipantsByTaskId(taskId)).thenReturn(participants);
+        when(tasksMapper.updateTaskStatus(eq(taskId), eq("RUNNING"), any(LocalDateTime.class))).thenReturn(1);
+        when(tasksMapper.updateParticipantStatus(eq(taskId), anyString(), eq("CONNECTED"), any(LocalDateTime.class))).thenReturn(1);
+        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+
+        // 调用服务方法
+        TaskOperationVO result = federatedTaskService.startTask(taskId, "admin");
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(taskId, result.getTaskId());
+        assertEquals("RUNNING", result.getStatus());
+        assertNotNull(result.getStartedAt());
+        assertEquals(0, result.getCurrentRound());
+        assertNotNull(result.getParticipants());
+        assertEquals(2, result.getParticipants().size());
+
+        // 验证所有参与者状态为CONNECTED
+        for (TaskOperationVO.ParticipantStatus ps : result.getParticipants()) {
+            assertEquals("CONNECTED", ps.getStatus());
+        }
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper).selectParticipantsByTaskId(taskId);
+        verify(tasksMapper).updateTaskStatus(eq(taskId), eq("RUNNING"), any(LocalDateTime.class));
+        verify(tasksMapper, times(2)).updateParticipantStatus(eq(taskId), anyString(), eq("CONNECTED"), any(LocalDateTime.class));
+
+        // 验证日志记录
+        verify(logService).logTask(anyString(), eq("INFO"), eq("任务启动成功"), eq("TASK_MANAGER"), isNull(), any());
+    }
+
+    /**
+     * 测试启动任务 - 任务状态不允许启动
+     */
+    @Test
+    void testStartTask_InvalidStatus() {
+        String taskId = "task-12345";
+        
+        // Mock任务状态为CREATED（需要先配置才能启动）
+        FederatedTask createdTask = FederatedTask.builder()
+                .id(taskId)
+                .status("CREATED")
+                .build();
+        
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(createdTask);
+
+        // 调用服务方法应该抛出异常
+        UserException exception = assertThrows(UserException.class, () -> {
+            federatedTaskService.startTask(taskId, "admin");
+        });
+
+        assertTrue(exception.getMessage().contains("任务状态不允许启动"));
+        assertTrue(exception.getMessage().contains("CREATED"));
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper, never()).updateTaskStatus(anyString(), anyString(), any(LocalDateTime.class));
+    }
+
+    /**
+     * 测试暂停任务功能
+     */
+    @Test
+    void testPauseTask_Success() {
+        String taskId = "task-12345";
+        
+        // Mock任务存在且状态为RUNNING
+        FederatedTask runningTask = FederatedTask.builder()
+                .id(taskId)
+                .status("RUNNING")
+                .build();
+        
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(runningTask);
+
+        // 调用服务方法
+        TaskOperationVO result = federatedTaskService.pauseTask(taskId, "admin");
+
+        // 验证基本结果
+        assertNotNull(result);
+        assertEquals(taskId, result.getTaskId());
+        // 根据实际实现验证其他字段
+    }
+
+    /**
+     * 测试任务详情查询
+     */
+    @Test
+    void testGetTaskDetail() {
+        String taskId = "task-12345";
+        
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(sampleTask);
+        when(tasksMapper.selectParticipantsByTaskId(taskId)).thenReturn(Arrays.asList(sampleParticipant));
+
+        TaskDetailVO result = federatedTaskService.getTaskDetail(taskId);
+
+        assertNotNull(result);
+        assertEquals(taskId, result.getTaskId());
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(taskId);
+        verify(tasksMapper).selectParticipantsByTaskId(taskId);
+    }
+
+    /**
+     * 测试添加任务参与者
+     */
+    @Test
+    void testAddParticipant() {
+        String taskId = "task-12345";
+        TaskParticipant participant = TaskParticipant.builder()
+                .id(taskId)
+                .vmId("vm-003")
+                .status("PENDING")
+                .build();
+
+        when(tasksMapper.insertParticipant(participant)).thenReturn(1);
+
+        // 调用服务方法
+        federatedTaskService.addParticipant(taskId, participant);
+
+        // 验证mapper调用
+        verify(tasksMapper).insertParticipant(participant);
+    }
+
+    /**
+     * 测试更新参与者状态
+     */
+    @Test
+    void testUpdateParticipantStatus() {
+        String taskId = "task-12345";
+        String vmId = "vm-001";
+        String status = "CONNECTED";
+
+        when(tasksMapper.updateParticipantStatus(eq(taskId), eq(vmId), eq(status), any(LocalDateTime.class))).thenReturn(1);
+
+        // 调用服务方法
+        federatedTaskService.updateParticipantStatus(taskId, vmId, status);
+
+        // 验证mapper调用
+        verify(tasksMapper).updateParticipantStatus(eq(taskId), eq(vmId), eq(status), any(LocalDateTime.class));
+    }
+
+    /**
+     * 测试任务存在检查
+     */
+    @Test
+    void testTaskExists() {
+        String existingTaskId = "existing-task";
+        String nonExistentTaskId = "non-existent-task";
+
+        when(tasksMapper.selectTaskById(existingTaskId)).thenReturn(sampleTask);
+        when(tasksMapper.selectTaskById(nonExistentTaskId)).thenReturn(null);
+
+        // 测试存在的任务
+        assertTrue(federatedTaskService.taskExists(existingTaskId));
+
+        // 测试不存在的任务
+        assertFalse(federatedTaskService.taskExists(nonExistentTaskId));
+
+        // 验证mapper调用
+        verify(tasksMapper).selectTaskById(existingTaskId);
+        verify(tasksMapper).selectTaskById(nonExistentTaskId);
+    }
+
+    /**
+     * 测试任务配置验证
+     */
+    @Test
+    void testIsValidTaskConfig() {
+        // 测试有效配置
+        assertTrue(federatedTaskService.isValidTaskConfig(sampleCreateDTO));
+
+        // 测试无效配置 - 空任务名
+        TaskCreateDTO invalidDTO1 = TaskCreateDTO.builder()
+                .taskName("")
+                .build();
+        assertFalse(federatedTaskService.isValidTaskConfig(invalidDTO1));
+
+        // 测试无效配置 - 负数轮数
+        TaskCreateDTO invalidDTO2 = TaskCreateDTO.builder()
+                .taskName("Test Task")
+                .taskType("CLASSIFICATION")
+                .algorithm("FedAvg")
+                .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
+                        .rounds(-1)
+                        .build())
+                .build();
+        assertFalse(federatedTaskService.isValidTaskConfig(invalidDTO2));
+
+        // 测试无效配置 - 空参与者列表
+        TaskCreateDTO invalidDTO3 = TaskCreateDTO.builder()
+                .taskName("Test Task")
+                .taskType("CLASSIFICATION")
+                .algorithm("FedAvg")
+                .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
+                        .rounds(10)
+                        .build())
+                .participants(new ArrayList<>())
+                .build();
+        assertFalse(federatedTaskService.isValidTaskConfig(invalidDTO3));
+    }
+
+    /**
+     * 测试状态转换验证
+     */
+    @Test
+    void testIsValidStatusTransition() {
+        // 测试有效的状态转换
+        assertTrue(federatedTaskService.isValidStatusTransition("CREATED", "CONFIGURED"));
+        assertTrue(federatedTaskService.isValidStatusTransition("CONFIGURED", "RUNNING"));
+        assertTrue(federatedTaskService.isValidStatusTransition("RUNNING", "PAUSED"));
+        assertTrue(federatedTaskService.isValidStatusTransition("PAUSED", "RUNNING"));
+        assertTrue(federatedTaskService.isValidStatusTransition("RUNNING", "COMPLETED"));
+
+        // 测试无效的状态转换
+        assertFalse(federatedTaskService.isValidStatusTransition("CREATED", "RUNNING"));
+        assertFalse(federatedTaskService.isValidStatusTransition("COMPLETED", "RUNNING"));
+        assertFalse(federatedTaskService.isValidStatusTransition("CANCELLED", "RUNNING"));
+    }
+
+    /**
+     * 测试任务进度计算
+     */
+    @Test
+    void testCalculateTaskProgress() {
+        String taskId = "task-12345";
+        
+        // Mock任务当前轮数为5，最大轮数为10
+        FederatedTask taskWithProgress = FederatedTask.builder()
+                .id(taskId)
+                .currentRound(5)
+                .totalRounds(10)
+                .build();
+        
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(taskWithProgress);
+
+        double progress = federatedTaskService.calculateTaskProgress(taskId);
+
+        assertEquals(50.0, progress, 0.001);
+    }
+
+    /**
+     * 测试任务执行时间估算
+     */
+    @Test
+    void testEstimateTaskDuration() {
+        // 使用样例创建DTO进行估算
+        int estimatedDuration = federatedTaskService.estimateTaskDuration(sampleCreateDTO);
+
+        // 验证估算时间为正数
+        assertTrue(estimatedDuration > 0);
+        
+        // 根据任务配置验证估算的合理性（轮数、epochs等影响执行时间）
+        assertTrue(estimatedDuration > sampleCreateDTO.getHyperparameters().getRounds() * sampleCreateDTO.getHyperparameters().getEpochs());
+    }
+
+    /**
+     * 测试记录任务日志
+     */
+    @Test
+    void testLogTask() {
+        String taskId = "task-12345";
+        String level = "INFO";
+        String message = "测试日志消息";
+        String source = "TEST";
+        String vmId = "vm-001";
+        Object details = Map.of("key", "value");
+
+        doNothing().when(logService).logTask(taskId, level, message, source, vmId, details);
+
+        // 调用服务方法
+        federatedTaskService.logTask(taskId, level, message, source, vmId, details);
+
+        // 验证日志服务调用
+        verify(logService).logTask(taskId, level, message, source, vmId, details);
+    }
+}
