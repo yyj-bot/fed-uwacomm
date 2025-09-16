@@ -11,6 +11,7 @@ import com.feduwacomm.vo.*;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,18 +28,21 @@ public class LogController {
     private LogService logService;
 
     @GetMapping("/list")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<PageResult<LogListVO>> queryLogs(@Valid LogQueryDTO queryDTO) {
         PageResult<LogListVO> pageResult = logService.queryLogs(queryDTO);
         return Result.success(pageResult);
     }
 
     @GetMapping("/detail/{logId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogDetailVO> getLogDetail(@PathVariable String logId) {
         LogDetailVO logDetail = logService.getLogDetail(logId);
         return Result.success(logDetail);
     }
 
     @GetMapping("/realtime")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<RealtimeLogVO> getRealtimeLogs(@Valid LogQueryDTO queryDTO) {
         List<LogListVO> logs = logService.getRealtimeLogs(queryDTO);
         RealtimeLogVO realtimeLog = RealtimeLogVO.builder()
@@ -49,6 +53,7 @@ public class LogController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogStatisticsVO> getStatistics(
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String category,
@@ -72,52 +77,71 @@ public class LogController {
         return Result.success(statistics);
     }
 
-    @PostMapping("/export")
-    public Result<LogExportTaskVO> exportLogs(@RequestBody @Valid LogExportDTO exportDTO) {
-        LogExportTaskVO exportTask = logService.createExportTask(exportDTO);
-        return Result.success(exportTask);
-    }
 
-    @GetMapping("/export/status/{exportId}")
-    public Result<LogExportTaskVO> getExportStatus(@PathVariable String exportId) {
-        LogExportTaskVO exportTask = logService.getExportStatus(exportId);
-        return Result.success(exportTask);
-    }
-
-    @GetMapping("/export/download/{exportId}")
-    public ResponseEntity<byte[]> downloadExport(@PathVariable String exportId) {
+    @PostMapping("/download")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> downloadLogs(@RequestBody @Valid LogExportDTO exportDTO) {
         try {
-            byte[] fileContent = logService.downloadExport(exportId);
+            byte[] fileContent = logService.generateLogFile(exportDTO);
+            String filename = generateFilename(exportDTO);
+
+            // 根据格式设置正确的Content-Type
+            String contentType = "text/csv; charset=UTF-8";
+            if (exportDTO.getFormat() != null) {
+                switch (exportDTO.getFormat()) {
+                    case JSON -> contentType = "application/json; charset=UTF-8";
+                    case EXCEL -> contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=UTF-8";
+                    default -> contentType = "text/csv; charset=UTF-8";
+                }
+            }
+
             return ResponseEntity.ok()
-                    .header("Content-Disposition", "attachment; filename=\"" + exportId + ".csv\"")
-                    .header("Content-Type", "application/octet-stream")
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                    .header("Content-Type", contentType)
                     .body(fileContent);
         } catch (Exception e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    @GetMapping("/export/history")
-    public Result<PageResult<LogExportTaskVO>> getExportHistory(@RequestParam(defaultValue = "1") Integer page,
-                                                               @RequestParam(defaultValue = "10") Integer size,
-                                                               @RequestParam(required = false) String status) {
-        PageResult<LogExportTaskVO> pageResult = logService.getExportHistory(page, size, status);
-        return Result.success(pageResult);
+    private String generateFilename(LogExportDTO exportDTO) {
+        StringBuilder filename = new StringBuilder("logs_");
+        if (exportDTO.getLevel() != null) {
+            filename.append(exportDTO.getLevel().name().toLowerCase()).append("_");
+        }
+        if (exportDTO.getCategory() != null) {
+            filename.append(exportDTO.getCategory().name().toLowerCase()).append("_");
+        }
+        filename.append(java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")));
+
+        String extension = ".csv";
+        if (exportDTO.getFormat() != null) {
+            switch (exportDTO.getFormat()) {
+                case JSON -> extension = ".json";
+                case EXCEL -> extension = ".xlsx";
+                default -> extension = ".csv";
+            }
+        }
+        return filename.toString() + extension;
     }
 
+
     @PostMapping("/cleanup")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogCleanupTaskVO> cleanupLogs(@RequestBody @Valid LogCleanupDTO cleanupDTO) {
         LogCleanupTaskVO cleanupTask = logService.createCleanupTask(cleanupDTO);
         return Result.success(cleanupTask);
     }
 
     @GetMapping("/cleanup/status/{cleanupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogCleanupTaskVO> getCleanupStatus(@PathVariable String cleanupId) {
         LogCleanupTaskVO cleanupTask = logService.getCleanupStatus(cleanupId);
         return Result.success(cleanupTask);
     }
 
     @GetMapping("/cleanup/history")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<PageResult<LogCleanupTaskVO>> getCleanupHistory(@RequestParam(defaultValue = "1") Integer page,
                                                                  @RequestParam(defaultValue = "10") Integer size,
                                                                  @RequestParam(required = false) String status) {
@@ -126,12 +150,14 @@ public class LogController {
     }
 
     @GetMapping("/monitor/system")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogMonitorVO> getSystemMonitor() {
         LogMonitorVO monitor = logService.getSystemMonitor();
         return Result.success(monitor);
     }
 
     @GetMapping("/monitor/logs")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogMonitorVO> getLogMonitor(@RequestParam(defaultValue = "1h") String timeRange,
                                              @RequestParam(required = false) String level) {
         LogMonitorVO monitor = logService.getLogMonitor(timeRange, level);
@@ -139,6 +165,7 @@ public class LogController {
     }
 
     @GetMapping("/monitor/performance")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogMonitorVO> getPerformanceMonitor(@RequestParam(defaultValue = "1h") String timeRange,
                                                      @RequestParam(required = false) String endpoint) {
         LogMonitorVO monitor = logService.getPerformanceMonitor(timeRange, endpoint);
@@ -146,18 +173,21 @@ public class LogController {
     }
 
     @GetMapping("/monitor/alerts")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogMonitorVO> getAlerts() {
         LogMonitorVO monitor = logService.getAlerts();
         return Result.success(monitor);
     }
 
     @GetMapping("/config")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<LogConfigVO> getLogConfig() {
         LogConfigVO config = logService.getLogConfig();
         return Result.success(config);
     }
 
     @PutMapping("/config")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> updateLogConfig(@RequestBody @Valid LogConfigDTO configDTO) {
         logService.updateLogConfig(configDTO);
         return Result.success();

@@ -18,7 +18,6 @@ import org.springframework.scheduling.annotation.Async;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
-import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import com.feduwacomm.utils.UuidUtil;
@@ -50,8 +49,6 @@ public class LogServiceImpl implements LogService {
     @Autowired
     private VmRuntimeLogMapper vmRuntimeLogMapper;
     
-    @Autowired
-    private LogExportTaskMapper logExportTaskMapper;
     
     @Autowired
     private LogCleanupTaskMapper logCleanupTaskMapper;
@@ -355,93 +352,123 @@ public class LogServiceImpl implements LogService {
     }
     
     // ==================== 日志导出方法 ====================
-    
     @Override
-    public LogExportTaskVO createExportTask(LogExportDTO exportDTO) {
+    public byte[] generateLogFile(LogExportDTO exportDTO) {
         try {
-            String exportId = "export_" + System.currentTimeMillis() + "_" + UuidUtil.generateShortUuid();
-            String taskId = uuidUtil.generateUuid();
-            
-            LogExportTask task = LogExportTask.builder()
-                    .id(taskId)
-                    .exportId(exportId)
-                    .status(TaskStatus.PENDING)
-                    .format(exportDTO.getFormat() != null ? exportDTO.getFormat() : LogExportFormat.CSV)
-                    .filterConditions(objectMapper.writeValueAsString(exportDTO))
-                    .progress(0)
-                    .totalRecords(0L)
-                    .processedRecords(0L)
-                    .includeDetails(exportDTO.getIncludeDetails() != null ? exportDTO.getIncludeDetails() : true)
-                    .estimatedTime(30)
-                    .createdAt(LocalDateTime.now())
-                    .expiresAt(LocalDateTime.now().plusDays(exportRetentionDays))
+            // 限制导出数量，避免内存溢出
+            if (exportDTO.getStartTime() == null || exportDTO.getEndTime() == null) {
+                exportDTO.setStartTime(LocalDateTime.now().minusDays(1));
+                exportDTO.setEndTime(LocalDateTime.now());
+            }
+
+            // 构建查询条件
+            LogQueryDTO queryDTO = LogQueryDTO.builder()
+                    .level(exportDTO.getLevel())
+                    .category(exportDTO.getCategory())
+                    .vmId(exportDTO.getVmId())
+                    .taskId(exportDTO.getTaskId())
+                    .keyword(exportDTO.getKeyword())
+                    .startTime(exportDTO.getStartTime())
+                    .endTime(exportDTO.getEndTime())
+                    .page(1)
+                    .size(10000) // 限制最大导出10000条记录
+                    .sort("createdAt")
+                    .order("desc")
                     .build();
-            
-            logExportTaskMapper.insert(task);
-            
-            // 异步处理导出任务
-            processExportTaskAsync(task, exportDTO);
-            
-            return convertToLogExportTaskVO(task);
+
+            // 查询日志数据
+            PageResult<LogListVO> logs = queryLogs(queryDTO);
+
+            // 根据格式生成文件内容
+            String content = generateExportContent(logs.getRecords(), exportDTO);
+            return content.getBytes("UTF-8");
+
         } catch (Exception e) {
-            logger.error("创建导出任务失败: {}", e.getMessage());
-            throw new RuntimeException("创建导出任务失败: " + e.getMessage());
+            logger.error("生成日志文件失败: {}", e.getMessage());
+            throw new RuntimeException("生成日志文件失败: " + e.getMessage());
         }
     }
-    
-    @Override
-    public LogExportTaskVO getExportStatus(String exportId) {
-        LogExportTask task = logExportTaskMapper.selectById(exportId);
-        if (task == null) {
-            throw new RuntimeException("导出任务不存在: " + exportId);
+
+    private String generateExportContent(List<LogListVO> logs, LogExportDTO exportDTO) {
+        LogExportFormat format = exportDTO.getFormat() != null ? exportDTO.getFormat() : LogExportFormat.CSV;
+        Boolean includeDetails = exportDTO.getIncludeDetails() != null ? exportDTO.getIncludeDetails() : true;
+
+        switch (format) {
+            case CSV:
+                return generateCSVContent(logs, includeDetails);
+            case JSON:
+                return generateJSONContent(logs, includeDetails);
+            case EXCEL:
+                // 对于EXCEL格式，我们使用CSV格式返回，前端可以转换
+                return generateCSVContent(logs, includeDetails);
+            default:
+                return generateCSVContent(logs, includeDetails);
         }
-        return convertToLogExportTaskVO(task);
     }
-    
-    @Override
-    public byte[] downloadExport(String exportId) {
-        LogExportTask task = logExportTaskMapper.selectById(exportId);
-        if (task == null) {
-            throw new RuntimeException("导出任务不存在: " + exportId);
+
+    private String generateCSVContent(List<LogListVO> logs, Boolean includeDetails) {
+        StringBuilder csv = new StringBuilder();
+
+        // CSV头部
+        if (includeDetails) {
+            csv.append("日志ID,时间,级别,类别,虚拟机ID,任务ID,消息,详细信息\n");
+        } else {
+            csv.append("时间,级别,类别,消息\n");
         }
-        
-        if (task.getStatus() != TaskStatus.COMPLETED) {
-            throw new RuntimeException("导出任务未完成");
+
+        // CSV数据行
+        for (LogListVO log : logs) {
+            if (includeDetails) {
+                csv.append(String.format("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
+                    escapeCSV(log.getLogId()),
+                    escapeCSV(log.getCreatedAt() != null ? log.getCreatedAt().toString() : ""),
+                    escapeCSV(log.getLevel() != null ? log.getLevel().toString() : ""),
+                    escapeCSV(log.getCategory() != null ? log.getCategory().toString() : ""),
+                    escapeCSV(log.getVmId() != null ? log.getVmId() : ""),
+                    escapeCSV(log.getTaskId() != null ? log.getTaskId() : ""),
+                    escapeCSV(log.getMessage() != null ? log.getMessage() : ""),
+                    escapeCSV(log.getDetails() != null ? log.getDetails().toString() : "")));
+            } else {
+                csv.append(String.format("\"%s\",\"%s\",\"%s\",\"%s\"\n",
+                    escapeCSV(log.getCreatedAt() != null ? log.getCreatedAt().toString() : ""),
+                    escapeCSV(log.getLevel() != null ? log.getLevel().toString() : ""),
+                    escapeCSV(log.getCategory() != null ? log.getCategory().toString() : ""),
+                    escapeCSV(log.getMessage() != null ? log.getMessage() : "")));
+            }
         }
-        
-        if (task.getExpiresAt() != null && LocalDateTime.now().isAfter(task.getExpiresAt())) {
-            throw new RuntimeException("导出文件已过期");
-        }
-        
+
+        return csv.toString();
+    }
+
+    private String generateJSONContent(List<LogListVO> logs, Boolean includeDetails) {
         try {
-            return Files.readAllBytes(Paths.get(task.getFilePath()));
-        } catch (IOException e) {
-            logger.error("读取导出文件失败: {}", e.getMessage());
-            throw new RuntimeException("读取导出文件失败: " + e.getMessage());
+            if (includeDetails) {
+                return objectMapper.writeValueAsString(logs);
+            } else {
+                // 创建简化版本的日志对象
+                List<Map<String, Object>> simplifiedLogs = logs.stream()
+                    .map(log -> {
+                        Map<String, Object> simplified = new HashMap<>();
+                        simplified.put("timestamp", log.getCreatedAt());
+                        simplified.put("level", log.getLevel());
+                        simplified.put("category", log.getCategory());
+                        simplified.put("message", log.getMessage());
+                        return simplified;
+                    })
+                    .collect(Collectors.toList());
+                return objectMapper.writeValueAsString(simplifiedLogs);
+            }
+        } catch (Exception e) {
+            logger.error("生成JSON内容失败: {}", e.getMessage());
+            return "[]";
         }
     }
-    
-    @Override
-    public PageResult<LogExportTaskVO> getExportHistory(Integer page, Integer size, String status) {
-        List<LogExportTask> tasks = logExportTaskMapper.selectByStatus(
-                status != null ? TaskStatus.valueOf(status.toUpperCase()) : null, 
-                (page - 1) * size, size);
-        long total = logExportTaskMapper.countByStatus(
-                status != null ? TaskStatus.valueOf(status.toUpperCase()) : null);
-        
-        List<LogExportTaskVO> taskVOs = tasks.stream()
-                .map(this::convertToLogExportTaskVO)
-                .collect(Collectors.toList());
-        
-        return PageResult.<LogExportTaskVO>builder()
-                .records(taskVOs)
-                .total(total)
-                .current((long)page)
-                .size((long)size)
-                .pages((total + size - 1) / size)
-                .build();
+
+    private String escapeCSV(String value) {
+        if (value == null) return "";
+        return value.replace("\"", "\"\"").replace("\\n", " ").replace("\\r", " ");
     }
-    
+
     // ==================== 日志清理方法 ====================
     
     @Override
@@ -773,45 +800,6 @@ public class LogServiceImpl implements LogService {
     
     // ==================== 异步任务处理方法 ====================
     
-    @Async
-    public void processExportTaskAsync(LogExportTask task, LogExportDTO exportDTO) {
-        try {
-            // 更新任务状态为处理中
-            task.setStatus(TaskStatus.PROCESSING);
-            task.setStartedAt(LocalDateTime.now());
-            logExportTaskMapper.updateStatus(task.getExportId(), TaskStatus.PROCESSING, 0, 0L, 0L, null, null);
-            
-            // 模拟导出处理
-            Thread.sleep(5000); // 模拟处理时间
-            
-            // 创建导出文件
-            String fileName = task.getExportId() + "." + task.getFormat().name().toLowerCase();
-            String filePath = exportBasePath + "/" + fileName;
-            Files.createDirectories(Paths.get(exportBasePath));
-            
-            // 生成示例导出内容
-            String content = generateExportContent(exportDTO, task.getFormat());
-            Files.write(Paths.get(filePath), content.getBytes());
-            
-            // 更新任务完成状态
-            task.setStatus(TaskStatus.COMPLETED);
-            task.setProgress(100);
-            task.setFileSize((long) content.length());
-            task.setFilePath(filePath);
-            task.setDownloadUrl("/api/log/export/download/" + task.getExportId());
-            task.setCompletedAt(LocalDateTime.now());
-            
-            logExportTaskMapper.updateStatus(task.getExportId(), TaskStatus.COMPLETED, 
-                    100, task.getProcessedRecords(), task.getFileSize(), 
-                    LocalDateTime.now(), null);
-            
-        } catch (Exception e) {
-            logger.error("导出任务处理失败: {}", e.getMessage());
-            logExportTaskMapper.updateStatus(task.getExportId(), TaskStatus.FAILED, 
-                    task.getProgress(), task.getProcessedRecords(), 0L, 
-                    LocalDateTime.now(), e.getMessage());
-        }
-    }
     
     @Async
     public void processCleanupTaskAsync(LogCleanupTask task, LogCleanupDTO cleanupDTO) {
@@ -841,23 +829,6 @@ public class LogServiceImpl implements LogService {
     
     // ==================== 辅助方法 ====================
     
-    private LogExportTaskVO convertToLogExportTaskVO(LogExportTask task) {
-        return LogExportTaskVO.builder()
-                .exportId(task.getExportId())
-                .status(task.getStatus())
-                .format(task.getFormat())
-                .progress(task.getProgress())
-                .totalRecords(task.getTotalRecords())
-                .processedRecords(task.getProcessedRecords())
-                .fileSize(task.getFileSize())
-                .downloadUrl(task.getDownloadUrl())
-                .estimatedTime(task.getEstimatedTime())
-                .expiresAt(task.getExpiresAt())
-                .createdAt(task.getCreatedAt())
-                .completedAt(task.getCompletedAt())
-                .errorMessage(task.getErrorMessage())
-                .build();
-    }
     
     private LogCleanupTaskVO convertToLogCleanupTaskVO(LogCleanupTask task) {
         return LogCleanupTaskVO.builder()
@@ -872,15 +843,6 @@ public class LogServiceImpl implements LogService {
                 .build();
     }
     
-    private String generateExportContent(LogExportDTO exportDTO, LogExportFormat format) {
-        // 简单的示例导出内容生成
-        if (format == LogExportFormat.CSV) {
-            return "timestamp,level,category,message\n2024-01-01 10:00:00,INFO,SYSTEM,系统启动成功\n";
-        } else if (format == LogExportFormat.JSON) {
-            return "[{\"timestamp\":\"2024-01-01T10:00:00\",\"level\":\"INFO\",\"category\":\"SYSTEM\",\"message\":\"系统启动成功\"}]";
-        }
-        return "导出内容";
-    }
     
     // ==================== 监控数据收集方法（完整实现） ====================
     
