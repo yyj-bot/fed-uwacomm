@@ -210,12 +210,25 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Override
     public void updateConnectionStatus(String vmId, String connectionStatus, String wsSessionId) {
-        logger.debug("更新虚拟机连接状态: vmId={}, status={}, sessionId={}", 
+        logger.debug("更新虚拟机连接状态: vmId={}, status={}, sessionId={}",
                     vmId, connectionStatus, wsSessionId);
 
+        // 先更新WebSocket会话信息
         int result = vmInstancesMapper.updateWebSocketSession(vmId, wsSessionId, connectionStatus);
         if (result <= 0) {
             logger.warn("更新连接状态失败: vmId={}", vmId);
+            return;
+        }
+
+        // 如果是连接状态，同时更新心跳时间
+        if ("CONNECTED".equals(connectionStatus)) {
+            String currentTime = LocalDateTime.now().toString();
+            int heartbeatResult = vmInstancesMapper.updateConnection(vmId, connectionStatus, currentTime);
+            if (heartbeatResult <= 0) {
+                logger.warn("更新心跳时间失败: vmId={}", vmId);
+            } else {
+                logger.debug("VM连接并更新心跳成功: vmId={}, heartbeat={}", vmId, currentTime);
+            }
         }
     }
 
@@ -237,6 +250,18 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         int result = vmInstancesMapper.updateWebSocketSession(vmId, null, "DISCONNECTED");
         if (result <= 0) {
             logger.warn("断开连接状态更新失败: vmId={}", vmId);
+        }
+    }
+
+    @Override
+    public void disconnectVm(String vmId) {
+        logger.info("虚拟机断开连接 - VmId: {}", vmId);
+
+        int result = vmInstancesMapper.updateWebSocketSession(vmId, null, "DISCONNECTED");
+        if (result <= 0) {
+            logger.warn("更新VM断开状态失败 - VmId: {}", vmId);
+        } else {
+            logger.debug("VM断开状态更新成功 - VmId: {}", vmId);
         }
     }
 
@@ -749,7 +774,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .memory(calculateMemoryUsage())
                 .disk(calculateDiskUsage())
                 .build())
-            .online("CONNECTED".equals(vmInstance.getConnectionStatus()))
+            .online(isVmOnline(vmInstance))
             .uptime(calculateUptime(vmInstance))
             .build();
     }
@@ -801,7 +826,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                     .user(15)
                     .build())
                 .uptime(calculateUptime(vmInstance))
-                .online("CONNECTED".equals(vmInstance.getConnectionStatus()))
+                .online(isVmOnline(vmInstance))
                 .notes("")
                 .build();
         } catch (Exception e) {
@@ -843,6 +868,40 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         }
         return 0L;
     }
+
+    /**
+     * 判断VM是否在线
+     * 综合考虑连接状态和心跳时间
+     *
+     * @param vmInstance VM实例
+     * @return true如果VM在线，false否则
+     */
+    private boolean isVmOnline(VmInstance vmInstance) {
+        // 首先检查连接状态
+        if (!"CONNECTED".equals(vmInstance.getConnectionStatus())) {
+            return false;
+        }
+
+        // 检查心跳时间
+        LocalDateTime lastHeartbeat = vmInstance.getLastHeartbeat();
+        if (lastHeartbeat == null) {
+            return false;
+        }
+
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            long secondsSinceLastHeartbeat = java.time.temporal.ChronoUnit.SECONDS.between(lastHeartbeat, now);
+
+            // 90秒内有心跳视为在线
+            return secondsSinceLastHeartbeat <= 90;
+
+        } catch (Exception e) {
+            logger.warn("计算VM心跳时间失败，视为离线 - VmId: {}, LastHeartbeat: {}",
+                       vmInstance.getId(), lastHeartbeat, e);
+            return false;
+        }
+    }
+
 
     /**
      * 计算CPU使用率（模拟）

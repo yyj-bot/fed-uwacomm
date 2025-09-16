@@ -266,6 +266,53 @@
             grid-template-columns: 1fr;
         }
 
+        /* API响应区域样式 */
+        .response-area {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            min-height: 120px;
+            display: block !important; /* 始终显示 */
+        }
+
+        .response-area h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .response-content {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 12px;
+            min-height: 80px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #333;
+        }
+
+        .response-content.success {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .response-content.error {
+            border-color: #dc3545;
+            background: #fff8f8;
+        }
+
+        .response-content.loading {
+            color: #666;
+            font-style: italic;
+        }
+
         /* 结果样式 */
         .result-item {
             margin-bottom: 10px;
@@ -469,6 +516,12 @@
                         <button class="btn btn-secondary" onclick="getUserDetail()">获取用户详情</button>
                         <button class="btn btn-secondary" onclick="updateUser()">更新用户</button>
                         <button class="btn btn-danger" onclick="deleteUser()">删除用户</button>
+
+                        <!-- API响应区域 -->
+                        <div class="response-area">
+                            <h4>🔄 用户管理 API 响应</h4>
+                            <div class="response-content" id="userManagementResponse">等待API调用...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -506,6 +559,12 @@
                         <button class="btn btn-danger" onclick="lockUser()">锁定用户</button>
                         <button class="btn btn-success" onclick="unlockUser()">解锁用户</button>
                         <button class="btn btn-secondary" onclick="resetPassword()">重置密码</button>
+
+                        <!-- API响应区域 -->
+                        <div class="response-area">
+                            <h4>🔧 用户操作 API 响应</h4>
+                            <div class="response-content" id="userOperationResponse">等待API调用...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -668,29 +727,45 @@
             }
         }
 
+        // 显示API响应的通用函数
+        function showResponse(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            element.className = `response-content ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
         // 获取用户列表
         async function getUserList() {
+            const responseElement = document.getElementById('userManagementResponse');
+            responseElement.className = 'response-content loading';
+            responseElement.textContent = '正在获取用户列表...';
+
             const page = document.getElementById('listPage').value || 1;
             const size = document.getElementById('listSize').value || 10;
             const username = document.getElementById('listUsername').value;
             const email = document.getElementById('listEmail').value;
-            
+
             const params = new URLSearchParams({ page, size });
             if (username) params.append('username', username);
             if (email) params.append('email', email);
-            
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/list?${params}`);
-                
+
                 if (response.ok && data.code === 200) {
                     const count = data.data.records?.length || 0;
-                    addResult('user-list', '获取用户列表', 
+                    showResponse('userManagementResponse', data, true);
+                    addResult('user-list', '获取用户列表',
                         `成功获取 ${count} 个用户\n${JSON.stringify(data.data, null, 2)}`, 'success');
                 } else {
-                    addResult('user-list', '获取用户列表', 
+                    showResponse('userManagementResponse', data, false);
+                    addResult('user-list', '获取用户列表',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userManagementResponse', `错误: ${error.message}`, false);
                 addResult('user-list', '获取用户列表', error.message, 'error');
             }
         }
@@ -698,23 +773,29 @@
         // 获取用户详情
         async function getUserDetail() {
             const userId = document.getElementById('userId').value;
-            
+
             if (!userId) {
+                showResponse('userManagementResponse', '请输入用户ID', false);
                 addResult('user-detail', '获取用户详情', '请输入用户ID', 'warning');
                 return;
             }
-            
+
+            showResponse('userManagementResponse', '正在获取用户详情...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}`);
-                
+
                 if (response.ok && data.code === 200) {
-                    addResult('user-detail', '获取用户详情', 
+                    showResponse('userManagementResponse', data, true);
+                    addResult('user-detail', '获取用户详情',
                         `用户信息获取成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
                 } else {
-                    addResult('user-detail', '获取用户详情', 
+                    showResponse('userManagementResponse', data, false);
+                    addResult('user-detail', '获取用户详情',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userManagementResponse', `错误: ${error.message}`, false);
                 addResult('user-detail', '获取用户详情', error.message, 'error');
             }
         }
@@ -725,37 +806,44 @@
             const username = document.getElementById('newUsername').value;
             const email = document.getElementById('newEmail').value;
             const role = document.getElementById('newRole').value;
-            
+
             if (!userId) {
+                showResponse('userManagementResponse', '请输入用户ID', false);
                 addResult('update-user', '更新用户', '请输入用户ID', 'warning');
                 return;
             }
-            
+
             // 构建更新数据，只包含非空字段
             const updateData = {};
             if (username && username.trim()) updateData.username = username;
             if (email && email.trim()) updateData.email = email;
             if (role && role.trim()) updateData.role = role;
-            
+
             if (Object.keys(updateData).length === 0) {
+                showResponse('userManagementResponse', '请至少填写一个要更新的字段', false);
                 addResult('update-user', '更新用户', '请至少填写一个要更新的字段', 'warning');
                 return;
             }
-            
+
+            showResponse('userManagementResponse', '正在更新用户...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}`, {
                     method: 'PUT',
                     body: JSON.stringify(updateData)
                 });
-                
+
                 if (response.ok && data.code === 200) {
-                    addResult('update-user', '更新用户', 
+                    showResponse('userManagementResponse', data, true);
+                    addResult('update-user', '更新用户',
                         `用户 ${userId} 更新成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
                 } else {
-                    addResult('update-user', '更新用户', 
+                    showResponse('userManagementResponse', data, false);
+                    addResult('update-user', '更新用户',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userManagementResponse', `错误: ${error.message}`, false);
                 addResult('update-user', '更新用户', error.message, 'error');
             }
         }
@@ -763,29 +851,35 @@
         // 删除用户
         async function deleteUser() {
             const userId = document.getElementById('userId').value;
-            
+
             if (!userId) {
+                showResponse('userManagementResponse', '请输入用户ID', false);
                 addResult('delete-user', '删除用户', '请输入用户ID', 'warning');
                 return;
             }
-            
+
             // 确认删除
             if (!confirm(`确定要删除用户 ${userId} 吗？此操作不可逆！`)) {
                 return;
             }
-            
+
+            showResponse('userManagementResponse', '正在删除用户...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok && data.code === 200) {
+                    showResponse('userManagementResponse', data, true);
                     addResult('delete-user', '删除用户', `用户 ${userId} 已删除`, 'success');
                 } else {
-                    addResult('delete-user', '删除用户', 
+                    showResponse('userManagementResponse', data, false);
+                    addResult('delete-user', '删除用户',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userManagementResponse', `错误: ${error.message}`, false);
                 addResult('delete-user', '删除用户', error.message, 'error');
             }
         }
@@ -796,33 +890,38 @@
             const email = document.getElementById('newEmail').value;
             const role = document.getElementById('newRole').value;
             const password = document.getElementById('newPassword').value;
-            
+
             if (!username || !email || !password) {
+                showResponse('userOperationResponse', '请填写完整的用户信息', false);
                 addResult('create-user', '创建用户', '请填写完整的用户信息', 'warning');
                 return;
             }
-            
+
             const userData = { username, email, role, password };
-            
+            showResponse('userOperationResponse', '正在创建用户...', true);
+
             try {
                 const { response, data } = await makeRequest('/api/admin/user/create', {
                     method: 'POST',
                     body: JSON.stringify(userData)
                 });
-                
+
                 if (response.ok && data.code === 200) {
-                    addResult('create-user', '创建用户', 
+                    showResponse('userOperationResponse', data, true);
+                    addResult('create-user', '创建用户',
                         `用户创建成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
-                    
+
                     // 清空表单
                     document.getElementById('newUsername').value = '';
                     document.getElementById('newEmail').value = '';
                     document.getElementById('newPassword').value = '';
                 } else {
-                    addResult('create-user', '创建用户', 
+                    showResponse('userOperationResponse', data, false);
+                    addResult('create-user', '创建用户',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userOperationResponse', `错误: ${error.message}`, false);
                 addResult('create-user', '创建用户', error.message, 'error');
             }
         }
@@ -830,24 +929,30 @@
         // 锁定用户
         async function lockUser() {
             const userId = document.getElementById('userId').value;
-            
+
             if (!userId) {
+                showResponse('userOperationResponse', '请输入用户ID', false);
                 addResult('lock-user', '锁定用户', '请输入用户ID', 'warning');
                 return;
             }
-            
+
+            showResponse('userOperationResponse', '正在锁定用户...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}/lock`, {
                     method: 'POST'
                 });
-                
+
                 if (response.ok && data.code === 200) {
+                    showResponse('userOperationResponse', data, true);
                     addResult('lock-user', '锁定用户', `用户 ${userId} 已锁定`, 'success');
                 } else {
-                    addResult('lock-user', '锁定用户', 
+                    showResponse('userOperationResponse', data, false);
+                    addResult('lock-user', '锁定用户',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userOperationResponse', `错误: ${error.message}`, false);
                 addResult('lock-user', '锁定用户', error.message, 'error');
             }
         }
@@ -855,24 +960,30 @@
         // 解锁用户
         async function unlockUser() {
             const userId = document.getElementById('userId').value;
-            
+
             if (!userId) {
+                showResponse('userOperationResponse', '请输入用户ID', false);
                 addResult('unlock-user', '解锁用户', '请输入用户ID', 'warning');
                 return;
             }
-            
+
+            showResponse('userOperationResponse', '正在解锁用户...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}/unlock`, {
                     method: 'POST'
                 });
-                
+
                 if (response.ok && data.code === 200) {
+                    showResponse('userOperationResponse', data, true);
                     addResult('unlock-user', '解锁用户', `用户 ${userId} 已解锁`, 'success');
                 } else {
-                    addResult('unlock-user', '解锁用户', 
+                    showResponse('userOperationResponse', data, false);
+                    addResult('unlock-user', '解锁用户',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userOperationResponse', `错误: ${error.message}`, false);
                 addResult('unlock-user', '解锁用户', error.message, 'error');
             }
         }
@@ -881,30 +992,37 @@
         async function resetPassword() {
             const userId = document.getElementById('userId').value;
             const newPassword = prompt('请输入新密码:');
-            
+
             if (!userId) {
+                showResponse('userOperationResponse', '请输入用户ID', false);
                 addResult('reset-password', '重置密码', '请输入用户ID', 'warning');
                 return;
             }
-            
+
             if (!newPassword) {
+                showResponse('userOperationResponse', '密码不能为空', false);
                 addResult('reset-password', '重置密码', '密码不能为空', 'warning');
                 return;
             }
-            
+
+            showResponse('userOperationResponse', '正在重置密码...', true);
+
             try {
                 const { response, data } = await makeRequest(`/api/admin/user/${userId}/reset-password`, {
                     method: 'POST',
                     body: JSON.stringify({ password: newPassword })
                 });
-                
+
                 if (response.ok && data.code === 200) {
+                    showResponse('userOperationResponse', data, true);
                     addResult('reset-password', '重置密码', `用户 ${userId} 密码已重置`, 'success');
                 } else {
-                    addResult('reset-password', '重置密码', 
+                    showResponse('userOperationResponse', data, false);
+                    addResult('reset-password', '重置密码',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userOperationResponse', `错误: ${error.message}`, false);
                 addResult('reset-password', '重置密码', error.message, 'error');
             }
         }
@@ -912,17 +1030,22 @@
 
         // 获取用户统计
         async function getUserStatistics() {
+            showResponse('userManagementResponse', '正在获取用户统计...', true);
+
             try {
                 const { response, data } = await makeRequest('/api/admin/user/statistics');
-                
+
                 if (response.ok && data.code === 200) {
-                    addResult('user-statistics', '用户统计', 
+                    showResponse('userManagementResponse', data, true);
+                    addResult('user-statistics', '用户统计',
                         `统计信息获取成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
                 } else {
-                    addResult('user-statistics', '用户统计', 
+                    showResponse('userManagementResponse', data, false);
+                    addResult('user-statistics', '用户统计',
                         `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
+                showResponse('userManagementResponse', `错误: ${error.message}`, false);
                 addResult('user-statistics', '用户统计', error.message, 'error');
             }
         }

@@ -40,8 +40,8 @@ public class VmJwtAuthenticationInterceptor implements HandlerInterceptor {
             throw UserException.tokenMissing();
         }
 
-        // 提取Token
-        String token = authHeader.substring(7);
+        // 提取Token并清理空白字符
+        String token = authHeader.substring(7).trim();
         if (!StringUtils.hasText(token)) {
             log.warn("VM Token为空: {}", request.getRequestURI());
             throw UserException.tokenInvalid();

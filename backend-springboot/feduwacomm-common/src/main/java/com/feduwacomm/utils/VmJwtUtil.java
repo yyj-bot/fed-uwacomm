@@ -61,10 +61,16 @@ public class VmJwtUtil {
      */
     public Claims validateToken(String token) {
         try {
+            // 额外清理token，移除可能存在的空白字符和Bearer前缀
+            String cleanToken = token.trim().replaceAll("\\s+", "");
+            if (cleanToken.startsWith("Bearer")) {
+                cleanToken = cleanToken.substring(6); // 移除"Bearer"前缀
+            }
+
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(getKey())
                     .build()
-                    .parseClaimsJws(token)
+                    .parseClaimsJws(cleanToken)
                     .getBody();
             
             // 验证token类别

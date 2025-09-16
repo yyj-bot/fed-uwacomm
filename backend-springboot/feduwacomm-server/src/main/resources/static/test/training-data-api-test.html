@@ -201,6 +201,24 @@
             white-space: pre-wrap;
             max-height: 300px;
             overflow-y: auto;
+            min-height: 80px;
+            display: block !important; /* 始终显示 */
+            color: #333;
+        }
+
+        .response-content.success {
+            border-color: #27ae60;
+            background: #f8fff9;
+        }
+
+        .response-content.error {
+            border-color: #e74c3c;
+            background: #fff8f8;
+        }
+
+        .response-content.loading {
+            color: #666;
+            font-style: italic;
         }
 
         .success {
@@ -303,8 +321,8 @@
                     <button class="test-button" onclick="testFileUpload()">测试文件上传</button>
                     <button class="clear-button" onclick="clearForm('upload')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="upload_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="upload_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -344,8 +362,8 @@
                     <button class="test-button" onclick="testTextUpload()">测试文本上传</button>
                     <button class="clear-button" onclick="clearForm('text')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="text_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="text_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -391,8 +409,8 @@
                     <button class="test-button" onclick="testDataQuery()">测试列表查询</button>
                     <button class="clear-button" onclick="clearForm('query')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="query_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="query_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -411,8 +429,8 @@
                     <button class="test-button" onclick="testDataDetail()">测试详情查询</button>
                     <button class="clear-button" onclick="clearForm('detail')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="detail_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="detail_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -439,8 +457,8 @@
                     <button class="test-button" onclick="testPreprocess()">测试预处理</button>
                     <button class="clear-button" onclick="clearForm('preprocess')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="preprocess_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="preprocess_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -463,8 +481,8 @@
                     <button class="test-button" onclick="testValidation()">测试验证</button>
                     <button class="clear-button" onclick="clearForm('validate')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="validate_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="validate_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -493,8 +511,8 @@
                     <button class="test-button" onclick="testStatistics()">测试统计查询</button>
                     <button class="clear-button" onclick="clearForm('stats')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="stats_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="stats_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -522,8 +540,8 @@
                     <button class="test-button" onclick="testDelete()">测试删除</button>
                     <button class="clear-button" onclick="clearForm('delete')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="delete_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="delete_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -542,8 +560,8 @@
                     <button class="test-button" onclick="testDownload()">测试下载</button>
                     <button class="clear-button" onclick="clearForm('download')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="download_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="download_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -574,8 +592,8 @@
                     <button class="test-button" onclick="testUpdate()">测试更新</button>
                     <button class="clear-button" onclick="clearForm('update')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="update_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="update_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -606,8 +624,8 @@
                     <button class="test-button" onclick="testBatchOperation()">测试批量操作</button>
                     <button class="clear-button" onclick="clearForm('batch')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="batch_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="batch_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -647,8 +665,8 @@
                     <button class="test-button" onclick="testExport()">测试导出</button>
                     <button class="clear-button" onclick="clearForm('export')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="export_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="export_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -667,8 +685,8 @@
                     <button class="test-button" onclick="testExportDownload()">测试导出下载</button>
                     <button class="clear-button" onclick="clearForm('export_download')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="export_download_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="export_download_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -1247,7 +1265,7 @@
             
             const responseDiv = document.getElementById(`${prefix}_response`);
             if (responseDiv) {
-                responseDiv.textContent = '';
+                responseDiv.textContent = '等待API调用...';
                 responseDiv.className = 'response-content';
             }
         }

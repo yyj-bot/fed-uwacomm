@@ -148,4 +148,137 @@
         SELECT COUNT(1) FROM vm_instances WHERE id = #{id}
     </select>
 
+    <!-- ==================== CRUD扩展方法 ==================== -->
+
+    <!-- 分页查询虚拟机列表 -->
+    <select id="selectPagedList" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT
+            id, name, ip_address as ipAddress, port, os_type as osType,
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE 1=1
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="osType != null and osType != ''">
+            AND os_type = #{osType}
+        </if>
+        <if test="connectionStatus != null and connectionStatus != ''">
+            AND connection_status = #{connectionStatus}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE CONCAT('%', #{keyword}, '%') OR ip_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <choose>
+            <when test="sortField != null and sortField != '' and sortOrder != null and sortOrder != ''">
+                ORDER BY ${sortField} ${sortOrder}
+            </when>
+            <otherwise>
+                ORDER BY created_at DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 查询虚拟机总数（用于分页） -->
+    <select id="countVmInstances" resultType="int">
+        SELECT COUNT(1) FROM vm_instances
+        WHERE 1=1
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="osType != null and osType != ''">
+            AND os_type = #{osType}
+        </if>
+        <if test="connectionStatus != null and connectionStatus != ''">
+            AND connection_status = #{connectionStatus}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE CONCAT('%', #{keyword}, '%') OR ip_address LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <!-- 根据ID查询虚拟机详情（包含所有字段） -->
+    <select id="selectDetailById" parameterType="string" resultType="com.feduwacomm.entity.VmInstance">
+        SELECT
+            id, name, ip_address as ipAddress, port, os_type as osType,
+            cpu_cores as cpuCores, memory_mb as memoryMb, disk_gb as diskGb,
+            status, connection_status as connectionStatus, ws_session_id as wsSessionId, last_heartbeat as lastHeartbeat,
+            secret_id as secretId, secret_expire_time as secretExpireTime,
+            system_info as systemInfo, capabilities, network_config as networkConfig, metadata,
+            created_at as createdAt, updated_at as updatedAt, created_by as createdBy, updated_by as updatedBy
+        FROM vm_instances
+        WHERE id = #{id}
+    </select>
+
+    <!-- 更新虚拟机基本信息 -->
+    <update id="updateBasicInfo" parameterType="com.feduwacomm.entity.VmInstance">
+        UPDATE vm_instances SET
+            updated_at = #{updatedAt},
+            updated_by = #{updatedBy}
+            <if test="name != null and name != ''">
+                , name = #{name}
+            </if>
+            <if test="ipAddress != null and ipAddress != ''">
+                , ip_address = #{ipAddress}
+            </if>
+            <if test="port != null">
+                , port = #{port}
+            </if>
+            <if test="osType != null and osType != ''">
+                , os_type = #{osType}
+            </if>
+            <if test="cpuCores != null">
+                , cpu_cores = #{cpuCores}
+            </if>
+            <if test="memoryMb != null">
+                , memory_mb = #{memoryMb}
+            </if>
+            <if test="diskGb != null">
+                , disk_gb = #{diskGb}
+            </if>
+            <if test="systemInfo != null and systemInfo != ''">
+                , system_info = #{systemInfo}
+            </if>
+            <if test="capabilities != null and capabilities != ''">
+                , capabilities = #{capabilities}
+            </if>
+            <if test="networkConfig != null and networkConfig != ''">
+                , network_config = #{networkConfig}
+            </if>
+            <if test="metadata != null and metadata != ''">
+                , metadata = #{metadata}
+            </if>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新虚拟机状态 -->
+    <update id="updateStatus">
+        UPDATE vm_instances SET
+            status = #{status},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 批量删除虚拟机 -->
+    <delete id="batchDeleteByIds">
+        DELETE FROM vm_instances
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 查询用户有权限的虚拟机ID列表（占位方法，具体权限控制逻辑后续实现） -->
+    <select id="selectVmIdsByUserId" parameterType="string" resultType="string">
+        SELECT id FROM vm_instances
+        WHERE 1=1
+        <!-- 暂时返回所有VM ID，后续根据业务需求实现具体的权限控制逻辑 -->
+        ORDER BY created_at DESC
+    </select>
+
 </mapper>
