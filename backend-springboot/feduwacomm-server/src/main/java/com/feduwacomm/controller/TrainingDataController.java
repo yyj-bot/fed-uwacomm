@@ -46,10 +46,10 @@ public class TrainingDataController {
         String clientIp = IpUtil.getClientIpAddress(request);
         String userId = BaseContext.getCurrentId();
 
-        log.info("收到文件上传请求: vmId={}, dataType={}, fileName={}, ip={}", 
-                uploadDTO.getVmId(), uploadDTO.getDataType(), file.getOriginalFilename(), clientIp);
-        accessLog.info("训练数据文件上传: vmId={}, dataType={}, fileName={}, userId={}, ip={}",
-                uploadDTO.getVmId(), uploadDTO.getDataType(), file.getOriginalFilename(), userId, clientIp);
+        log.info("收到文件上传请求: dataType={}, fileName={}, ip={}",
+                uploadDTO.getDataType(), file.getOriginalFilename(), clientIp);
+        accessLog.info("训练数据文件上传: dataType={}, fileName={}, userId={}, ip={}",
+                uploadDTO.getDataType(), file.getOriginalFilename(), userId, clientIp);
 
         try {
             TrainingDataUploadVO result = trainingDataService.uploadFile(uploadDTO, file, userId);
@@ -73,10 +73,10 @@ public class TrainingDataController {
         String clientIp = IpUtil.getClientIpAddress(request);
         String userId = BaseContext.getCurrentId();
 
-        log.info("收到文本上传请求: vmId={}, dataType={}, title={}, ip={}", 
-                textDTO.getVmId(), textDTO.getDataType(), textDTO.getTitle(), clientIp);
-        accessLog.info("训练数据文本上传: vmId={}, dataType={}, title={}, userId={}, ip={}",
-                textDTO.getVmId(), textDTO.getDataType(), textDTO.getTitle(), userId, clientIp);
+        log.info("收到文本上传请求: dataType={}, title={}, ip={}",
+                textDTO.getDataType(), textDTO.getTitle(), clientIp);
+        accessLog.info("训练数据文本上传: dataType={}, title={}, userId={}, ip={}",
+                textDTO.getDataType(), textDTO.getTitle(), userId, clientIp);
 
         try {
             TrainingDataUploadVO result = trainingDataService.uploadText(textDTO, userId);

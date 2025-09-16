@@ -288,10 +288,6 @@
                 <div class="api-body">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>虚拟机ID *</label>
-                            <input type="text" id="upload_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
-                        </div>
-                        <div class="form-group">
                             <label>数据类型 *</label>
                             <select id="upload_dataType">
                                 <option value="ACOUSTIC">声学数据</option>
@@ -335,10 +331,6 @@
                 </div>
                 <div class="api-body">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>虚拟机ID *</label>
-                            <input type="text" id="text_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
-                        </div>
                         <div class="form-group">
                             <label>数据类型 *</label>
                             <select id="text_dataType">
@@ -386,10 +378,6 @@
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>虚拟机ID</label>
-                            <input type="text" id="query_vmId" placeholder="过滤特定虚拟机">
-                        </div>
                         <div class="form-group">
                             <label>数据类型</label>
                             <select id="query_dataType">
@@ -495,10 +483,6 @@
                 </div>
                 <div class="api-body">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>虚拟机ID</label>
-                            <input type="text" id="stats_vmId" placeholder="过滤特定虚拟机">
-                        </div>
                         <div class="form-group">
                             <label>数据类型</label>
                             <select id="stats_dataType">
@@ -656,11 +640,11 @@
                     </div>
                     <div class="form-group">
                         <label>过滤条件 (JSON对象)</label>
-                        <textarea id="export_filters" class="json-input" placeholder='{"dataType": "ACOUSTIC", "vmId": "a1b2c3d4e5f678901234567890123456", "status": "READY"}'></textarea>
+                        <textarea id="export_filters" class="json-input" placeholder='{"dataType": "ACOUSTIC", "status": "READY"}'></textarea>
                     </div>
                     <div class="form-group">
                         <label>导出字段 (JSON数组)</label>
-                        <textarea id="export_fields" class="json-input" placeholder='["datasetId", "datasetName", "datasetType", "vmId", "status", "uploadTime"]'></textarea>
+                        <textarea id="export_fields" class="json-input" placeholder='["datasetId", "datasetName", "datasetType", "status", "uploadTime"]'></textarea>
                     </div>
                     <button class="test-button" onclick="testExport()">测试导出</button>
                     <button class="clear-button" onclick="clearForm('export')">清空</button>
@@ -774,14 +758,13 @@
 
         // 1. 文件上传测试
         async function testFileUpload() {
-            const vmId = document.getElementById('upload_vmId').value;
             const dataType = document.getElementById('upload_dataType').value;
             const description = document.getElementById('upload_description').value;
             const tags = document.getElementById('upload_tags').value;
             const metadata = document.getElementById('upload_metadata').value;
             const fileInput = document.getElementById('upload_file');
 
-            if (!vmId || !dataType || !fileInput.files[0]) {
+            if (!dataType || !fileInput.files[0]) {
                 alert('请填写必填字段并选择文件');
                 return;
             }
@@ -792,7 +775,6 @@
 
             try {
                 const formData = new FormData();
-                formData.append('vmId', vmId);
                 formData.append('dataType', dataType);
                 if (description) formData.append('description', description);
                 if (tags) formData.append('tags', tags);
@@ -814,13 +796,12 @@
 
         // 2. 文本上传测试
         async function testTextUpload() {
-            const vmId = document.getElementById('text_vmId').value;
             const dataType = document.getElementById('text_dataType').value;
             const title = document.getElementById('text_title').value;
             const content = document.getElementById('text_content').value;
             const description = document.getElementById('text_description').value;
 
-            if (!vmId || !dataType || !title || !content) {
+            if (!dataType || !title || !content) {
                 alert('请填写所有必填字段');
                 return;
             }
@@ -831,7 +812,6 @@
 
             try {
                 const requestData = {
-                    vmId,
                     dataType,
                     title,
                     content,
@@ -854,7 +834,6 @@
         async function testDataQuery() {
             const page = document.getElementById('query_page').value;
             const size = document.getElementById('query_size').value;
-            const vmId = document.getElementById('query_vmId').value;
             const dataType = document.getElementById('query_dataType').value;
             const keyword = document.getElementById('query_keyword').value;
 
@@ -866,7 +845,6 @@
                 const params = new URLSearchParams();
                 if (page) params.append('page', page);
                 if (size) params.append('size', size);
-                if (vmId) params.append('vmId', vmId);
                 if (dataType) params.append('dataType', dataType);
                 if (keyword) params.append('keyword', keyword);
 
@@ -975,7 +953,6 @@
 
         // 7. 数据统计测试
         async function testStatistics() {
-            const vmId = document.getElementById('stats_vmId').value;
             const dataType = document.getElementById('stats_dataType').value;
 
             const responseDiv = document.getElementById('stats_response');
@@ -984,7 +961,6 @@
 
             try {
                 const params = new URLSearchParams();
-                if (vmId) params.append('vmId', vmId);
                 if (dataType) params.append('dataType', dataType);
 
                 const url = `${API_BASE_URL}/training-data/statistics?${params.toString()}`;

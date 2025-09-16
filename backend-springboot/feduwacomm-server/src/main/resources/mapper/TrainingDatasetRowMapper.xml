@@ -2,20 +2,64 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feduwacomm.mapper.TrainingDatasetRowMapper">
 
+    <!-- Result mapping for TrainingDataRow -->
+    <resultMap id="TrainingDataRowResultMap" type="com.feduwacomm.entity.TrainingDataRow">
+        <id property="id" column="id"/>
+        <result property="datasetId" column="dataset_id"/>
+        <result property="rowData" column="row_data"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 批量插入数据行记录（JSON字符串格式） -->
     <insert id="insertRows">
-        INSERT INTO training_dataset_row (id, dataset_id, row_data)
+        INSERT INTO training_dataset_row (id, dataset_id, row_data, created_at)
         VALUES
         <foreach collection="rowsJson" item="row" separator=",">
-            (REPLACE(UUID(), '-', ''), #{datasetId}, CAST(#{row} AS JSON))
+            (REPLACE(UUID(), '-', ''), #{datasetId}, CAST(#{row} AS JSON), NOW())
         </foreach>
     </insert>
 
+    <!-- 插入单条数据行记录 -->
+    <insert id="insertDataRow">
+        INSERT INTO training_dataset_row (id, dataset_id, row_data, created_at)
+        VALUES (#{id}, #{datasetId}, #{rowData}, #{createdAt})
+    </insert>
+
+    <!-- 批量插入数据行记录 -->
+    <insert id="insertDataRows">
+        INSERT INTO training_dataset_row (id, dataset_id, row_data, created_at)
+        VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{row.datasetId}, #{row.rowData}, #{row.createdAt})
+        </foreach>
+    </insert>
+
+    <!-- 根据数据集ID统计数据行数 -->
     <select id="countByDataset" resultType="int">
         SELECT COUNT(1) FROM training_dataset_row WHERE dataset_id = #{datasetId}
     </select>
 
+    <!-- 根据数据集ID删除数据行 -->
     <delete id="deleteByDataset">
         DELETE FROM training_dataset_row WHERE dataset_id = #{datasetId}
     </delete>
+
+    <!-- 根据数据集ID查询数据行 -->
+    <select id="selectByDatasetId" resultMap="TrainingDataRowResultMap">
+        SELECT id, dataset_id, row_data, created_at
+        FROM training_dataset_row
+        WHERE dataset_id = #{datasetId}
+        ORDER BY created_at
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 根据行ID查询数据行 -->
+    <select id="selectById" resultMap="TrainingDataRowResultMap">
+        SELECT id, dataset_id, row_data, created_at
+        FROM training_dataset_row
+        WHERE id = #{id}
+    </select>
 
 </mapper> 

@@ -366,14 +366,6 @@ CREATE INDEX idx_users_status ON users (status);
 
 CREATE INDEX idx_users_created_at ON users (created_at);
 
--- 用户权限表索引
-CREATE INDEX idx_user_permissions_user_id ON user_permissions (user_id);
-
-CREATE INDEX idx_user_permissions_resource_type ON user_permissions (resource_type);
-
-CREATE INDEX idx_user_permissions_resource_id ON user_permissions (resource_id);
-
-CREATE INDEX idx_user_permissions_permission ON user_permissions (permission);
 
 -- 虚拟机表索引
 CREATE INDEX idx_vm_instances_connection_status ON vm_instances (connection_status);

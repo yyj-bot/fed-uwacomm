@@ -413,11 +413,6 @@ public class TrainingDataServiceTest {
                 .thenReturn(Map.of("ACOUSTIC", 500, "ENVIRONMENT", 300, "MODEL", 200));
         when(trainingDatasetMapper.getStatusDistribution())
                 .thenReturn(Map.of("READY", 800, "PROCESSING", 150, "ERROR", 50));
-        when(trainingDatasetMapper.getVmDistribution())
-                .thenReturn(Arrays.asList(
-                        Map.of("vmId", "vm1", "count", 300, "size", 322122547L),
-                        Map.of("vmId", "vm2", "count", 400, "size", 429496730L)
-                ));
         when(trainingDatasetMapper.getTopDataTypes(10))
                 .thenReturn(Arrays.asList(
                         Map.of("dataType", "ACOUSTIC", "count", 500, "percentage", 50.0),
@@ -433,14 +428,12 @@ public class TrainingDataServiceTest {
         assertEquals(1024000L, result.getTotalSize());
         assertNotNull(result.getDataTypeDistribution());
         assertNotNull(result.getStatusDistribution());
-        assertNotNull(result.getVmDistribution());
         assertNotNull(result.getUploadTrend());
         assertNotNull(result.getTopDataTypes());
 
         // 验证分布数据
         assertEquals(3, result.getDataTypeDistribution().size());
         assertEquals(3, result.getStatusDistribution().size());
-        assertEquals(2, result.getVmDistribution().size());
         assertEquals(2, result.getTopDataTypes().size());
 
         // 验证调用
@@ -448,7 +441,6 @@ public class TrainingDataServiceTest {
         verify(trainingDatasetMapper, times(1)).getTotalSize();
         verify(trainingDatasetMapper, times(1)).getDataTypeDistribution();
         verify(trainingDatasetMapper, times(1)).getStatusDistribution();
-        verify(trainingDatasetMapper, times(1)).getVmDistribution();
         verify(trainingDatasetMapper, times(1)).getTopDataTypes(10);
     }
 

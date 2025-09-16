@@ -31,7 +31,6 @@ public class TrainingDataListVO {
         private String datasetId;
         private String datasetDescription;
         private String datasetType;
-        private String vmId;
         private String status;
         private List<String> tags;
     }

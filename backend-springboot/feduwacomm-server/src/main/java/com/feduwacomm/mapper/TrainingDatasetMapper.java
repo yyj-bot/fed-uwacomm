@@ -11,11 +11,11 @@ import java.util.Map;
 public interface TrainingDatasetMapper {
 
     int upsertDataset(@Param("id") String id,
-                      @Param("vmId") String vmId,
                       @Param("name") String name,
                       @Param("description") String description,
                       @Param("dataType") String dataType,
                       @Param("status") String status,
+                      @Param("uploadedBy") String uploadedBy,
                       @Param("metadata") String metadataJson);
 
     int insertTrainingData(TrainingData trainingData);
@@ -29,7 +29,7 @@ public interface TrainingDatasetMapper {
 
     TrainingData selectByIdEntity(@Param("id") String id);
 
-    List<TrainingData> selectByQuery(@Param("vmId") String vmId,
+    List<TrainingData> selectByQuery(@Param("uploadedBy") String uploadedBy,
                                    @Param("dataType") String dataType,
                                    @Param("status") String status,
                                    @Param("keyword") String keyword,
@@ -39,7 +39,7 @@ public interface TrainingDatasetMapper {
                                    @Param("offset") Integer offset,
                                    @Param("limit") Integer limit);
 
-    Long countByQuery(@Param("vmId") String vmId,
+    Long countByQuery(@Param("uploadedBy") String uploadedBy,
                      @Param("dataType") String dataType,
                      @Param("status") String status,
                      @Param("keyword") String keyword,
@@ -53,7 +53,7 @@ public interface TrainingDatasetMapper {
 
     int deleteByIds(@Param("ids") List<String> ids);
 
-    Map<String, Object> selectStatistics(@Param("vmId") String vmId,
+    Map<String, Object> selectStatistics(@Param("uploadedBy") String uploadedBy,
                                         @Param("dataType") String dataType,
                                         @Param("startDate") String startDate,
                                         @Param("endDate") String endDate);
@@ -66,7 +66,6 @@ public interface TrainingDatasetMapper {
 
     Map<String, Integer> getStatusDistribution();
 
-    List<Map<String, Object>> getVmDistribution();
 
     List<Integer> getUploadTrendLast7Days();
 

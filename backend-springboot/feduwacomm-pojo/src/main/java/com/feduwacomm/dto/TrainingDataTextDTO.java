@@ -17,9 +17,6 @@ import java.util.Map;
 @Builder
 public class TrainingDataTextDTO {
 
-    @NotBlank(message = "虚拟机ID不能为空")
-    private String vmId;
-
     @NotBlank(message = "数据类型不能为空")
     private String dataType;
 

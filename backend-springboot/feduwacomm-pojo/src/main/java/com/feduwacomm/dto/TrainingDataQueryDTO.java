@@ -19,8 +19,6 @@ public class TrainingDataQueryDTO {
 
     private Integer size = 20;
 
-    private String vmId;
-
     private String dataType;
 
     private String status;

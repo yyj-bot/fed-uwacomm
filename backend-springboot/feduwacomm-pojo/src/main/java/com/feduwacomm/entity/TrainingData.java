@@ -20,8 +20,6 @@ public class TrainingData {
 
     private String id;
 
-    private String vmId;
-
     private String name;
 
     private String description;

@@ -224,3 +224,5 @@ config/production_*.py
 /.mcp.json
 
 frontend-admin/node_modules/
+
+/uploads

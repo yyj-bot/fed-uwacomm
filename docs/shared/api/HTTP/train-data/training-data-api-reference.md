@@ -6,7 +6,7 @@
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/training-data`
-- **API版本**: v1.0
+- **API版本**: v1.2
 - **认证方式**: JWT Token
 - **数据格式**: JSON / Multipart Form Data
 
@@ -54,9 +54,8 @@ Content-Type: multipart/form-data
 
 **请求参数**:
 ```
-vmId: a1b2c3d4e5f678901234567890123456 (必需) - 虚拟机ID
 dataType: ACOUSTIC (必需) - 数据类型
-description: 水声传播特征数据 (可选) - 数据描述
+datasetDescription: 水声传播特征数据 (可选) - 数据描述
 tags: ["feature", "acoustic"] (可选) - 数据标签
 metadata: {"source": "bellhop", "version": "1.0"} (可选) - 元数据
 file: [文件] (必需) - 上传的文件
@@ -71,7 +70,6 @@ file: [文件] (必需) - 上传的文件
     "datasetId": "e5f67890123456789012345678901234",
     "datasetDescription": "水声传播特征数据",
     "datasetType": "ACOUSTIC",
-    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "UPLOADING",
     "uploadTime": "2024-01-01T10:00:00.000Z",
     "uploadedBy": "f6789012345678901234567890123456",
@@ -93,11 +91,10 @@ Content-Type: application/json
 **请求参数**:
 ```json
 {
-  "vmId": "a1b2c3d4e5f678901234567890123456",
   "dataType": "ENVIRONMENT",
   "title": "声学传播环境配置",
   "content": "声学传播环境配置文件内容...",
-  "description": "声学传播环境配置描述",
+  "datasetDescription": "声学传播环境配置描述",
   "tags": ["environment", "acoustic"],
   "metadata": {
     "source": "bellhop",
@@ -116,7 +113,6 @@ Content-Type: application/json
     "datasetId": "f6789012345678901234567890123456",
     "datasetDescription": "声学传播环境配置描述",
     "datasetType": "ENVIRONMENT",
-    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
     "uploadTime": "2024-01-01T10:00:00.000Z",
     "uploadedBy": "f6789012345678901234567890123456"
@@ -136,7 +132,6 @@ Authorization: Bearer {token}
 **查询参数**:
 - `page`: 页码 (默认: 1)
 - `size`: 每页大小 (默认: 20)
-- `vmId`: 虚拟机ID过滤
 - `dataType`: 数据类型过滤
 - `status`: 状态过滤
 - `keyword`: 关键词搜索
@@ -158,7 +153,6 @@ Authorization: Bearer {token}
         "datasetId": "e5f67890123456789012345678901234",
         "datasetDescription": "水声传播特征数据",
         "datasetType": "ACOUSTIC",
-        "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
         "tags": ["feature", "acoustic"]
       },
@@ -166,7 +160,6 @@ Authorization: Bearer {token}
         "datasetId": "f6789012345678901234567890123456",
         "datasetDescription": "声学传播环境参数配置",
         "datasetType": "ENVIRONMENT",
-        "vmId": "a1b2c3d4e5f678901234567890123456",
         "status": "READY",
         "tags": ["environment", "acoustic"]
       }
@@ -193,7 +186,6 @@ Authorization: Bearer {token}
     "datasetId": "e5f67890123456789012345678901234",
     "datasetDescription": "水声传播特征数据",
     "datasetType": "ACOUSTIC",
-    "vmId": "a1b2c3d4e5f678901234567890123456",
     "status": "READY",
     "uploadTime": "2024-01-01T10:00:00.000Z",
     "uploadedBy": "f6789012345678901234567890123456",
@@ -485,7 +477,6 @@ Authorization: Bearer {token}
 ```
 
 **查询参数**:
-- `vmId`: 虚拟机ID过滤
 - `dataType`: 数据类型过滤
 - `startDate`: 开始日期
 - `endDate`: 结束日期
@@ -509,16 +500,16 @@ Authorization: Bearer {token}
       "PROCESSING": 150,
       "ERROR": 50
     },
-    "vmDistribution": {
-      "a1b2c3d4e5f678901234567890123456": {
+    "userDistribution": {
+      "019952af2f63758a189339aef3180e4f": {
         "count": 300,
         "size": 322122547
       },
-      "b2c3d4e5f67890123456789012345678": {
+      "029952af2f63758a189339aef3180e4f": {
         "count": 400,
         "size": 429496730
       },
-      "c3d4e5f6789012345678901234567890": {
+      "039952af2f63758a189339aef3180e4f": {
         "count": 300,
         "size": 322122547
       }
@@ -559,12 +550,11 @@ Content-Type: application/json
   "exportType": "CSV",                    // 导出类型，CSV/JSON/EXCEL
   "filters": {
     "dataType": "ACOUSTIC",               // 数据类型过滤，可选
-    "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
     "status": "READY",                    // 状态过滤，可选
     "startTime": "2024-01-01T00:00:00",  // 开始时间，可选
     "endTime": "2024-01-31T23:59:59"     // 结束时间，可选
   },
-  "fields": ["datasetId", "datasetName", "datasetType", "vmId", "status", "uploadTime"],  // 导出字段，可选
+  "fields": ["datasetId", "datasetDescription", "datasetType", "status", "uploadTime"],  // 导出字段，可选
   "format": "ZIP"                         // 导出格式，ZIP/TAR，可选
 }
 ```
