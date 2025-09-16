@@ -5,7 +5,7 @@
     <!-- Simplified result mapping - only includes fields that exist in database -->
     <resultMap id="TrainingDataResultMap" type="com.feduwacomm.entity.TrainingData">
         <id property="id" column="id"/>
-        <result property="vmId" column="vm_id"/>
+        <result property="uploadedBy" column="uploaded_by"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
         <result property="dataType" column="data_type"/>
@@ -15,10 +15,10 @@
 
     <!-- Original methods kept unchanged -->
     <insert id="upsertDataset">
-        INSERT INTO training_dataset (id, vm_id, name, description, data_type, status, metadata)
-        VALUES (#{id}, #{vmId}, #{name}, #{description}, #{dataType}, #{status}, #{metadata})
+        INSERT INTO training_dataset (id, uploaded_by, name, description, data_type, status, metadata)
+        VALUES (#{id}, #{uploadedBy}, #{name}, #{description}, #{dataType}, #{status}, #{metadata})
         ON DUPLICATE KEY UPDATE
-            vm_id = VALUES(vm_id),
+            uploaded_by = VALUES(uploaded_by),
             name = VALUES(name),
             description = VALUES(description),
             data_type = VALUES(data_type),
@@ -29,10 +29,10 @@
     <!-- New insert method -->
     <insert id="insertTrainingData">
         INSERT INTO training_dataset (
-            id, vm_id, name, description, data_type, status, metadata, upload_time
+            id, uploaded_by, name, description, data_type, status, metadata, upload_time
         )
         VALUES (
-            #{id}, #{vmId}, #{name}, #{description}, #{dataType}, #{status}, 
+            #{id}, #{uploadedBy}, #{name}, #{description}, #{dataType}, #{status},
             #{metadata}, #{uploadTime}
         )
     </insert>
@@ -53,7 +53,7 @@
     <!-- Note: progress, validation and process related fields don't exist in database -->
 
     <select id="selectById" resultType="map">
-        SELECT id, vm_id, name, description, data_type, status, metadata, upload_time
+        SELECT id, uploaded_by, name, description, data_type, status, metadata, upload_time
         FROM training_dataset WHERE id = #{id}
     </select>
 
@@ -66,8 +66,8 @@
     <select id="selectByQuery" resultMap="TrainingDataResultMap">
         SELECT * FROM training_dataset
         <where>
-            <if test="vmId != null and vmId != ''">
-                AND vm_id = #{vmId}
+            <if test="uploadedBy != null and uploadedBy != ''">
+                AND uploaded_by = #{uploadedBy}
             </if>
             <if test="dataType != null and dataType != ''">
                 AND data_type = #{dataType}
@@ -95,8 +95,8 @@
     <select id="countByQuery" resultType="long">
         SELECT COUNT(*) FROM training_dataset
         <where>
-            <if test="vmId != null and vmId != ''">
-                AND vm_id = #{vmId}
+            <if test="uploadedBy != null and uploadedBy != ''">
+                AND uploaded_by = #{uploadedBy}
             </if>
             <if test="dataType != null and dataType != ''">
                 AND data_type = #{dataType}
@@ -145,8 +145,8 @@
             0 as totalSize
         FROM training_dataset
         <where>
-            <if test="vmId != null and vmId != ''">
-                AND vm_id = #{vmId}
+            <if test="uploadedBy != null and uploadedBy != ''">
+                AND uploaded_by = #{uploadedBy}
             </if>
             <if test="dataType != null and dataType != ''">
                 AND data_type = #{dataType}
@@ -186,11 +186,11 @@
 
     <!-- VM distribution -->
     <select id="getVmDistribution" resultType="map">
-        SELECT vm_id as vmId, 
+        SELECT uploaded_by as uploadedBy, 
                COUNT(*) as count, 
                0 as size
         FROM training_dataset
-        GROUP BY vm_id
+        GROUP BY uploaded_by
     </select>
 
     <!-- Last 7 days upload trend -->

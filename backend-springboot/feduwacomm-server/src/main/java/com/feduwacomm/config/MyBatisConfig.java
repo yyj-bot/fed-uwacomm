@@ -34,6 +34,10 @@ public class MyBatisConfig {
         // 设置MyBatis配置
         org.apache.ibatis.session.Configuration configuration = new org.apache.ibatis.session.Configuration();
         configuration.setMapUnderscoreToCamelCase(true);
+
+        // 注册自定义类型处理器
+        configuration.getTypeHandlerRegistry().register(java.util.Map.class, com.feduwacomm.config.JsonTypeHandler.class);
+
         sessionFactory.setConfiguration(configuration);
 
         // 设置Mapper XML文件位置

@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
 -- 5. 训练数据集元信息表 (training_dataset，原training_data)
 CREATE TABLE IF NOT EXISTS training_dataset (
     id VARCHAR(32) PRIMARY KEY COMMENT '数据集唯一标识(32位UUID)',
-    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
     name VARCHAR(255) NOT NULL COMMENT '数据集名称',
     description TEXT COMMENT '数据集描述',
     data_type ENUM(
@@ -127,6 +126,7 @@ CREATE TABLE IF NOT EXISTS training_dataset (
         'OTHER'
     ) NOT NULL COMMENT '数据类型',
     upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by VARCHAR(32) NULL COMMENT '上传者ID(32位UUID)',
     status ENUM(
         'UPLOADING',
         'PROCESSING',
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS training_dataset (
 
 -- 添加训练数据集表外键约束（在表创建后单独添加）
 ALTER TABLE training_dataset
-ADD CONSTRAINT fk_training_dataset_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
+ADD CONSTRAINT fk_training_dataset_uploaded_by FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL;
 
 -- 6. 训练数据明细表 (training_dataset_row，宽表+JSON)
 CREATE TABLE IF NOT EXISTS training_dataset_row (
@@ -366,14 +366,6 @@ CREATE INDEX idx_users_status ON users (status);
 
 CREATE INDEX idx_users_created_at ON users (created_at);
 
--- 用户权限表索引
-CREATE INDEX idx_user_permissions_user_id ON user_permissions (user_id);
-
-CREATE INDEX idx_user_permissions_resource_type ON user_permissions (resource_type);
-
-CREATE INDEX idx_user_permissions_resource_id ON user_permissions (resource_id);
-
-CREATE INDEX idx_user_permissions_permission ON user_permissions (permission);
 
 -- 虚拟机表索引
 CREATE INDEX idx_vm_instances_connection_status ON vm_instances (connection_status);
@@ -386,7 +378,7 @@ CREATE INDEX idx_federated_tasks_status ON federated_tasks (status);
 CREATE INDEX idx_federated_tasks_algorithm ON federated_tasks (algorithm);
 
 -- 训练数据集元信息表索引
-CREATE INDEX idx_training_dataset_vm_id ON training_dataset (vm_id);
+CREATE INDEX idx_training_dataset_uploaded_by ON training_dataset (uploaded_by);
 
 CREATE INDEX idx_training_dataset_data_type ON training_dataset (data_type);
 

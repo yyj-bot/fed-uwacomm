@@ -14,8 +14,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class TrainingDataStatisticsDTO {
 
-    private String vmId;
-
     private String dataType;
 
     private String startDate;
