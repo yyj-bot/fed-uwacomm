@@ -23,7 +23,6 @@ public class LogCleanupTaskVO {
     private Long deletedRecords;
     private Long estimatedSize;
     private Long freedSpace;
-    private Boolean dryRun;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
     private String errorMessage;

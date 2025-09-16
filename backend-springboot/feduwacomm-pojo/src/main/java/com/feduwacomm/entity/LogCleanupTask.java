@@ -25,7 +25,6 @@ public class LogCleanupTask {
     private Long deletedRecords;
     private Long estimatedSize;
     private Long freedSpace;
-    private Boolean dryRun;
     private LocalDateTime createdAt;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;

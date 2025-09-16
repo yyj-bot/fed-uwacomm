@@ -701,13 +701,6 @@
                                 <input type="number" id="maxSizeGB" value="10" min="1">
                             </div>
                             <div class="form-group">
-                                <label>试运行模式</label>
-                                <select id="dryRun">
-                                    <option value="true">是(仅预览)</option>
-                                    <option value="false">否(真实执行)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <label>清理任务ID</label>
                                 <input type="text" id="cleanupTaskId" placeholder="输入清理任务ID">
                             </div>
@@ -1237,7 +1230,6 @@
                 retentionDays: parseInt(document.getElementById('retentionDays').value) || undefined,
                 level: document.getElementById('cleanupLevel').value || undefined,
                 maxSizeGB: parseInt(document.getElementById('maxSizeGB').value) || undefined,
-                dryRun: document.getElementById('dryRun').value === 'true',
                 ...getQueryParams()
             };
 
@@ -1258,8 +1250,8 @@
                     const cleanupInfo = data.data;
                     document.getElementById('cleanupTaskId').value = cleanupInfo.cleanupId;
                     
-                    addResult('cleanup-create', '🗑️ 创建清理任务', 
-                        `清理任务创建成功\n任务ID: ${cleanupInfo.cleanupId}\n状态: ${cleanupInfo.status}\n预计删除记录: ${cleanupInfo.estimatedRecords}\n预计释放空间: ${cleanupInfo.estimatedSize} 字节\n试运行: ${cleanupInfo.dryRun}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
+                    addResult('cleanup-create', '🗑️ 创建清理任务',
+                        `清理任务创建成功\n任务ID: ${cleanupInfo.cleanupId}\n状态: ${cleanupInfo.status}\n预计删除记录: ${cleanupInfo.estimatedRecords}\n预计释放空间: ${cleanupInfo.estimatedSize} 字节\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
                     
                     // 启动任务监控
                     startTaskMonitor(cleanupInfo.cleanupId, 'cleanup');

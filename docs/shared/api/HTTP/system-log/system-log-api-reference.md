@@ -265,7 +265,8 @@
   "category": "SYSTEM",               // 日志类别过滤，可选
   "vmId": "a1b2c3d4e5f678901234567890123456",           // 虚拟机ID过滤，可选
   "taskId": "b2c3d4e5f67890123456789012345678",       // 任务ID过滤，可选
-  "dryRun": false                     // 试运行模式，可选，默认false
+  "startTime": "2024-01-01T00:00:00", // 开始时间，可选，ISO 8601格式
+  "endTime": "2024-01-02T00:00:00"    // 结束时间，可选，ISO 8601格式
 }
 ```
 
@@ -278,8 +279,7 @@
     "cleanupId": "cleanup_1234567890",
     "status": "PROCESSING",
     "estimatedRecords": 5000,
-    "estimatedSize": 104857600,
-    "dryRun": false
+    "estimatedSize": 104857600
   }
 }
 ```

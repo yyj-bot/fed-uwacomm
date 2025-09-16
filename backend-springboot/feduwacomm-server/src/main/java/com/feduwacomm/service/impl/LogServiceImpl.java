@@ -491,7 +491,6 @@ public class LogServiceImpl implements LogService {
                     .deletedRecords(0L)
                     .estimatedSize(0L)
                     .freedSpace(0L)
-                    .dryRun(cleanupDTO.getDryRun() != null ? cleanupDTO.getDryRun() : false)
                     .createdAt(LocalDateTime.now())
                     .createdBy(BaseContext.getUserId())
                     .build();
@@ -625,7 +624,7 @@ public class LogServiceImpl implements LogService {
                             }
                         });
                         return LogMonitorVO.TimeSeriesData.builder()
-                                .timestamp(LocalDateTime.parse((String) data.get("timestamp")))
+                                .timestamp(parseTimestamp((String) data.get("timestamp")))
                                 .data(dataMap)
                                 .build();
                 }).collect(Collectors.toList()))
@@ -637,14 +636,14 @@ public class LogServiceImpl implements LogService {
                             }
                         });
                         return LogMonitorVO.TimeSeriesData.builder()
-                                .timestamp(LocalDateTime.parse((String) data.get("timestamp")))
+                                .timestamp(parseTimestamp((String) data.get("timestamp")))
                                 .data(dataMap)
                                 .build();
                 }).collect(Collectors.toList()))
                 .recentErrors(getRecentErrors(timeRange).stream().map(data ->
                         LogMonitorVO.RecentError.builder()
                                 .message((String) data.get("message"))
-                                .createdAt(LocalDateTime.parse((String) data.get("createdAt")))
+                                .createdAt(parseTimestamp((String) data.get("createdAt")))
                                 .build()).collect(Collectors.toList()))
                 .build();
     }
@@ -666,7 +665,7 @@ public class LogServiceImpl implements LogService {
                                 .build()).collect(Collectors.toList()))
                 .responseTimeTrend(getResponseTimeTrend(timeRange).stream().map(data ->
                         LogMonitorVO.ResponseTimeData.builder()
-                                .timestamp(LocalDateTime.parse((String) data.get("timestamp")))
+                                .timestamp(parseTimestamp((String) data.get("timestamp")))
                                 .average((Double) data.get("average"))
                                 .build()).collect(Collectors.toList()))
                 .build();
@@ -811,21 +810,10 @@ public class LogServiceImpl implements LogService {
             task.setStatus(TaskStatus.PROCESSING);
             logCleanupTaskMapper.updateStatus(task.getCleanupId(), TaskStatus.PROCESSING, 0, 0L, 0L, LocalDateTime.now(), null);
 
-            // 执行真实的日志清理
-            long deletedRecords = 0L;
-            long freedSpace = 0L;
-
-            if (cleanupDTO.getDryRun() != null && cleanupDTO.getDryRun()) {
-                // 干运行模式：只计算会删除的记录数，不实际删除
-                deletedRecords = countRecordsToCleanup(cleanupDTO);
-                freedSpace = estimateFreedSpace(deletedRecords);
-                logger.info("干运行模式: 预计删除 {} 条记录，释放 {} 字节空间", deletedRecords, freedSpace);
-            } else {
-                // 实际执行清理
-                deletedRecords = performActualCleanup(cleanupDTO);
-                freedSpace = estimateFreedSpace(deletedRecords);
-                logger.info("清理完成: 删除了 {} 条记录，释放 {} 字节空间", deletedRecords, freedSpace);
-            }
+            // 执行日志清理
+            long deletedRecords = performActualCleanup(cleanupDTO);
+            long freedSpace = estimateFreedSpace(deletedRecords);
+            logger.info("清理完成: 删除了 {} 条记录，释放 {} 字节空间", deletedRecords, freedSpace);
 
             // 更新任务完成状态
             task.setStatus(TaskStatus.COMPLETED);
@@ -844,24 +832,6 @@ public class LogServiceImpl implements LogService {
     }
     
     // ==================== 日志清理实现方法 ====================
-
-    /**
-     * 计算需要清理的记录数（用于干运行模式）
-     */
-    private long countRecordsToCleanup(LogCleanupDTO cleanupDTO) {
-        try {
-            StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM system_logs WHERE 1=1");
-            List<Object> params = new ArrayList<>();
-
-            buildCleanupConditions(sql, params, cleanupDTO);
-
-            Long count = jdbcTemplate.queryForObject(sql.toString(), params.toArray(), Long.class);
-            return count != null ? count : 0L;
-        } catch (Exception e) {
-            logger.error("统计待清理记录数失败: {}", e.getMessage());
-            return 0L;
-        }
-    }
 
     /**
      * 执行实际的日志清理
@@ -890,7 +860,7 @@ public class LogServiceImpl implements LogService {
         switch (cleanupDTO.getStrategy() != null ? cleanupDTO.getStrategy() : LogCleanupStrategy.TIME_BASED) {
             case TIME_BASED:
                 if (cleanupDTO.getRetentionDays() != null && cleanupDTO.getRetentionDays() > 0) {
-                    sql.append(" AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)");
+                    sql.append(" AND timestamp < DATE_SUB(NOW(), INTERVAL ? DAY)");
                     params.add(cleanupDTO.getRetentionDays());
                 }
                 break;
@@ -920,12 +890,12 @@ public class LogServiceImpl implements LogService {
         }
 
         if (cleanupDTO.getStartTime() != null) {
-            sql.append(" AND created_at >= ?");
+            sql.append(" AND timestamp >= ?");
             params.add(cleanupDTO.getStartTime());
         }
 
         if (cleanupDTO.getEndTime() != null) {
-            sql.append(" AND created_at <= ?");
+            sql.append(" AND timestamp <= ?");
             params.add(cleanupDTO.getEndTime());
         }
     }
@@ -1444,7 +1414,26 @@ public class LogServiceImpl implements LogService {
             default -> 1;
         };
     }
-    
+
+    /**
+     * 解析MySQL DATE_FORMAT返回的时间字符串
+     * MySQL返回格式: '2025-09-16 12:00:00'
+     * 需要转换为LocalDateTime
+     */
+    private LocalDateTime parseTimestamp(String timestampStr) {
+        try {
+            if (timestampStr == null || timestampStr.isEmpty()) {
+                return LocalDateTime.now();
+            }
+            // MySQL DATE_FORMAT 格式: yyyy-MM-dd HH:mm:ss
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            return LocalDateTime.parse(timestampStr, formatter);
+        } catch (Exception e) {
+            logger.warn("解析时间戳失败: {}, 使用当前时间", timestampStr, e);
+            return LocalDateTime.now();
+        }
+    }
+
     /**
      * 获取CPU使用率（近似值）
      */

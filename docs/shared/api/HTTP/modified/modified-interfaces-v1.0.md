@@ -443,7 +443,133 @@ case CATEGORY_BASED:
 
 ---
 
-## 六、兼容性说明
+## 六、日志清理功能简化 - 移除试运行模式
+
+### 修改原因
+- **用户反馈**: 试运行模式容易造成用户困惑，显示删除记录但实际未删除
+- **简化操作**: 移除不必要的中间步骤，用户执行清理即为真实清理
+- **提升效率**: 避免因默认试运行模式导致的操作无效问题
+- **减少复杂度**: 简化系统逻辑，降低维护成本
+
+### system-log-api-reference.md-4.1 日志清理接口 (已修改)
+
+#### 修改前
+**请求参数**:
+```json
+{
+  "strategy": "TIME_BASED",          // 清理策略，TIME_BASED/LEVEL_BASED/CATEGORY_BASED
+  "retentionDays": 30,               // 保留天数，可选
+  "level": "DEBUG",                  // 清理级别，可选
+  "category": "SYSTEM",              // 日志类别，可选
+  "vmId": "a1b2c3d4e5f678901234567890123456",  // 虚拟机ID，可选
+  "taskId": "b2c3d4e5f67890123456789012345678", // 任务ID，可选
+  "dryRun": false                    // 试运行模式，可选，默认false
+}
+```
+
+**特点**:
+- 支持试运行模式 (`dryRun: true`) 仅预览清理结果
+- 需要用户明确指定 `dryRun: false` 才能执行真实清理
+- 前端页面默认选择试运行模式，容易造成用户误解
+
+#### 修改后
+**请求参数**:
+```json
+{
+  "strategy": "TIME_BASED",          // 清理策略，TIME_BASED/LEVEL_BASED/CATEGORY_BASED
+  "retentionDays": 30,               // 保留天数，可选
+  "level": "DEBUG",                  // 清理级别，可选
+  "category": "SYSTEM",              // 日志类别，可选
+  "vmId": "a1b2c3d4e5f678901234567890123456",  // 虚拟机ID，可选
+  "taskId": "b2c3d4e5f67890123456789012345678"  // 任务ID，可选
+}
+```
+
+**特点**:
+- 完全移除 `dryRun` 参数
+- 执行清理即为真实清理操作
+- 简化用户操作流程
+- 提供清晰明确的操作反馈
+
+#### 修改影响范围
+
+**后端修改**:
+- `LogCleanupDTO.java`: 移除 `dryRun` 字段
+- `LogCleanupTask.java`: 移除 `dryRun` 字段
+- `LogCleanupTaskVO.java`: 移除 `dryRun` 字段
+- `LogServiceImpl.java`: 移除所有试运行逻辑，简化为直接执行清理
+- `LogCleanupTaskMapper.xml`: 移除 `dry_run` 列映射
+- `LogControllerTest.java`: 更新测试用例移除 `dryRun` 参数
+
+**前端修改**:
+- `log-management.html`: 移除试运行模式选择器
+- `log-api-test.html`: 已在之前版本中移除试运行选项
+
+**数据库影响**:
+- 如存在 `dry_run` 列，建议在下次数据库迁移时移除
+
+#### 迁移指南
+
+**客户端代码更新**:
+
+**修改前**:
+```javascript
+const cleanupData = {
+  strategy: 'TIME_BASED',
+  retentionDays: 30,
+  dryRun: false  // 需要明确指定才能真实执行
+};
+```
+
+**修改后**:
+```javascript
+const cleanupData = {
+  strategy: 'TIME_BASED',
+  retentionDays: 30
+  // 不再需要 dryRun 参数，直接执行清理
+};
+```
+
+**Java代码更新**:
+
+**修改前**:
+```java
+LogCleanupDTO cleanupDTO = LogCleanupDTO.builder()
+    .strategy(LogCleanupStrategy.TIME_BASED)
+    .retentionDays(30)
+    .dryRun(false)  // 需要显式设置
+    .build();
+```
+
+**修改后**:
+```java
+LogCleanupDTO cleanupDTO = LogCleanupDTO.builder()
+    .strategy(LogCleanupStrategy.TIME_BASED)
+    .retentionDays(30)
+    // 移除 dryRun 设置
+    .build();
+```
+
+#### 优势总结
+
+1. **用户体验改进**
+   - 消除试运行模式带来的混淆
+   - 简化操作流程，减少用户错误
+   - 提供明确的操作结果反馈
+
+2. **系统逻辑简化**
+   - 减少条件分支处理
+   - 降低代码复杂度
+   - 提高系统可维护性
+
+3. **操作一致性**
+   - 用户执行清理操作即为真实清理
+   - 避免"显示删除但实际未删除"的问题
+   - 与其他管理操作保持一致的行为模式
+
+---
+
+## 七、兼容性说明
 
 ### 不兼容变更
 - 日志导出接口从异步模式改为同步模式
@@ -452,6 +578,7 @@ case CATEGORY_BASED:
 - 参数传递方式发生变化
 - **日志清理策略枚举变更**: SIZE_BASED策略完全移除，替换为CATEGORY_BASED策略
 - **清理参数变更**: 移除maxSize参数，新增category、vmId、taskId参数
+- **试运行模式移除**: 完全移除日志清理接口中的 `dryRun` 参数，所有清理操作均为真实执行
 
 ### 兼容性新增
 - **用户统计接口**: 新增 `GET /api/admin/user/statistics` 接口，完全向后兼容
@@ -460,8 +587,9 @@ case CATEGORY_BASED:
 ### 建议措施
 1. **及时更新客户端代码**: 按照迁移指南更新相关代码
 2. **更新清理策略配置**: 将使用SIZE_BASED的配置改为TIME_BASED或LEVEL_BASED或CATEGORY_BASED策略
-3. **测试验证**: 确保新接口功能正常
-4. **用户通知**: 告知用户操作流程的简化改进
+3. **移除dryRun参数**: 更新所有调用日志清理接口的代码，移除 `dryRun` 参数
+4. **测试验证**: 确保新接口功能正常，特别注意清理操作现在为真实执行
+5. **用户通知**: 告知用户操作流程的简化改进，强调清理操作的直接性
 
 ---
 
