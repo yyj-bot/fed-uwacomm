@@ -1,0 +1,11 @@
+// 业务模块统一导出
+// 企业标准：通过模块index文件统一管理导出
+
+export { DashboardPage } from './dashboard'
+export { LoginPage } from './login'
+export { AdminPage } from './admin'
+export { FederatedLearningPage } from './federated-learning'
+export { ModelManagementPage } from './model-management'
+export { SystemLogsPage } from './system-logs'
+export { UnderwaterOptimizationPage } from './underwater-optimization'
+export { EnvironmentAnalysisPage } from './environment-analysis' 
