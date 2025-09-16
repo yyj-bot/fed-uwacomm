@@ -580,7 +580,6 @@
                     </div>
                     <button class="btn btn-secondary" onclick="stopTaskMonitor()">停止监控</button>
                 </div>
-                <button class="btn btn-info" onclick="getExportHistory()">导出历史</button>
                 <button class="btn btn-info" onclick="getCleanupHistory()">清理历史</button>
             </div>
         </div>
@@ -640,17 +639,17 @@
                     </div>
                 </div>
 
-                <!-- 日志导出测试 -->
+                <!-- 日志下载测试 -->
                 <div class="test-section">
                     <div class="test-section-header" onclick="toggleSection(this)">
-                        📤 日志导出测试 (4个接口)
+                        📤 日志下载测试 (1个接口)
                         <span class="toggle-icon">▼</span>
                     </div>
                     <div class="test-section-content">
                         <div class="test-form">
                             <div class="form-group">
                                 <label>导出格式</label>
-                                <select id="exportFormat">
+                                <select id="downloadFormat">
                                     <option value="CSV">CSV</option>
                                     <option value="JSON">JSON</option>
                                     <option value="EXCEL">EXCEL</option>
@@ -658,30 +657,13 @@
                             </div>
                             <div class="form-group">
                                 <label>包含详细信息</label>
-                                <select id="includeDetails">
+                                <select id="downloadIncludeDetails">
                                     <option value="true">是</option>
                                     <option value="false">否</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label>导出任务ID</label>
-                                <input type="text" id="exportTaskId" placeholder="输入导出任务ID">
-                            </div>
-                            <div class="form-group">
-                                <label>历史查询状态</label>
-                                <select id="exportHistoryStatus">
-                                    <option value="">全部</option>
-                                    <option value="PENDING">等待中</option>
-                                    <option value="PROCESSING">处理中</option>
-                                    <option value="COMPLETED">已完成</option>
-                                    <option value="FAILED">失败</option>
-                                </select>
-                            </div>
                         </div>
-                        <button class="btn btn-success" onclick="createExportTask()">📤 创建导出任务</button>
-                        <button class="btn btn-info" onclick="getExportStatus()">📋 查询导出状态</button>
-                        <button class="btn btn-warning" onclick="downloadExport()">⬇️ 下载导出文件</button>
-                        <button class="btn btn-secondary" onclick="getExportHistory()">📜 导出历史查询</button>
+                        <button class="btn btn-success" onclick="downloadLogs()">⬇️ 直接下载日志文件</button>
                     </div>
                 </div>
 
@@ -837,7 +819,7 @@
                         <div class="result-time">页面已加载完成</div>
                         <div class="result-content">日志管理测试工具已准备就绪
 ✅ 日志查询接口 (4个): 列表、详情、实时、统计
-✅ 日志导出接口 (4个): 创建、状态、下载、历史  
+✅ 日志下载接口 (1个): 直接下载  
 ✅ 日志清理接口 (3个): 创建、状态、历史
 ✅ 系统监控接口 (4个): 系统、日志、性能、告警
 ✅ 日志配置接口 (2个): 查询、更新
@@ -855,7 +837,7 @@
         let authToken = '';
         let taskMonitorInterval = null;
         let currentTaskId = null;
-        let currentTaskType = null; // 'export' 或 'cleanup'
+        let currentTaskType = null; // 'cleanup'
 
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -1169,145 +1151,78 @@
         }
 
         // =========================
-        // 日志导出接口测试
+        // 日志下载接口测试
         // =========================
 
-        // 5. 创建导出任务
-        async function createExportTask() {
-            const exportData = {
+        // 5. 直接下载日志文件
+        async function downloadLogs() {
+            const downloadData = {
                 ...getQueryParams(),
-                format: document.getElementById('exportFormat').value || 'CSV',
-                includeDetails: document.getElementById('includeDetails').value === 'true'
+                format: document.getElementById('downloadFormat').value || 'CSV',
+                includeDetails: document.getElementById('downloadIncludeDetails').value === 'true'
             };
 
             // 移除空值
-            Object.keys(exportData).forEach(key => {
-                if (exportData[key] === undefined || exportData[key] === '') {
-                    delete exportData[key];
+            Object.keys(downloadData).forEach(key => {
+                if (downloadData[key] === undefined || downloadData[key] === '') {
+                    delete downloadData[key];
                 }
             });
-            
+
             try {
-                const { response, data } = await makeRequest('/api/log/export', {
+                const response = await fetch('/api/log/download', {
                     method: 'POST',
-                    body: JSON.stringify(exportData)
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(downloadData)
                 });
-                
-                if (response.ok && data.code === 200) {
-                    const exportInfo = data.data;
-                    document.getElementById('exportTaskId').value = exportInfo.exportId;
-                    
-                    addResult('export-create', '📤 创建导出任务', 
-                        `导出任务创建成功\n任务ID: ${exportInfo.exportId}\n状态: ${exportInfo.status}\n预计时间: ${exportInfo.estimatedTime}秒\n下载地址: ${exportInfo.downloadUrl}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
-                    
-                    // 启动任务监控
-                    startTaskMonitor(exportInfo.exportId, 'export');
-                } else {
-                    addResult('export-create', '📤 创建导出任务', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('export-create', '📤 创建导出任务', error.message, 'error');
-            }
-        }
 
-        // 6. 导出状态查询
-        async function getExportStatus() {
-            const exportId = document.getElementById('exportTaskId').value;
-            
-            if (!exportId) {
-                addResult('export-status', '📋 查询导出状态', '请输入导出任务ID', 'warning');
-                return;
-            }
-            
-            try {
-                const { response, data } = await makeRequest(`/api/log/export/status/${exportId}`);
-                
-                if (response.ok && data.code === 200) {
-                    const status = data.data;
-                    addResult('export-status', '📋 查询导出状态', 
-                        `导出状态查询成功\n任务ID: ${status.exportId}\n状态: ${status.status}\n进度: ${status.progress}%\n已处理: ${status.processedRecords}/${status.totalRecords}\n文件大小: ${(status.fileSize || 0)} 字节\n创建时间: ${status.createdAt}\n完成时间: ${status.completedAt || '未完成'}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
-                } else {
-                    addResult('export-status', '📋 查询导出状态', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('export-status', '📋 查询导出状态', error.message, 'error');
-            }
-        }
-
-        // 7. 导出文件下载
-        async function downloadExport() {
-            const exportId = document.getElementById('exportTaskId').value;
-            
-            if (!exportId) {
-                addResult('export-download', '⬇️ 下载导出文件', '请输入导出任务ID', 'warning');
-                return;
-            }
-            
-            try {
-                const { response, data } = await makeRequest(`/api/log/export/download/${exportId}`);
-                
                 if (response.ok) {
-                    // 处理文件下载
-                    if (data.blob) {
-                        const blob = data.blob;
+                    // 检查是否返回的是文件
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && (contentType.includes('application/octet-stream') ||
+                                       contentType.includes('text/csv') ||
+                                       contentType.includes('application/json') && downloadData.format === 'JSON' ||
+                                       contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))) {
+                        // 处理文件下载
+                        const blob = await response.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
-                        a.style.display = 'none';
                         a.href = url;
-                        
-                        // 从响应头获取文件名
-                        const disposition = data.headers.get('content-disposition');
-                        let filename = `log-export-${exportId}.csv`;
-                        if (disposition && disposition.includes('filename=')) {
-                            filename = disposition.split('filename=')[1].replace(/"/g, '');
+
+                        // 从Content-Disposition header获取文件名
+                        let filename = `logs_${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.csv`;
+                        const contentDisposition = response.headers.get('content-disposition');
+                        if (contentDisposition) {
+                            const matches = contentDisposition.match(/filename="?([^;"]+)"?/);
+                            if (matches && matches[1]) {
+                                filename = matches[1].replace(/"/g, '');
+                            }
                         }
-                        
                         a.download = filename;
+
                         document.body.appendChild(a);
                         a.click();
-                        window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
-                        
-                        addResult('export-download', '⬇️ 下载导出文件', 
-                            `文件下载成功\n文件名: ${filename}\n大小: ${blob.size} 字节`, 'success');
+                        window.URL.revokeObjectURL(url);
+
+                        addResult('log-download', '⬇️ 直接下载日志文件',
+                            `文件下载成功\n文件名: ${filename}\n格式: ${downloadData.format}\n包含详细信息: ${downloadData.includeDetails}\n过滤条件: ${JSON.stringify(downloadData, null, 2)}`, 'success');
                     } else {
-                        addResult('export-download', '⬇️ 下载导出文件', 
-                            `文件下载成功\n${JSON.stringify(data, null, 2)}`, 'success');
+                        // 可能返回的是错误信息
+                        const data = await response.json();
+                        addResult('log-download', '⬇️ 直接下载日志文件',
+                            `下载失败: ${data.message}\n\n${JSON.stringify(data, null, 2)}`, 'error');
                     }
                 } else {
-                    addResult('export-download', '⬇️ 下载导出文件', 
-                        `请求失败: HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`, 'error');
+                    const data = await response.json();
+                    addResult('log-download', '⬇️ 直接下载日志文件',
+                        `下载失败 (${response.status}): ${data.message}\n\n${JSON.stringify(data, null, 2)}`, 'error');
                 }
             } catch (error) {
-                addResult('export-download', '⬇️ 下载导出文件', error.message, 'error');
-            }
-        }
-
-        // 8. 导出历史查询
-        async function getExportHistory() {
-            const params = {
-                status: document.getElementById('exportHistoryStatus').value || undefined,
-                page: 1,
-                size: 10
-            };
-            
-            const queryString = buildQueryString(params);
-            
-            try {
-                const { response, data } = await makeRequest(`/api/log/export/history?${queryString}`);
-                
-                if (response.ok && data.code === 200) {
-                    const count = data.data.records?.length || 0;
-                    addResult('export-history', '📜 导出历史查询', 
-                        `导出历史查询成功\n记录数: ${count}\n总计: ${data.data.total}\n\n${JSON.stringify(data.data, null, 2)}`, 'success');
-                } else {
-                    addResult('export-history', '📜 导出历史查询', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('export-history', '📜 导出历史查询', error.message, 'error');
+                addResult('log-download', '⬇️ 直接下载日志文件', `请求失败: ${error.message}`, 'error');
             }
         }
 
@@ -1604,7 +1519,6 @@
                     if (config.exportSettings) {
                         summary += `\n\n导出设置:`;
                         summary += `\n  单次最大导出记录: ${config.exportSettings.maxRecordsPerExport}`;
-                        summary += `\n  导出文件保留天数: ${config.exportSettings.exportRetentionDays}`;
                         summary += `\n  支持格式: ${config.exportSettings.supportedFormats?.join(', ')}`;
                     }
                     
@@ -1689,8 +1603,8 @@
             // 开始监控
             taskMonitorInterval = setInterval(async () => {
                 try {
-                    const url = taskType === 'export' 
-                        ? `/api/log/export/status/${taskId}`
+                    const url = taskType === 'cleanup'
+                        ? `/api/log/cleanup/status/${taskId}`
                         : `/api/log/cleanup/status/${taskId}`;
                     
                     const { response, data } = await makeRequest(url);

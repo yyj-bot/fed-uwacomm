@@ -5,6 +5,28 @@ import org.apache.ibatis.annotations.Param;
 
 public class SystemLogSqlProvider {
 
+    /**
+     * 将驼峰命名的字段名映射为数据库的下划线命名
+     */
+    private String mapSortField(String field) {
+        switch (field) {
+            case "createdAt":
+                return "created_at";
+            case "userId":
+                return "user_id";
+            case "requestUri":
+                return "request_uri";
+            case "clientIp":
+                return "client_ip";
+            case "vmId":
+                return "vm_id";
+            case "taskId":
+                return "task_id";
+            default:
+                return field; // timestamp, level, logger, message, thread, environment, exception等保持不变
+        }
+    }
+
     public String selectByCondition(LogQueryDTO queryDTO) {
         StringBuilder sql = new StringBuilder();
         
@@ -72,8 +94,8 @@ public class SystemLogSqlProvider {
             sql.append("WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
         }
         
-        // 排序优化：使用索引排序
-        String sortField = queryDTO.getSort() != null ? queryDTO.getSort() : "timestamp";
+        // 排序优化：使用索引排序，映射驼峰命名到下划线命名
+        String sortField = queryDTO.getSort() != null ? mapSortField(queryDTO.getSort()) : "timestamp";
         String sortOrder = "desc".equalsIgnoreCase(queryDTO.getOrder()) ? "DESC" : "ASC";
         sql.append(" ORDER BY ").append(sortField).append(" ").append(sortOrder);
         

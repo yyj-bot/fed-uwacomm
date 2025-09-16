@@ -52,37 +52,6 @@ ADD CONSTRAINT fk_users_created_by FOREIGN KEY (created_by) REFERENCES users (id
 ALTER TABLE users
 ADD CONSTRAINT fk_users_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL;
 
--- 2. 用户权限表 (user_permissions)
-CREATE TABLE IF NOT EXISTS user_permissions (
-    id VARCHAR(32) PRIMARY KEY COMMENT '权限唯一标识(32位UUID)',
-    user_id VARCHAR(32) NOT NULL COMMENT '用户ID(32位UUID)',
-    resource_type ENUM(
-        'VM',
-        'TASK',
-        'DATA',
-        'MODEL',
-        'SYSTEM',
-        'USER'
-    ) NOT NULL COMMENT '资源类型',
-    resource_id VARCHAR(32) NULL COMMENT '资源ID(32位UUID，NULL表示所有资源)',
-    permission ENUM(
-        'READ',
-        'WRITE',
-        'DELETE',
-        'EXECUTE',
-        'ADMIN'
-    ) NOT NULL COMMENT '权限类型',
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    granted_by VARCHAR(32) NOT NULL COMMENT '授权者ID(32位UUID)',
-    expires_at TIMESTAMP NULL COMMENT '权限过期时间'
-);
-
--- 添加用户权限表外键约束（在表创建后单独添加）
-ALTER TABLE user_permissions
-ADD CONSTRAINT fk_user_permissions_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE;
-
-ALTER TABLE user_permissions
-ADD CONSTRAINT fk_user_permissions_granted_by FOREIGN KEY (granted_by) REFERENCES users (id) ON DELETE RESTRICT;
 
 -- 3. 虚拟机表 (vm_instances)
 CREATE TABLE IF NOT EXISTS vm_instances (

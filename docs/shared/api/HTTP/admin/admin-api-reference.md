@@ -246,9 +246,9 @@ Authorization: Bearer {token}
 }
 ```
 
-### 1.9 获取用户权限
+### 1.9 获取用户统计信息
 
-**接口地址**: `GET /api/admin/user/{userId}/permissions`
+**接口地址**: `GET /api/admin/user/statistics`
 
 **请求头**:
 ```
@@ -260,64 +260,44 @@ Authorization: Bearer {token}
 {
   "code": 200,
   "message": "获取成功",
-  "data": [
-    {
-      "permissionId": "p1b2c3d4e5f678901234567890123456",
-      "permissionName": "READ_DATA",
-      "description": "读取数据权限",
-      "grantedAt": "2024-01-01T10:00:00"
-    }
-  ]
-}
-```
-
-### 1.10 授予用户权限
-
-**接口地址**: `POST /api/admin/user/{userId}/permissions`
-
-**请求头**:
-```
-Authorization: Bearer {token}
-```
-
-**请求参数**:
-```json
-{
-  "permissionName": "string"  // 权限名称，必填
-}
-```
-
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "权限授予成功",
   "data": {
-    "permissionId": "p1b2c3d4e5f678901234567890123456",
-    "permissionName": "READ_DATA",
-    "description": "读取数据权限",
-    "grantedAt": "2024-01-01T10:00:00"
+    "totalUsers": 25,
+    "activeUsers": 20,
+    "lockedUsers": 2,
+    "adminUsers": 3,
+    "researcherUsers": 8,
+    "operatorUsers": 6,
+    "viewerUsers": 8,
+    "todayNewUsers": 2,
+    "timestamp": 1642761600000,
+    "hasUsers": true
   }
 }
 ```
 
-### 1.11 撤销用户权限
+## 📋 权限管理架构说明
 
-**接口地址**: `DELETE /api/admin/user/{userId}/permissions/{permissionId}`
+### 基于角色的权限管理
 
-**请求头**:
-```
-Authorization: Bearer {token}
-```
+本系统采用基于角色的权限管理（RBAC），通过用户角色来控制权限，替代了原有的细粒度权限表管理方式。
 
-**响应示例**:
-```json
-{
-  "code": 200,
-  "message": "权限撤销成功",
-  "data": null
-}
-```
+#### 角色权限对应关系
+
+| 角色 | 权限范围 | 说明 |
+|------|----------|------|
+| ADMIN | READ, WRITE, EXECUTE, DELETE | 系统管理员，拥有所有权限 |
+| RESEARCHER | READ, WRITE, EXECUTE | 研究人员，可以读写执行，但不能删除 |
+| OPERATOR | READ, EXECUTE | 操作员，可以读取和执行操作 |
+| VIEWER | READ | 查看者，只能读取信息 |
+
+#### 权限管理方式
+
+- **修改用户权限**: 通过修改用户角色实现（使用1.4更新用户接口）
+- **权限检查**: 服务层自动根据用户角色进行权限验证
+- **权限查询**: 通过获取用户详情查看当前角色（使用1.2获取用户详情接口）
+
+> **注意**: 原有的细粒度权限管理接口（获取用户权限、授予用户权限、撤销用户权限）已被移除。相关文档请参考：`/docs/shared/api/HTTP/removed/permission-management-removed.md`
+
 
 ## 2. 虚拟机管理
 

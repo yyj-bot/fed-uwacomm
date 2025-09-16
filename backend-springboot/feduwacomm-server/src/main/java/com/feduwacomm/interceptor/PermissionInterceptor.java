@@ -34,7 +34,16 @@ public class PermissionInterceptor implements HandlerInterceptor {
             "/api/user/delete",
             "/api/user/lock",
             "/api/user/unlock",
-            "/api/user/reset-password");
+            "/api/user/reset-password",
+            // 日志管理接口 - 仅限管理员访问
+            "/api/log/list",
+            "/api/log/detail",
+            "/api/log/realtime",
+            "/api/log/statistics",
+            "/api/log/download",
+            "/api/log/cleanup",
+            "/api/log/monitor",
+            "/api/log/config");
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)

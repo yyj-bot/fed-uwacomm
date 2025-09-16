@@ -3,11 +3,9 @@ package com.feduwacomm.service;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
-import com.feduwacomm.entity.UserPermission;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.AdminMapper;
 import com.feduwacomm.mapper.UserMapper;
-import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.service.impl.AdminServiceImpl;
 import com.feduwacomm.testdata.TestDataBuilder;
 import com.feduwacomm.testdata.TestHelper;
@@ -50,8 +48,6 @@ public class AdminServiceTest {
     @Mock
     private UserMapper userMapper;
 
-    @Mock
-    private UserPermissionMapper userPermissionMapper;
 
 
     @InjectMocks
@@ -140,11 +136,7 @@ public class AdminServiceTest {
         when(adminMapper.countByCondition(anyString(), anyString(), anyString()))
                 .thenAnswer(invocation -> mockDatabase.countUsers());
         
-        // 权限相关Mock
-        when(userPermissionMapper.selectByUserId(anyString())).thenReturn(Arrays.asList());
-        when(userPermissionMapper.selectById(anyString())).thenReturn(null);
-        when(userPermissionMapper.insert(any(UserPermission.class))).thenReturn(1);
-        when(userPermissionMapper.deleteById(anyString())).thenReturn(1);
+        // 移除权限相关Mock - 现在基于用户角色
     }
 
     // 用户管理方法测试
@@ -552,181 +544,6 @@ public class AdminServiceTest {
         verify(adminMapper, never()).updatePassword(anyString(), anyString());
     }
 
-    // 权限管理方法测试
-
-    @Test
-    void testGetUserPermissions_Success() {
-        // 准备测试数据
-        String userId = "a1b2c3d4e5f678901234567890123456";
-        List<UserPermission> permissions = Arrays.asList(
-                UserPermission.builder()
-                        .id("perm_1234567890")
-                        .userId(userId)
-                        .resourceType("VM")
-                        .resourceId("vm_1234567890")
-                        .permission("READ")
-                        .grantedAt(LocalDateTime.now())
-                        .grantedBy("admin_1234567890")
-                        .build());
-
-        when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(userPermissionMapper.selectByUserId(userId)).thenReturn(permissions);
-
-        // 执行测试
-        List<UserPermissionVO> result = adminService.getUserPermissions(userId);
-
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals("perm_1234567890", result.get(0).getId());
-        assertEquals("VM", result.get(0).getResourceType());
-        assertEquals("READ", result.get(0).getPermission());
-    }
-
-    @Test
-    void testGetUserPermissions_UserNotFound() {
-        // 准备测试数据
-        String userId = "nonexistent_user";
-        when(adminMapper.selectById(userId)).thenReturn(null);
-
-        // 执行测试并验证异常
-        UserException exception = assertThrows(UserException.class, () -> {
-            adminService.getUserPermissions(userId);
-        });
-
-        assertEquals("用户不存在", exception.getMessage());
-    }
-
-    @Test
-    void testGrantPermission_Success() {
-        // 准备测试数据
-        String userId = "a1b2c3d4e5f678901234567890123456";
-        PermissionGrantDTO grantDTO = PermissionGrantDTO.builder()
-                .resourceType("VM")
-                .resourceId("vm_1234567890")
-                .permission("READ")
-                .expiresAt(LocalDateTime.now().plusDays(30))
-                .build();
-
-        when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(userPermissionMapper.insert(any(UserPermission.class))).thenReturn(1);
-
-        try (MockedStatic<BaseContext> baseContextMock = mockStatic(BaseContext.class)) {
-            baseContextMock.when(BaseContext::getCurrentUserId).thenReturn("admin_1234567890");
-
-            // 执行测试
-            PermissionGrantResponseVO result = adminService.grantPermission(userId, grantDTO);
-
-            // 验证结果
-            assertNotNull(result);
-            assertNotNull(result.getPermissionId());
-            assertNotNull(result.getGrantedAt());
-        }
-
-        verify(userPermissionMapper, times(1)).insert(any(UserPermission.class));
-    }
-
-    @Test
-    void testGrantPermission_UserNotFound() {
-        // 准备测试数据
-        String userId = "nonexistent_user";
-        PermissionGrantDTO grantDTO = PermissionGrantDTO.builder()
-                .resourceType("VM")
-                .resourceId("vm_1234567890")
-                .permission("READ")
-                .build();
-
-        when(adminMapper.selectById(userId)).thenReturn(null);
-
-        // 执行测试并验证异常
-        UserException exception = assertThrows(UserException.class, () -> {
-            adminService.grantPermission(userId, grantDTO);
-        });
-
-        assertEquals("用户不存在", exception.getMessage());
-        verify(userPermissionMapper, never()).insert(any(UserPermission.class));
-    }
-
-    @Test
-    void testRevokePermission_Success() {
-        // 准备测试数据
-        String userId = "a1b2c3d4e5f678901234567890123456";
-        String permissionId = "perm_1234567890";
-
-        UserPermission permission = UserPermission.builder()
-                .id(permissionId)
-                .userId(userId)
-                .build();
-
-        when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(userPermissionMapper.selectById(permissionId)).thenReturn(permission);
-        when(userPermissionMapper.deleteById(permissionId)).thenReturn(1);
-
-        // 执行测试
-        assertDoesNotThrow(() -> {
-            adminService.revokePermission(userId, permissionId);
-        });
-
-        verify(userPermissionMapper, times(1)).deleteById(permissionId);
-    }
-
-    @Test
-    void testRevokePermission_UserNotFound() {
-        // 准备测试数据
-        String userId = "nonexistent_user";
-        String permissionId = "perm_1234567890";
-
-        when(adminMapper.selectById(userId)).thenReturn(null);
-
-        // 执行测试并验证异常
-        UserException exception = assertThrows(UserException.class, () -> {
-            adminService.revokePermission(userId, permissionId);
-        });
-
-        assertEquals("用户不存在", exception.getMessage());
-        verify(userPermissionMapper, never()).deleteById(anyString());
-    }
-
-    @Test
-    void testRevokePermission_PermissionNotFound() {
-        // 准备测试数据
-        String userId = "a1b2c3d4e5f678901234567890123456";
-        String permissionId = "nonexistent_permission";
-
-        when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(userPermissionMapper.selectById(permissionId)).thenReturn(null);
-
-        // 执行测试并验证异常
-        UserException exception = assertThrows(UserException.class, () -> {
-            adminService.revokePermission(userId, permissionId);
-        });
-
-        assertEquals("权限不足", exception.getMessage());
-        verify(userPermissionMapper, never()).deleteById(anyString());
-    }
-
-    @Test
-    void testRevokePermission_PermissionNotBelongToUser() {
-        // 准备测试数据
-        String userId = "a1b2c3d4e5f678901234567890123456";
-        String permissionId = "perm_1234567890";
-
-        UserPermission permission = UserPermission.builder()
-                .id(permissionId)
-                .userId("other_user")
-                .build();
-
-        when(adminMapper.selectById(userId)).thenReturn(testUser);
-        when(userPermissionMapper.selectById(permissionId)).thenReturn(permission);
-
-        // 执行测试并验证异常
-        UserException exception = assertThrows(UserException.class, () -> {
-            adminService.revokePermission(userId, permissionId);
-        });
-
-        assertEquals("权限不足", exception.getMessage());
-        verify(userPermissionMapper, never()).deleteById(anyString());
-    }
 
     // ======================== 边界条件和异常路径测试 ========================
 
@@ -832,17 +649,7 @@ public class AdminServiceTest {
         assertEquals(STATUS_LOCKED, lockedUser.getStatus());
     }
 
-    @Test
-    void testGrantPermission_WithNullValues_ShouldThrowException() {
-        // 准备测试数据
-        User existingUser = TestDataBuilder.Users.validUser().build();
-        mockDatabase.insertUser(existingUser);
-
-        // 测试null DTO
-        assertThrows(Exception.class, 
-            () -> adminService.grantPermission(existingUser.getId(), null),
-            "Should throw exception when permission DTO is null");
-    }
+    // 权限管理测试已移除 - 现在基于用户角色
 
     // ======================== 性能测试 ========================
 

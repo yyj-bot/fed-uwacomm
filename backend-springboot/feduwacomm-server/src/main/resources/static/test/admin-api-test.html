@@ -509,24 +509,6 @@
                     </div>
                 </div>
 
-                <!-- 权限管理测试 -->
-                <div class="test-section">
-                    <div class="test-section-header" onclick="toggleSection(this)">
-                        🔑 权限管理测试
-                        <span class="toggle-icon">▼</span>
-                    </div>
-                    <div class="test-section-content">
-                        <div class="test-form single-column">
-                            <div class="form-group">
-                                <label>权限名称</label>
-                                <input type="text" id="permissionName" placeholder="权限名称">
-                            </div>
-                        </div>
-                        <button class="btn" onclick="getUserPermissions()">获取用户权限</button>
-                        <button class="btn btn-success" onclick="grantPermission()">授予权限</button>
-                        <button class="btn btn-danger" onclick="revokePermission()">撤销权限</button>
-                    </div>
-                </div>
             </div>
 
             <!-- 结果显示面板 -->
@@ -927,84 +909,6 @@
             }
         }
 
-        // 获取用户权限
-        async function getUserPermissions() {
-            const userId = document.getElementById('userId').value;
-            
-            if (!userId) {
-                addResult('user-permissions', '获取用户权限', '请输入用户ID', 'warning');
-                return;
-            }
-            
-            try {
-                const { response, data } = await makeRequest(`/api/admin/user/${userId}/permissions`);
-                
-                if (response.ok && data.code === 200) {
-                    addResult('user-permissions', '获取用户权限', 
-                        `权限获取成功\n${JSON.stringify(data.data, null, 2)}`, 'success');
-                } else {
-                    addResult('user-permissions', '获取用户权限', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('user-permissions', '获取用户权限', error.message, 'error');
-            }
-        }
-
-        // 授予权限
-        async function grantPermission() {
-            const userId = document.getElementById('userId').value;
-            const permissionName = document.getElementById('permissionName').value;
-            
-            if (!userId || !permissionName) {
-                addResult('grant-permission', '授予权限', '请输入用户ID和权限名称', 'warning');
-                return;
-            }
-            
-            try {
-                const { response, data } = await makeRequest(`/api/admin/user/${userId}/permissions`, {
-                    method: 'POST',
-                    body: JSON.stringify({ permission: permissionName })
-                });
-                
-                if (response.ok && data.code === 200) {
-                    addResult('grant-permission', '授予权限', 
-                        `权限 "${permissionName}" 已授予用户 ${userId}`, 'success');
-                } else {
-                    addResult('grant-permission', '授予权限', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('grant-permission', '授予权限', error.message, 'error');
-            }
-        }
-
-        // 撤销权限
-        async function revokePermission() {
-            const userId = document.getElementById('userId').value;
-            const permissionId = document.getElementById('permissionId').value;
-            
-            if (!userId || !permissionId) {
-                addResult('revoke-permission', '撤销权限', '请输入用户ID和权限ID', 'warning');
-                return;
-            }
-            
-            try {
-                const { response, data } = await makeRequest(`/api/admin/user/${userId}/permissions/${permissionId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok && data.code === 200) {
-                    addResult('revoke-permission', '撤销权限', 
-                        `权限 ${permissionId} 已从用户 ${userId} 撤销`, 'success');
-                } else {
-                    addResult('revoke-permission', '撤销权限', 
-                        `请求失败: ${data.message}\n${JSON.stringify(data, null, 2)}`, 'error');
-                }
-            } catch (error) {
-                addResult('revoke-permission', '撤销权限', error.message, 'error');
-            }
-        }
 
         // 获取用户统计
         async function getUserStatistics() {

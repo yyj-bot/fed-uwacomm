@@ -50,7 +50,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 注册用户JWT认证拦截器
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**") // 用户相关接口需要用户JWT认证
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**") // 用户相关接口需要用户JWT认证
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
@@ -77,7 +77,7 @@ public class WebConfig implements WebMvcConfigurer {
 
         // 注册权限拦截器
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**") // 只对用户相关接口进行权限检查
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**") // 对用户相关接口和日志接口进行权限检查
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口

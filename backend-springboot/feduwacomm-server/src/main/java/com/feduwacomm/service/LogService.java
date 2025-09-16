@@ -21,13 +21,7 @@ public interface LogService {
     LogStatisticsVO getStatistics(LogQueryDTO queryDTO);
     
     // 日志导出方法
-    LogExportTaskVO createExportTask(LogExportDTO exportDTO);
-    
-    LogExportTaskVO getExportStatus(String exportId);
-    
-    byte[] downloadExport(String exportId);
-    
-    PageResult<LogExportTaskVO> getExportHistory(Integer page, Integer size, String status);
+    byte[] generateLogFile(LogExportDTO exportDTO);
     
     // 日志清理方法
     LogCleanupTaskVO createCleanupTask(LogCleanupDTO cleanupDTO);

@@ -4,7 +4,6 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.UserMapper;
-import com.feduwacomm.mapper.UserPermissionMapper;
 import com.feduwacomm.mapper.AdminMapper;
 import com.feduwacomm.service.impl.AdminServiceImpl;
 import com.feduwacomm.testdata.TestDataBuilder;
@@ -39,8 +38,6 @@ class AdminServiceTestSimple {
     @Mock
     private UserMapper userMapper;
 
-    @Mock
-    private UserPermissionMapper userPermissionMapper;
 
     @Mock
     private AdminMapper adminMapper;
@@ -269,29 +266,4 @@ class AdminServiceTestSimple {
         assertNotNull(result.getRecords(), "Records should not be null");
     }
 
-    @Test
-    @DisplayName("获取用户权限 - 获取权限列表")
-    void testGetUserPermissions_ValidUser_ShouldReturnPermissions() {
-        String userId = "test-user-id";
-
-        when(userPermissionMapper.selectByUserId(userId)).thenReturn(Arrays.asList());
-
-        List<UserPermissionVO> result = adminService.getUserPermissions(userId);
-
-        assertNotNull(result);
-        verify(userPermissionMapper).selectByUserId(userId);
-    }
-
-    @Test
-    @DisplayName("撤销用户权限 - 成功撤销")
-    void testRevokePermission_ValidPermission_ShouldRevokeSuccessfully() {
-        String userId = "test-user-id";
-        String permissionId = "test-permission-id";
-
-        when(userPermissionMapper.deleteById(permissionId)).thenReturn(1);
-
-        assertDoesNotThrow(() -> adminService.revokePermission(userId, permissionId));
-        
-        verify(userPermissionMapper).deleteById(permissionId);
-    }
 }
