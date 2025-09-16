@@ -1,7 +1,6 @@
 package com.feduwacomm.service.alert;
 
 import com.feduwacomm.service.LogService;
-import com.feduwacomm.service.cache.LogCacheService;
 import com.feduwacomm.mapper.SystemLogMapper;
 import com.feduwacomm.dto.LogQueryDTO;
 import org.apache.logging.log4j.LogManager;
@@ -31,9 +30,6 @@ public class AlertService {
     
     @Autowired
     private LogService logService;
-    
-    @Autowired
-    private LogCacheService logCacheService;
     
     // 告警规则配置
     private final Map<String, AlertRule> alertRules = new ConcurrentHashMap<>();

@@ -258,7 +258,6 @@ class LogControllerTest {
         LogCleanupDTO cleanupDTO = LogCleanupDTO.builder()
                 .strategy(LogCleanupStrategy.TIME_BASED)
                 .retentionDays(30)
-                .dryRun(true)
                 .build();
 
         mockMvc.perform(post("/api/log/cleanup")
