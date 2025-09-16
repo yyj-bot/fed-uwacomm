@@ -230,64 +230,83 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ overviewLoading: true, overviewError: null })
     
     try {
+      // 调用现有的API获取数据
+      const { userApi } = await import('../../api/user')
+      const { vmApi } = await import('../../api/vm')
+      const federatedTaskModule = await import('../../api/federated-task')
+      const taskApi = federatedTaskModule.federatedTask
+      
       // 并行获取各模块的统计数据
       const [
-        // 这里应该调用各个服务的统计接口，但由于示例限制，我们模拟数据
+        vmListResult,
+        taskListResult
       ] = await Promise.allSettled([
-        // userService.getStatistics(),
-        // vmService.getStatistics(),
-        // federatedTaskService.getStatistics(),
-        // trainingDataService.getStatistics(),
-        // modelVersionService.getStatistics(),
-        // systemLogService.getStatistics()
+        vmApi.getVMList({ page: 1, size: 100 }),
+        taskApi.getTaskList({ page: 1, size: 100 })
       ])
       
-      // 模拟概览数据
+      // 从API结果计算统计数据
+      const vmList = vmListResult.status === 'fulfilled' ? vmListResult.value.list : []
+      const taskList = taskListResult.status === 'fulfilled' ? taskListResult.value.tasks : []
+      
+      // 计算VM统计
+      const totalVMs = vmList.length
+      const runningVMs = vmList.filter((vm: any) => vm.status === 'RUNNING').length
+      const stoppedVMs = vmList.filter((vm: any) => vm.status === 'STOPPED').length
+      const errorVMs = vmList.filter((vm: any) => vm.status === 'ERROR').length
+      
+      // 计算任务统计
+      const totalTasks = taskList.length
+      const runningTasks = taskList.filter((task: any) => task.status === 'RUNNING').length
+      const completedTasks = taskList.filter((task: any) => task.status === 'COMPLETED').length
+      const failedTasks = taskList.filter((task: any) => task.status === 'FAILED').length
+      
+      // 构建概览数据（仅使用真实API数据，其他设为0）
       const overview: DashboardOverview = {
         userStats: {
-          totalUsers: 156,
-          activeUsers: 89,
-          newUsersToday: 12,
-          onlineUsers: 34
+          totalUsers: 0, // 需要用户API支持
+          activeUsers: 0,
+          newUsersToday: 0,
+          onlineUsers: 0
         },
         vmStats: {
-          totalVMs: 45,
-          runningVMs: 28,
-          stoppedVMs: 15,
-          errorVMs: 2,
-          cpuUsage: 68.5,
-          memoryUsage: 72.3,
-          diskUsage: 45.8
+          totalVMs,
+          runningVMs,
+          stoppedVMs,
+          errorVMs,
+          cpuUsage: 0, // 需要系统监控API支持
+          memoryUsage: 0,
+          diskUsage: 0
         },
         taskStats: {
-          totalTasks: 234,
-          runningTasks: 18,
-          completedTasks: 198,
-          failedTasks: 18,
-          tasksToday: 15,
-          averageTrainingTime: 2.5
+          totalTasks,
+          runningTasks,
+          completedTasks,
+          failedTasks,
+          tasksToday: 0, // 需要根据创建时间计算
+          averageTrainingTime: 0
         },
         dataStats: {
-          totalDatasets: 89,
-          totalDataSize: 15.6, // GB
-          processedData: 76,
-          pendingData: 13,
-          uploadedToday: 8
+          totalDatasets: 0, // 需要训练数据API支持
+          totalDataSize: 0,
+          processedData: 0,
+          pendingData: 0,
+          uploadedToday: 0
         },
         modelStats: {
-          totalModels: 167,
-          deployedModels: 23,
-          trainingModels: 12,
-          averageAccuracy: 87.6,
-          modelsToday: 6
+          totalModels: 0, // 需要模型版本API支持
+          deployedModels: 0,
+          trainingModels: 0,
+          averageAccuracy: 0,
+          modelsToday: 0
         },
         systemStats: {
-          systemUptime: 15.6, // 天
-          totalLogs: 125467,
-          errorLogsToday: 23,
-          warningLogsToday: 156,
-          systemLoad: 0.68,
-          networkTraffic: 1.2 // GB/hour
+          systemUptime: 0, // 需要系统监控API支持
+          totalLogs: 0,
+          errorLogsToday: 0,
+          warningLogsToday: 0,
+          systemLoad: 0,
+          networkTraffic: 0
         }
       }
       
@@ -315,44 +334,44 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ chartDataLoading: true, chartDataError: null })
     
     try {
-      // 生成模拟图表数据
+      // 空的图表数据，需要真实API支持
       const chartData: DashboardChartData = {
         userActivityTrend: {
-          dates: ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05', '2024-01-06', '2024-01-07'],
-          activeUsers: [45, 52, 48, 61, 55, 67, 59],
-          newUsers: [3, 5, 2, 8, 4, 6, 7],
-          loginCount: [89, 102, 95, 118, 107, 125, 112]
+          dates: [],
+          activeUsers: [],
+          newUsers: [],
+          loginCount: []
         },
         taskExecutionTrend: {
-          dates: ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05', '2024-01-06', '2024-01-07'],
-          createdTasks: [5, 8, 6, 12, 9, 15, 11],
-          completedTasks: [4, 7, 5, 10, 8, 13, 9],
-          failedTasks: [1, 1, 1, 2, 1, 2, 2],
-          averageTrainingTime: [2.3, 2.5, 2.1, 2.8, 2.4, 2.9, 2.6]
+          dates: [],
+          createdTasks: [],
+          completedTasks: [],
+          failedTasks: [],
+          averageTrainingTime: []
         },
         systemPerformanceTrend: {
-          timestamps: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
-          cpuUsage: [45, 38, 65, 72, 68, 58, 42],
-          memoryUsage: [62, 58, 75, 82, 78, 70, 65],
-          diskUsage: [45, 45, 46, 47, 47, 48, 48],
-          networkIn: [1.2, 0.8, 2.1, 2.5, 2.3, 1.8, 1.1],
-          networkOut: [0.9, 0.6, 1.8, 2.1, 1.9, 1.5, 0.8]
+          timestamps: [],
+          cpuUsage: [],
+          memoryUsage: [],
+          diskUsage: [],
+          networkIn: [],
+          networkOut: []
         },
         dataDistribution: {
-          labels: ['图像数据', '文本数据', '音频数据', '视频数据', '表格数据'],
-          datasets: [35, 28, 15, 12, 23],
-          categories: ['训练集', '验证集', '测试集'],
-          sizes: [65, 20, 15]
+          labels: [],
+          datasets: [],
+          categories: [],
+          sizes: []
         },
         modelPerformanceDistribution: {
-          accuracyRanges: ['90-100%', '80-90%', '70-80%', '60-70%', '<60%'],
-          modelCounts: [23, 45, 67, 28, 12],
-          averageAccuracy: [95.2, 85.6, 75.3, 65.8, 52.4]
+          accuracyRanges: [],
+          modelCounts: [],
+          averageAccuracy: []
         },
         logLevelDistribution: {
-          levels: ['INFO', 'WARN', 'ERROR', 'DEBUG'],
-          counts: [85234, 12456, 2345, 25432],
-          percentages: [68.2, 10.0, 1.9, 20.3]
+          levels: [],
+          counts: [],
+          percentages: []
         }
       }
       
@@ -378,54 +397,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ recentActivitiesLoading: true })
     
     try {
-      // 模拟最近活动数据
-      const recentActivities = [
-        {
-          id: '1',
-          type: 'task_completed',
-          title: '联邦学习任务 FL-2024-001 已完成',
-          description: '训练轮数: 10, 参与节点: 5, 最终准确率: 92.5%',
-          timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-          icon: 'task',
-          status: 'success'
-        },
-        {
-          id: '2',
-          type: 'vm_started',
-          title: '虚拟机 VM-GPU-001 已启动',
-          description: '配置: 8 CPU, 32GB RAM, RTX 4090',
-          timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-          icon: 'vm',
-          status: 'info'
-        },
-        {
-          id: '3',
-          type: 'data_uploaded',
-          title: '新数据集已上传',
-          description: 'CIFAR-100 数据集, 大小: 2.5GB, 样本数: 60,000',
-          timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          icon: 'data',
-          status: 'info'
-        },
-        {
-          id: '4',
-          type: 'model_deployed',
-          title: '模型 ResNet-50-v2 已部署',
-          description: '部署环境: 生产环境, 版本: 2.1.0',
-          timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-          icon: 'model',
-          status: 'success'
-        },
-        {
-          id: '5',
-          type: 'system_alert',
-          title: '系统内存使用率过高',
-          description: '当前使用率: 87%, 建议优化内存分配',
-          timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-          icon: 'alert',
-          status: 'warning'
-        }
-      ]
+      // 空的最近活动数据，需要真实API支持
+      const recentActivities: any[] = []
       
       set({
         recentActivities,
@@ -444,33 +417,8 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ systemAlertsLoading: true })
     
     try {
-      // 模拟系统告警数据
-      const systemAlerts = [
-        {
-          id: '1',
-          level: 'warning',
-          title: 'GPU 温度过高',
-          message: 'GPU-001 温度达到 82°C，请检查散热系统',
-          timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-          resolved: false
-        },
-        {
-          id: '2',
-          level: 'error',
-          title: '任务执行失败',
-          message: '联邦学习任务 FL-2024-002 在第 3 轮训练时失败',
-          timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-          resolved: false
-        },
-        {
-          id: '3',
-          level: 'info',
-          title: '系统维护通知',
-          message: '系统将于今晚 23:00 进行例行维护，预计耗时 2 小时',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          resolved: false
-        }
-      ]
+      // 空的系统告警数据，需要真实API支持
+      const systemAlerts: any[] = []
       
       set({
         systemAlerts,

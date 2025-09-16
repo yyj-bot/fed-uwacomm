@@ -59,10 +59,42 @@ const DashboardPage: React.FC = () => {
 
   // 页面加载时获取数据
   useEffect(() => {
-    fetchOverview()
-    fetchChartData()
-    fetchRecentActivities()
+    const loadData = async () => {
+      try {
+        await fetchOverview()
+        console.log('仪表盘概览数据加载成功')
+      } catch (error) {
+        console.error('仪表盘概览数据加载失败:', error)
+      }
+      
+      try {
+        await fetchChartData()
+        console.log('图表数据加载成功')
+      } catch (error) {
+        console.error('图表数据加载失败:', error)
+      }
+      
+      try {
+        await fetchRecentActivities()
+        console.log('最近活动数据加载成功')
+      } catch (error) {
+        console.error('最近活动数据加载失败:', error)
+      }
+    }
+    
+    loadData()
   }, [fetchOverview, fetchChartData, fetchRecentActivities])
+
+  // 如果正在加载，显示加载状态
+  if (overviewLoading) {
+    return (
+      <div className="fed-dashboard">
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <div>正在加载仪表盘数据...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fed-dashboard">
