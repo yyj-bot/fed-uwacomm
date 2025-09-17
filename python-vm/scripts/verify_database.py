@@ -14,7 +14,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from feduwacomm.database.database_v2 import DatabaseManagerV2
+from feduwacomm.database.database import DatabaseManager
 
 def verify_database_integrity():
     """Complete database verification"""
@@ -22,7 +22,7 @@ def verify_database_integrity():
     print("=== Database Data Integrity Verification ===")
     print(f"Verification time: {datetime.now()}")
     
-    db = DatabaseManagerV2()
+    db = DatabaseManager()
     
     if not db.connect():
         print("[FAIL] Database connection failed")
@@ -169,8 +169,8 @@ Key Statistics:
 
 ### Retrieve Data for ML:
 ```python
-from ml_modules.database_v2 import DatabaseManagerV2
-db = DatabaseManagerV2()
+from feduwacomm.database.database import DatabaseManager
+db = DatabaseManager()
 if db.connect():
     df = db.get_features_for_training()
     print(f"Retrieved {{len(df)}} records with {{len(df.columns)}} columns")
@@ -179,7 +179,7 @@ if db.connect():
 
 ### Get Specific Environments:
 ```python
-db = DatabaseManagerV2()
+db = DatabaseManager()
 if db.connect():
     df = db.get_features_for_training(['B01', 'B02', 'B03'])
     db.disconnect()
