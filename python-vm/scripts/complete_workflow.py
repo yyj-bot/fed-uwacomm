@@ -37,7 +37,7 @@ sys.path.insert(0, str(project_root / 'src'))
 from feduwacomm.acoustic.generate_environments import BellhopEnvGenerator
 from feduwacomm.acoustic.run_bellhop import BellhopProcessor
 from feduwacomm.ml.feature_extractor import BellhopFeatureExtractor
-from feduwacomm.database.database_v2 import DatabaseManagerV2
+from feduwacomm.database.database import DatabaseManager
 from feduwacomm.ml.random_forest_trainer import RandomForestTrainer
 from feduwacomm.ml.model_evaluator import ModelEvaluator
 
@@ -214,7 +214,7 @@ def step4_database_storage(csv_file):
     print("="*60)
     
     try:
-        db = DatabaseManagerV2()
+        db = DatabaseManager()
         
         print("🔄 连接数据库...")
         if not db.connect():
@@ -246,7 +246,7 @@ def step5_machine_learning():
     
     try:
         # 使用数据库中的数据进行训练
-        db = DatabaseManagerV2()
+        db = DatabaseManager()
         db.connect()
         
         # 获取数据

@@ -5,9 +5,7 @@
 """
 
 from .database import *
-from .database_v2 import *
 
 __all__ = [
     "database",
-    "database_v2"
 ] 
