@@ -16,21 +16,69 @@ import {
 } from '@/modules'
 
 import { userService, websocketService } from '@/services'
+import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
+import { useAuthStore } from '@/store/auth/authStore'
 
 // 路由保护组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 直接检查认证服务，而不是依赖store状态
-  if (!userService.isAuthenticated()) {
+  const token = userService.getAccessToken()
+  
+  console.log('🛡️ ProtectedRoute检查:', {
+    hasToken: !!token,
+    tokenPreview: token ? '***' + token.slice(-10) : 'null',
+    pathname: window.location.pathname
+  })
+  
+  // 简化逻辑：只检查token存在，不验证有效性
+  if (!token) {
+    console.log('❌ ProtectedRoute无token，重定向到login')
     return <Navigate to="/login" replace />
   }
   
+  console.log('✅ ProtectedRoute有token，允许访问')
   return <>{children}</>
 }
 
 const App: React.FC = () => {
+  const authStore = useAuthStore()
+  
   useEffect(() => {
     // 初始化应用
-    console.log('应用初始化完成')
+    console.log('🚀 App应用初始化开始')
+    
+    // 同步localStorage和store的认证状态
+    const localToken = localStorage.getItem('access_token')
+    const localRefresh = localStorage.getItem('refresh_token')
+    const storeToken = authStore.token
+    const storeIsAuthenticated = authStore.isAuthenticated
+    const localTokenValid = localToken ? isTokenValid(localToken) : false
+    
+    console.log('🔍 App认证状态检查:', { 
+      localToken: !!localToken, 
+      localRefresh: !!localRefresh,
+      storeToken: !!storeToken, 
+      storeIsAuthenticated,
+      localTokenValid,
+      localTokenPreview: localToken ? '***' + localToken.slice(-10) : 'null',
+      storeTokenPreview: storeToken ? '***' + storeToken.slice(-10) : 'null'
+    })
+    
+    // 如果localStorage有token，但store没有认证状态，同步到store
+    if (localToken && (!storeToken || !storeIsAuthenticated)) {
+      console.log('✅ 检测到localStorage有token，同步到store')
+      authStore.initializeAuth()
+    }
+    // 如果localStorage没有token，但store认为已认证，清理store（但不调用API logout）
+    else if (!localToken && storeIsAuthenticated) {
+      console.log('🧹 localStorage无token，直接清理store状态（不调用API）')
+      authStore.clearAuthState()
+    }
+    // 如果状态一致，无需操作
+    else {
+      console.log('✅ 认证状态一致，无需操作')
+    }
+    
+    console.log('🎯 App初始化完成')
   }, [])
   
   return (
@@ -55,9 +103,23 @@ const App: React.FC = () => {
             <Route 
               path="/" 
               element={
-                userService.isAuthenticated() ? 
-                  <Navigate to="/dashboard" replace /> : 
-                  <Navigate to="/login" replace />
+                (() => {
+                  const token = userService.getAccessToken()
+                  console.log('🔍 根路径处理，token检查:', {
+                    hasToken: !!token,
+                    tokenPreview: token ? '***' + token.slice(-10) : 'null',
+                    pathname: window.location.pathname
+                  })
+                  
+                  // 如果有token就跳转到dashboard，不验证token有效性（避免清理）
+                  if (token) {
+                    console.log('✅ 根路径有token，跳转到dashboard')
+                    return <Navigate to="/dashboard" replace />
+                  } else {
+                    console.log('❌ 根路径无token，跳转到login')
+                    return <Navigate to="/login" replace />
+                  }
+                })()
               } 
             />
             

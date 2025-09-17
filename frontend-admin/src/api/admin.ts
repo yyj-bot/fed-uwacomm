@@ -5,6 +5,7 @@ import type {
   PaginatedResponse,
   PaginationParams
 } from '@/types'
+import type { UserStatistics } from '@/services/admin/type'
 
 // 创建管理员API实例
 const adminApiInstance = createApiInstance('ADMIN')
@@ -87,24 +88,10 @@ export const admin = {
     await adminApiInstance.post<ApiResponse<null>>(`/user/${userId}/reset-password`, { newPassword })
   },
 
-  // 1.9 获取用户权限
-  async getUserPermissions(userId: string): Promise<Permission[]> {
-    const response = await adminApiInstance.get<ApiResponse<Permission[]>>(`/user/${userId}/permissions`)
+  // 1.9 获取用户统计信息
+  async getUserStatistics(): Promise<UserStatistics> {
+    const response = await adminApiInstance.get<ApiResponse<UserStatistics>>('/user/statistics')
     return response.data.data
-  },
-
-  // 1.10 授予用户权限
-  async grantUserPermission(userId: string, permissionName: string): Promise<Permission> {
-    const response = await adminApiInstance.post<ApiResponse<Permission>>(
-      `/user/${userId}/permissions`,
-      { permissionName }
-    )
-    return response.data.data
-  },
-
-  // 1.11 撤销用户权限
-  async revokeUserPermission(userId: string, permissionId: string): Promise<void> {
-    await adminApiInstance.delete<ApiResponse<null>>(`/user/${userId}/permissions/${permissionId}`)
   },
 } as const
 

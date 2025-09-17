@@ -21,6 +21,7 @@ import {
 
 import { useDashboard, useVM, useTask, useWebSocket } from '@/store'
 import { StatusIndicator, Table } from '@/components'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { 
   OverviewCards, 
   SystemStatus, 
@@ -60,26 +61,49 @@ const DashboardPage: React.FC = () => {
   // 页面加载时获取数据
   useEffect(() => {
     const loadData = async () => {
+      // 检查认证状态
+      const token = localStorage.getItem('access_token')
+      console.log('📋 Dashboard加载数据前检查:', {
+        hasToken: !!token,
+        tokenPreview: token ? '***' + token.slice(-10) : 'null',
+        pathname: window.location.pathname
+      })
+      
+      if (!token) {
+        console.warn('⚠️ Dashboard没有token，跳过数据加载')
+        return
+      }
+      
+      // 延迟500ms再加载数据，确保认证状态稳定
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('📊 开始加载Dashboard数据')
+      
       try {
         await fetchOverview()
-        console.log('仪表盘概览数据加载成功')
+        console.log('✅ 概览数据加载成功')
       } catch (error) {
-        console.error('仪表盘概览数据加载失败:', error)
+        console.error('❌ 仪表盘概览数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
       }
       
       try {
         await fetchChartData()
-        console.log('图表数据加载成功')
+        console.log('✅ 图表数据加载成功')
       } catch (error) {
-        console.error('图表数据加载失败:', error)
+        console.error('❌ 图表数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
       }
       
       try {
         await fetchRecentActivities()
-        console.log('最近活动数据加载成功')
+        console.log('✅ 活动数据加载成功')
       } catch (error) {
-        console.error('最近活动数据加载失败:', error)
+        console.error('❌ 最近活动数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
       }
+      
+      console.log('🎯 Dashboard数据加载流程完成（忽略API错误）')
     }
     
     loadData()
@@ -135,10 +159,19 @@ const DashboardPage: React.FC = () => {
           <TaskProgress tasks={tasks} />
           
           {/* 性能图表 */}
-          <PerformanceCharts 
-            chartData={chartData}
-            loading={overviewLoading}
-          />
+          <ErrorBoundary fallback={
+            <Card title="性能监控" className="fed-dashboard-card">
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
+                <p>图表组件加载失败，请刷新页面重试</p>
+              </div>
+            </Card>
+          }>
+            <PerformanceCharts 
+              chartData={chartData}
+              loading={overviewLoading}
+            />
+          </ErrorBoundary>
         </Col>
 
         {/* 右侧列 */}

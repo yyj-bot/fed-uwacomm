@@ -33,9 +33,6 @@ interface AdminState {
   currentUserLoading: boolean
   currentUserError: string | null
   
-  // 用户权限
-  userPermissions: Record<string, Permission[]>
-  permissionsLoading: Record<string, boolean>
   
   // 操作状态
   operationLoading: Record<string, boolean>
@@ -86,10 +83,6 @@ interface AdminActions {
   unlockUser: (userId: string) => Promise<void>
   resetUserPassword: (userId: string, request: ResetPasswordRequest) => Promise<void>
   
-  // 权限管理操作
-  fetchUserPermissions: (userId: string) => Promise<void>
-  grantUserPermission: (userId: string, request: GrantPermissionRequest) => Promise<void>
-  revokeUserPermission: (userId: string, permissionId: string) => Promise<void>
   
   // 分页操作
   setPagination: (page: number, size?: number) => void
@@ -123,8 +116,6 @@ const initialState: AdminState = {
   currentUserLoading: false,
   currentUserError: null,
   
-  userPermissions: {},
-  permissionsLoading: {},
   
   operationLoading: {},
   operationError: {},
@@ -342,17 +333,6 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
         }
       }))
       
-      // 清理权限数据
-      set((state) => {
-        const newUserPermissions = { ...state.userPermissions }
-        const newPermissionsLoading = { ...state.permissionsLoading }
-        delete newUserPermissions[userId]
-        delete newPermissionsLoading[userId]
-        return {
-          userPermissions: newUserPermissions,
-          permissionsLoading: newPermissionsLoading
-        }
-      })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '删除用户失败'
       set((state) => ({
@@ -505,133 +485,6 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
     }
   },
 
-  // ==================== 权限管理操作 ====================
-  
-  /**
-   * 获取用户权限
-   */
-  fetchUserPermissions: async (userId: string) => {
-    set((state) => ({
-      permissionsLoading: {
-        ...state.permissionsLoading,
-        [userId]: true
-      }
-    }))
-    
-    try {
-      const permissions = await adminService.getUserPermissions(userId)
-      
-      set((state) => ({
-        userPermissions: {
-          ...state.userPermissions,
-          [userId]: permissions
-        },
-        permissionsLoading: {
-          ...state.permissionsLoading,
-          [userId]: false
-        }
-      }))
-    } catch (error) {
-      set((state) => ({
-        permissionsLoading: {
-          ...state.permissionsLoading,
-          [userId]: false
-        }
-      }))
-      console.error(`获取用户权限失败 (${userId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 授予用户权限
-   */
-  grantUserPermission: async (userId: string, request: GrantPermissionRequest) => {
-    set((state) => ({
-      operationLoading: {
-        ...state.operationLoading,
-        [`grant-permission-${userId}`]: true
-      },
-      operationError: {
-        ...state.operationError,
-        [`grant-permission-${userId}`]: null
-      }
-    }))
-    
-    try {
-      const permission = await adminService.grantUserPermission(userId, request)
-      
-      // 更新权限列表
-      set((state) => ({
-        userPermissions: {
-          ...state.userPermissions,
-          [userId]: [...(state.userPermissions[userId] || []), permission]
-        },
-        operationLoading: {
-          ...state.operationLoading,
-          [`grant-permission-${userId}`]: false
-        }
-      }))
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '授予权限失败'
-      set((state) => ({
-        operationLoading: {
-          ...state.operationLoading,
-          [`grant-permission-${userId}`]: false
-        },
-        operationError: {
-          ...state.operationError,
-          [`grant-permission-${userId}`]: errorMessage
-        }
-      }))
-      throw error
-    }
-  },
-
-  /**
-   * 撤销用户权限
-   */
-  revokeUserPermission: async (userId: string, permissionId: string) => {
-    set((state) => ({
-      operationLoading: {
-        ...state.operationLoading,
-        [`revoke-permission-${userId}-${permissionId}`]: true
-      },
-      operationError: {
-        ...state.operationError,
-        [`revoke-permission-${userId}-${permissionId}`]: null
-      }
-    }))
-    
-    try {
-      await adminService.revokeUserPermission(userId, permissionId)
-      
-      // 从权限列表中移除
-      set((state) => ({
-        userPermissions: {
-          ...state.userPermissions,
-          [userId]: (state.userPermissions[userId] || []).filter(p => p.permissionId !== permissionId)
-        },
-        operationLoading: {
-          ...state.operationLoading,
-          [`revoke-permission-${userId}-${permissionId}`]: false
-        }
-      }))
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '撤销权限失败'
-      set((state) => ({
-        operationLoading: {
-          ...state.operationLoading,
-          [`revoke-permission-${userId}-${permissionId}`]: false
-        },
-        operationError: {
-          ...state.operationError,
-          [`revoke-permission-${userId}-${permissionId}`]: errorMessage
-        }
-      }))
-      throw error
-    }
-  },
 
   // ==================== 分页操作 ====================
   
@@ -671,20 +524,20 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
    */
   fetchUserStatistics: async () => {
     try {
-      const { userList } = get()
+      const statistics = await adminService.getUserStatistics()
       
-      // 基于当前用户列表计算统计数据
-      const statistics = {
-        totalUsers: userList.length,
-        activeUsers: userList.filter(u => u.status === 'ACTIVE').length,
-        lockedUsers: userList.filter(u => u.status === 'LOCKED').length,
-        adminUsers: userList.filter(u => u.role === 'ADMIN').length,
-        researcherUsers: userList.filter(u => u.role === 'RESEARCHER').length,
-        operatorUsers: userList.filter(u => u.role === 'OPERATOR').length,
-        viewerUsers: userList.filter(u => u.role === 'VIEWER').length
+      // 转换为组件需要的格式
+      const transformedStats = {
+        totalUsers: statistics.totalUsers,
+        activeUsers: statistics.activeUsers,
+        lockedUsers: statistics.lockedUsers,
+        adminUsers: statistics.roleDistribution.ADMIN,
+        researcherUsers: statistics.roleDistribution.RESEARCHER,
+        operatorUsers: statistics.roleDistribution.OPERATOR,
+        viewerUsers: statistics.roleDistribution.VIEWER
       }
       
-      set({ userStatistics: statistics })
+      set({ userStatistics: transformedStats })
     } catch (error) {
       console.error('获取用户统计失败:', error)
     }

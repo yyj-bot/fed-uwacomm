@@ -136,9 +136,7 @@ export const useSystem = () => {
   const fetchLogDetailAction = useSystemStore((state) => state.fetchLogDetail)
   const fetchRealtimeLogsAction = useSystemStore((state) => state.fetchRealtimeLogs)
   const fetchLogStatisticsAction = useSystemStore((state) => state.fetchLogStatistics)
-  const exportLogsAction = useSystemStore((state) => state.exportLogs)
-  const getExportStatusAction = useSystemStore((state) => state.getExportStatus)
-  const downloadExportFileAction = useSystemStore((state) => state.downloadExportFile)
+  const downloadLogsAction = useSystemStore((state) => state.downloadLogs)
   const cleanupLogsAction = useSystemStore((state) => state.cleanupLogs)
   const getCleanupStatusAction = useSystemStore((state) => state.getCleanupStatus)
   const fetchSystemMonitorAction = useSystemStore((state) => state.fetchSystemMonitor)
@@ -223,43 +221,17 @@ export const useSystem = () => {
   }, [fetchLogStatisticsAction])
 
   /**
-   * 导出日志
+   * 下载日志
    */
-  const exportLogs = useCallback(async (exportData: LogExportData) => {
+  const downloadLogs = useCallback(async (exportData: LogExportData) => {
     try {
-      const exportId = await exportLogsAction(exportData)
-      return { success: true, error: null, data: exportId }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '导出日志失败'
-      return { success: false, error: errorMessage, data: null }
-    }
-  }, [exportLogsAction])
-
-  /**
-   * 获取导出状态
-   */
-  const getExportStatus = useCallback(async (exportId: string) => {
-    try {
-      await getExportStatusAction(exportId)
+      await downloadLogsAction(exportData)
       return { success: true, error: null }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取导出状态失败'
+      const errorMessage = error instanceof Error ? error.message : '下载日志失败'
       return { success: false, error: errorMessage }
     }
-  }, [getExportStatusAction])
-
-  /**
-   * 下载导出文件
-   */
-  const downloadExportFile = useCallback(async (exportId: string) => {
-    try {
-      await downloadExportFileAction(exportId)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '下载文件失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [downloadExportFileAction])
+  }, [downloadLogsAction])
 
   /**
    * 清理日志
@@ -481,9 +453,9 @@ export const useSystem = () => {
   const isAnyOperationLoading = Object.values(operationLoading).some(loading => loading)
 
   /**
-   * 检查导出是否正在进行
+   * 检查下载是否正在进行
    */
-  const isExporting = !!operationLoading['export-logs']
+  const isDownloading = !!operationLoading['download-logs']
 
   /**
    * 检查清理是否正在进行
@@ -553,9 +525,7 @@ export const useSystem = () => {
     fetchLogDetail,
     fetchRealtimeLogs,
     fetchLogStatistics,
-    exportLogs,
-    getExportStatus,
-    downloadExportFile,
+    downloadLogs,
     cleanupLogs,
     getCleanupStatus,
     fetchSystemMonitor,
@@ -581,7 +551,7 @@ export const useSystem = () => {
     hasWarningLogs,
     getRecentErrorLogs,
     isAnyOperationLoading,
-    isExporting,
+    isDownloading,
     isCleaning,
     isUpdatingConfig
   }

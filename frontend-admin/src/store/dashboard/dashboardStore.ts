@@ -231,7 +231,6 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     
     try {
       // 调用现有的API获取数据
-      const { userApi } = await import('../../api/user')
       const { vmApi } = await import('../../api/vm')
       const federatedTaskModule = await import('../../api/federated-task')
       const taskApi = federatedTaskModule.federatedTask

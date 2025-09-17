@@ -32,8 +32,6 @@ export const useAdmin = () => {
   const currentUserLoading = useAdminStore((state) => state.currentUserLoading)
   const currentUserError = useAdminStore((state) => state.currentUserError)
   
-  const userPermissions = useAdminStore((state) => state.userPermissions)
-  const permissionsLoading = useAdminStore((state) => state.permissionsLoading)
   
   const operationLoading = useAdminStore((state) => state.operationLoading)
   const operationError = useAdminStore((state) => state.operationError)
@@ -56,9 +54,6 @@ export const useAdmin = () => {
   const lockUserAction = useAdminStore((state) => state.lockUser)
   const unlockUserAction = useAdminStore((state) => state.unlockUser)
   const resetUserPasswordAction = useAdminStore((state) => state.resetUserPassword)
-  const fetchUserPermissionsAction = useAdminStore((state) => state.fetchUserPermissions)
-  const grantUserPermissionAction = useAdminStore((state) => state.grantUserPermission)
-  const revokeUserPermissionAction = useAdminStore((state) => state.revokeUserPermission)
   const setPaginationAction = useAdminStore((state) => state.setPagination)
   const setQueryParamsAction = useAdminStore((state) => state.setQueryParams)
   const resetQueryParamsAction = useAdminStore((state) => state.resetQueryParams)
@@ -193,44 +188,6 @@ export const useAdmin = () => {
     }
   }, [resetUserPasswordAction])
 
-  /**
-   * 获取用户权限
-   */
-  const fetchUserPermissions = useCallback(async (userId: string) => {
-    try {
-      await fetchUserPermissionsAction(userId)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取用户权限失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [fetchUserPermissionsAction])
-
-  /**
-   * 授予用户权限
-   */
-  const grantUserPermission = useCallback(async (userId: string, request: GrantPermissionRequest) => {
-    try {
-      await grantUserPermissionAction(userId, request)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '授予权限失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [grantUserPermissionAction])
-
-  /**
-   * 撤销用户权限
-   */
-  const revokeUserPermission = useCallback(async (userId: string, permissionId: string) => {
-    try {
-      await revokeUserPermissionAction(userId, permissionId)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '撤销权限失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [revokeUserPermissionAction])
 
   /**
    * 设置分页参数
@@ -289,19 +246,6 @@ export const useAdmin = () => {
 
   // ==================== 计算属性 ====================
 
-  /**
-   * 获取用户权限
-   */
-  const getUserPermissions = useCallback((userId: string): Permission[] => {
-    return userPermissions[userId] || []
-  }, [userPermissions])
-
-  /**
-   * 检查用户权限是否正在加载
-   */
-  const isUserPermissionsLoading = useCallback((userId: string): boolean => {
-    return !!permissionsLoading[userId]
-  }, [permissionsLoading])
 
   /**
    * 检查用户是否正在执行操作
@@ -312,7 +256,7 @@ export const useAdmin = () => {
     }
     
     // 检查是否有任何操作正在进行
-    const operations = ['update', 'delete', 'lock', 'unlock', 'reset-password', 'grant-permission']
+    const operations = ['update', 'delete', 'lock', 'unlock', 'reset-password']
     return operations.some(op => !!operationLoading[`${op}-${userId}`])
   }, [operationLoading])
 
@@ -374,20 +318,6 @@ export const useAdmin = () => {
    */
   const isCreatingUser = createUserLoading
 
-  /**
-   * 获取用户权限数量
-   */
-  const getUserPermissionCount = useCallback((userId: string): number => {
-    return getUserPermissions(userId).length
-  }, [getUserPermissions])
-
-  /**
-   * 检查用户是否有特定权限
-   */
-  const userHasPermission = useCallback((userId: string, permissionName: string): boolean => {
-    const permissions = getUserPermissions(userId)
-    return permissions.some(p => p.permissionName === permissionName)
-  }, [getUserPermissions])
 
   // ==================== 返回接口 ====================
 
@@ -400,8 +330,6 @@ export const useAdmin = () => {
     currentUser,
     currentUserLoading,
     currentUserError,
-    userPermissions,
-    permissionsLoading,
     operationLoading,
     operationError,
     createUserLoading,
@@ -421,9 +349,6 @@ export const useAdmin = () => {
     lockUser,
     unlockUser,
     resetUserPassword,
-    fetchUserPermissions,
-    grantUserPermission,
-    revokeUserPermission,
     setPagination,
     setQueryParams,
     resetQueryParams,
@@ -433,8 +358,6 @@ export const useAdmin = () => {
     resetState,
     
     // 计算属性和工具方法
-    getUserPermissions,
-    isUserPermissionsLoading,
     isUserOperating,
     getUserOperationError,
     canLockUser,
@@ -444,8 +367,6 @@ export const useAdmin = () => {
     getUserCountByRole,
     getUserCountByStatus,
     isCreatingUser,
-    getUserPermissionCount,
-    userHasPermission
   }
 }
 

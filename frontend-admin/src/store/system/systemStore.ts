@@ -115,9 +115,7 @@ interface SystemActions {
   fetchLogStatistics: (params?: LogStatisticsParams) => Promise<void>
   
   // 日志导出
-  exportLogs: (exportData: LogExportData) => Promise<string>
-  getExportStatus: (exportId: string) => Promise<void>
-  downloadExportFile: (exportId: string) => Promise<void>
+  downloadLogs: (exportData: LogExportData) => Promise<void>
   
   // 日志清理
   cleanupLogs: (cleanupData: LogCleanupData) => Promise<string>
@@ -314,94 +312,41 @@ export const useSystemStore = create<SystemStore>((set, get) => ({
   // ==================== 日志导出 ====================
   
   /**
-   * 导出日志
+   * 同步下载日志
    */
-  exportLogs: async (exportData: LogExportData) => {
+  downloadLogs: async (exportData: LogExportData) => {
     set((state) => ({
       operationLoading: {
         ...state.operationLoading,
-        'export-logs': true
+        'download-logs': true
       },
       operationError: {
         ...state.operationError,
-        'export-logs': null
+        'download-logs': null
       }
     }))
     
     try {
-      const response = await systemLogService.exportLogs(exportData)
+      await systemLogService.downloadLogs(exportData)
       
       set((state) => ({
-        exportTasks: {
-          ...state.exportTasks,
-          [response.exportId]: {
-            exportId: response.exportId,
-            status: response.status,
-            estimatedTime: response.estimatedTime,
-            downloadUrl: response.downloadUrl,
-            createdAt: new Date().toISOString(),
-            format: exportData.format || 'JSON'
-          }
-        },
         operationLoading: {
           ...state.operationLoading,
-          'export-logs': false
+          'download-logs': false
         }
       }))
-      
-      return response.exportId
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '导出日志失败'
+      const errorMessage = error instanceof Error ? error.message : '下载日志失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
-          'export-logs': false
+          'download-logs': false
         },
         operationError: {
           ...state.operationError,
-          'export-logs': errorMessage
+          'download-logs': errorMessage
         }
       }))
-      throw error
-    }
-  },
-
-  /**
-   * 获取导出状态
-   */
-  getExportStatus: async (exportId: string) => {
-    try {
-      const task = await systemLogService.getExportStatus(exportId)
-      
-      set((state) => ({
-        exportTasks: {
-          ...state.exportTasks,
-          [exportId]: task
-        }
-      }))
-    } catch (error) {
-      console.error(`获取导出状态失败 (${exportId}):`, error)
-    }
-  },
-
-  /**
-   * 下载导出文件
-   */
-  downloadExportFile: async (exportId: string) => {
-    try {
-      const blob = await systemLogService.downloadExportFile(exportId)
-      
-      // 创建下载链接
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = url
-      a.download = `logs-export-${exportId}.zip`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-    } catch (error) {
       throw error
     }
   },
@@ -434,7 +379,6 @@ export const useSystemStore = create<SystemStore>((set, get) => ({
             status: response.status,
             estimatedRecords: response.estimatedRecords,
             estimatedSize: response.estimatedSize,
-            dryRun: response.dryRun,
             createdAt: new Date().toISOString(),
             strategy: cleanupData.strategy
           }

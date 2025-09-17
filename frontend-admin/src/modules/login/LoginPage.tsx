@@ -12,6 +12,7 @@ import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@a
 import { useNavigate, useLocation } from 'react-router-dom'
 
 import { useAuth } from '@/store'
+import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
 import './LoginPage.module.css'
 
 const { Title, Text, Link } = Typography
@@ -35,31 +36,57 @@ const LoginPage: React.FC = () => {
 
   // 如果已登录，重定向到目标页面
   useEffect(() => {
+    console.log('📋 LoginPage认证状态检查:', {
+      isAuthenticated,
+      from,
+      localStorage: {
+        hasAccessToken: !!localStorage.getItem('access_token'),
+        hasRefreshToken: !!localStorage.getItem('refresh_token')
+      }
+    })
+    
+    // 使用store的认证状态，确保与App.tsx一致
     if (isAuthenticated) {
+      console.log('✅ 检测到已登录状态，重定向到:', from)
       navigate(from, { replace: true })
     }
   }, [isAuthenticated, navigate, from])
 
   // 处理登录
   const handleLogin = async (values: LoginForm) => {
+    console.log('🚀 LoginPage开始处理登录:', values.username)
     setLoginLoading(true)
     
     try {
+      console.log('🔐 调用useAuth.login')
       const result = await login({
         loginIdentifier: values.username,
         password: values.password,
         rememberMe: values.remember
       })
 
+      console.log('📊 登录结果:', { success: result.success, error: result.error })
+
       if (result.success) {
         message.success('登录成功')
+        
+        // 检查登录后的状态
+        const tokenAfterLogin = localStorage.getItem('access_token')
+        console.log('🔍 登录成功后localStorage状态:', {
+          hasToken: !!tokenAfterLogin,
+          storeAuthenticated: isAuthenticated,
+          tokenPreview: tokenAfterLogin ? '***' + tokenAfterLogin.slice(-10) : 'null'
+        })
+        
+        // 登录成功后直接跳转，不依赖状态同步
+        console.log('🔄 登录成功，直接跳转到:', from)
         navigate(from, { replace: true })
       } else {
         message.error(result.error || '登录失败')
       }
     } catch (error) {
       message.error('登录过程中发生错误')
-      console.error('Login error:', error)
+      console.error('❌ LoginPage登录错误:', error)
     } finally {
       setLoginLoading(false)
     }

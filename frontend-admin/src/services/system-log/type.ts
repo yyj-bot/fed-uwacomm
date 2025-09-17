@@ -121,17 +121,17 @@ export interface ExportHistoryParams {
 
 // ==================== 日志清理相关类型 ====================
 
-export type CleanupStrategy = 'TIME_BASED' | 'LEVEL_BASED' | 'SIZE_BASED'
+export type CleanupStrategy = 'TIME_BASED' | 'LEVEL_BASED' | 'CATEGORY_BASED'
 
 export interface LogCleanupData {
   readonly strategy: CleanupStrategy
   readonly retentionDays?: number
   readonly level?: string
-  readonly maxSizeGB?: number
   readonly category?: string
   readonly vmId?: string
   readonly taskId?: string
-  readonly dryRun?: boolean
+  readonly startTime?: string
+  readonly endTime?: string
 }
 
 export interface LogCleanupResponse {
@@ -139,7 +139,6 @@ export interface LogCleanupResponse {
   readonly status: string
   readonly estimatedRecords: number
   readonly estimatedSize: number
-  readonly dryRun: boolean
 }
 
 export interface CleanupTask {
@@ -147,7 +146,6 @@ export interface CleanupTask {
   readonly status: string
   readonly estimatedRecords?: number
   readonly estimatedSize?: number
-  readonly dryRun?: boolean
   readonly progress?: number
   readonly deletedRecords?: number
   readonly freedSpace?: number

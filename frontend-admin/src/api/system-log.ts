@@ -275,8 +275,8 @@ export const log = {
 
   // ==================== 4. 日志导出接口 ====================
   
-  // 4.1 日志导出
-  async exportLogs(exportData: {
+  // 4.1 同步日志下载（新版本）
+  async downloadLogs(exportData: {
     level?: string
     category?: string
     vmId?: string
@@ -286,70 +286,36 @@ export const log = {
     keyword?: string
     format?: 'CSV' | 'JSON' | 'EXCEL'
     includeDetails?: boolean
-  }): Promise<{
-    exportId: string
-    status: string
-    estimatedTime: number
-    downloadUrl: string
-  }> {
-    const response = await logApiInstance.post<ApiResponse<{
-      exportId: string
-      status: string
-      estimatedTime: number
-      downloadUrl: string
-    }>>('/export', exportData)
-    return response.data.data
-  },
-
-  // 4.2 导出状态查询
-  async getExportStatus(exportId: string): Promise<ExportTask> {
-    const response = await logApiInstance.get<ApiResponse<ExportTask>>(`/export/status/${exportId}`)
-    return response.data.data
-  },
-
-  // 4.3 导出文件下载
-  async downloadExportFile(exportId: string): Promise<Blob> {
-    const response = await logApiInstance.get(`/export/download/${exportId}`, {
+  }): Promise<Blob> {
+    const response = await logApiInstance.post('/download', exportData, {
       responseType: 'blob'
     })
     return response.data
-  },
-
-  // 4.4 导出历史查询
-  async getExportHistory(params: {
-    status?: string
-    page?: number
-    size?: number
-  } = {}): Promise<PaginatedResponse<ExportTask>> {
-    const response = await logApiInstance.get<ApiResponse<PaginatedResponse<ExportTask>>>('/export/history', { params })
-    return response.data.data
   },
 
   // ==================== 5. 日志清理接口 ====================
   
   // 5.1 日志清理
   async cleanupLogs(cleanupData: {
-    strategy: 'TIME_BASED' | 'LEVEL_BASED' | 'SIZE_BASED'
+    strategy: 'TIME_BASED' | 'LEVEL_BASED' | 'CATEGORY_BASED'
     retentionDays?: number
     level?: string
-    maxSizeGB?: number
     category?: string
     vmId?: string
     taskId?: string
-    dryRun?: boolean
+    startTime?: string
+    endTime?: string
   }): Promise<{
     cleanupId: string
     status: string
     estimatedRecords: number
     estimatedSize: number
-    dryRun: boolean
   }> {
     const response = await logApiInstance.post<ApiResponse<{
       cleanupId: string
       status: string
       estimatedRecords: number
       estimatedSize: number
-      dryRun: boolean
     }>>('/cleanup', cleanupData)
     return response.data.data
   },
