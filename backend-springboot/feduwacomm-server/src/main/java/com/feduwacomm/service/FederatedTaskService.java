@@ -4,6 +4,7 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
 import com.feduwacomm.vo.*;
+import com.feduwacomm.controller.FederatedTaskController;
 
 import java.util.List;
 
@@ -15,8 +16,9 @@ public interface FederatedTaskService {
 
     // 任务生命周期管理
     /**
-     * 创建联邦学习任务
+     * 创建联邦学习任务 (v1.0 已废弃)
      */
+    @Deprecated
     TaskOperationVO createTask(TaskCreateDTO createDTO, String createdBy);
 
     /**
@@ -148,4 +150,56 @@ public interface FederatedTaskService {
      * 估算任务执行时间
      */
     int estimateTaskDuration(TaskCreateDTO createDTO);
+
+    // ========== v1.3 图形化配置接口方法 ==========
+
+    /**
+     * 获取可用虚拟机列表 (v1.3)
+     */
+    ConfigPreviewVO.AvailableVmsVO getAvailableVms(String algorithm, Integer minCpuCores,
+                                                   Integer minMemoryMb, String status, String capabilities);
+
+    /**
+     * 获取可用数据集列表 (v1.3)
+     */
+    ConfigPreviewVO.AvailableDatasetsVO getAvailableDatasets(String dataType, String status,
+                                                            Long minSize, Long maxSize, String keyword);
+
+    /**
+     * 获取角色配置选项 (v1.3)
+     */
+    ConfigPreviewVO.RoleConfigVO getRoleConfig();
+
+    /**
+     * 获取算法配置模板 (v1.3)
+     */
+    ConfigPreviewVO.AlgorithmTemplatesVO getAlgorithmTemplates();
+
+    /**
+     * 数据分配预览 (v1.3)
+     */
+    ConfigPreviewVO.DistributionPreviewVO previewDistribution(
+        FederatedTaskController.DistributionPreviewRequestDTO requestDTO);
+
+    /**
+     * 参与者验证 (v1.3)
+     */
+    ConfigPreviewVO.ParticipantValidationVO validateParticipants(
+        FederatedTaskController.ParticipantValidationRequestDTO requestDTO);
+
+    /**
+     * 获取任务配置状态 (v1.3)
+     */
+    TaskConfigStatusVO getTaskConfigStatus(String taskId);
+
+    /**
+     * 获取任务资源使用情况 (v1.3)
+     */
+    TaskResourceUsageVO getTaskResourceUsage(String taskId);
+
+    /**
+     * 创建智能任务 (v1.3 标准方法)
+     * 支持新的datasetConfig和participantConfig格式
+     */
+    TaskOperationVO createSmartTask(TaskCreateDTO createDTO, String createdBy);
 }
