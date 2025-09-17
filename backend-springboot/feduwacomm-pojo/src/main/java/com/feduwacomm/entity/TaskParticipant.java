@@ -34,7 +34,14 @@ public class TaskParticipant {
     private Double finalLoss;
     private Long trainingTime; // 训练时间(秒)
     private Integer dataSize; // 数据量大小
-    
+
+    // v1.3 新增字段
+    private String participantId;
+    private Double dataRatio;
+    private String capabilities; // JSON格式存储能力列表
+    private Integer maxCpuUsage;
+    private Integer maxMemoryUsage;
+
     // 系统字段
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

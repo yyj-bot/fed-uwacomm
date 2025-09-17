@@ -406,13 +406,194 @@
 
             <!-- 任务管理标签页 -->
             <div class="nav-tabs">
-                <div class="nav-tab active" onclick="showTab('lifecycle')">任务生命周期</div>
+                <div class="nav-tab active" onclick="showTab('create')">🆕 图形化创建</div>
+                <div class="nav-tab" onclick="showTab('lifecycle')">任务生命周期</div>
                 <div class="nav-tab" onclick="showTab('query')">查询与监控</div>
                 <div class="nav-tab" onclick="showTab('management')">任务管理</div>
             </div>
 
+            <!-- 🆕 图形化任务创建 -->
+            <div id="create-tab" class="tab-content active">
+                <!-- 数据集选择器 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>📁 数据集选择器</h3>
+                        <small>选择训练数据集并预览分配策略</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>数据集选择 *</label>
+                                    <select id="datasetSelect" class="form-control" onchange="onDatasetChange()">
+                                        <option value="">请选择数据集</option>
+                                    </select>
+                                    <button onclick="loadAvailableDatasets()" class="btn btn-info" style="margin-top: 10px;">🔄 刷新数据集列表</button>
+                                </div>
+                                <div class="form-group">
+                                    <label>分配策略</label>
+                                    <select id="distributionStrategy" class="form-control" onchange="updateDistributionPreview()">
+                                        <option value="BALANCED">均衡分配</option>
+                                        <option value="WEIGHTED">加权分配</option>
+                                        <option value="CUSTOM">自定义分配</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-half">
+                                <div id="datasetInfo" class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 6px; display: none;">
+                                    <label>数据集信息</label>
+                                    <div id="datasetInfoContent"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 虚拟机选择器 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>💻 虚拟机选择器</h3>
+                        <small>选择参与联邦学习的虚拟机节点</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>算法类型</label>
+                                    <select id="vmFilterAlgorithm" class="form-control" onchange="filterAvailableVms()">
+                                        <option value="">全部算法</option>
+                                        <option value="FEDERATED_AVERAGING">联邦平均</option>
+                                        <option value="FEDPROX">FedProx</option>
+                                        <option value="FEDNOVA">FedNova</option>
+                                        <option value="SCAFFOLD">Scaffold</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>最小资源要求</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="number" id="minCpuCores" class="form-control" placeholder="CPU核数" onchange="filterAvailableVms()">
+                                        <input type="number" id="minMemoryMb" class="form-control" placeholder="内存(MB)" onchange="filterAvailableVms()">
+                                    </div>
+                                </div>
+                                <button onclick="loadAvailableVms()" class="btn btn-info">🔄 刷新VM列表</button>
+                            </div>
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>能力要求</label>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                                        <label><input type="checkbox" id="reqGpu" onchange="filterAvailableVms()"> GPU加速</label>
+                                        <label><input type="checkbox" id="reqHighMemory" onchange="filterAvailableVms()"> 大内存</label>
+                                        <label><input type="checkbox" id="reqFastNetwork" onchange="filterAvailableVms()"> 快速网络</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="availableVmsList" class="form-group">
+                            <label>可用虚拟机列表 (点击选择)</label>
+                            <div id="vmCards"></div>
+                        </div>
+                        <div id="selectedVmsList" class="form-group" style="display: none;">
+                            <label>已选择的虚拟机</label>
+                            <div id="selectedVmCards"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据分配预览 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>📈 数据分配预览</h3>
+                        <small>实时预览数据在各VM上的分配情况</small>
+                    </div>
+                    <div class="api-body">
+                        <div id="distributionPreview" style="display: none;">
+                            <div id="distributionChart"></div>
+                            <div id="distributionTable"></div>
+                        </div>
+                        <div id="distributionPlaceholder" style="text-align: center; padding: 40px; color: #6c757d;">
+                            请先选择数据集和虚拟机后，即可预览数据分配
+                        </div>
+                        <button onclick="previewDataDistribution()" class="btn btn-primary" id="previewBtn" disabled>🔍 预览分配</button>
+                        <button onclick="validateParticipants()" class="btn btn-success" id="validateBtn" disabled>✅ 验证参与者</button>
+                    </div>
+                </div>
+
+                <!-- 智能任务创建 -->
+                <div class="api-section">
+                    <div class="api-header">
+                        <h3>🤖 智能任务创建</h3>
+                        <small>使用v1.3新版接口创建联邦学习任务</small>
+                    </div>
+                    <div class="api-body">
+                        <div class="row">
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>任务名称 *</label>
+                                    <input type="text" id="smartTaskName" class="form-control" value="智能水声特征分类任务">
+                                </div>
+                                <div class="form-group">
+                                    <label>任务类型 *</label>
+                                    <select id="smartTaskType" class="form-control">
+                                        <option value="CLASSIFICATION">分类任务</option>
+                                        <option value="REGRESSION">回归任务</option>
+                                        <option value="CLUSTERING">聚类任务</option>
+                                        <option value="ANOMALY_DETECTION">异常检测</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>算法类型 *</label>
+                                    <select id="smartAlgorithm" class="form-control" onchange="loadAlgorithmTemplate()">
+                                        <option value="FEDERATED_AVERAGING">联邦平均</option>
+                                        <option value="FEDPROX">FedProx</option>
+                                        <option value="FEDNOVA">FedNova</option>
+                                        <option value="SCAFFOLD">Scaffold</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-half">
+                                <div class="form-group">
+                                    <label>任务描述</label>
+                                    <textarea id="smartTaskDescription" class="form-control">基于智能配置的水声传播特征分类任务</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>资源限制</label>
+                                    <div style="display: flex; gap: 10px;">
+                                        <input type="number" id="maxCpuUsage" class="form-control" placeholder="最大CPU使用率(%)" value="80">
+                                        <input type="number" id="maxMemoryUsage" class="form-control" placeholder="最大内存使用率(%)" value="75">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <div class="form-group">
+                                    <label>超参数配置 (JSON格式)</label>
+                                    <textarea id="smartHyperparameters" class="form-control" style="height: 100px;">{
+  "learningRate": 0.01,
+  "batchSize": 32,
+  "epochs": 100,
+  "rounds": 10,
+  "minParticipants": 2,
+  "aggregationMethod": "WEIGHTED_AVERAGE"
+}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin: 20px 0;">
+                            <button onclick="createSmartTask()" class="btn btn-success" id="createSmartTaskBtn" disabled style="font-size: 16px; padding: 12px 24px;">🚀 创建智能任务</button>
+                        </div>
+                        <div id="smartTaskResult" class="result-container hidden">
+                            <div class="result-header">智能任务创建结果</div>
+                            <div class="result-body">
+                                <div id="smartTaskContent" class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 任务生命周期管理 -->
-            <div id="lifecycle-tab" class="tab-content active">
+            <div id="lifecycle-tab" class="tab-content">
                 <!-- 创建任务 -->
                 <div class="api-section">
                     <div class="api-header">
@@ -780,6 +961,11 @@
     <script>
         let jwtToken = '';
         const BASE_URL = 'http://localhost:8080';
+        let availableVms = [];
+        let availableDatasets = [];
+        let selectedVms = [];
+        let selectedDataset = null;
+        let distributionPreviewData = null;
 
         // Token管理
         function setToken() {
@@ -813,6 +999,18 @@
 
             // 设置选中的标签页为激活状态
             event.target.classList.add('active');
+
+            // 初始化智能创建页面
+            if (tabName === 'create') {
+                initSmartCreateTab();
+            }
+        }
+
+        // 初始化智能创建标签页
+        function initSmartCreateTab() {
+            loadAvailableDatasets();
+            loadAvailableVms();
+            loadAlgorithmTemplate();
         }
 
         // 通用请求函数
@@ -1087,9 +1285,445 @@
             showResult('deleteTaskResult', 'deleteTaskContent', result);
         }
 
+        // ========== v1.3 智能配置功能 ==========
+
+        // 加载可用数据集列表
+        async function loadAvailableDatasets() {
+            const result = await makeRequest('/api/federated/config/available-datasets');
+            if (result.success && result.data.data) {
+                availableDatasets = result.data.data.availableDatasets || [];
+                updateDatasetSelect();
+            } else {
+                console.error('加载数据集列表失败:', result);
+            }
+        }
+
+        // 更新数据集选择器
+        function updateDatasetSelect() {
+            const select = document.getElementById('datasetSelect');
+            select.innerHTML = '<option value="">请选择数据集</option>';
+
+            availableDatasets.forEach(dataset => {
+                const option = document.createElement('option');
+                option.value = dataset.datasetId;
+                option.textContent = `${dataset.name} (${dataset.statistics.fileSizeFormatted})`;
+                select.appendChild(option);
+            });
+        }
+
+        // 数据集变化事件
+        function onDatasetChange() {
+            const datasetId = document.getElementById('datasetSelect').value;
+            selectedDataset = availableDatasets.find(d => d.datasetId === datasetId);
+
+            if (selectedDataset) {
+                showDatasetInfo(selectedDataset);
+                updateCreateButtonState();
+                updateDistributionPreview();
+            } else {
+                hideDatasetInfo();
+            }
+        }
+
+        // 显示数据集信息
+        function showDatasetInfo(dataset) {
+            const infoDiv = document.getElementById('datasetInfo');
+            const contentDiv = document.getElementById('datasetInfoContent');
+
+            contentDiv.innerHTML = `
+                <div style="font-size: 14px;">
+                    <div><strong>数据集名称:</strong> ${dataset.name}</div>
+                    <div><strong>数据行数:</strong> ${dataset.statistics.totalRows.toLocaleString()}</div>
+                    <div><strong>特征列数:</strong> ${dataset.statistics.totalColumns}</div>
+                    <div><strong>文件大小:</strong> ${dataset.statistics.fileSizeFormatted}</div>
+                    <div><strong>状态:</strong> <span style="color: #28a745;">${dataset.status}</span></div>
+                </div>
+            `;
+
+            infoDiv.style.display = 'block';
+        }
+
+        // 隐藏数据集信息
+        function hideDatasetInfo() {
+            document.getElementById('datasetInfo').style.display = 'none';
+        }
+
+        // 加载可用虚拟机列表
+        async function loadAvailableVms() {
+            const params = new URLSearchParams();
+
+            const algorithm = document.getElementById('vmFilterAlgorithm')?.value;
+            if (algorithm) params.append('algorithm', algorithm);
+
+            const minCpu = document.getElementById('minCpuCores')?.value;
+            if (minCpu) params.append('minCpuCores', minCpu);
+
+            const minMemory = document.getElementById('minMemoryMb')?.value;
+            if (minMemory) params.append('minMemoryMb', minMemory);
+
+            let capabilities = [];
+            if (document.getElementById('reqGpu')?.checked) capabilities.push('GPU');
+            if (document.getElementById('reqHighMemory')?.checked) capabilities.push('HIGH_MEMORY');
+            if (document.getElementById('reqFastNetwork')?.checked) capabilities.push('FAST_NETWORK');
+            if (capabilities.length > 0) params.append('capabilities', capabilities.join(','));
+
+            const url = `/api/federated/config/available-vms${params.toString() ? '?' + params.toString() : ''}`;
+            const result = await makeRequest(url);
+
+            if (result.success && result.data.data) {
+                availableVms = result.data.data.availableVms || [];
+                updateVmCards();
+            } else {
+                console.error('加载VM列表失败:', result);
+            }
+        }
+
+        // 过滤可用虚拟机
+        function filterAvailableVms() {
+            loadAvailableVms();
+        }
+
+        // 更新VM卡片显示
+        function updateVmCards() {
+            const container = document.getElementById('vmCards');
+            container.innerHTML = '';
+
+            availableVms.forEach(vm => {
+                const isSelected = selectedVms.some(selected => selected.vmId === vm.vmId);
+                const card = createVmCard(vm, isSelected);
+                container.appendChild(card);
+            });
+        }
+
+        // 创建VM卡片
+        function createVmCard(vm, isSelected) {
+            const card = document.createElement('div');
+            card.className = `vm-card ${isSelected ? 'selected' : ''}`;
+            card.style.cssText = `
+                border: 2px solid ${isSelected ? '#28a745' : '#dee2e6'};
+                border-radius: 8px;
+                padding: 15px;
+                margin: 10px 0;
+                cursor: pointer;
+                background: ${isSelected ? '#f8fff8' : '#fff'};
+                transition: all 0.3s ease;
+            `;
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: bold; color: #495057;">${vm.name}</div>
+                        <div style="color: #6c757d; font-size: 12px;">${vm.ipAddress} | ${vm.status}</div>
+                        <div style="margin-top: 5px; font-size: 13px;">
+                            CPU: ${vm.resources.cpuCores}核 | 内存: ${Math.round(vm.resources.memoryMb/1024)}GB
+                            ${vm.resources.gpuCount ? ` | GPU: ${vm.resources.gpuCount}个` : ''}
+                        </div>
+                        <div style="margin-top: 5px;">
+                            ${vm.capabilities.map(cap => `<span style="background: #e9ecef; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-right: 5px;">${cap}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        ${isSelected ? '✅' : '⭕'}
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => toggleVmSelection(vm));
+            return card;
+        }
+
+        // 切换VM选择状态
+        function toggleVmSelection(vm) {
+            const index = selectedVms.findIndex(selected => selected.vmId === vm.vmId);
+
+            if (index >= 0) {
+                selectedVms.splice(index, 1);
+            } else {
+                selectedVms.push(vm);
+            }
+
+            updateVmCards();
+            updateSelectedVmsList();
+            updateCreateButtonState();
+            updateDistributionPreview();
+        }
+
+        // 更新已选择VM列表
+        function updateSelectedVmsList() {
+            const container = document.getElementById('selectedVmsList');
+            const cardsContainer = document.getElementById('selectedVmCards');
+
+            if (selectedVms.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            cardsContainer.innerHTML = '';
+
+            selectedVms.forEach(vm => {
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    display: flex; justify-content: space-between; align-items: center;
+                    background: #e8f5e8; border: 1px solid #28a745;
+                    padding: 10px; margin: 5px 0; border-radius: 5px;
+                `;
+
+                card.innerHTML = `
+                    <div>
+                        <strong>${vm.name}</strong>
+                        <span style="margin-left: 10px; color: #6c757d;">${vm.ipAddress}</span>
+                    </div>
+                    <div>
+                        <input type="number" id="ratio_${vm.vmId}" value="${(1/selectedVms.length).toFixed(2)}"
+                               min="0" max="1" step="0.01" style="width: 80px;" onchange="updateDistributionPreview()">
+                        <span style="margin-left: 5px;">比例</span>
+                        <button onclick="removeVmSelection('${vm.vmId}')" style="margin-left: 10px; background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 6px;">X</button>
+                    </div>
+                `;
+
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        // 移除VM选择
+        function removeVmSelection(vmId) {
+            selectedVms = selectedVms.filter(vm => vm.vmId !== vmId);
+            updateVmCards();
+            updateSelectedVmsList();
+            updateCreateButtonState();
+            updateDistributionPreview();
+        }
+
+        // 预览数据分配
+        async function previewDataDistribution() {
+            if (!selectedDataset || selectedVms.length === 0) {
+                alert('请先选择数据集和虚拟机');
+                return;
+            }
+
+            const distributionData = {
+                datasetId: selectedDataset.datasetId,
+                distributionStrategy: document.getElementById('distributionStrategy').value,
+                participants: selectedVms.map(vm => ({
+                    vmId: vm.vmId,
+                    requestedRatio: parseFloat(document.getElementById(`ratio_${vm.vmId}`).value)
+                }))
+            };
+
+            const result = await makeRequest('/api/federated/tasks/preview-distribution', 'POST', distributionData);
+
+            if (result.success && result.data.data) {
+                distributionPreviewData = result.data.data;
+                showDistributionPreview(result.data.data);
+            } else {
+                alert('预览失败: ' + (result.data.message || '未知错误'));
+            }
+        }
+
+        // 显示分配预览
+        function showDistributionPreview(data) {
+            const previewDiv = document.getElementById('distributionPreview');
+            const placeholderDiv = document.getElementById('distributionPlaceholder');
+            const tableDiv = document.getElementById('distributionTable');
+
+            previewDiv.style.display = 'block';
+            placeholderDiv.style.display = 'none';
+
+            let tableHtml = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="border: 1px solid #dee2e6; padding: 10px;">虚拟机</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px;">分配比例</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px;">数据行数</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px;">预估训练时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.distributionResult.participants.forEach(participant => {
+                tableHtml += `
+                    <tr>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">${participant.vmName}</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">${(participant.allocatedRatio * 100).toFixed(1)}%</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">${participant.allocatedRows.toLocaleString()}</td>
+                        <td style="border: 1px solid #dee2e6; padding: 10px;">${Math.round(participant.estimatedTrainingTime/60)}分钟</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <div><strong>质量指标:</strong></div>
+                    <div>IID分数: ${(data.qualityMetrics.iidScore * 100).toFixed(1)}% | 均衡分数: ${(data.qualityMetrics.balanceScore * 100).toFixed(1)}%</div>
+                </div>
+            `;
+
+            tableDiv.innerHTML = tableHtml;
+        }
+
+        // 更新分配预览
+        function updateDistributionPreview() {
+            if (selectedDataset && selectedVms.length > 0) {
+                document.getElementById('previewBtn').disabled = false;
+                document.getElementById('validateBtn').disabled = false;
+            } else {
+                document.getElementById('previewBtn').disabled = true;
+                document.getElementById('validateBtn').disabled = true;
+            }
+        }
+
+        // 验证参与者
+        async function validateParticipants() {
+            if (selectedVms.length === 0) {
+                alert('请先选择虚拟机');
+                return;
+            }
+
+            const validationData = {
+                algorithm: document.getElementById('smartAlgorithm').value,
+                taskType: document.getElementById('smartTaskType').value,
+                participants: selectedVms.map(vm => ({
+                    vmId: vm.vmId,
+                    role: 'PARTICIPANT'
+                }))
+            };
+
+            const result = await makeRequest('/api/federated/tasks/validate-participants', 'POST', validationData);
+
+            if (result.success && result.data.data) {
+                const validation = result.data.data;
+                let message = `验证结果: ${validation.overallValid ? '✅ 通过' : '❌ 失败'}\n\n`;
+
+                validation.participantValidations.forEach(pv => {
+                    const vm = selectedVms.find(v => v.vmId === pv.vmId);
+                    message += `${vm.name}: ${pv.isValid ? '✅' : '❌'}\n`;
+
+                    Object.entries(pv.validationResults).forEach(([key, result]) => {
+                        message += `  - ${key}: ${result.status} - ${result.message}\n`;
+                    });
+                });
+
+                alert(message);
+            } else {
+                alert('验证失败: ' + (result.data.message || '未知错误'));
+            }
+        }
+
+        // 加载算法模板
+        async function loadAlgorithmTemplate() {
+            const algorithm = document.getElementById('smartAlgorithm')?.value;
+            if (!algorithm) return;
+
+            const result = await makeRequest('/api/federated/config/algorithm-templates');
+            if (result.success && result.data.data) {
+                const template = result.data.data.templates.find(t => t.algorithm === algorithm);
+                if (template) {
+                    const hyperparams = template.defaultHyperparameters;
+                    document.getElementById('smartHyperparameters').value = JSON.stringify(hyperparams, null, 2);
+                }
+            }
+        }
+
+        // 更新创建按钮状态
+        function updateCreateButtonState() {
+            const btn = document.getElementById('createSmartTaskBtn');
+            const canCreate = selectedDataset && selectedVms.length > 0 &&
+                             document.getElementById('smartTaskName').value.trim() !== '';
+            btn.disabled = !canCreate;
+        }
+
+        // 创建智能任务
+        async function createSmartTask() {
+            if (!selectedDataset || selectedVms.length === 0) {
+                alert('请先选择数据集和虚拟机');
+                return;
+            }
+
+            try {
+                const distributionRatios = {};
+                selectedVms.forEach(vm => {
+                    const ratio = parseFloat(document.getElementById(`ratio_${vm.vmId}`).value);
+                    distributionRatios[vm.vmId] = ratio;
+                });
+
+                const taskData = {
+                    taskName: document.getElementById('smartTaskName').value,
+                    taskType: document.getElementById('smartTaskType').value,
+                    description: document.getElementById('smartTaskDescription').value,
+                    algorithm: document.getElementById('smartAlgorithm').value,
+
+                    // v1.3 新格式: 智能数据集配置
+                    datasetConfig: {
+                        datasetId: selectedDataset.datasetId,
+                        distributionStrategy: document.getElementById('distributionStrategy').value,
+                        distributionRatios: distributionRatios,
+                        validationSplit: 0.2,
+                        testSplit: 0.1
+                    },
+
+                    // v1.3 新格式: 智能参与者配置
+                    participantConfig: {
+                        selectionMode: 'MANUAL',
+                        requirements: {
+                            minParticipants: Math.min(2, selectedVms.length),
+                            maxParticipants: selectedVms.length,
+                            minCpuCores: Math.min(...selectedVms.map(vm => vm.resources.cpuCores)),
+                            minMemoryMb: Math.min(...selectedVms.map(vm => vm.resources.memoryMb))
+                        },
+                        participants: selectedVms.map(vm => ({
+                            vmId: vm.vmId,
+                            role: 'PARTICIPANT',
+                            dataRatio: distributionRatios[vm.vmId],
+                            capabilities: vm.capabilities,
+                            constraints: {
+                                maxCpuUsage: parseInt(document.getElementById('maxCpuUsage').value) || 80,
+                                maxMemoryUsage: parseInt(document.getElementById('maxMemoryUsage').value) || 75
+                            }
+                        }))
+                    },
+
+                    hyperparameters: JSON.parse(document.getElementById('smartHyperparameters').value),
+
+                    modelConfig: {
+                        modelType: 'RANDOM_FOREST',
+                        featureColumns: ['feature_1', 'feature_2', 'feature_3'],
+                        targetColumn: 'target_class',
+                        testSize: 0.2,
+                        randomState: 42
+                    },
+
+                    schedule: {
+                        startTime: new Date(Date.now() + 3600000).toISOString(),
+                        endTime: new Date(Date.now() + 28800000).toISOString(),
+                        timeout: 3600
+                    }
+                };
+
+                const result = await makeRequest('/api/federated/tasks', 'POST', taskData);
+                showResult('smartTaskResult', 'smartTaskContent', result);
+
+                if (result.success && result.data.data && result.data.data.taskId) {
+                    const taskId = result.data.data.taskId;
+                    // 自动填入任务ID到其他标签页
+                    document.getElementById('controlTaskId').value = taskId;
+                    document.getElementById('queryTaskId').value = taskId;
+                    document.getElementById('configTaskId').value = taskId;
+                }
+
+            } catch (error) {
+                alert('创建任务失败: ' + error.message);
+            }
+        }
+
         // 页面加载完成后的初始化
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('联邦学习任务API测试页面已加载');
+            console.log('联邦学习任务API测试页面已加载 - v1.3 增强版');
+            initSmartCreateTab();
         });
     </script>
 </body>

@@ -57,6 +57,9 @@ public interface FederatedTasksMapper {
     
     List<Map<String, Object>> selectTaskStatsByDateRange(@Param("startDate") LocalDateTime startDate,
                                                          @Param("endDate") LocalDateTime endDate);
+
+    // v1.3 新增：检查VM占用情况
+    int countTasksByVmIdAndStatuses(@Param("vmId") String vmId, @Param("statuses") List<String> statuses);
     
     // 兼容旧方法
     @Deprecated
