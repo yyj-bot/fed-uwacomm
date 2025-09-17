@@ -201,6 +201,24 @@
             white-space: pre-wrap;
             max-height: 300px;
             overflow-y: auto;
+            min-height: 80px;
+            display: block !important; /* 始终显示 */
+            color: #333;
+        }
+
+        .response-content.success {
+            border-color: #27ae60;
+            background: #f8fff9;
+        }
+
+        .response-content.error {
+            border-color: #e74c3c;
+            background: #fff8f8;
+        }
+
+        .response-content.loading {
+            color: #666;
+            font-style: italic;
         }
 
         .success {
@@ -270,10 +288,6 @@
                 <div class="api-body">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>虚拟机ID *</label>
-                            <input type="text" id="upload_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
-                        </div>
-                        <div class="form-group">
                             <label>数据类型 *</label>
                             <select id="upload_dataType">
                                 <option value="ACOUSTIC">声学数据</option>
@@ -303,8 +317,8 @@
                     <button class="test-button" onclick="testFileUpload()">测试文件上传</button>
                     <button class="clear-button" onclick="clearForm('upload')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="upload_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="upload_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -317,10 +331,6 @@
                 </div>
                 <div class="api-body">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>虚拟机ID *</label>
-                            <input type="text" id="text_vmId" placeholder="a1b2c3d4e5f678901234567890123456">
-                        </div>
                         <div class="form-group">
                             <label>数据类型 *</label>
                             <select id="text_dataType">
@@ -344,8 +354,8 @@
                     <button class="test-button" onclick="testTextUpload()">测试文本上传</button>
                     <button class="clear-button" onclick="clearForm('text')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="text_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="text_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -369,10 +379,6 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>虚拟机ID</label>
-                            <input type="text" id="query_vmId" placeholder="过滤特定虚拟机">
-                        </div>
-                        <div class="form-group">
                             <label>数据类型</label>
                             <select id="query_dataType">
                                 <option value="">全部类型</option>
@@ -391,8 +397,8 @@
                     <button class="test-button" onclick="testDataQuery()">测试列表查询</button>
                     <button class="clear-button" onclick="clearForm('query')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="query_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="query_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -411,8 +417,8 @@
                     <button class="test-button" onclick="testDataDetail()">测试详情查询</button>
                     <button class="clear-button" onclick="clearForm('detail')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="detail_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="detail_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -439,8 +445,8 @@
                     <button class="test-button" onclick="testPreprocess()">测试预处理</button>
                     <button class="clear-button" onclick="clearForm('preprocess')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="preprocess_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="preprocess_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -463,8 +469,8 @@
                     <button class="test-button" onclick="testValidation()">测试验证</button>
                     <button class="clear-button" onclick="clearForm('validate')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="validate_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="validate_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -478,10 +484,6 @@
                 <div class="api-body">
                     <div class="form-row">
                         <div class="form-group">
-                            <label>虚拟机ID</label>
-                            <input type="text" id="stats_vmId" placeholder="过滤特定虚拟机">
-                        </div>
-                        <div class="form-group">
                             <label>数据类型</label>
                             <select id="stats_dataType">
                                 <option value="">全部类型</option>
@@ -493,8 +495,8 @@
                     <button class="test-button" onclick="testStatistics()">测试统计查询</button>
                     <button class="clear-button" onclick="clearForm('stats')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="stats_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="stats_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -522,8 +524,8 @@
                     <button class="test-button" onclick="testDelete()">测试删除</button>
                     <button class="clear-button" onclick="clearForm('delete')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="delete_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="delete_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -542,8 +544,8 @@
                     <button class="test-button" onclick="testDownload()">测试下载</button>
                     <button class="clear-button" onclick="clearForm('download')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="download_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="download_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -574,8 +576,8 @@
                     <button class="test-button" onclick="testUpdate()">测试更新</button>
                     <button class="clear-button" onclick="clearForm('update')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="update_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="update_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -606,8 +608,8 @@
                     <button class="test-button" onclick="testBatchOperation()">测试批量操作</button>
                     <button class="clear-button" onclick="clearForm('batch')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="batch_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="batch_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -638,17 +640,17 @@
                     </div>
                     <div class="form-group">
                         <label>过滤条件 (JSON对象)</label>
-                        <textarea id="export_filters" class="json-input" placeholder='{"dataType": "ACOUSTIC", "vmId": "a1b2c3d4e5f678901234567890123456", "status": "READY"}'></textarea>
+                        <textarea id="export_filters" class="json-input" placeholder='{"dataType": "ACOUSTIC", "status": "READY"}'></textarea>
                     </div>
                     <div class="form-group">
                         <label>导出字段 (JSON数组)</label>
-                        <textarea id="export_fields" class="json-input" placeholder='["datasetId", "datasetName", "datasetType", "vmId", "status", "uploadTime"]'></textarea>
+                        <textarea id="export_fields" class="json-input" placeholder='["datasetId", "datasetName", "datasetType", "status", "uploadTime"]'></textarea>
                     </div>
                     <button class="test-button" onclick="testExport()">测试导出</button>
                     <button class="clear-button" onclick="clearForm('export')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="export_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="export_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -667,8 +669,8 @@
                     <button class="test-button" onclick="testExportDownload()">测试导出下载</button>
                     <button class="clear-button" onclick="clearForm('export_download')">清空</button>
                     <div class="response-section">
-                        <div class="response-header">响应结果</div>
-                        <div id="export_download_response" class="response-content"></div>
+                        <div class="response-header">📄 API响应</div>
+                        <div id="export_download_response" class="response-content">等待API调用...</div>
                     </div>
                 </div>
             </div>
@@ -756,14 +758,13 @@
 
         // 1. 文件上传测试
         async function testFileUpload() {
-            const vmId = document.getElementById('upload_vmId').value;
             const dataType = document.getElementById('upload_dataType').value;
             const description = document.getElementById('upload_description').value;
             const tags = document.getElementById('upload_tags').value;
             const metadata = document.getElementById('upload_metadata').value;
             const fileInput = document.getElementById('upload_file');
 
-            if (!vmId || !dataType || !fileInput.files[0]) {
+            if (!dataType || !fileInput.files[0]) {
                 alert('请填写必填字段并选择文件');
                 return;
             }
@@ -774,7 +775,6 @@
 
             try {
                 const formData = new FormData();
-                formData.append('vmId', vmId);
                 formData.append('dataType', dataType);
                 if (description) formData.append('description', description);
                 if (tags) formData.append('tags', tags);
@@ -796,13 +796,12 @@
 
         // 2. 文本上传测试
         async function testTextUpload() {
-            const vmId = document.getElementById('text_vmId').value;
             const dataType = document.getElementById('text_dataType').value;
             const title = document.getElementById('text_title').value;
             const content = document.getElementById('text_content').value;
             const description = document.getElementById('text_description').value;
 
-            if (!vmId || !dataType || !title || !content) {
+            if (!dataType || !title || !content) {
                 alert('请填写所有必填字段');
                 return;
             }
@@ -813,7 +812,6 @@
 
             try {
                 const requestData = {
-                    vmId,
                     dataType,
                     title,
                     content,
@@ -836,7 +834,6 @@
         async function testDataQuery() {
             const page = document.getElementById('query_page').value;
             const size = document.getElementById('query_size').value;
-            const vmId = document.getElementById('query_vmId').value;
             const dataType = document.getElementById('query_dataType').value;
             const keyword = document.getElementById('query_keyword').value;
 
@@ -848,7 +845,6 @@
                 const params = new URLSearchParams();
                 if (page) params.append('page', page);
                 if (size) params.append('size', size);
-                if (vmId) params.append('vmId', vmId);
                 if (dataType) params.append('dataType', dataType);
                 if (keyword) params.append('keyword', keyword);
 
@@ -957,7 +953,6 @@
 
         // 7. 数据统计测试
         async function testStatistics() {
-            const vmId = document.getElementById('stats_vmId').value;
             const dataType = document.getElementById('stats_dataType').value;
 
             const responseDiv = document.getElementById('stats_response');
@@ -966,7 +961,6 @@
 
             try {
                 const params = new URLSearchParams();
-                if (vmId) params.append('vmId', vmId);
                 if (dataType) params.append('dataType', dataType);
 
                 const url = `${API_BASE_URL}/training-data/statistics?${params.toString()}`;
@@ -1247,7 +1241,7 @@
             
             const responseDiv = document.getElementById(`${prefix}_response`);
             if (responseDiv) {
-                responseDiv.textContent = '';
+                responseDiv.textContent = '等待API调用...';
                 responseDiv.className = 'response-content';
             }
         }

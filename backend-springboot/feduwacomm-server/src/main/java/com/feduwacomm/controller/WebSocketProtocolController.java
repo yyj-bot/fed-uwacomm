@@ -13,6 +13,8 @@ import java.security.Principal;
 @Controller
 public class WebSocketProtocolController {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(WebSocketProtocolController.class);
+
     private final WebSocketProtocolService protocolService;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -24,7 +26,16 @@ public class WebSocketProtocolController {
     @MessageMapping("/protocol")
     public void onProtocol(@Payload ProtocolMessage message, Principal principal) {
         try {
+            // 添加调试日志
+            logger.info("收到WebSocket消息 - Type: {}, VmId: {}, Principal: {}",
+                       message != null ? message.getType() : null,
+                       message != null ? message.getVmId() : null,
+                       principal != null ? principal.getName() : null);
+
             ProtocolAck ack = protocolService.handle(message);
+
+            logger.debug("消息处理完成，发送ACK - AckType: {}", ack != null ? ack.getType() : null);
+
             // 点对点回复给当前用户
             if (principal != null) {
                 messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/reply", ack);
@@ -34,8 +45,9 @@ public class WebSocketProtocolController {
                 messagingTemplate.convertAndSend("/topic/vm/" + message.getVmId(), ack);
             }
         } catch (Exception e) {
-            // 捕获异常以防止WebSocket连接断开
-            // 在生产环境中可能需要记录日志或发送错误响应
+            logger.error("WebSocket消息处理异常 - Message: {}, Principal: {}",
+                        message != null ? message.getType() : null,
+                        principal != null ? principal.getName() : null, e);
         }
     }
 } 

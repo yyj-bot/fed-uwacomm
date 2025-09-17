@@ -23,8 +23,6 @@ public class TrainingDataVO {
 
     private String datasetType;
 
-    private String vmId;
-
     private String status;
 
     private LocalDateTime uploadTime;

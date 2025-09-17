@@ -54,6 +54,14 @@ public interface VmInstanceService {
 
     /**
      * 断开虚拟机连接
+     * 将连接状态更新为DISCONNECTED，清除WebSocket会话ID
+     *
+     * @param vmId 虚拟机ID
+     */
+    void disconnectVm(String vmId);
+
+    /**
+     * 断开虚拟机连接
      *
      * @param vmId 虚拟机ID
      */

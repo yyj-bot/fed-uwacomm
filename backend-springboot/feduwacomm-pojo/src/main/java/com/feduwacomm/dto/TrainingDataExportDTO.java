@@ -29,7 +29,6 @@ public class TrainingDataExportDTO {
     @Builder
     public static class ExportFilters {
         private String dataType;
-        private String vmId;
         private String status;
         private String startTime;
         private String endTime;

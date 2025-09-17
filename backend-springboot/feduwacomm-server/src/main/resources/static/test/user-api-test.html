@@ -157,6 +157,8 @@
             border-radius: 8px;
             background: #f8f9fa;
             border: 1px solid #e9ecef;
+            min-height: 120px;
+            display: block !important; /* 始终显示 */
         }
 
         .response-area h4 {
@@ -439,12 +441,18 @@
                             </div>
                         </div>
                         <button class="btn" onclick="testRegister()">注册用户</button>
-                        <div id="registerResponse" class="response-area hidden">
+                        <div id="registerResponse" class="response-area">
                             <h4>📤 请求数据</h4>
-                            <div class="request-content"></div>
+                            <div class="request-content">
+                                <div style="color: #6c757d; font-style: italic;">等待API调用...</div>
+                            </div>
                             <h4>📥 响应结果</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
 
@@ -467,12 +475,18 @@
                             </label>
                         </div>
                         <button class="btn" onclick="testLogin()">登录</button>
-                        <div id="loginResponse" class="response-area hidden">
+                        <div id="loginResponse" class="response-area">
                             <h4>📤 请求数据</h4>
-                            <div class="request-content"></div>
+                            <div class="request-content">
+                                <div style="color: #6c757d; font-style: italic;">等待API调用...</div>
+                            </div>
                             <h4>📥 响应结果</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
 
@@ -480,10 +494,14 @@
                     <div class="form-group">
                         <h4>🔄 Token刷新</h4>
                         <button class="btn btn-secondary" onclick="testRefreshToken()">刷新Token</button>
-                        <div id="refreshResponse" class="response-area hidden">
+                        <div id="refreshResponse" class="response-area">
                             <h4>响应状态</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
 
@@ -491,10 +509,14 @@
                     <div class="form-group">
                         <h4>🚪 用户登出</h4>
                         <button class="btn btn-danger" onclick="testLogout()">登出</button>
-                        <div id="logoutResponse" class="response-area hidden">
+                        <div id="logoutResponse" class="response-area">
                             <h4>响应状态</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -511,10 +533,14 @@
                     <div class="form-group">
                         <h4>📋 获取当前用户信息</h4>
                         <button class="btn" onclick="testGetCurrentUserInfo()">获取信息</button>
-                        <div id="getUserInfoResponse" class="response-area hidden">
+                        <div id="getUserInfoResponse" class="response-area">
                             <h4>响应状态</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
 
@@ -532,10 +558,14 @@
                             </div>
                         </div>
                         <button class="btn" onclick="testUpdateUserInfo()">更新信息</button>
-                        <div id="updateUserInfoResponse" class="response-area hidden">
+                        <div id="updateUserInfoResponse" class="response-area">
                             <h4>响应状态</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
 
@@ -557,10 +587,14 @@
                             <input type="password" id="confirmNewPassword" placeholder="确认新密码">
                         </div>
                         <button class="btn" onclick="testChangePassword()">修改密码</button>
-                        <div id="changePasswordResponse" class="response-area hidden">
+                        <div id="changePasswordResponse" class="response-area">
                             <h4>响应状态</h4>
-                            <div class="response-status"></div>
-                            <div class="response-content"></div>
+                            <div class="response-status">
+                                <span style="color: #6c757d;">🔄 待响应</span>
+                            </div>
+                            <div class="response-content">
+                                <div style="color: #6c757d; font-style: italic;">API响应将在此显示</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -616,7 +650,7 @@
         // 工具函数
         function showResponse(elementId, response, isSuccess = true) {
             const element = document.getElementById(elementId);
-            element.classList.remove('hidden');
+            // 移除hidden类依赖，响应区域始终可见
             element.classList.remove('status-success', 'status-error');
             element.classList.add(isSuccess ? 'status-success' : 'status-error');
             

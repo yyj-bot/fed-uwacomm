@@ -189,9 +189,6 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
 
--- 用户权限表索引
-CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions (user_id);
-CREATE INDEX IF NOT EXISTS idx_user_permissions_resource_type ON user_permissions (resource_type);
 
 -- 虚拟机表索引
 CREATE INDEX IF NOT EXISTS idx_vm_instances_status ON vm_instances (status);

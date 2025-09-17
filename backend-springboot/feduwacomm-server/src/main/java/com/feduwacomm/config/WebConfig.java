@@ -50,7 +50,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 注册用户JWT认证拦截器
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**") // 用户相关接口需要用户JWT认证
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**") // 用户相关接口、VM管理接口和训练数据管理接口需要用户JWT认证
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
@@ -63,10 +63,8 @@ public class WebConfig implements WebMvcConfigurer {
         // 注册VM JWT认证拦截器（在测试环境中可配置为禁用）
         if (vmJwtInterceptorEnabled) {
             registry.addInterceptor(vmJwtAuthenticationInterceptor)
-                    .addPathPatterns("/api/vm/**", "/api/federated/**", "/api/training-data/**", "/api/model-version/**") // VM相关接口需要VM JWT认证
+                    .addPathPatterns("/api/federated/**", "/api/model-version/**") // VM自身执行的接口需要VM JWT认证
                     .excludePathPatterns(
-                            "/api/vm/register", // VM注册接口
-                            "/api/vm/token/refresh", // Token刷新接口，使用API Key认证
                             "/api/health", // 健康检查
                             "/api/websocket/**", // WebSocket接口
                             "/pages/**", // 测试页面
@@ -77,7 +75,7 @@ public class WebConfig implements WebMvcConfigurer {
 
         // 注册权限拦截器
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**") // 对用户相关接口和日志接口进行权限检查
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**") // 对用户相关接口、日志接口、VM管理接口和训练数据管理接口进行权限检查
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
