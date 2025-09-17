@@ -182,7 +182,7 @@ export class SystemLogService {
    * @param params 查询参数
    * @returns 清理历史列表
    */
-  async getCleanupHistory(params: CleanupHistoryParams = {}): Promise<PaginatedResponse<CleanupTask>> {
+  async getCleanupHistory(params: CleanupHistoryParams = {}): Promise<SystemLogPaginatedResponse<CleanupTask>> {
     try {
       this.validateCleanupHistoryParams(params)
       const result = await log.getCleanupHistory(params)
@@ -503,17 +503,23 @@ export class SystemLogService {
 
   // ==================== 私有转换方法 ====================
 
-  private transformLogList(result: any): SystemLogPaginatedResponse<SystemLog> {
+  private transformLogList(result: {
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: SystemLog[]
+  }): SystemLogPaginatedResponse<SystemLog> {
     return {
       total: result.total,
       pages: result.pages,
       current: result.current,
       size: result.size,
-      records: result.records.map((item: any) => this.transformLogDetail(item))
+      records: result.records.map((item: SystemLog) => this.transformLogDetail(item))
     }
   }
 
-  private transformLogDetail(detail: any): SystemLog {
+  private transformLogDetail(detail: SystemLog): SystemLog {
     return {
       logId: detail.logId,
       level: detail.level,
@@ -526,15 +532,19 @@ export class SystemLogService {
     }
   }
 
-  private transformRealtimeLogs(result: any): RealtimeLogsResponse {
+  private transformRealtimeLogs(result: {
+    logs: SystemLog[]
+    totalCount: number
+    lastUpdateTime: string
+  }): RealtimeLogsResponse {
     return {
-      logs: result.logs.map((item: any) => this.transformLogDetail(item)),
+      logs: result.logs.map((item: SystemLog) => this.transformLogDetail(item)),
       totalCount: result.totalCount,
       lastUpdateTime: result.lastUpdateTime
     }
   }
 
-  private transformLogStatistics(result: any): LogStatisticsResponse {
+  private transformLogStatistics(result: LogStatisticsResponse): LogStatisticsResponse {
     return {
       totalLogs: result.totalLogs,
       levelDistribution: result.levelDistribution,
@@ -589,28 +599,35 @@ export class SystemLogService {
     }
   }
 
-  private transformCleanupTask(result: any): CleanupTask {
+  private transformCleanupTask(result: CleanupTask): CleanupTask {
     return {
       cleanupId: result.cleanupId,
       status: result.status,
+      strategy: result.strategy,
       estimatedRecords: result.estimatedRecords,
       estimatedSize: result.estimatedSize,
+      dryRun: result.dryRun,
       progress: result.progress,
       deletedRecords: result.deletedRecords,
       freedSpace: result.freedSpace,
       createdAt: result.createdAt,
-      completedAt: result.completedAt,
-      strategy: result.strategy
+      completedAt: result.completedAt
     }
   }
 
-  private transformCleanupHistory(result: any): PaginatedResponse<CleanupTask> {
+  private transformCleanupHistory(result: {
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: CleanupTask[]
+  }): SystemLogPaginatedResponse<CleanupTask> {
     return {
       total: result.total,
-      page: result.page || result.current || 1,
+      current: result.current,
       size: result.size,
       pages: result.pages,
-      records: result.records.map((item: any) => this.transformCleanupTask(item))
+      records: result.records.map((item: CleanupTask) => this.transformCleanupTask(item))
     }
   }
 

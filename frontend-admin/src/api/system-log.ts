@@ -30,6 +30,7 @@ interface ExportTask {
 interface CleanupTask {
   cleanupId: string
   status: string
+  strategy?: string
   estimatedRecords?: number
   estimatedSize?: number
   dryRun?: boolean
@@ -38,19 +39,18 @@ interface CleanupTask {
   freedSpace?: number
   createdAt: string
   completedAt?: string
-  strategy?: string
 }
 
-// 系统监控类型
+// 统一的系统监控类型 - 与后端LogMonitorVO保持一致
 interface SystemMonitor {
-  systemInfo: {
-    version: string
-    uptime: number
-    startTime: string
-    javaVersion: string
-    osInfo: string
+  systemInfo?: {
+    version?: string
+    uptime?: number
+    startTime?: string
+    javaVersion?: string
+    osInfo?: string
   }
-  resourceUsage: {
+  resourceUsage?: {
     cpuUsage: number
     memoryUsage: number
     diskUsage: number
@@ -59,54 +59,40 @@ interface SystemMonitor {
       bytesOut: number
     }
   }
-  applicationMetrics: {
+  applicationMetrics?: {
     activeConnections: number
     requestPerSecond: number
     averageResponseTime: number
     errorRate: number
   }
-  databaseMetrics: {
+  databaseMetrics?: {
     activeConnections: number
     queryPerSecond: number
     averageQueryTime: number
   }
-}
-
-// 日志监控类型
-interface LogMonitor {
-  logMetrics: {
+  logMetrics?: {
     totalLogs: number
     errorCount: number
     warningCount: number
     errorRate: number
     warningRate: number
   }
-  levelTrend: Array<{
+  levelTrend?: Array<{
     timestamp: string
-    DEBUG: number
-    INFO: number
-    WARN: number
-    ERROR: number
+    data: Record<string, number>
   }>
-  categoryTrend: Array<{
+  categoryTrend?: Array<{
     timestamp: string
-    SYSTEM: number
-    USER: number
-    VM: number
-    TASK: number
+    data: Record<string, number>
   }>
-  recentErrors: Array<{
+  recentErrors?: Array<{
     logId: string
     level: string
     category: string
     message: string
     createdAt: string
   }>
-}
-
-// 性能监控类型
-interface PerformanceMonitor {
-  apiMetrics: {
+  apiMetrics?: {
     totalRequests: number
     successfulRequests: number
     failedRequests: number
@@ -115,39 +101,49 @@ interface PerformanceMonitor {
     p95ResponseTime: number
     p99ResponseTime: number
   }
-  endpointMetrics: Array<{
+  endpointMetrics?: Array<{
     endpoint: string
     requestCount: number
     successRate: number
     averageResponseTime: number
     errorCount: number
   }>
-  responseTimeTrend: Array<{
+  responseTimeTrend?: Array<{
     timestamp: string
     average: number
     p95: number
     p99: number
   }>
-}
-
-// 告警配置类型
-interface AlertConfig {
-  alerts: Array<{
+  alerts?: Array<{
     alertId: string
     name: string
     type: string
     condition: string
     status: string
-    lastTriggered: string
+    severity?: string
+    enabled?: boolean
+    threshold?: number
+    currentValue?: number
+    lastTriggered?: string
     triggerCount: number
   }>
-  alertHistory: Array<{
+  alertHistory?: Array<{
     alertId: string
+    alertName?: string
     triggeredAt: string
+    resolvedAt?: string
     message: string
     severity: string
+    value?: number
+    resolved?: boolean
   }>
+  alertStatistics?: Record<string, any>
 }
+
+// 为了向后兼容，保留这些类型别名
+type LogMonitor = SystemMonitor
+type PerformanceMonitor = SystemMonitor
+type AlertConfig = SystemMonitor
 
 // 日志配置类型
 interface LogConfig {
@@ -178,8 +174,20 @@ export const log = {
     startTime?: string
     endTime?: string
     keyword?: string
-  } = {}): Promise<any> {
-    const response = await logApiInstance.get<ApiResponse<any>>('/list', { params })
+  } = {}): Promise<{
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: SystemLog[]
+  }> {
+    const response = await logApiInstance.get<ApiResponse<{
+      total: number
+      pages: number
+      current: number
+      size: number
+      records: SystemLog[]
+    }>>('/list', { params })
     return response.data.data
   },
 
@@ -331,40 +339,52 @@ export const log = {
     status?: string
     page?: number
     size?: number
-  } = {}): Promise<PaginatedResponse<CleanupTask>> {
-    const response = await logApiInstance.get<ApiResponse<PaginatedResponse<CleanupTask>>>('/cleanup/history', { params })
+  } = {}): Promise<{
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: CleanupTask[]
+  }> {
+    const response = await logApiInstance.get<ApiResponse<{
+      total: number
+      pages: number
+      current: number
+      size: number
+      records: CleanupTask[]
+    }>>('/cleanup/history', { params })
     return response.data.data
   },
 
   // ==================== 6. 系统监控接口 ====================
   
-  // 6.1 系统状态监控
+  // 6.1 系统状态监控 - 返回完整的LogMonitorVO
   async getSystemMonitor(): Promise<SystemMonitor> {
     const response = await logApiInstance.get<ApiResponse<SystemMonitor>>('/monitor/system')
     return response.data.data
   },
 
-  // 6.2 日志监控
+  // 6.2 日志监控 - 返回LogMonitorVO的日志部分
   async getLogMonitor(params: {
     timeRange?: '1h' | '6h' | '24h' | '7d'
     level?: string
-  } = {}): Promise<LogMonitor> {
-    const response = await logApiInstance.get<ApiResponse<LogMonitor>>('/monitor/logs', { params })
+  } = {}): Promise<SystemMonitor> {
+    const response = await logApiInstance.get<ApiResponse<SystemMonitor>>('/monitor/logs', { params })
     return response.data.data
   },
 
-  // 6.3 性能监控
+  // 6.3 性能监控 - 返回LogMonitorVO的性能部分
   async getPerformanceMonitor(params: {
     timeRange?: '1h' | '6h' | '24h' | '7d'
     endpoint?: string
-  } = {}): Promise<PerformanceMonitor> {
-    const response = await logApiInstance.get<ApiResponse<PerformanceMonitor>>('/monitor/performance', { params })
+  } = {}): Promise<SystemMonitor> {
+    const response = await logApiInstance.get<ApiResponse<SystemMonitor>>('/monitor/performance', { params })
     return response.data.data
   },
 
-  // 6.4 告警配置
-  async getAlertConfig(): Promise<AlertConfig> {
-    const response = await logApiInstance.get<ApiResponse<AlertConfig>>('/monitor/alerts')
+  // 6.4 告警配置 - 返回LogMonitorVO的告警部分
+  async getAlertConfig(): Promise<SystemMonitor> {
+    const response = await logApiInstance.get<ApiResponse<SystemMonitor>>('/monitor/alerts')
     return response.data.data
   },
 
@@ -386,8 +406,8 @@ export const log = {
       enabled: boolean
     }>
     exportSettings?: {
-      maxRecordsPerExport: number
-      exportRetentionDays: number
+      maxRecordsPerExport?: number
+      exportRetentionDays?: number
     }
   }): Promise<{
     updatedAt: string
@@ -398,5 +418,16 @@ export const log = {
     return response.data.data
   },
 } as const
+
+// 导出类型定义以供其他层使用
+export type {
+  ExportTask,
+  CleanupTask,
+  SystemMonitor,
+  LogMonitor,
+  PerformanceMonitor,
+  AlertConfig,
+  LogConfig
+}
 
 // 使用命名导出以保持一致性 

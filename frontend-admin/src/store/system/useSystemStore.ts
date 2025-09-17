@@ -15,79 +15,19 @@ import type {
   LogExportData,
   LogCleanupData
 } from '@/services'
+import type {
+  LogStatisticsParams,
+  LogConfigUpdateData,
+  SystemMonitor,
+  LogMonitor,
+  PerformanceMonitor,
+  AlertConfig,
+  LogConfig,
+  ExportTask,
+  CleanupTask
+} from '@/services/system-log'
 
-// 临时类型定义，应该从 services 中导入
-interface LogStatisticsParams {
-  startDate?: string
-  endDate?: string
-  level?: string
-  category?: string
-}
-
-interface LogConfigUpdateData {
-  logLevel?: string
-  retentionDays?: number
-  maxFileSize?: string
-  enableRotation?: boolean
-}
-
-interface SystemMonitor {
-  cpuUsage: number
-  memoryUsage: number
-  diskUsage: number
-  networkTraffic: number
-  uptime: number
-  systemLoad: number
-}
-
-interface LogMonitor {
-  totalLogs: number
-  errorCount: number
-  warningCount: number
-  infoCount: number
-  logRate: number
-  averageResponseTime: number
-}
-
-interface PerformanceMonitor {
-  responseTime: number[]
-  throughput: number[]
-  errorRate: number[]
-  timestamps: string[]
-}
-
-interface AlertConfig {
-  enabled: boolean
-  rules: any[]
-  notifications: any[]
-}
-
-interface LogConfig {
-  level: string
-  retentionDays: number
-  maxFileSize: string
-  enableRotation: boolean
-  categories: string[]
-}
-
-interface ExportTask {
-  exportId: string
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
-  estimatedTime?: number
-  downloadUrl?: string
-  createdAt: string
-  format: string
-}
-
-interface CleanupTask {
-  cleanupId: string
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
-  estimatedRecords?: number
-  estimatedSize?: string
-  dryRun?: boolean
-  createdAt: string
-  strategy: string
-}
+// 所有类型定义现在都从 @/services 导入
 
 // ==================== Hook 实现 ====================
 

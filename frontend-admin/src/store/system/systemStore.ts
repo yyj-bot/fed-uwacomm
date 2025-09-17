@@ -15,30 +15,19 @@ import type {
   LogExportData,
   LogCleanupData
 } from '@/services'
+import type {
+  LogStatisticsParams,
+  LogConfigUpdateData,
+  SystemMonitor,
+  LogMonitor,
+  PerformanceMonitor,
+  AlertConfig,
+  LogConfig,
+  ExportTask,
+  CleanupTask
+} from '@/services/system-log'
 
-// 简化的类型定义
-interface LogStatisticsParams {
-  startDate?: string
-  endDate?: string
-  level?: string
-  category?: string
-}
-
-interface LogConfigUpdateData {
-  logLevel?: string
-  retentionDays?: number
-  maxFileSize?: number
-  enableRotation?: boolean
-}
-
-// 使用 any 类型来避免类型冲突
-type SystemMonitor = any
-type LogMonitor = any
-type PerformanceMonitor = any
-type AlertConfig = any
-type LogConfig = any
-type ExportTask = any
-type CleanupTask = any
+// 所有类型定义现在都从 @/services 导入
 
 // ==================== 状态类型定义 ====================
 
