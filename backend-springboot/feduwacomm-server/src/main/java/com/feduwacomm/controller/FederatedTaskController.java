@@ -6,6 +6,17 @@ import com.feduwacomm.dto.*;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.vo.*;
+import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.service.TrainingDataService;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -28,33 +39,259 @@ public class FederatedTaskController {
     @Autowired
     private FederatedTaskService federatedTaskService;
 
+    @Autowired
+    private VmInstanceService vmInstanceService;
+
+    @Autowired
+    private TrainingDataService trainingDataService;
+
+    // ========== v1.3 图形化配置接口 ==========
+
     /**
-     * 创建联邦学习任务
+     * 获取可用虚拟机列表
+     * GET /api/federated/config/available-vms
+     */
+    @GetMapping("/config/available-vms")
+    public Result<ConfigPreviewVO.AvailableVmsVO> getAvailableVms(
+            @RequestParam(required = false) String algorithm,
+            @RequestParam(required = false) Integer minCpuCores,
+            @RequestParam(required = false) Integer minMemoryMb,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String capabilities,
+            HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到可用VM查询请求: algorithm={}, minCpu={}, minMemory={}, userId={}, ip={}",
+            algorithm, minCpuCores, minMemoryMb, currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.AvailableVmsVO response = federatedTaskService.getAvailableVms(
+                algorithm, minCpuCores, minMemoryMb, status, capabilities);
+
+            log.info("可用VM查询成功: total={}, userId={}", response.getTotal(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("可用VM查询失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取可用数据集列表
+     * GET /api/federated/config/available-datasets
+     */
+    @GetMapping("/config/available-datasets")
+    public Result<ConfigPreviewVO.AvailableDatasetsVO> getAvailableDatasets(
+            @RequestParam(required = false) String dataType,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long minSize,
+            @RequestParam(required = false) Long maxSize,
+            @RequestParam(required = false) String keyword,
+            HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到可用数据集查询请求: dataType={}, status={}, userId={}, ip={}",
+            dataType, status, currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.AvailableDatasetsVO response = federatedTaskService.getAvailableDatasets(
+                dataType, status, minSize, maxSize, keyword);
+
+            log.info("可用数据集查询成功: total={}, userId={}", response.getTotal(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("可用数据集查询失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取角色配置选项
+     * GET /api/federated/config/roles
+     */
+    @GetMapping("/config/roles")
+    public Result<ConfigPreviewVO.RoleConfigVO> getRoleConfig(HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到角色配置查询请求: userId={}, ip={}", currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.RoleConfigVO response = federatedTaskService.getRoleConfig();
+
+            log.info("角色配置查询成功: roles={}, userId={}", response.getRoles().size(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("角色配置查询失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取算法配置模板
+     * GET /api/federated/config/algorithm-templates
+     */
+    @GetMapping("/config/algorithm-templates")
+    public Result<ConfigPreviewVO.AlgorithmTemplatesVO> getAlgorithmTemplates(HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到算法模板查询请求: userId={}, ip={}", currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.AlgorithmTemplatesVO response = federatedTaskService.getAlgorithmTemplates();
+
+            log.info("算法模板查询成功: templates={}, userId={}", response.getTemplates().size(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("算法模板查询失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 数据分配预览
+     * POST /api/federated/tasks/preview-distribution
+     */
+    @PostMapping("/tasks/preview-distribution")
+    public Result<ConfigPreviewVO.DistributionPreviewVO> previewDistribution(
+            @Valid @RequestBody DistributionPreviewRequestDTO requestDTO,
+            HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到数据分配预览请求: datasetId={}, strategy={}, participantCount={}, userId={}, ip={}",
+            requestDTO.getDatasetId(), requestDTO.getDistributionStrategy(),
+            requestDTO.getParticipants().size(), currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.DistributionPreviewVO response = federatedTaskService.previewDistribution(requestDTO);
+
+            log.info("数据分配预览成功: participants={}, userId={}",
+                response.getDistributionResult().getParticipants().size(), currentUserId);
+            return Result.success("预览生成成功", response);
+
+        } catch (Exception e) {
+            log.error("数据分配预览失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("预览失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 参与者验证
+     * POST /api/federated/tasks/validate-participants
+     */
+    @PostMapping("/tasks/validate-participants")
+    public Result<ConfigPreviewVO.ParticipantValidationVO> validateParticipants(
+            @Valid @RequestBody ParticipantValidationRequestDTO requestDTO,
+            HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到参与者验证请求: algorithm={}, taskType={}, participantCount={}, userId={}, ip={}",
+            requestDTO.getAlgorithm(), requestDTO.getTaskType(),
+            requestDTO.getParticipants().size(), currentUserId, clientIp);
+
+        try {
+            ConfigPreviewVO.ParticipantValidationVO response = federatedTaskService.validateParticipants(requestDTO);
+
+            log.info("参与者验证完成: overallValid={}, userId={}", response.getOverallValid(), currentUserId);
+            return Result.success("验证完成", response);
+
+        } catch (Exception e) {
+            log.error("参与者验证失败: userId={}, error={}", currentUserId, e.getMessage());
+            return Result.error("验证失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 配置状态监控
+     * GET /api/federated/tasks/{taskId}/config-status
+     */
+    @GetMapping("/tasks/{taskId}/config-status")
+    public Result<TaskConfigStatusVO> getTaskConfigStatus(@PathVariable String taskId,
+                                                        HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到任务配置状态查询请求: taskId={}, userId={}, ip={}", taskId, currentUserId, clientIp);
+
+        try {
+            TaskConfigStatusVO response = federatedTaskService.getTaskConfigStatus(taskId);
+
+            log.info("任务配置状态查询成功: taskId={}, configStatus={}, userId={}",
+                taskId, response.getConfigStatus(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("任务配置状态查询失败: taskId={}, userId={}, error={}", taskId, currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 资源使用监控
+     * GET /api/federated/tasks/{taskId}/resource-usage
+     */
+    @GetMapping("/tasks/{taskId}/resource-usage")
+    public Result<TaskResourceUsageVO> getTaskResourceUsage(@PathVariable String taskId,
+                                                          HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到任务资源使用查询请求: taskId={}, userId={}, ip={}", taskId, currentUserId, clientIp);
+
+        try {
+            TaskResourceUsageVO response = federatedTaskService.getTaskResourceUsage(taskId);
+
+            log.info("任务资源使用查询成功: taskId={}, participantCount={}, userId={}",
+                taskId, response.getParticipantMetrics().size(), currentUserId);
+            return Result.success("查询成功", response);
+
+        } catch (Exception e) {
+            log.error("任务资源使用查询失败: taskId={}, userId={}, error={}", taskId, currentUserId, e.getMessage());
+            return Result.error("查询失败: " + e.getMessage());
+        }
+    }
+
+    // ========== v1.3 增强的任务创建接口 ==========
+
+    /**
+     * 创建联邦学习任务 (v1.3 专用)
      * POST /api/federated/tasks
+     * 只支持v1.3新格式，不再兼容v1.0旧格式
      */
     @PostMapping("/tasks")
     public Result<TaskOperationVO> createTask(@Valid @RequestBody TaskCreateDTO createDTO,
                                             HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String currentUserId = BaseContext.getCurrentId();
-        
-        log.info("收到任务创建请求: taskName={}, algorithm={}, participantCount={}, userId={}, ip={}", 
-            createDTO.getTaskName(), createDTO.getAlgorithm(), 
-            createDTO.getParticipants().size(), currentUserId, clientIp);
-        
-        accessLog.info("联邦任务创建请求: taskName={}, algorithm={}, userId={}, ip={}", 
+
+        int participantCount = createDTO.getParticipantConfig().getParticipants().size();
+
+        log.info("收到v1.3任务创建请求: taskName={}, algorithm={}, participantCount={}, userId={}, ip={}",
+            createDTO.getTaskName(), createDTO.getAlgorithm(), participantCount, currentUserId, clientIp);
+
+        accessLog.info("v1.3联邦任务创建请求: taskName={}, algorithm={}, userId={}, ip={}",
             createDTO.getTaskName(), createDTO.getAlgorithm(), currentUserId, clientIp);
 
         try {
-            TaskOperationVO response = federatedTaskService.createTask(createDTO, currentUserId);
-            
-            log.info("任务创建成功: taskId={}, taskName={}, userId={}", 
+            // 只使用v1.3智能任务创建
+            TaskOperationVO response = federatedTaskService.createSmartTask(createDTO, currentUserId);
+
+            log.info("v1.3任务创建成功: taskId={}, taskName={}, userId={}",
                 response.getTaskId(), createDTO.getTaskName(), currentUserId);
-            
+
             return Result.success("任务创建成功", response);
-            
+
         } catch (Exception e) {
-            log.error("任务创建失败: taskName={}, userId={}, error={}", 
+            log.error("v1.3任务创建失败: taskName={}, userId={}, error={}",
                 createDTO.getTaskName(), currentUserId, e.getMessage());
             return Result.error("任务创建失败: " + e.getMessage());
         }
@@ -449,6 +686,65 @@ public class FederatedTaskController {
         } catch (Exception e) {
             log.error("任务批量操作失败: userId={}, error={}", currentUserId, e.getMessage());
             return Result.error("操作失败: " + e.getMessage());
+        }
+    }
+
+    // ========== v1.3 支持的请求DTO类 ==========
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DistributionPreviewRequestDTO {
+        @NotBlank(message = "数据集ID不能为空")
+        private String datasetId;
+
+        @NotBlank(message = "分配策略不能为空")
+        private String distributionStrategy;
+
+        @Valid
+        @NotEmpty(message = "参与者列表不能为空")
+        private List<ParticipantRequestDTO> participants;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class ParticipantRequestDTO {
+            @NotBlank(message = "虚拟机ID不能为空")
+            private String vmId;
+
+            @DecimalMin(value = "0.0", message = "请求比例不能小于0.0")
+            @DecimalMax(value = "1.0", message = "请求比例不能大于1.0")
+            private Double requestedRatio;
+        }
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ParticipantValidationRequestDTO {
+        @NotBlank(message = "算法类型不能为空")
+        private String algorithm;
+
+        @NotBlank(message = "任务类型不能为空")
+        private String taskType;
+
+        @Valid
+        @NotEmpty(message = "参与者列表不能为空")
+        private List<ParticipantForValidationDTO> participants;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class ParticipantForValidationDTO {
+            @NotBlank(message = "虚拟机ID不能为空")
+            private String vmId;
+
+            @NotBlank(message = "参与者角色不能为空")
+            private String role;
         }
     }
 }

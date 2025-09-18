@@ -300,7 +300,7 @@
                     </div>
                     <div class="form-group">
                         <label>数据描述</label>
-                        <input type="text" id="upload_description" placeholder="水声传播特征数据">
+                        <input type="text" id="upload_datasetDescription" placeholder="水声传播特征数据">
                     </div>
                     <div class="form-group">
                         <label>标签 (JSON数组)</label>
@@ -348,8 +348,8 @@
                         <textarea id="text_content" placeholder="声学传播环境配置文件内容..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>描述</label>
-                        <input type="text" id="text_description" placeholder="声学传播环境配置描述">
+                        <label>数据描述</label>
+                        <input type="text" id="text_datasetDescription" placeholder="声学传播环境配置描述">
                     </div>
                     <button class="test-button" onclick="testTextUpload()">测试文本上传</button>
                     <button class="clear-button" onclick="clearForm('text')">清空</button>
@@ -389,10 +389,37 @@
                                 <option value="OTHER">其他数据</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label>状态</label>
+                            <select id="query_status">
+                                <option value="">全部状态</option>
+                                <option value="UPLOADING">上传中</option>
+                                <option value="PROCESSING">处理中</option>
+                                <option value="VALIDATING">验证中</option>
+                                <option value="READY">就绪</option>
+                                <option value="ERROR">错误</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>关键词搜索</label>
-                        <input type="text" id="query_keyword" placeholder="搜索名称或描述">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始日期</label>
+                            <input type="date" id="query_startDate">
+                        </div>
+                        <div class="form-group">
+                            <label>结束日期</label>
+                            <input type="date" id="query_endDate">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>关键词搜索</label>
+                            <input type="text" id="query_keyword" placeholder="搜索名称或描述">
+                        </div>
+                        <div class="form-group">
+                            <label>标签过滤</label>
+                            <input type="text" id="query_tags" placeholder="acoustic,feature">
+                        </div>
                     </div>
                     <button class="test-button" onclick="testDataQuery()">测试列表查询</button>
                     <button class="clear-button" onclick="clearForm('query')">清空</button>
@@ -489,7 +516,20 @@
                                 <option value="">全部类型</option>
                                 <option value="ACOUSTIC">声学数据</option>
                                 <option value="ENVIRONMENT">环境数据</option>
+                                <option value="MODEL">模型数据</option>
+                                <option value="FEATURE">特征数据</option>
+                                <option value="OTHER">其他数据</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始日期</label>
+                            <input type="date" id="stats_startDate">
+                        </div>
+                        <div class="form-group">
+                            <label>结束日期</label>
+                            <input type="date" id="stats_endDate">
                         </div>
                     </div>
                     <button class="test-button" onclick="testStatistics()">测试统计查询</button>
@@ -563,7 +603,7 @@
                     </div>
                     <div class="form-group">
                         <label>数据描述</label>
-                        <input type="text" id="update_description" placeholder="更新后的数据描述">
+                        <input type="text" id="update_datasetDescription" placeholder="更新后的数据描述">
                     </div>
                     <div class="form-group">
                         <label>标签 (JSON数组)</label>
@@ -759,7 +799,7 @@
         // 1. 文件上传测试
         async function testFileUpload() {
             const dataType = document.getElementById('upload_dataType').value;
-            const description = document.getElementById('upload_description').value;
+            const datasetDescription = document.getElementById('upload_datasetDescription').value;
             const tags = document.getElementById('upload_tags').value;
             const metadata = document.getElementById('upload_metadata').value;
             const fileInput = document.getElementById('upload_file');
@@ -776,7 +816,7 @@
             try {
                 const formData = new FormData();
                 formData.append('dataType', dataType);
-                if (description) formData.append('description', description);
+                if (datasetDescription) formData.append('datasetDescription', datasetDescription);
                 if (tags) formData.append('tags', tags);
                 if (metadata) formData.append('metadata', metadata);
                 formData.append('file', fileInput.files[0]);
@@ -799,7 +839,7 @@
             const dataType = document.getElementById('text_dataType').value;
             const title = document.getElementById('text_title').value;
             const content = document.getElementById('text_content').value;
-            const description = document.getElementById('text_description').value;
+            const datasetDescription = document.getElementById('text_datasetDescription').value;
 
             if (!dataType || !title || !content) {
                 alert('请填写所有必填字段');
@@ -815,7 +855,7 @@
                     dataType,
                     title,
                     content,
-                    description
+                    datasetDescription
                 };
 
                 const response = await makeRequest(`${API_BASE_URL}/training-data/text`, {
@@ -835,7 +875,11 @@
             const page = document.getElementById('query_page').value;
             const size = document.getElementById('query_size').value;
             const dataType = document.getElementById('query_dataType').value;
+            const status = document.getElementById('query_status').value;
             const keyword = document.getElementById('query_keyword').value;
+            const startDate = document.getElementById('query_startDate').value;
+            const endDate = document.getElementById('query_endDate').value;
+            const tags = document.getElementById('query_tags').value;
 
             const responseDiv = document.getElementById('query_response');
             responseDiv.textContent = '查询中...';
@@ -846,7 +890,11 @@
                 if (page) params.append('page', page);
                 if (size) params.append('size', size);
                 if (dataType) params.append('dataType', dataType);
+                if (status) params.append('status', status);
                 if (keyword) params.append('keyword', keyword);
+                if (startDate) params.append('startDate', startDate);
+                if (endDate) params.append('endDate', endDate);
+                if (tags) params.append('tags', tags);
 
                 const url = `${API_BASE_URL}/training-data?${params.toString()}`;
                 const response = await makeRequest(url, { method: 'GET' });
@@ -954,6 +1002,8 @@
         // 7. 数据统计测试
         async function testStatistics() {
             const dataType = document.getElementById('stats_dataType').value;
+            const startDate = document.getElementById('stats_startDate').value;
+            const endDate = document.getElementById('stats_endDate').value;
 
             const responseDiv = document.getElementById('stats_response');
             responseDiv.textContent = '统计中...';
@@ -962,6 +1012,8 @@
             try {
                 const params = new URLSearchParams();
                 if (dataType) params.append('dataType', dataType);
+                if (startDate) params.append('startDate', startDate);
+                if (endDate) params.append('endDate', endDate);
 
                 const url = `${API_BASE_URL}/training-data/statistics?${params.toString()}`;
                 const response = await makeRequest(url, { method: 'GET' });
@@ -1058,7 +1110,7 @@
         // 10. 数据更新测试
         async function testUpdate() {
             const datasetId = document.getElementById('update_datasetId').value;
-            const description = document.getElementById('update_description').value;
+            const datasetDescription = document.getElementById('update_datasetDescription').value;
             const tags = document.getElementById('update_tags').value;
             const metadata = document.getElementById('update_metadata').value;
 
@@ -1073,8 +1125,8 @@
 
             try {
                 const requestData = {};
-                
-                if (description) requestData.description = description;
+
+                if (datasetDescription) requestData.datasetDescription = datasetDescription;
                 if (tags) requestData.tags = JSON.parse(tags);
                 if (metadata) requestData.metadata = JSON.parse(metadata);
 

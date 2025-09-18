@@ -49,7 +49,11 @@ public class FederatedTask {
     private Double epsilon;
     private Double delta;
     private Boolean secureAggregation;
-    
+
+    // v1.3 新增字段
+    private String datasetId;
+    private String distributionStrategy;
+
     // 系统字段
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

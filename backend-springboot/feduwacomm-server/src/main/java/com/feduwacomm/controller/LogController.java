@@ -48,6 +48,7 @@ public class LogController {
         RealtimeLogVO realtimeLog = RealtimeLogVO.builder()
                 .logs(logs)
                 .totalCount(logs.size())
+                .lastUpdateTime(LocalDateTime.now())
                 .build();
         return Result.success(realtimeLog);
     }
@@ -62,19 +63,65 @@ public class LogController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime) {
+        try {
+            // 参数验证和转换
+            LogLevel logLevel = null;
+            if (level != null && !level.trim().isEmpty()) {
+                try {
+                    logLevel = LogLevel.valueOf(level.trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    return Result.error("无效的日志级别: " + level + "，支持的级别: DEBUG, INFO, WARN, ERROR");
+                }
+            }
 
-        LogQueryDTO queryDTO = LogQueryDTO.builder()
-                .level(level != null ? LogLevel.valueOf(level) : null)
-                .category(category != null ? LogCategory.valueOf(category) : null)
-                .vmId(vmId)
-                .taskId(taskId)
-                .keyword(keyword)
-                .startTime(startTime != null ? LocalDateTime.parse(startTime) : null)
-                .endTime(endTime != null ? LocalDateTime.parse(endTime) : null)
-                .build();
+            LogCategory logCategory = null;
+            if (category != null && !category.trim().isEmpty()) {
+                try {
+                    logCategory = LogCategory.valueOf(category.trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    return Result.error("无效的日志类别: " + category + "，支持的类别: SYSTEM, USER, VM, TASK, DATA, MODEL, SECURITY, PERFORMANCE");
+                }
+            }
 
-        LogStatisticsVO statistics = logService.getStatistics(queryDTO);
-        return Result.success(statistics);
+            LocalDateTime startDateTime = null;
+            if (startTime != null && !startTime.trim().isEmpty()) {
+                try {
+                    startDateTime = LocalDateTime.parse(startTime.trim());
+                } catch (Exception e) {
+                    return Result.error("无效的开始时间格式: " + startTime + "，请使用ISO格式如: 2024-01-01T00:00:00");
+                }
+            }
+
+            LocalDateTime endDateTime = null;
+            if (endTime != null && !endTime.trim().isEmpty()) {
+                try {
+                    endDateTime = LocalDateTime.parse(endTime.trim());
+                } catch (Exception e) {
+                    return Result.error("无效的结束时间格式: " + endTime + "，请使用ISO格式如: 2024-01-01T23:59:59");
+                }
+            }
+
+            // 时间范围验证
+            if (startDateTime != null && endDateTime != null && startDateTime.isAfter(endDateTime)) {
+                return Result.error("开始时间不能晚于结束时间");
+            }
+
+            LogQueryDTO queryDTO = LogQueryDTO.builder()
+                    .level(logLevel)
+                    .category(logCategory)
+                    .vmId(vmId != null ? vmId.trim() : null)
+                    .taskId(taskId != null ? taskId.trim() : null)
+                    .keyword(keyword != null ? keyword.trim() : null)
+                    .startTime(startDateTime)
+                    .endTime(endDateTime)
+                    .build();
+
+            LogStatisticsVO statistics = logService.getStatistics(queryDTO);
+            return Result.success(statistics);
+
+        } catch (Exception e) {
+            return Result.error("获取统计数据失败: " + e.getMessage());
+        }
     }
 
 
@@ -196,36 +243,46 @@ public class LogController {
     public static class RealtimeLogVO {
         private List<LogListVO> logs;
         private Integer totalCount;
-        
+        private LocalDateTime lastUpdateTime;
+
         public static RealtimeLogVOBuilder builder() {
             return new RealtimeLogVOBuilder();
         }
-        
+
         public static class RealtimeLogVOBuilder {
             private List<LogListVO> logs;
             private Integer totalCount;
-            
+            private LocalDateTime lastUpdateTime;
+
             public RealtimeLogVOBuilder logs(List<LogListVO> logs) {
                 this.logs = logs;
                 return this;
             }
-            
+
             public RealtimeLogVOBuilder totalCount(Integer totalCount) {
                 this.totalCount = totalCount;
                 return this;
             }
-            
+
+            public RealtimeLogVOBuilder lastUpdateTime(LocalDateTime lastUpdateTime) {
+                this.lastUpdateTime = lastUpdateTime;
+                return this;
+            }
+
             public RealtimeLogVO build() {
                 RealtimeLogVO vo = new RealtimeLogVO();
                 vo.logs = this.logs;
                 vo.totalCount = this.totalCount;
+                vo.lastUpdateTime = this.lastUpdateTime;
                 return vo;
             }
         }
-        
+
         public List<LogListVO> getLogs() { return logs; }
         public void setLogs(List<LogListVO> logs) { this.logs = logs; }
         public Integer getTotalCount() { return totalCount; }
         public void setTotalCount(Integer totalCount) { this.totalCount = totalCount; }
+        public LocalDateTime getLastUpdateTime() { return lastUpdateTime; }
+        public void setLastUpdateTime(LocalDateTime lastUpdateTime) { this.lastUpdateTime = lastUpdateTime; }
     }
 }

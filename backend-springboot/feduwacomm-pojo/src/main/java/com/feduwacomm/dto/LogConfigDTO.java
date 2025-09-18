@@ -25,8 +25,8 @@ public class LogConfigDTO {
     private Long maxFileSize;
     
     private Map<LogCategory, CategoryConfig> categories;
-    
-    private ExportSettings exportSettings;
+
+    private DownloadSettings downloadSettings;
 
     @Data
     @Builder
@@ -41,10 +41,10 @@ public class LogConfigDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ExportSettings {
-        @Min(value = 1, message = "导出记录数必须大于0")
-        private Integer maxRecordsPerExport;
-        
+    public static class DownloadSettings {
+        @Min(value = 1, message = "下载记录数必须大于0")
+        private Integer maxRecordsPerDownload;
+
         @Min(value = 1, message = "保留天数必须大于0")
         private Integer exportRetentionDays;
     }
