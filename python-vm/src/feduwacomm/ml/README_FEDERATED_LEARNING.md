@@ -26,11 +26,12 @@
 ### 基础用法
 
 ```python
-from feduwacomm.ml.federated_client import (
+from feduwacomm.ml import (
     FederatedLearningClient, 
     FederatedLearningCoordinator,
     FederatedConfig, 
-    FederatedAlgorithm
+    FederatedAlgorithm,
+    VMClient
 )
 
 # 1. 创建联邦学习配置
