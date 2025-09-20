@@ -1,12 +1,12 @@
 /**
- * 管理员页面样式
+ * 系统管理页面样式
  */
 
-.fed-admin-page {
+.fed-system-management-page {
   background: transparent;
 }
 
-.fed-admin-header {
+.fed-system-management-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -14,24 +14,24 @@
   padding: 0 4px;
 }
 
-.fed-admin-title {
+.fed-system-management-title {
   flex: 1;
 }
 
-.fed-admin-title .ant-typography {
+.fed-system-management-title .ant-typography {
   margin-bottom: 0;
 }
 
-.fed-admin-title .ant-typography + .ant-typography {
+.fed-system-management-title .ant-typography + .ant-typography {
   margin-top: 4px;
 }
 
-.fed-admin-actions {
+.fed-system-management-actions {
   flex-shrink: 0;
   margin-left: 24px;
 }
 
-.fed-admin-stats {
+.fed-system-management-stats {
   margin-bottom: 24px;
 }
 
@@ -51,38 +51,38 @@
   margin-bottom: 8px;
 }
 
-.fed-admin-content {
+.fed-system-management-content {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.fed-admin-content .ant-tabs-nav {
+.fed-system-management-content .ant-tabs-nav {
   margin-bottom: 0;
   padding: 0 24px;
   background: #fafafa;
   border-radius: 8px 8px 0 0;
 }
 
-.fed-admin-content .ant-tabs-content-holder {
+.fed-system-management-content .ant-tabs-content-holder {
   padding: 24px;
 }
 
 /* 响应式样式 */
 @media (max-width: 768px) {
-  .fed-admin-header {
+  .fed-system-management-header {
     flex-direction: column;
     align-items: stretch;
     gap: 16px;
   }
   
-  .fed-admin-actions {
+  .fed-system-management-actions {
     margin-left: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
   
-  .fed-admin-content .ant-tabs-content-holder {
+  .fed-system-management-content .ant-tabs-content-holder {
     padding: 16px;
   }
 }

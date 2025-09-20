@@ -7,7 +7,7 @@ import { MainLayout } from '@/layouts'
 import {
   LoginPage,
   DashboardPage,
-  AdminPage,
+  SystemManagementPage,
   FederatedLearningPage,
   ModelManagementPage,
   SystemLogsPage,
@@ -132,7 +132,7 @@ const App: React.FC = () => {
                     <Routes>
                       {/* 主页面路由 */}
                       <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/admin" element={<SystemManagementPage />} />
                       <Route path="/federated-learning" element={<FederatedLearningPage />} />
                       <Route path="/models" element={<ModelManagementPage />} />
                       <Route path="/logs" element={<SystemLogsPage />} />

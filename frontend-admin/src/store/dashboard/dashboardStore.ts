@@ -66,6 +66,14 @@ interface DashboardOverview {
     modelsToday: number
   }
   
+  // 参与者统计
+  participantStats: {
+    totalParticipants: number
+    onlineParticipants: number
+    activeParticipants: number
+    newParticipantsToday: number
+  }
+  
   // 系统统计
   systemStats: {
     systemUptime: number
@@ -298,6 +306,12 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           trainingModels: 0,
           averageAccuracy: 0,
           modelsToday: 0
+        },
+        participantStats: {
+          totalParticipants: 0, // 需要参与者API支持
+          onlineParticipants: 0,
+          activeParticipants: 0,
+          newParticipantsToday: 0
         },
         systemStats: {
           systemUptime: 0, // 需要系统监控API支持
