@@ -226,3 +226,4 @@ config/production_*.py
 frontend-admin/node_modules/
 
 /uploads
+/python-vm/results/
