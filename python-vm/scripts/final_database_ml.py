@@ -40,7 +40,7 @@ sys.path.insert(0, str(project_root / 'src'))
 
 # 导入自定义模块
 from feduwacomm.ml.feature_extractor import BellhopFeatureExtractor     # 特征提取器
-from feduwacomm.database.database_v2 import DatabaseManagerV2           # 数据库管理器
+from feduwacomm.database.database import DatabaseManager           # 数据库管理器
 from feduwacomm.ml.random_forest_trainer import RandomForestTrainer     # 随机森林训练器
 from feduwacomm.ml.model_evaluator import ModelEvaluator               # 模型评估器
 
@@ -73,7 +73,7 @@ class FinalDatabaseMLWorkflow:
         """
         self.project_root = project_root
         self.bellhop_dir = project_root / "data" / "bellhop"  # BELLHOP数据目录
-        self.db = DatabaseManagerV2()                         # 数据库管理器
+        self.db = DatabaseManager()                         # 数据库管理器
         self.extractor = BellhopFeatureExtractor()            # 特征提取器
         self.trainer = RandomForestTrainer()                  # 随机森林训练器
         self.evaluator = ModelEvaluator()                     # 模型评估器

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,8 +32,8 @@ public class TaskCreateDTO {
     @NotBlank(message = "算法类型不能为空")
     private String algorithm; // FEDERATED_AVERAGING, FEDPROX, FEDNOVA, SCAFFOLD
 
-    @Valid
-    @NotEmpty(message = "参与者列表不能为空")
+    // v1.0 废弃：使用新的participantConfig替代
+    @Deprecated
     private List<ParticipantDTO> participants;
 
     @Valid
@@ -46,6 +47,16 @@ public class TaskCreateDTO {
 
     @Valid
     private SecurityConfigDTO securityConfig;
+
+    // v1.3 必需：智能数据集配置
+    @Valid
+    @NotNull(message = "数据集配置不能为空")
+    private DatasetConfigDTO datasetConfig;
+
+    // v1.3 必需：智能参与者配置
+    @Valid
+    @NotNull(message = "参与者配置不能为空")
+    private ParticipantConfigDTO participantConfig;
 
     @Data
     @Builder
@@ -149,5 +160,99 @@ public class TaskCreateDTO {
         @DecimalMin(value = "0.00001", message = "delta不能小于0.00001")
         @DecimalMax(value = "0.1", message = "delta不能大于0.1")
         private Double delta = 0.0001;
+    }
+
+    // v1.3 新增：数据集配置DTO
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DatasetConfigDTO {
+        @NotBlank(message = "数据集ID不能为空")
+        private String datasetId;
+
+        @NotBlank(message = "分配策略不能为空")
+        private String distributionStrategy; // BALANCED, WEIGHTED, CUSTOM
+
+        @Valid
+        private java.util.Map<String, Double> distributionRatios; // vmId -> ratio
+
+        @DecimalMin(value = "0.0", message = "验证集比例不能小于0.0")
+        @DecimalMax(value = "0.5", message = "验证集比例不能大于0.5")
+        private Double validationSplit = 0.2;
+
+        @DecimalMin(value = "0.0", message = "测试集比例不能小于0.0")
+        @DecimalMax(value = "0.3", message = "测试集比例不能大于0.3")
+        private Double testSplit = 0.1;
+    }
+
+    // v1.3 新增：参与者配置DTO
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ParticipantConfigDTO {
+        @NotBlank(message = "选择模式不能为空")
+        private String selectionMode; // MANUAL, AUTO, HYBRID
+
+        @Valid
+        private RequirementsDTO requirements;
+
+        @Valid
+        @NotEmpty(message = "参与者列表不能为空")
+        private List<SmartParticipantDTO> participants;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class RequirementsDTO {
+            @Min(value = 1, message = "最少参与者数量不能小于1")
+            private Integer minParticipants = 2;
+
+            @Max(value = 50, message = "最多参与者数量不能大于50")
+            private Integer maxParticipants = 10;
+
+            @Min(value = 1, message = "最小CPU核心数不能小于1")
+            private Integer minCpuCores = 2;
+
+            @Min(value = 1024, message = "最小内存不能小于1024MB")
+            private Integer minMemoryMb = 4096;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class SmartParticipantDTO {
+            @NotBlank(message = "虚拟机ID不能为空")
+            private String vmId;
+
+            @NotBlank(message = "参与者角色不能为空")
+            private String role; // PARTICIPANT, AGGREGATOR
+
+            @DecimalMin(value = "0.0", message = "数据比例不能小于0.0")
+            @DecimalMax(value = "1.0", message = "数据比例不能大于1.0")
+            private Double dataRatio;
+
+            private List<String> capabilities; // GPU, HIGH_MEMORY, FAST_NETWORK
+
+            @Valid
+            private ConstraintsDTO constraints;
+
+            @Data
+            @Builder
+            @NoArgsConstructor
+            @AllArgsConstructor
+            public static class ConstraintsDTO {
+                @Min(value = 1, message = "最大CPU使用率不能小于1%")
+                @Max(value = 100, message = "最大CPU使用率不能大于100%")
+                private Integer maxCpuUsage = 80;
+
+                @Min(value = 1, message = "最大内存使用率不能小于1%")
+                @Max(value = 100, message = "最大内存使用率不能大于100%")
+                private Integer maxMemoryUsage = 75;
+            }
+        }
     }
 }

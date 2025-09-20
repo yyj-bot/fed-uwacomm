@@ -6,7 +6,7 @@
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/federated`
-- **API版本**: v1.0
+- **API版本**: v1.3
 - **认证方式**: JWT Token
 - **数据格式**: JSON
 
@@ -43,7 +43,141 @@
 
 ## 3. API接口定义
 
-### 3.1 任务创建接口
+### ⚠️ 版本兼容性说明
+
+**v1.3 版本更新内容**:
+- 新增图形化任务创建支持的配置接口组
+- 增强任务创建接口，支持智能数据集和参与者配置
+- 废弃简化的参与者配置格式，推荐使用新的 `datasetConfig` 和 `participantConfig`
+- 新增实时预览、验证和监控功能
+
+**向后兼容性**:
+- v1.3 版本仍支持 v1.0 的 `participants` 数组格式，但会显示废弃警告
+- v2.0 版本将完全移除对旧格式的支持
+- 详细的迁移指南请参考：[废弃接口文档](../removed/removed-interfaces-v1.3.md)
+- 新增接口详情请参考：[修改接口文档](../modified/modified-interfaces-v1.3.md)
+
+---
+
+### 🆕 3.0 图形化配置接口组 (v1.3 新增)
+
+#### 3.0.1 获取可用虚拟机列表
+**接口地址**: `GET /api/federated/config/available-vms`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**查询参数**:
+- `algorithm`: 算法类型过滤 (可选)
+- `minCpuCores`: 最小CPU核心数 (可选)
+- `minMemoryMb`: 最小内存(MB) (可选)
+- `status`: 虚拟机状态过滤 (可选)
+- `capabilities`: 能力要求 (可选)
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "total": 5,
+    "availableVms": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "name": "水声联邦学习节点-001",
+        "ipAddress": "192.168.1.100",
+        "status": "RUNNING",
+        "resources": {
+          "cpuCores": 8,
+          "memoryMb": 16384,
+          "gpuCount": 1
+        },
+        "capabilities": ["GPU", "HIGH_MEMORY"]
+      }
+    ]
+  }
+}
+```
+
+#### 3.0.2 获取可用数据集列表
+**接口地址**: `GET /api/federated/config/available-datasets`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "total": 15,
+    "availableDatasets": [
+      {
+        "datasetId": "e5f67890123456789012345678901234",
+        "name": "水声传播特征数据集_v1.0",
+        "status": "READY",
+        "statistics": {
+          "totalRows": 10000,
+          "totalColumns": 128,
+          "fileSizeFormatted": "43.5MB"
+        }
+      }
+    ]
+  }
+}
+```
+
+#### 3.0.3 数据分配预览
+**接口地址**: `POST /api/federated/tasks/preview-distribution`
+
+**请求参数**:
+```json
+{
+  "datasetId": "e5f67890123456789012345678901234",
+  "distributionStrategy": "BALANCED",
+  "participants": [
+    {
+      "vmId": "a1b2c3d4e5f678901234567890123456",
+      "requestedRatio": 0.6
+    }
+  ]
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "预览生成成功",
+  "data": {
+    "distributionResult": {
+      "participants": [
+        {
+          "vmId": "a1b2c3d4e5f678901234567890123456",
+          "allocatedRatio": 0.65,
+          "allocatedRows": 5200,
+          "estimatedTrainingTime": 450
+        }
+      ]
+    },
+    "qualityMetrics": {
+      "iidScore": 0.85,
+      "balanceScore": 0.92
+    }
+  }
+}
+```
+
+---
+
+### 3.1 任务创建接口 (v1.3 增强)
+
+> ⚠️ **兼容性注意**: v1.3 版本同时支持新旧两种参数格式，旧格式会显示废弃警告
 
 **接口地址**: `POST /api/federated/tasks`
 
@@ -53,25 +187,56 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**请求参数**:
+**请求参数** (v1.3 推荐格式):
 ```json
 {
   "taskName": "水声传播特征分类任务",
   "taskType": "CLASSIFICATION",
   "description": "基于声学传播特征的水声目标分类",
   "algorithm": "FEDERATED_AVERAGING",
-  "participants": [
-    {
-      "vmId": "a1b2c3d4e5f678901234567890123456",
-      "role": "PARTICIPANT",
-      "dataSource": "bellhop_features_001.csv"
+
+  // 🆕 v1.3: 智能数据集配置
+  "datasetConfig": {
+    "datasetId": "e5f67890123456789012345678901234",
+    "distributionStrategy": "BALANCED",
+    "distributionRatios": {
+      "a1b2c3d4e5f678901234567890123456": 0.6,
+      "b2c3d4e5f67890123456789012345678": 0.4
     },
-    {
-      "vmId": "b2c3d4e5f67890123456789012345678", 
-      "role": "PARTICIPANT",
-      "dataSource": "bellhop_features_002.csv"
-    }
-  ],
+    "validationSplit": 0.2,
+    "testSplit": 0.1
+  },
+
+  // 🆕 v1.3: 智能参与者配置
+  "participantConfig": {
+    "selectionMode": "MANUAL",
+    "requirements": {
+      "minParticipants": 2,
+      "maxParticipants": 10,
+      "minCpuCores": 4,
+      "minMemoryMb": 8192
+    },
+    "participants": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "role": "PARTICIPANT",
+        "dataRatio": 0.6,
+        "capabilities": ["GPU"],
+        "constraints": {
+          "maxCpuUsage": 80,
+          "maxMemoryUsage": 75
+        }
+      },
+      {
+        "vmId": "b2c3d4e5f67890123456789012345678",
+        "role": "PARTICIPANT",
+        "dataRatio": 0.4,
+        "capabilities": ["TRAINING"]
+      }
+    ]
+  },
+
+  // 原有字段保持兼容
   "hyperparameters": {
     "learningRate": 0.01,
     "batchSize": 32,
@@ -94,7 +259,25 @@ Content-Type: application/json
 }
 ```
 
-**响应示例**:
+**⚠️ 旧格式 (v1.0 兼容，已废弃)**:
+```json
+{
+  "taskName": "水声传播特征分类任务",
+  "taskType": "CLASSIFICATION",
+  "algorithm": "FEDERATED_AVERAGING",
+  // ⚠️ 废弃: 简化的参与者配置
+  "participants": [
+    {
+      "vmId": "a1b2c3d4e5f678901234567890123456",
+      "role": "PARTICIPANT",
+      "dataSource": "bellhop_features_001.csv"  // ⚠️ 已废弃字段
+    }
+  ],
+  "hyperparameters": { /* ... */ }
+}
+```
+
+**响应示例** (v1.3 增强版):
 ```json
 {
   "code": 200,
@@ -106,8 +289,46 @@ Content-Type: application/json
     "createdAt": "2024-01-01T09:00:00.000Z",
     "createdBy": "d4e5f678901234567890123456789012",
     "participantCount": 2,
-    "estimatedDuration": 3600
-  }
+    "estimatedDuration": 46500,
+
+    // 🆕 v1.3: 配置摘要
+    "configSummary": {
+      "dataset": {
+        "datasetId": "e5f67890123456789012345678901234",
+        "totalRows": 10000,
+        "distributionStrategy": "BALANCED"
+      },
+      "participants": [
+        {
+          "vmId": "a1b2c3d4e5f678901234567890123456",
+          "vmName": "水声联邦学习节点-001",
+          "role": "PARTICIPANT",
+          "dataRatio": 0.6,
+          "status": "PENDING"
+        }
+      ]
+    },
+
+    // 🆕 v1.3: 预计性能指标
+    "performanceEstimation": {
+      "expectedAccuracy": 0.85,
+      "convergenceRounds": 8,
+      "networkTraffic": "2.3GB"
+    }
+  },
+
+  // ⚠️ 废弃警告 (使用旧格式时出现)
+  "warnings": [
+    {
+      "code": "SIMPLE_PARTICIPANT_CONFIG_DEPRECATED",
+      "message": "简化的参与者配置格式已废弃，建议使用新的participantConfig结构",
+      "details": {
+        "deprecationVersion": "v1.3",
+        "removalVersion": "v2.0",
+        "migrationGuide": "/docs/api/migration-guide-v1.3.md"
+      }
+    }
+  ]
 }
 ```
 
@@ -522,7 +743,86 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.11 任务日志查询接口
+### 3.11 配置状态监控接口 (v1.3 新增)
+
+**接口地址**: `GET /api/federated/tasks/{taskId}/config-status`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "taskId": "c3d4e5f6789012345678901234567890",
+    "configStatus": "READY",
+    "configurationSteps": [
+      {
+        "step": "DATASET_DISTRIBUTION",
+        "status": "COMPLETED",
+        "completedAt": "2024-01-01T09:15:00.000Z"
+      },
+      {
+        "step": "PARTICIPANT_VALIDATION",
+        "status": "COMPLETED",
+        "completedAt": "2024-01-01T09:25:00.000Z"
+      }
+    ],
+    "participantStatuses": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "configStatus": "READY",
+        "dataDistributed": true,
+        "modelInitialized": true
+      }
+    ]
+  }
+}
+```
+
+### 3.12 资源使用监控接口 (v1.3 新增)
+
+**接口地址**: `GET /api/federated/tasks/{taskId}/resource-usage`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "taskId": "c3d4e5f6789012345678901234567890",
+    "participantMetrics": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "currentUsage": {
+          "cpu": 75.5,
+          "memory": 68.2,
+          "network": {
+            "inbound": 15.6,
+            "outbound": 12.3
+          }
+        }
+      }
+    ],
+    "aggregatedMetrics": {
+      "totalCpuUsage": 73.8,
+      "totalMemoryUsage": 66.8,
+      "taskProgress": 55.6
+    }
+  }
+}
+```
+
+### 3.13 任务日志查询接口
 
 **接口地址**: `GET /api/federated/tasks/{taskId}/logs`
 
@@ -571,7 +871,7 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.12 任务删除接口
+### 3.14 任务删除接口
 
 **接口地址**: `DELETE /api/federated/tasks/{taskId}`
 
@@ -626,6 +926,8 @@ Authorization: Bearer {token}
 | PARTICIPANT_TIMEOUT | 408 | 参与者响应超时 |
 | PARTICIPANT_ERROR | 500 | 参与者执行错误 |
 | INSUFFICIENT_PARTICIPANTS | 400 | 参与者数量不足 |
+| DATASET_CONFIG_ERROR | 400 | 数据集配置错误 (v1.3新增) |
+| SIMPLE_PARTICIPANT_CONFIG_DEPRECATED | 200 | 简化参与者配置已废弃警告 (v1.3新增) |
 
 ### 4.3 模型相关错误码
 | 错误码 | HTTP状态码 | 说明 |
@@ -691,10 +993,33 @@ Authorization: Bearer {token}
 - 配置信息缓存1小时
 - 结果数据缓存24小时
 
-## 7. 相关文档
+## 7. 版本更新历史
 
+### v1.3 (2024年)
+- ✅ 新增图形化任务创建支持的9个配置接口
+- ✅ 增强任务创建接口，支持智能数据集和参与者配置
+- ⚠️ 废弃简化的参与者配置格式，推荐使用新的结构化配置
+- ✅ 新增实时预览、验证和监控功能
+- ✅ 增强响应数据，包含配置摘要和性能预估
+
+### v1.0 (原始版本)
+- 基础的联邦学习任务CRUD操作
+- 简化的参与者配置格式
+- 基本的任务控制和状态查询功能
+
+## 8. 相关文档
+
+**API 文档**:
 - [HTTP接口导览.md](../HTTP接口导览.md) - 系统整体API接口
+- [修改接口文档 v1.3](../modified/modified-interfaces-v1.3.md) - v1.3新增和修改的接口详情
+- [废弃接口文档 v1.3](../removed/removed-interfaces-v1.3.md) - v1.3废弃接口和迁移指南
 - [用户管理API参考文档](../user/user-api-reference.md) - 用户管理相关接口
 - [虚拟机API参考文档](../vm/vm-api-reference.md) - 虚拟机管理相关接口
+
+**技术文档**:
 - [数据库表结构文档](../../database/database_schema.md) - 联邦学习任务相关数据库设计
-- [WebSocket协议文档](../WebSocket/) - 实时通信协议 
+- [WebSocket协议文档](../WebSocket/) - 实时通信协议
+
+**迁移指南**:
+- 从 v1.0 到 v1.3 的详细迁移步骤，请参考废弃接口文档
+- 图形化前端集成示例，请参考修改接口文档 

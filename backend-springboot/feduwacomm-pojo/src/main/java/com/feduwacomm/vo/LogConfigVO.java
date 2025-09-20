@@ -21,7 +21,7 @@ public class LogConfigVO {
     private Integer retentionDays;
     private Long maxFileSize;
     private Map<String, CategoryConfig> categories;
-    private ExportSettings exportSettings;
+    private DownloadSettings downloadSettings;
     private LocalDateTime updatedAt;
 
     @Data
@@ -37,8 +37,8 @@ public class LogConfigVO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ExportSettings {
-        private Integer maxRecordsPerExport;
+    public static class DownloadSettings {
+        private Integer maxRecordsPerDownload;
         private Integer exportRetentionDays;
         private List<String> supportedFormats;
     }

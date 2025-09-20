@@ -1,6 +1,7 @@
 package com.feduwacomm.event;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.springframework.context.ApplicationEvent;
 
 import java.math.BigDecimal;
@@ -15,6 +16,7 @@ import java.util.Map;
  * @version 1.0.0
  */
 @Data
+@EqualsAndHashCode(callSuper=false)
 public class RoundCompleteEvent extends ApplicationEvent {
 
     private final String taskId;

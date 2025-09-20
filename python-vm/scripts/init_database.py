@@ -10,7 +10,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / 'src'))
 
-from feduwacomm.database.database_v2 import DatabaseManagerV2
+from feduwacomm.database.database import DatabaseManager
 
 
 def initialize_database():
@@ -28,7 +28,7 @@ def initialize_database():
     print(f"✅ 找到CSV文件: {csv_file}")
     
     # 初始化数据库管理器
-    db = DatabaseManagerV2()
+    db = DatabaseManager()
     
     try:
         # 连接数据库
