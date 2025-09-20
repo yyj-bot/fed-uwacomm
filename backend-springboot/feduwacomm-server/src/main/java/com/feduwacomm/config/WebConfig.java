@@ -50,7 +50,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 注册用户JWT认证拦截器
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**") // 用户相关接口、VM管理接口和训练数据管理接口需要用户JWT认证
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/federated/**", "/api/model/**", "/api/workflow/**") // 用户相关接口、VM管理接口、训练数据管理接口、联邦学习接口、模型管理接口和工作流接口需要用户JWT认证
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
@@ -61,9 +61,10 @@ public class WebConfig implements WebMvcConfigurer {
                 );
 
         // 注册VM JWT认证拦截器（在测试环境中可配置为禁用）
+        // 注意：目前没有专门的VM接口，如需要可以在此处添加
         if (vmJwtInterceptorEnabled) {
             registry.addInterceptor(vmJwtAuthenticationInterceptor)
-                    .addPathPatterns("/api/federated/**", "/api/model-version/**") // VM自身执行的接口需要VM JWT认证
+                    .addPathPatterns("/api/vm-internal/**") // VM内部通信接口需要VM JWT认证（目前暂无此类接口）
                     .excludePathPatterns(
                             "/api/health", // 健康检查
                             "/api/websocket/**", // WebSocket接口
@@ -75,7 +76,7 @@ public class WebConfig implements WebMvcConfigurer {
 
         // 注册权限拦截器
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**") // 对用户相关接口、日志接口、VM管理接口和训练数据管理接口进行权限检查
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/federated/**", "/api/model/**", "/api/workflow/**") // 对用户相关接口、日志接口、VM管理接口、训练数据管理接口、联邦学习接口、模型管理接口和工作流接口进行权限检查
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
