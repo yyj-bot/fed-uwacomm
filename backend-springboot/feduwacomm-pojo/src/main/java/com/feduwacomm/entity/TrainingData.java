@@ -1,5 +1,7 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.DataType;
+import com.feduwacomm.enums.DataStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,13 +22,15 @@ public class TrainingData {
 
     private String id;
 
+    private String vmId;
+
     private String name;
 
     private String description;
 
-    private String dataType;
+    private DataType dataType;
 
-    private String status;
+    private DataStatus status;
 
     private String filePath;
 

@@ -960,7 +960,7 @@
 
     <script>
         let jwtToken = '';
-        const BASE_URL = 'http://localhost:8080';
+        const BASE_URL = `${window.location.protocol}//${window.location.host}`;
         let availableVms = [];
         let availableDatasets = [];
         let selectedVms = [];

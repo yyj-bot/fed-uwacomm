@@ -7,7 +7,11 @@ import com.feduwacomm.entity.ModelVersion;
 import com.feduwacomm.mapper.ModelVersionMapper;
 import com.feduwacomm.service.ModelVersionService;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.vo.*;
+import com.feduwacomm.constants.SystemConstants;
+import com.feduwacomm.config.NetworkProperties;
+import com.feduwacomm.config.FileUploadProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
@@ -43,6 +47,12 @@ public class ModelVersionServiceImpl implements ModelVersionService {
 
     @Autowired
     private ModelVersionMapper modelVersionMapper;
+
+    @Autowired
+    private NetworkProperties networkProperties;
+
+    @Autowired
+    private FileUploadProperties fileUploadProperties;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -411,7 +421,7 @@ public class ModelVersionServiceImpl implements ModelVersionService {
             .targetVms(deployDTO.getTargetVms())
             .status("DEPLOYED")
             .deploymentConfig(deployDTO.getDeploymentConfig())
-            .endpoints(Arrays.asList("http://vm_1:8080/predict", "http://vm_2:8080/predict"))
+            .endpoints(generateDeploymentEndpoints(deployDTO.getTargetVms()))
             .createdAt(LocalDateTime.now())
             .build();
     }
@@ -728,10 +738,9 @@ public class ModelVersionServiceImpl implements ModelVersionService {
             throw new BusinessException("不支持的模型文件格式: " + extension);
         }
         
-        // 检查文件大小（最大100MB）
-        long maxSize = 100 * 1024 * 1024;
-        if (file.getSize() > maxSize) {
-            throw new BusinessException("模型文件过大，最大支持100MB");
+        // 检查文件大小
+        if (!fileUploadProperties.isFileSizeValid(file.getSize(), FileUploadProperties.FileType.MODEL)) {
+            throw new BusinessException(fileUploadProperties.getFileSizeLimitErrorMessage(FileUploadProperties.FileType.MODEL));
         }
     }
     
@@ -766,8 +775,8 @@ public class ModelVersionServiceImpl implements ModelVersionService {
                 totalBytes += bytesRead;
                 
                 // 可选：添加进度监控或大文件检查
-                if (totalBytes > 100 * 1024 * 1024) { // 100MB 限制检查
-                    throw new IOException("文件过大，超过100MB限制");
+                if (totalBytes > fileUploadProperties.getUpload().getMaxModelFileSize().toBytes()) {
+                    throw new IOException(fileUploadProperties.getFileSizeLimitErrorMessage(FileUploadProperties.FileType.MODEL));
                 }
             }
             
@@ -830,8 +839,8 @@ public class ModelVersionServiceImpl implements ModelVersionService {
                 totalBytes += bytesRead;
                 
                 // 防止单个文件过大占用过多内存
-                if (totalBytes > 200 * 1024 * 1024) { // 200MB限制
-                    throw new IOException("文件过大，超过200MB下载限制");
+                if (totalBytes > fileUploadProperties.getUpload().getMaxTrainingDataFileSize().toBytes()) {
+                    throw new IOException(fileUploadProperties.getFileSizeLimitErrorMessage(FileUploadProperties.FileType.TRAINING_DATA));
                 }
             }
             
@@ -860,8 +869,8 @@ public class ModelVersionServiceImpl implements ModelVersionService {
                 totalBytes += bytesRead;
                 
                 // 防止压缩过程中内存溢出
-                if (totalBytes > 200 * 1024 * 1024) { // 200MB限制
-                    throw new IOException("文件过大，超过200MB压缩限制");
+                if (totalBytes > fileUploadProperties.getUpload().getMaxTrainingDataFileSize().toBytes()) {
+                    throw new IOException("文件过大，超过" + fileUploadProperties.getUpload().getMaxTrainingDataFileSizeMB() + "MB压缩限制");
                 }
             }
             
@@ -887,5 +896,42 @@ public class ModelVersionServiceImpl implements ModelVersionService {
             
             return baos.toByteArray();
         }
+    }
+
+    /**
+     * 生成部署端点列表
+     * 根据目标虚拟机列表生成预测接口端点
+     *
+     * @param targetVms 目标虚拟机列表
+     * @return 端点列表
+     */
+    private List<String> generateDeploymentEndpoints(List<String> targetVms) {
+        if (targetVms == null || targetVms.isEmpty()) {
+            // 如果没有指定目标VM，返回当前服务器的端点
+            String currentHost = IpUtil.getCurrentHostOrDefault();
+            return Arrays.asList(buildPredictEndpoint(currentHost));
+        }
+
+        return targetVms.stream()
+                .map(vmId -> {
+                    // 这里应该从数据库查询VM的真实IP地址
+                    // 目前先使用VM ID作为主机名，实际部署时需要查询VM实例表
+                    String host = vmId.contains("vm_") ? vmId : "vm_" + vmId;
+                    return buildPredictEndpoint(host);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 构建预测端点URL
+     *
+     * @param host 主机地址
+     * @return 预测端点URL
+     */
+    private String buildPredictEndpoint(String host) {
+        return String.format("%s%s:%s/predict",
+            networkProperties.getServer().getProtocol(),
+            host,
+            networkProperties.getServer().getPort());
     }
 }

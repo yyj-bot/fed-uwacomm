@@ -1,5 +1,7 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.ParticipantRole;
+import com.feduwacomm.enums.ParticipantStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,8 +21,8 @@ public class TaskParticipant {
     private String id;
     private String taskId;
     private String vmId;
-    private String role; // PARTICIPANT, AGGREGATOR
-    private String status; // CONNECTED, DISCONNECTED, TRAINING, COMPLETED, FAILED
+    private ParticipantRole role; // PARTICIPANT
+    private ParticipantStatus status; // CONNECTED, DISCONNECTED, TRAINING, COMPLETED, FAILED
     private String dataSource;
     
     // 训练状态

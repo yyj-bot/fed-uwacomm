@@ -5,6 +5,7 @@ import com.feduwacomm.exception.UserException;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.enums.*;
 import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.FederatedTaskService;
@@ -46,14 +47,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private ApplicationEventPublisher eventPublisher;
 
     // 任务状态常量
-    private static final String STATUS_CREATED = "CREATED";
-    private static final String STATUS_CONFIGURED = "CONFIGURED";
-    private static final String STATUS_RUNNING = "RUNNING";
-    private static final String STATUS_PAUSED = "PAUSED";
-    private static final String STATUS_STOPPED = "STOPPED";
-    private static final String STATUS_COMPLETED = "COMPLETED";
-    private static final String STATUS_FAILED = "FAILED";
-    private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
+    private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
+    private static final FederatedTaskStatus STATUS_RUNNING = FederatedTaskStatus.RUNNING;
+    private static final FederatedTaskStatus STATUS_PAUSED = FederatedTaskStatus.PAUSED;
+    private static final FederatedTaskStatus STATUS_STOPPED = FederatedTaskStatus.STOPPED;
+    private static final FederatedTaskStatus STATUS_COMPLETED = FederatedTaskStatus.COMPLETED;
+    private static final FederatedTaskStatus STATUS_FAILED = FederatedTaskStatus.FAILED;
+    private static final FederatedTaskStatus STATUS_CANCELLED = FederatedTaskStatus.CANCELLED;
 
     @Override
     @Transactional
@@ -95,7 +96,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
             .taskName(createDTO.getTaskName())
-            .status(STATUS_CREATED)
+            .status(STATUS_CREATED.getCode())
             .createdAt(now)
             .createdBy(createdBy)
             .participantCount(createDTO.getParticipants().size())
@@ -145,7 +146,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_CONFIGURED)
+            .status(STATUS_CONFIGURED.getCode())
             .updatedAt(LocalDateTime.now())
             .configVersion("v1.1")
             .build();
@@ -171,7 +172,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         LocalDateTime now = LocalDateTime.now();
         
         // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING, now);
+        tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING.getCode(), now);
 
         // 更新参与者状态为连接中
         List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
@@ -194,7 +195,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_RUNNING)
+            .status(STATUS_RUNNING.getCode())
             .startedAt(now)
             .currentRound(0)
             .participants(participantStatuses)
@@ -221,14 +222,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         LocalDateTime now = LocalDateTime.now();
         
         // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_PAUSED, now);
+        tasksMapper.updateTaskStatus(taskId, STATUS_PAUSED.getCode(), now);
 
         // 记录操作日志
         logTask(taskId, "INFO", "任务暂停成功", "TASK_MANAGER", null, null);
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_PAUSED)
+            .status(STATUS_PAUSED.getCode())
             .pausedAt(now)
             .currentRound(task.getCurrentRound())
             .resumePoint(TaskOperationVO.ResumePointVO.builder()
@@ -258,14 +259,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         LocalDateTime now = LocalDateTime.now();
         
         // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING, now);
+        tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING.getCode(), now);
 
         // 记录操作日志
         logTask(taskId, "INFO", "任务恢复成功", "TASK_MANAGER", null, null);
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_RUNNING)
+            .status(STATUS_RUNNING.getCode())
             .resumedAt(now)
             .currentRound(task.getCurrentRound())
             .build();
@@ -292,7 +293,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         LocalDateTime now = LocalDateTime.now();
         
         // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_STOPPED, now);
+        tasksMapper.updateTaskStatus(taskId, STATUS_STOPPED.getCode(), now);
 
         // 保存检查点（如果需要）
         String checkpointPath = null;
@@ -306,7 +307,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_STOPPED)
+            .status(STATUS_STOPPED.getCode())
             .stoppedAt(now)
             .finalRound(task.getCurrentRound())
             .checkpointSaved(stopDTO.getSaveCheckpoint())
@@ -335,7 +336,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         LocalDateTime now = LocalDateTime.now();
         
         // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_CANCELLED, now);
+        tasksMapper.updateTaskStatus(taskId, STATUS_CANCELLED.getCode(), now);
 
         // 记录操作日志
         logTask(taskId, "INFO", "任务取消成功", "TASK_MANAGER", null, 
@@ -343,7 +344,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
-            .status(STATUS_CANCELLED)
+            .status(STATUS_CANCELLED.getCode())
             .cancelledAt(now)
             .reason(cancelDTO.getReason())
             .build();
@@ -418,8 +419,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .taskName(task.getTaskName())
             .taskType(task.getTaskType())
             .description(task.getDescription())
-            .status(task.getStatus())
-            .algorithm(task.getAlgorithm())
+            .status(task.getStatus().getCode())
+            .algorithm(task.getAlgorithm().getCode())
             .createdAt(task.getCreatedAt())
             .startedAt(task.getStartedAt())
             .pausedAt(task.getPausedAt())
@@ -554,14 +555,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     public boolean isValidStatusTransition(String currentStatus, String targetStatus) {
         // 定义状态转换规则
         Map<String, Set<String>> validTransitions = Map.of(
-            STATUS_CREATED, Set.of(STATUS_CONFIGURED, STATUS_CANCELLED),
-            STATUS_CONFIGURED, Set.of(STATUS_RUNNING, STATUS_CANCELLED),
-            STATUS_RUNNING, Set.of(STATUS_PAUSED, STATUS_STOPPED, STATUS_COMPLETED, STATUS_FAILED),
-            STATUS_PAUSED, Set.of(STATUS_RUNNING, STATUS_STOPPED, STATUS_CANCELLED),
-            STATUS_STOPPED, Set.of(),
-            STATUS_COMPLETED, Set.of(),
-            STATUS_FAILED, Set.of(),
-            STATUS_CANCELLED, Set.of()
+            STATUS_CREATED.getCode(), Set.of(STATUS_CONFIGURED.getCode(), STATUS_CANCELLED.getCode()),
+            STATUS_CONFIGURED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_CANCELLED.getCode()),
+            STATUS_RUNNING.getCode(), Set.of(STATUS_PAUSED.getCode(), STATUS_STOPPED.getCode(), STATUS_COMPLETED.getCode(), STATUS_FAILED.getCode()),
+            STATUS_PAUSED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_STOPPED.getCode(), STATUS_CANCELLED.getCode()),
+            STATUS_STOPPED.getCode(), Set.of(),
+            STATUS_COMPLETED.getCode(), Set.of(),
+            STATUS_FAILED.getCode(), Set.of(),
+            STATUS_CANCELLED.getCode(), Set.of()
         );
 
         return validTransitions.getOrDefault(currentStatus, Set.of()).contains(targetStatus);
@@ -647,7 +648,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         task.setTaskName(createDTO.getTaskName());
         task.setTaskType(createDTO.getTaskType());
         task.setDescription(createDTO.getDescription());
-        task.setAlgorithm(createDTO.getAlgorithm());
+        task.setAlgorithm(FederatedAlgorithm.fromCode(createDTO.getAlgorithm()));
         task.setStatus(STATUS_CREATED);
         
         // 设置超参数
@@ -701,8 +702,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .id(UUID.randomUUID().toString().replace("-", ""))
             .taskId(taskId)
             .vmId(participantDTO.getVmId())
-            .role(participantDTO.getRole())
-            .status("PENDING")
+            .role(ParticipantRole.fromCode(participantDTO.getRole()))
+            .status(ParticipantStatus.PENDING)
             .dataSource(participantDTO.getDataSource())
             .createdAt(now)
             .updatedAt(now)
@@ -711,7 +712,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     private void updateTaskFromConfigDTO(FederatedTask task, TaskConfigDTO configDTO, String updatedBy) {
         if (configDTO.getAlgorithm() != null) {
-            task.setAlgorithm(configDTO.getAlgorithm());
+            task.setAlgorithm(FederatedAlgorithm.fromCode(configDTO.getAlgorithm()));
         }
         
         if (configDTO.getHyperparameters() != null) {
@@ -739,8 +740,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private TaskDetailVO.ParticipantVO convertToParticipantVO(TaskParticipant participant) {
         return TaskDetailVO.ParticipantVO.builder()
             .vmId(participant.getVmId())
-            .role(participant.getRole())
-            .status(participant.getStatus())
+            .role(participant.getRole().getCode())
+            .status(participant.getStatus().getCode())
             .lastHeartbeat(participant.getLastHeartbeat())
             .currentEpoch(participant.getCurrentEpoch())
             .loss(participant.getLoss())
@@ -786,8 +787,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .taskId(task.getId())
             .taskName(task.getTaskName())
             .taskType(task.getTaskType())
-            .status(task.getStatus())
-            .algorithm(task.getAlgorithm())
+            .status(task.getStatus().getCode())
+            .algorithm(task.getAlgorithm().getCode())
             .createdAt(task.getCreatedAt())
             .startedAt(task.getStartedAt())
             .completedAt(task.getCompletedAt())
@@ -853,7 +854,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         return TaskResultVO.builder()
             .taskId(taskId)
             .taskName(task.getTaskName())
-            .status(task.getStatus())
+            .status(task.getStatus().getCode())
             .finalResults(finalResults)
             .roundResults(roundResults)
             .participantResults(participantResults)
@@ -1023,22 +1024,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             ConfigPreviewVO.RoleConfigVO.RoleInfoVO.builder()
                 .role("PARTICIPANT")
                 .name("参与者")
-                .description("参与联邦学习训练的客户端节点")
+                .description("参与联邦学习训练的客户端节点，所有虚拟机均为参与者角色，聚合由后端服务统一处理")
                 .requirements(ConfigPreviewVO.RoleConfigVO.RoleInfoVO.RequirementsVO.builder()
                     .minCpuCores(2)
                     .minMemoryMb(4096)
                     .requiredCapabilities(Arrays.asList("TRAINING"))
-                    .build())
-                .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA", "SCAFFOLD"))
-                .build(),
-            ConfigPreviewVO.RoleConfigVO.RoleInfoVO.builder()
-                .role("AGGREGATOR")
-                .name("聚合器")
-                .description("负责模型聚合的服务端节点")
-                .requirements(ConfigPreviewVO.RoleConfigVO.RoleInfoVO.RequirementsVO.builder()
-                    .minCpuCores(4)
-                    .minMemoryMb(8192)
-                    .requiredCapabilities(Arrays.asList("AGGREGATION"))
                     .build())
                 .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA", "SCAFFOLD"))
                 .build()
@@ -1208,8 +1198,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .build(),
             TaskConfigStatusVO.ConfigurationStepVO.builder()
                 .step("MODEL_INITIALIZATION")
-                .status(task.getStatus().equals("RUNNING") ? "COMPLETED" : "PENDING")
-                .completedAt(task.getStatus().equals("RUNNING") ? LocalDateTime.now().minusMinutes(20) : null)
+                .status(FederatedTaskStatus.RUNNING.equals(task.getStatus()) ? "COMPLETED" : "PENDING")
+                .completedAt(FederatedTaskStatus.RUNNING.equals(task.getStatus()) ? LocalDateTime.now().minusMinutes(20) : null)
                 .build()
         );
 
@@ -1219,7 +1209,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .vmId(p.getVmId())
                 .configStatus("READY")
                 .dataDistributed(true)
-                .modelInitialized(task.getStatus().equals("RUNNING"))
+                .modelInitialized(FederatedTaskStatus.RUNNING.equals(task.getStatus()))
                 .build())
             .collect(Collectors.toList());
 
@@ -1323,7 +1313,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
             .taskName(createDTO.getTaskName())
-            .status(STATUS_CREATED)
+            .status(STATUS_CREATED.getCode())
             .createdAt(now)
             .createdBy(createdBy)
             .participantCount(createDTO.getParticipantConfig().getParticipants().size())
@@ -1359,7 +1349,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         task.setTaskName(createDTO.getTaskName());
         task.setTaskType(createDTO.getTaskType());
         task.setDescription(createDTO.getDescription());
-        task.setAlgorithm(createDTO.getAlgorithm());
+        task.setAlgorithm(FederatedAlgorithm.fromCode(createDTO.getAlgorithm()));
         task.setStatus(STATUS_CREATED);
         task.setCreatedBy(createdBy);
         task.setCreatedAt(now);
@@ -1392,8 +1382,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         participant.setParticipantId(UUID.randomUUID().toString().replace("-", ""));
         participant.setTaskId(taskId);
         participant.setVmId(participantDTO.getVmId());
-        participant.setRole(participantDTO.getRole());
-        participant.setStatus("CREATED");
+        participant.setRole(ParticipantRole.fromCode(participantDTO.getRole()));
+        participant.setStatus(ParticipantStatus.CREATED);
         participant.setDataRatio(participantDTO.getDataRatio());
         participant.setCreatedAt(now);
         participant.setUpdatedAt(now);

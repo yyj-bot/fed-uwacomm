@@ -1,5 +1,6 @@
 package com.feduwacomm.utils;
 
+import com.feduwacomm.common.BaseContext;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,7 @@ public class IpUtil {
     private static final String UNKNOWN = "unknown";
     private static final String LOCALHOST = "127.0.0.1";
     private static final String SEPARATOR = ",";
+    private static final String SYSTEM_INTERNAL = "system";
 
     /**
      * 获取客户端真实IP地址
@@ -128,5 +130,46 @@ public class IpUtil {
             log.error("获取本机主机名失败", e);
             return "unknown";
         }
+    }
+
+    /**
+     * 获取当前上下文中的客户端IP，如果不存在则返回系统标识
+     * 用于系统内部操作的日志记录
+     */
+    public static String getCurrentIpOrDefault() {
+        String ip = BaseContext.getClientIp();
+        if (ip != null && !ip.isEmpty()) {
+            return ip;
+        }
+
+        // 尝试从当前请求上下文获取IP
+        try {
+            String currentIp = getClientIpAddress();
+            if (currentIp != null && !UNKNOWN.equals(currentIp)) {
+                return currentIp;
+            }
+        } catch (Exception e) {
+            log.debug("无法从请求上下文获取IP地址: {}", e.getMessage());
+        }
+
+        // 如果都获取不到，返回系统内部操作标识
+        return SYSTEM_INTERNAL;
+    }
+
+    /**
+     * 获取当前请求的主机名（用于WebSocket等场景）
+     */
+    public static String getCurrentHostOrDefault() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes != null) {
+            HttpServletRequest request = attributes.getRequest();
+            String serverName = request.getServerName();
+            if (serverName != null && !serverName.isEmpty() && !"localhost".equals(serverName)) {
+                return serverName;
+            }
+        }
+
+        // 如果无法获取请求主机名，返回本机主机名
+        return getLocalHostName();
     }
 }

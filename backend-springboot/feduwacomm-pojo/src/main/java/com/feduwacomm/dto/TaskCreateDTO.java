@@ -67,7 +67,7 @@ public class TaskCreateDTO {
         private String vmId;
         
         @NotBlank(message = "参与者角色不能为空")
-        private String role; // PARTICIPANT, AGGREGATOR
+        private String role; // PARTICIPANT
         
         private String dataSource;
     }
@@ -229,7 +229,7 @@ public class TaskCreateDTO {
             private String vmId;
 
             @NotBlank(message = "参与者角色不能为空")
-            private String role; // PARTICIPANT, AGGREGATOR
+            private String role; // PARTICIPANT
 
             @DecimalMin(value = "0.0", message = "数据比例不能小于0.0")
             @DecimalMax(value = "1.0", message = "数据比例不能大于1.0")

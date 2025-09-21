@@ -1,6 +1,7 @@
 package com.feduwacomm.utils;
 
 import com.feduwacomm.config.JwtConfig;
+import com.feduwacomm.constants.SystemConstants;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ public class VmJwtUtil {
      */
     private SecretKey getKey() {
         if (key == null) {
-            this.key = Keys.hmacShaKeyFor(jwtConfig.getVm().getSecret().getBytes());
+            this.key = Keys.hmacShaKeyFor(jwtConfig.getVm().getSecret().getBytes(SystemConstants.DEFAULT_CHARSET));
         }
         return key;
     }

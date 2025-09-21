@@ -1,5 +1,7 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.VmStatus;
+import com.feduwacomm.enums.ConnectionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -63,13 +65,13 @@ public class VmInstance {
      * 虚拟机状态
      * OFFLINE, RUNNING, STOPPED, STARTING, STOPPING, ERROR
      */
-    private String status;
+    private VmStatus status;
 
     /**
      * WebSocket连接状态
      * DISCONNECTED, CONNECTED, CONNECTING, RECONNECTING
      */
-    private String connectionStatus;
+    private ConnectionStatus connectionStatus;
 
     /**
      * WebSocket会话ID

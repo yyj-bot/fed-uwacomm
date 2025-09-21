@@ -17,6 +17,8 @@ public class TrainingDataUploadVO {
 
     private String datasetId;
 
+    private String vmId;
+
     private String datasetDescription;
 
     private String datasetType;

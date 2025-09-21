@@ -35,11 +35,6 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# FedUWAComm模块配置
-feduwacomm:
-  module:
-    name: feduwacomm # 模块名称，用于UUID前缀
-
 # JWT配置 - 双套配置（用户JWT和VM JWT）
 jwt:
   user:
@@ -50,7 +45,113 @@ jwt:
     secret: ${JWT_VM_SECRET:feduwacomm_vm_jwt_secret_key_2024_water_acoustic_federated_learning_vm_machine_auth}
     expiration: ${JWT_VM_EXPIRATION:86400} # VM Token 24小时，单位：秒
     refresh-expiration: ${JWT_VM_REFRESH_EXPIRATION:864000} # VM刷新Token 240小时，单位：秒
-    
+
+# FedUWAComm自定义配置
+feduwacomm:
+  module:
+    name: feduwacomm # 模块名称，用于UUID前缀
+  # 网络配置
+  network:
+    server:
+      host: ${SERVER_HOST:localhost}
+      port: ${SERVER_PORT:8080}
+      protocol: ${SERVER_PROTOCOL:http://}
+      secure-protocol: ${SERVER_SECURE_PROTOCOL:https://}
+      enable-https: ${ENABLE_HTTPS:false}
+
+    websocket:
+      protocol: ${WS_PROTOCOL:ws://}
+      secure-protocol: ${WSS_PROTOCOL:wss://}
+      enable-wss: ${ENABLE_WSS:false}
+      endpoint: ${WS_ENDPOINT:/ws}
+      native-endpoint: ${WS_NATIVE_ENDPOINT:/ws-native}
+      heartbeat-interval: ${WS_HEARTBEAT_INTERVAL:30}
+      connection-timeout: ${WS_CONNECTION_TIMEOUT:60}
+
+    api:
+      base-path: ${API_BASE_PATH:/api}
+      v1-path: ${API_V1_PATH:/api/v1}
+      vm-prefix: ${API_VM_PREFIX:/api/v1/vm}
+      token-refresh-path: ${API_TOKEN_REFRESH_PATH:/api/v1/vm/token/refresh}
+      request-timeout: ${API_REQUEST_TIMEOUT:30}
+      max-retries: ${API_MAX_RETRIES:3}
+
+  # 文件上传配置
+  file:
+    upload:
+      max-model-file-size: ${MAX_MODEL_FILE_SIZE:100MB}
+      max-training-data-file-size: ${MAX_TRAINING_DATA_FILE_SIZE:200MB}
+      max-general-file-size: ${MAX_GENERAL_FILE_SIZE:50MB}
+      max-batch-files: ${MAX_BATCH_FILES:10}
+      enable-type-check: ${ENABLE_FILE_TYPE_CHECK:true}
+      enable-virus-scan: ${ENABLE_VIRUS_SCAN:false}
+      allowed-training-data-extensions:
+        - .csv
+        - .json
+        - .txt
+        - .xlsx
+        - .xls
+      allowed-model-extensions:
+        - .pkl
+        - .h5
+        - .pb
+        - .onnx
+        - .pt
+        - .pth
+
+    storage:
+      base-path: ${STORAGE_BASE_PATH:./data}
+      model-path: ${STORAGE_MODEL_PATH:models}
+      training-data-path: ${STORAGE_TRAINING_DATA_PATH:training-data}
+      temp-path: ${STORAGE_TEMP_PATH:temp}
+      backup-path: ${STORAGE_BACKUP_PATH:backup}
+      retention-days: ${STORAGE_RETENTION_DAYS:30}
+      enable-auto-cleanup: ${ENABLE_AUTO_CLEANUP:true}
+
+    log-export:
+      base-path: ${LOG_EXPORT_BASE_PATH:/tmp/log-exports}
+      retention-days: ${LOG_EXPORT_RETENTION_DAYS:7}
+      max-records-per-export: ${LOG_EXPORT_MAX_RECORDS:10000}
+      max-export-file-size: ${LOG_EXPORT_MAX_FILE_SIZE:50MB}
+      supported-formats:
+        - CSV
+        - JSON
+        - EXCEL
+      enable-compression: ${LOG_EXPORT_ENABLE_COMPRESSION:true}
+
+  # 系统配置
+  system:
+    default-page-number: ${DEFAULT_PAGE_NUMBER:1}
+    default-page-size: ${DEFAULT_PAGE_SIZE:10}
+    max-page-size: ${MAX_PAGE_SIZE:100}
+    default-mac-prefix: ${DEFAULT_MAC_PREFIX:00:FD:UW}
+    default-ssh-port: ${DEFAULT_SSH_PORT:22}
+
+  # 时间配置
+  time:
+    jwt-expire-seconds: ${JWT_EXPIRE_SECONDS:86400}
+    vm-secret-expire-days: ${VM_SECRET_EXPIRE_DAYS:30}
+    log-retention-days: ${LOG_RETENTION_DAYS:7}
+    iso-datetime-format: ${ISO_DATETIME_FORMAT:yyyy-MM-dd'T'HH:mm:ss}
+
+    # 用户锁定配置
+    default-user-lock-duration-seconds: ${DEFAULT_USER_LOCK_DURATION:3600} # 默认锁定1小时
+
+    # 任务超时配置
+    default-task-timeout-seconds: ${DEFAULT_TASK_TIMEOUT:3600} # 默认任务超时1小时
+    max-task-timeout-seconds: ${MAX_TASK_TIMEOUT:86400} # 最大任务超时24小时
+    min-task-timeout-seconds: ${MIN_TASK_TIMEOUT:60} # 最小任务超时1分钟
+
+    # 延迟配置
+    base-processing-delay-millis: ${BASE_PROCESSING_DELAY:1000} # 基础处理延迟1秒
+    short-processing-delay-millis: ${SHORT_PROCESSING_DELAY:5000} # 短延迟5秒
+    long-processing-delay-millis: ${LONG_PROCESSING_DELAY:10000} # 长延迟10秒
+    model-generation-base-delay-millis: ${MODEL_GENERATION_BASE_DELAY:2000} # 模型生成基础延迟2秒
+    model-generation-random-range-millis: ${MODEL_GENERATION_RANDOM_RANGE:5000} # 模型生成随机范围5秒
+
+    # 性能计算配置
+    performance-calculation-window-seconds: ${PERFORMANCE_WINDOW:3600} # 性能计算窗口1小时
+
 federated:
   aggregation:
     min-participants: 2
@@ -58,15 +159,15 @@ federated:
     participation-rate: 0.8
     enable-timeout-aggregation: true
     check-interval-seconds: 30
-    
+
     fed-avg:
       enable-weight-normalization: true
       decimal-scale: 8
-    
+
     fed-prox:
       default-mu: 0.01
       enable-adaptive-mu: false
-    
+
     model-distribution:
       enable-compression: false
       parallel-distribution-count: 10

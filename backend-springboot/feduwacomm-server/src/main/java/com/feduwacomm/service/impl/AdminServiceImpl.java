@@ -1,8 +1,11 @@
 package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.config.TimeProperties;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.AdminMapper;
 import com.feduwacomm.service.AdminService;
@@ -33,6 +36,9 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     private UuidUtil uuidUtil;
+
+    @Autowired
+    private TimeProperties timeProperties;
 
     @Override
     public PageResponseDTO<UserListVO> getUserList(UserQueryDTO queryDTO) {
@@ -88,15 +94,15 @@ public class AdminServiceImpl implements AdminService {
             throw UserException.userNotFound();
         }
 
-        log.info("用户详情查询成功 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}", 
-                userId, user.getUsername(), user.getRole(), user.getStatus());
+        log.info("用户详情查询成功 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}",
+                userId, user.getUsername(), user.getRole().getCode(), user.getStatus().getCode());
 
         return UserDetailVO.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole())
-                .status(user.getStatus())
+                .role(user.getRole().getCode())
+                .status(user.getStatus().getCode())
                 .lastLoginTime(user.getLastLoginTime())
                 .lastLoginIp(user.getLastLoginIp())
                 .loginAttempts(user.getLoginAttempts())
@@ -135,8 +141,8 @@ public class AdminServiceImpl implements AdminService {
                 .username(createDTO.getUsername())
                 .email(createDTO.getEmail())
                 .passwordHash(PasswordUtil.encode(createDTO.getPassword()))
-                .role(createDTO.getRole() != null ? createDTO.getRole() : "VIEWER")
-                .status("ACTIVE") // 默认状态
+                .role(createDTO.getRole() != null ? UserRole.fromCode(createDTO.getRole()) : UserRole.VIEWER)
+                .status(createDTO.getStatus() != null ? UserStatus.fromCode(createDTO.getStatus()) : UserStatus.ACTIVE)
                 .loginAttempts(0)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -144,7 +150,7 @@ public class AdminServiceImpl implements AdminService {
                 .build();
 
         adminMapper.insert(user);
-        log.info("用户创建成功 - 用户ID: {}, 用户名: {}, 角色: {}", user.getId(), user.getUsername(), user.getRole());
+        log.info("用户创建成功 - 用户ID: {}, 用户名: {}, 角色: {}", user.getId(), user.getUsername(), user.getRole().getCode());
 
         // 记录安全审计日志
         AdminLogUtil.logUserCreation(
@@ -153,15 +159,15 @@ public class AdminServiceImpl implements AdminService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getRole()
+                user.getRole().getCode()
         );
 
         return UserCreateResponseVO.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole())
-                .status(user.getStatus())
+                .role(user.getRole().getCode())
+                .status(user.getStatus().getCode())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -219,28 +225,28 @@ public class AdminServiceImpl implements AdminService {
             user.setEmail(updateDTO.getEmail());
         }
         if (updateDTO.getRole() != null) {
-            log.info("管理员修改用户角色 - 用户ID: {}, 旧角色: {}, 新角色: {}", 
-                    userId, user.getRole(), updateDTO.getRole());
-            user.setRole(updateDTO.getRole());
+            log.info("管理员修改用户角色 - 用户ID: {}, 旧角色: {}, 新角色: {}",
+                    userId, user.getRole().getCode(), updateDTO.getRole());
+            user.setRole(UserRole.fromCode(updateDTO.getRole()));
         }
         if (updateDTO.getStatus() != null) {
-            log.info("管理员修改用户状态 - 用户ID: {}, 旧状态: {}, 新状态: {}", 
-                    userId, user.getStatus(), updateDTO.getStatus());
-            user.setStatus(updateDTO.getStatus());
+            log.info("管理员修改用户状态 - 用户ID: {}, 旧状态: {}, 新状态: {}",
+                    userId, user.getStatus().getCode(), updateDTO.getStatus());
+            user.setStatus(UserStatus.fromCode(updateDTO.getStatus()));
         }
         user.setUpdatedAt(LocalDateTime.now());
         user.setUpdatedBy(BaseContext.getCurrentUserId());
 
         adminMapper.update(user);
-        log.info("用户更新成功 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}", 
-                userId, user.getUsername(), user.getRole(), user.getStatus());
+        log.info("用户更新成功 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}",
+                userId, user.getUsername(), user.getRole().getCode(), user.getStatus().getCode());
 
         return UserUpdateResponseVO.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole())
-                .status(user.getStatus())
+                .role(user.getRole().getCode())
+                .status(user.getStatus().getCode())
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
@@ -257,13 +263,13 @@ public class AdminServiceImpl implements AdminService {
         }
 
         // 不能删除管理员用户
-        if ("ADMIN".equals(user.getRole())) {
+        if (UserRole.ADMIN.equals(user.getRole())) {
             log.error("尝试删除管理员用户被拒绝 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
             throw UserException.permissionDenied();
         }
 
         log.info("删除用户信息 - 用户ID: {}, 用户名: {}, 角色: {}, 状态: {}",
-                userId, user.getUsername(), user.getRole(), user.getStatus());
+                userId, user.getUsername(), user.getRole().getCode(), user.getStatus().getCode());
 
         // 删除用户
         adminMapper.deleteById(userId);
@@ -282,20 +288,20 @@ public class AdminServiceImpl implements AdminService {
         }
 
         // 不能锁定管理员用户
-        if ("ADMIN".equals(user.getRole())) {
+        if (UserRole.ADMIN.equals(user.getRole())) {
             log.error("尝试锁定管理员用户被拒绝 - 用户ID: {}, 用户名: {}", userId, user.getUsername());
             throw UserException.permissionDenied();
         }
 
         // 设置锁定时长
-        int duration = lockDTO.getDuration() != null ? lockDTO.getDuration() : 3600; // 默认1小时
+        int duration = lockDTO.getDuration() != null ? lockDTO.getDuration() : timeProperties.getDefaultUserLockDurationSeconds();
         LocalDateTime lockedUntil = LocalDateTime.now().plusSeconds(duration);
 
         log.info("锁定用户账户 - 用户ID: {}, 用户名: {}, 旧状态: {}, 锁定时长: {}秒, 锁定截止时间: {}", 
-                userId, user.getUsername(), user.getStatus(), duration, lockedUntil);
+                userId, user.getUsername(), user.getStatus().getCode(), duration, lockedUntil);
 
         // 更新用户状态
-        user.setStatus("LOCKED");
+        user.setStatus(UserStatus.LOCKED);
         user.setLockedUntil(lockedUntil);
         user.setUpdatedAt(LocalDateTime.now());
         user.setUpdatedBy(BaseContext.getCurrentUserId());
@@ -321,17 +327,17 @@ public class AdminServiceImpl implements AdminService {
         }
 
         log.info("解锁用户账户 - 用户ID: {}, 用户名: {}, 旧状态: {}, 旧锁定时间: {}", 
-                userId, user.getUsername(), user.getStatus(), user.getLockedUntil());
+                userId, user.getUsername(), user.getStatus().getCode(), user.getLockedUntil());
 
         // 更新用户状态
-        user.setStatus("ACTIVE");
+        user.setStatus(UserStatus.ACTIVE);
         user.setLockedUntil(null);
         user.setLoginAttempts(0); // 重置登录失败次数
         user.setUpdatedAt(LocalDateTime.now());
         user.setUpdatedBy(BaseContext.getCurrentUserId());
 
         adminMapper.update(user);
-        log.info("用户解锁完成 - 用户ID: {}, 用户名: {}, 新状态: {}", userId, user.getUsername(), user.getStatus());
+        log.info("用户解锁完成 - 用户ID: {}, 用户名: {}, 新状态: {}", userId, user.getUsername(), user.getStatus().getCode());
 
         return UserUnlockResponseVO.builder()
                 .userId(user.getId())
@@ -477,8 +483,8 @@ public class AdminServiceImpl implements AdminService {
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole())
-                .status(user.getStatus())
+                .role(user.getRole().getCode())
+                .status(user.getStatus().getCode())
                 .lastLoginTime(user.getLastLoginTime())
                 .lastLoginIp(user.getLastLoginIp())
                 .createdAt(user.getCreatedAt())

@@ -40,6 +40,7 @@ public class BaseContext {
     private static final ThreadLocal<String> userIdHolder = new ThreadLocal<>();
     private static final ThreadLocal<String> usernameHolder = new ThreadLocal<>();
     private static final ThreadLocal<String> userRoleHolder = new ThreadLocal<>();
+    private static final ThreadLocal<String> clientIpHolder = new ThreadLocal<>();
 
     /**
      * 构造函数
@@ -112,12 +113,30 @@ public class BaseContext {
     }
 
     /**
+     * 设置当前线程的客户端IP
+     */
+    public static void setClientIp(String clientIp) {
+        clientIpHolder.set(clientIp);
+        log.debug("设置当前线程客户端IP: {}", clientIp);
+    }
+
+    /**
+     * 获取当前线程的客户端IP
+     */
+    public static String getClientIp() {
+        String clientIp = clientIpHolder.get();
+        log.debug("获取当前线程客户端IP: {}", clientIp);
+        return clientIp;
+    }
+
+    /**
      * 清除当前线程的所有用户信息
      */
     public static void clear() {
         userIdHolder.remove();
         usernameHolder.remove();
         userRoleHolder.remove();
+        clientIpHolder.remove();
         log.debug("清除当前线程所有用户信息");
     }
 

@@ -1,5 +1,7 @@
 package com.feduwacomm.vo;
 
+import com.feduwacomm.enums.FederatedAlgorithm;
+import com.feduwacomm.enums.FederatedTaskStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
