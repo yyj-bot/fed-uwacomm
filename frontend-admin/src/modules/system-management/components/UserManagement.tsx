@@ -296,6 +296,7 @@ const UserManagement: React.FC = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
+      width: 120,
       render: (text: string, record: User) => (
         <Button 
           type="link" 
@@ -309,12 +310,14 @@ const UserManagement: React.FC = () => {
     {
       title: '邮箱',
       dataIndex: 'email',
-      key: 'email'
+      key: 'email',
+      ellipsis: true
     },
     {
       title: '角色',
       dataIndex: 'role',
       key: 'role',
+      width: 100,
       render: (role: string) => {
         const roleConfig: Record<string, { color: string; text: string }> = {
           'ADMIN': { color: 'red', text: '管理员' },
@@ -330,6 +333,7 @@ const UserManagement: React.FC = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: 80,
       render: (status: string) => (
         <StatusIndicator
           status={
@@ -349,6 +353,7 @@ const UserManagement: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      width: 160,
       render: (date: string) => {
         if (!date) return '-'
         return new Date(date).toLocaleString('zh-CN')
@@ -357,7 +362,7 @@ const UserManagement: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 200,
+      width: 160,
       render: (_, record: User) => {
         const actionMenu = getUserActionMenu(record)
         const isOperating = operationLoading[`delete-${record.userId}`] || 
@@ -488,6 +493,7 @@ const UserManagement: React.FC = () => {
         rowKey="userId"
         showRefresh={false}
         showColumnSetting={false}
+        scroll={{}}
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,

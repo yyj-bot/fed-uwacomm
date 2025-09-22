@@ -195,7 +195,7 @@ const Table = <T extends Record<string, any>>({
         pagination={finalPagination}
         loading={loading}
         className={`fed-table ${props.className || ''}`}
-        scroll={{ x: 'max-content', ...props.scroll }}
+        scroll={props.scroll}
       />
     </div>
   )

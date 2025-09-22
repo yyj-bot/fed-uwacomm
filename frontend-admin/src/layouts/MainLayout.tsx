@@ -130,6 +130,24 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   ]
 
+  // 处理用户菜单点击
+  const handleUserMenuClick = ({ key }: { key: string }) => {
+    switch (key) {
+      case 'profile':
+        navigate('/user/profile')
+        break
+      case 'settings':
+        navigate('/user/settings')
+        break
+      case 'logout':
+        logout()
+        navigate('/login')
+        break
+      default:
+        break
+    }
+  }
+
   // 用户下拉菜单
   const userMenuItems = [
     {
@@ -146,11 +164,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登录',
-      onClick: () => {
-        logout()
-        navigate('/login')
-      }
+      label: '退出登录'
     }
   ]
 
@@ -162,6 +176,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // 获取当前选中的菜单项
   const getSelectedKeys = () => {
     const path = location.pathname
+    
+    // 如果是用户相关页面，不选中任何侧边栏菜单项
+    if (path.startsWith('/user/')) {
+      return []
+    }
+    
     // 找到匹配的菜单项
     for (const item of menuItems) {
       if (item.children) {
@@ -174,7 +194,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         return [item.key]
       }
     }
-    return ['/dashboard']
+    
+    // 只有在根路径或仪表盘路径时才默认选中仪表盘
+    if (path === '/' || path === '/dashboard') {
+      return ['/dashboard']
+    }
+    
+    // 其他未匹配的路径不选中任何菜单项
+    return []
   }
 
   // 获取展开的菜单项
@@ -255,7 +282,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
             {/* 用户信息 */}
             <Dropdown
-              menu={{ items: userMenuItems }}
+              menu={{ items: userMenuItems, onClick: handleUserMenuClick }}
               placement="bottomRight"
               arrow
             >

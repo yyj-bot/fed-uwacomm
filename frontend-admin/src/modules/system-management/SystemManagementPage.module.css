@@ -4,6 +4,7 @@
 
 .fed-system-management-page {
   background: transparent;
+  min-height: auto;
 }
 
 .fed-system-management-header {
@@ -85,4 +86,19 @@
   .fed-system-management-content .ant-tabs-content-holder {
     padding: 16px;
   }
+}
+
+/* 用户管理组件样式 */
+:global(.fed-user-management) {
+  background: transparent;
+  min-height: auto;
+}
+
+:global(.fed-user-toolbar) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 16px 0;
+  background: transparent;
 }

@@ -12,7 +12,9 @@ import {
   ModelManagementPage,
   SystemLogsPage,
   UnderwaterOptimizationPage,
-  EnvironmentAnalysisPage
+  EnvironmentAnalysisPage,
+  UserProfilePage,
+  AccountSettingsPage
 } from '@/modules'
 
 import { userService, websocketService } from '@/services'
@@ -138,6 +140,10 @@ const App: React.FC = () => {
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />
                       <Route path="/environment-analysis" element={<EnvironmentAnalysisPage />} />
+                      
+                      {/* 用户相关路由 */}
+                      <Route path="/user/profile" element={<UserProfilePage />} />
+                      <Route path="/user/settings" element={<AccountSettingsPage />} />
                       
                       {/* 未匹配路径重定向到仪表板 */}
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
