@@ -1,6 +1,7 @@
 package com.feduwacomm.controller;
 
 import com.feduwacomm.common.Result;
+import com.feduwacomm.config.TimeProperties;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.AdminService;
 import com.feduwacomm.vo.*;
@@ -25,6 +26,9 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    @Autowired
+    private TimeProperties timeProperties;
 
     /**
      * 获取用户列表
@@ -152,7 +156,7 @@ public class AdminController {
             @RequestBody(required = false) UserLockDTO lockDTO) {
         // 如果lockDTO为null，创建默认值
         if (lockDTO == null) {
-            lockDTO = UserLockDTO.builder().duration(3600).build(); // 默认1小时
+            lockDTO = UserLockDTO.builder().duration(timeProperties.getDefaultUserLockDurationSeconds()).build();
         }
         
         logger.warn("管理员锁定用户 - 用户ID: {}, 锁定时长: {}秒", userId, lockDTO.getDuration());

@@ -103,21 +103,21 @@ public interface SystemLogMapper {
                         @Param("startTime") LocalDateTime startTime, 
                         @Param("endTime") LocalDateTime endTime);
 
-    @Select("SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:00:00') as hour, COUNT(*) as count " +
+    @Select("SELECT DATE_FORMAT(timestamp, '%H') as hour, COUNT(*) as count " +
             "FROM system_logs " +
             "WHERE timestamp BETWEEN #{startTime} AND #{endTime} " +
             "GROUP BY hour " +
             "ORDER BY hour")
-    List<Map<String, Object>> countByHour(@Param("startTime") LocalDateTime startTime, 
+    List<Map<String, Object>> countByHour(@Param("startTime") LocalDateTime startTime,
                                          @Param("endTime") LocalDateTime endTime);
 
-    @Select("SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:00:00') as hour, COUNT(*) as count " +
+    @Select("SELECT DATE_FORMAT(timestamp, '%Y-%m-%d') as date, COUNT(*) as count " +
             "FROM system_logs " +
             "WHERE level = 'ERROR' " +
             "AND timestamp BETWEEN #{startTime} AND #{endTime} " +
-            "GROUP BY hour " +
-            "ORDER BY hour")
-    List<Map<String, Object>> countErrorTrend(@Param("startTime") LocalDateTime startTime, 
+            "GROUP BY date " +
+            "ORDER BY date")
+    List<Map<String, Object>> countErrorTrend(@Param("startTime") LocalDateTime startTime,
                                              @Param("endTime") LocalDateTime endTime);
 
     @SelectProvider(type = SystemLogSqlProvider.class, method = "getLevelDistribution")

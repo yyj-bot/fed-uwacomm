@@ -1,5 +1,7 @@
 package com.feduwacomm.vo;
 
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

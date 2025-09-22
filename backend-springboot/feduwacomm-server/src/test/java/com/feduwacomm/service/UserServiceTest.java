@@ -3,6 +3,8 @@ package com.feduwacomm.service;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.service.impl.UserServiceImpl;
@@ -365,8 +367,8 @@ class UserServiceTest {
                 .username("testuser")
                 .email("test@example.com")
                 .passwordHash(PasswordUtil.encode("password123"))
-                .role("VIEWER")
-                .status("LOCKED")
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("LOCKED"))
                 .loginAttempts(0)
                 .lastLoginTime(LocalDateTime.now())
                 .lastLoginIp("192.168.1.100")
@@ -393,8 +395,8 @@ class UserServiceTest {
                 .username("testuser")
                 .email("test@example.com")
                 .passwordHash(PasswordUtil.encode("password123"))
-                .role("VIEWER")
-                .status("LOCKED")
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("LOCKED"))
                 .loginAttempts(0)
                 .lastLoginTime(LocalDateTime.now())
                 .lastLoginIp("192.168.1.100")

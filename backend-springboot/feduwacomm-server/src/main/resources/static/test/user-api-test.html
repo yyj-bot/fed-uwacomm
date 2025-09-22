@@ -609,7 +609,10 @@
                 <div id="apiInfo" class="section-content">
                     <div class="form-group">
                         <h4>🔗 接口地址</h4>
-                        <p><strong>基础URL:</strong> <code>http://localhost:8080/api/user</code></p>
+                        <p><strong>基础URL:</strong> <code id="baseUrlDisplay"></code></p>
+                        <script>
+                            document.getElementById('baseUrlDisplay').textContent = `${window.location.protocol}//${window.location.host}/api/user`;
+                        </script>
                         
                         <h4>📋 接口列表</h4>
                         <ul style="margin-left: 20px; line-height: 1.8;">

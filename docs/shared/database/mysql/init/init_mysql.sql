@@ -169,7 +169,7 @@ ADD CONSTRAINT fk_model_versions_task_id FOREIGN KEY (task_id) REFERENCES federa
 CREATE TABLE IF NOT EXISTS system_logs (
     id VARCHAR(32) PRIMARY KEY COMMENT '日志唯一标识(32位UUID)',
     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '日志时间',
-    level VARCHAR(10) NOT NULL COMMENT '日志级别',
+    level ENUM('INFO', 'WARN', 'ERROR', 'DEBUG') NOT NULL COMMENT '日志级别',
     logger VARCHAR(100) NOT NULL COMMENT '日志记录器',
     message TEXT NOT NULL COMMENT '日志消息',
     thread VARCHAR(100) COMMENT '线程名',
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS global_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
     round_number INT NOT NULL COMMENT '轮次编号',
-    aggregation_method VARCHAR(50) NOT NULL COMMENT '聚合算法类型(FEDAVG, FEDPROX, FEDNOVA等)',
+    aggregation_method ENUM('FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD') NOT NULL COMMENT '聚合算法类型',
     global_parameters JSON COMMENT '全局模型参数(JSON格式)',
     global_loss DECIMAL(10, 8) COMMENT '全局损失值',
     global_accuracy DECIMAL(10, 8) COMMENT '全局准确率',
@@ -451,7 +451,7 @@ CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
 CREATE TABLE IF NOT EXISTS initial_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '初始模型唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
-    model_type VARCHAR(50) NOT NULL COMMENT '模型类型',
+    model_type ENUM('NEURAL_NETWORK', 'RANDOM_FOREST') NOT NULL COMMENT '模型类型',
     generation_method ENUM('RANDOM', 'CUSTOM_UPLOAD') NOT NULL COMMENT '生成方式',
     model_size BIGINT COMMENT '模型大小(字节)',
     architecture_params JSON COMMENT '架构参数(JSON格式)',
@@ -588,29 +588,79 @@ ADD COLUMN distribution_status ENUM('PENDING', 'DISTRIBUTING', 'DISTRIBUTED', 'F
 ADD COLUMN distributed_vms JSON COMMENT '已分发的虚拟机列表(JSON格式)',
 ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间';
 
+-- 20. 联邦学习任务参与者表 (task_participants)
+CREATE TABLE IF NOT EXISTS task_participants (
+    id VARCHAR(32) PRIMARY KEY COMMENT '参与者唯一标识(32位UUID)',
+    task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
+    vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
+    role ENUM('PARTICIPANT', 'COORDINATOR') NOT NULL DEFAULT 'PARTICIPANT' COMMENT '参与者角色',
+    status ENUM('CONNECTED', 'DISCONNECTED', 'TRAINING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'CONNECTED' COMMENT '参与状态',
+    data_source VARCHAR(255) COMMENT '数据源',
+
+    -- 训练状态字段
+    current_epoch INT COMMENT '当前训练轮次',
+    loss DECIMAL(10,8) COMMENT '当前损失值',
+    accuracy DECIMAL(10,8) COMMENT '当前准确率',
+    last_heartbeat TIMESTAMP COMMENT '最后心跳时间',
+
+    -- 训练结果字段
+    final_accuracy DECIMAL(10,8) COMMENT '最终准确率',
+    final_loss DECIMAL(10,8) COMMENT '最终损失值',
+    training_time BIGINT COMMENT '训练时间(秒)',
+    data_size INT COMMENT '数据量大小',
+
+    -- v1.3 扩展字段
+    participant_id VARCHAR(50) COMMENT '参与者标识',
+    data_ratio DECIMAL(5,4) COMMENT '数据比例',
+    capabilities JSON COMMENT '能力列表(JSON格式)',
+    max_cpu_usage INT COMMENT '最大CPU使用率',
+    max_memory_usage INT COMMENT '最大内存使用率',
+
+    -- 时间字段
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    joined_at TIMESTAMP COMMENT '加入时间',
+    left_at TIMESTAMP COMMENT '离开时间',
+
+    -- 配置参数
+    parameters JSON COMMENT '参与者参数配置(JSON格式)',
+
+    -- 索引
+    INDEX idx_task_participants_task_id (task_id),
+    INDEX idx_task_participants_vm_id (vm_id),
+    INDEX idx_task_participants_status (status),
+    INDEX idx_task_participants_role (role),
+    UNIQUE KEY uk_task_participants_task_vm (task_id, vm_id),
+
+    -- 外键约束
+    FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE,
+    FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='联邦学习任务参与者表 - 存储虚拟机在任务中的参与信息';
+
 -- =====================================================
 -- 初始化完成
 -- =====================================================
 -- 数据库初始化脚本执行完成
 -- 共创建了 20 个表:
 -- 1. users - 用户表
--- 2. user_permissions - 用户权限表
--- 3. vm_instances - 虚拟机表
--- 4. federated_tasks - 联邦学习任务表（已扩展）
--- 5. training_dataset - 训练数据集元信息表
--- 6. training_dataset_row - 训练数据明细表
--- 7. model_versions - 模型版本表
--- 8. system_logs - SpringBoot系统日志表
--- 9. vm_runtime_logs - 虚拟机运行日志表
--- 10. vm_round_models - 虚拟机轮次模型结果表
--- 11. vm_secrets - 虚拟机刷新凭证表
--- 12. global_models - 全局模型表（已扩展）
--- 13. log_export_tasks - 日志导出任务表
--- 14. log_cleanup_tasks - 日志清理任务表
--- 15. initial_models - 初始模型表（新增）
--- 16. model_distributions - 模型分发记录表（新增）
--- 17. data_distributions - 数据分发任务表（新增）
--- 18. data_distribution_details - 数据分发详情表（新增）
--- 19. orchestration_workflows - 工作流编排表（新增）
--- 20. workflow_stage_executions - 工作流阶段执行记录表（新增）
+-- 2. vm_instances - 虚拟机表
+-- 3. federated_tasks - 联邦学习任务表（已扩展）
+-- 4. training_dataset - 训练数据集元信息表
+-- 5. training_dataset_row - 训练数据明细表
+-- 6. model_versions - 模型版本表
+-- 7. system_logs - SpringBoot系统日志表
+-- 8. vm_runtime_logs - 虚拟机运行日志表
+-- 9. vm_round_models - 虚拟机轮次模型结果表
+-- 10. vm_secrets - 虚拟机刷新凭证表
+-- 11. global_models - 全局模型表（已扩展）
+-- 12. log_export_tasks - 日志导出任务表
+-- 13. log_cleanup_tasks - 日志清理任务表
+-- 14. initial_models - 初始模型表（新增）
+-- 15. model_distributions - 模型分发记录表（新增）
+-- 16. data_distributions - 数据分发任务表（新增）
+-- 17. data_distribution_details - 数据分发详情表（新增）
+-- 18. orchestration_workflows - 工作流编排表（新增）
+-- 19. workflow_stage_executions - 工作流阶段执行记录表（新增）
+-- 20. task_participants - 联邦学习任务参与者表（新增）
 -- =====================================================

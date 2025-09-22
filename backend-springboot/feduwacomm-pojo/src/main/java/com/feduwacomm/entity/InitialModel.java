@@ -1,5 +1,8 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.ModelType;
+import com.feduwacomm.enums.GenerationMethod;
+import com.feduwacomm.enums.InitialModelStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,12 +36,12 @@ public class InitialModel {
     /**
      * 模型类型
      */
-    private String modelType;
-    
+    private ModelType modelType;
+
     /**
      * 生成方式: RANDOM-随机生成, CUSTOM_UPLOAD-自定义上传
      */
-    private String generationMethod;
+    private GenerationMethod generationMethod;
     
     /**
      * 模型大小(字节)
@@ -63,7 +66,7 @@ public class InitialModel {
     /**
      * 状态: GENERATING-生成中, READY-就绪, DISTRIBUTED-已分发, FAILED-失败
      */
-    private String status;
+    private InitialModelStatus status;
     
     /**
      * 创建时间

@@ -4,6 +4,9 @@ import com.feduwacomm.common.PageResult;
 import com.feduwacomm.dto.InitialModelGenerationDTO;
 import com.feduwacomm.entity.InitialModel;
 import com.feduwacomm.entity.ModelDistribution;
+import com.feduwacomm.enums.GenerationMethod;
+import com.feduwacomm.enums.InitialModelStatus;
+import com.feduwacomm.enums.ModelType;
 import com.feduwacomm.event.InitialModelGeneratedEvent;
 import com.feduwacomm.mapper.InitialModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
@@ -64,10 +67,10 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         InitialModel initialModel = InitialModel.builder()
                 .id(modelId)
                 .taskId(generationDTO.getTaskId())
-                .modelType(generationDTO.getModelType())
-                .generationMethod(generationDTO.getGenerationMethod())
+                .modelType(ModelType.fromCode(generationDTO.getModelType()))
+                .generationMethod(GenerationMethod.fromCode(generationDTO.getGenerationMethod()))
                 .architectureParams(convertToJson(generationDTO.getArchitectureParams()))
-                .status("GENERATING")
+                .status(InitialModelStatus.GENERATING)
                 .createdAt(LocalDateTime.now())
                 .createdBy(createdBy)
                 .updatedAt(LocalDateTime.now())
@@ -79,15 +82,15 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         // 异步执行模型生成
         CompletableFuture.runAsync(() -> {
             try {
-                if ("RANDOM".equals(generationDTO.getGenerationMethod())) {
+                if (GenerationMethod.RANDOM.getCode().equals(generationDTO.getGenerationMethod())) {
                     generateRandomModel(initialModel, generationDTO.getArchitectureParams());
-                } else if ("CUSTOM_UPLOAD".equals(generationDTO.getGenerationMethod())) {
+                } else if (GenerationMethod.CUSTOM_UPLOAD.getCode().equals(generationDTO.getGenerationMethod())) {
                     // 自定义上传模式下，等待用户上传文件
                     log.info("等待用户上传自定义模型文件: modelId={}", modelId);
                 }
             } catch (Exception e) {
                 log.error("模型生成失败: modelId={}, error={}", modelId, e.getMessage(), e);
-                updateModelStatus(modelId, "FAILED");
+                updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
             }
         });
 
@@ -116,13 +119,13 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
             InitialModel initialModel = InitialModel.builder()
                     .id(modelId)
                     .taskId(taskId)
-                    .modelType(modelType)
-                    .generationMethod("CUSTOM_UPLOAD")
+                    .modelType(ModelType.fromCode(modelType))
+                    .generationMethod(GenerationMethod.CUSTOM_UPLOAD)
                     .modelSize(fileSize)
                     .architectureParams(architectureParams)
                     .filePath(filePath)
                     .checksum(checksum)
-                    .status("READY")
+                    .status(InitialModelStatus.READY)
                     .createdAt(LocalDateTime.now())
                     .createdBy(createdBy)
                     .updatedAt(LocalDateTime.now())
@@ -199,27 +202,27 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
             throw new RuntimeException("模型不存在: " + modelId);
         }
 
-        if (!"FAILED".equals(model.getStatus())) {
+        if (!InitialModelStatus.FAILED.equals(model.getStatus())) {
             throw new RuntimeException("只能重新生成失败的模型");
         }
 
         // 重置模型状态
-        initialModelMapper.updateStatus(modelId, "GENERATING");
+        initialModelMapper.updateStatus(modelId, InitialModelStatus.GENERATING.getCode());
 
         // 异步重新生成
         CompletableFuture.runAsync(() -> {
             try {
                 Map<String, Object> architectureParams = parseJsonToMap(model.getArchitectureParams());
-                if ("RANDOM".equals(model.getGenerationMethod())) {
+                if (GenerationMethod.RANDOM.equals(model.getGenerationMethod())) {
                     generateRandomModel(model, architectureParams);
                 }
             } catch (Exception e) {
                 log.error("模型重新生成失败: modelId={}, error={}", modelId, e.getMessage(), e);
-                updateModelStatus(modelId, "FAILED");
+                updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
             }
         });
 
-        model.setStatus("GENERATING");
+        model.setStatus(InitialModelStatus.GENERATING);
         return convertToInfoVO(model, getDistributionStats(modelId));
     }
 
@@ -306,12 +309,12 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         }
 
         switch (model.getStatus()) {
-            case "GENERATING":
+            case GENERATING:
                 return 50; // 正在生成，返回50%
-            case "READY":
-            case "DISTRIBUTED":
+            case READY:
+            case DISTRIBUTED:
                 return 100;
-            case "FAILED":
+            case FAILED:
                 return 0;
             default:
                 return 0;
@@ -324,12 +327,12 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         log.info("取消模型生成: modelId={}, cancelledBy={}", modelId, cancelledBy);
 
         InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null || !"GENERATING".equals(model.getStatus())) {
+        if (model == null || !InitialModelStatus.GENERATING.equals(model.getStatus())) {
             return false;
         }
 
         // 更新状态为失败
-        return updateModelStatus(modelId, "FAILED");
+        return updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
     }
 
     @Override
@@ -356,7 +359,7 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
 
         List<InitialModel> models = StringUtils.hasText(taskId) ?
                 initialModelMapper.selectByTaskId(taskId) :
-                initialModelMapper.selectByStatus("READY"); // 获取所有就绪模型作为全局统计
+                initialModelMapper.selectByStatus(InitialModelStatus.READY.getCode()); // 获取所有就绪模型作为全局统计
 
         if (models.isEmpty()) {
             return InitialModelInfoVO.ModelGenerationStats.builder()
@@ -372,12 +375,12 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
 
         // 统计各状态数量
         Map<String, Long> statusCounts = models.stream()
-                .collect(Collectors.groupingBy(InitialModel::getStatus, Collectors.counting()));
+                .collect(Collectors.groupingBy(m -> m.getStatus().getCode(), Collectors.counting()));
 
-        int generating = statusCounts.getOrDefault("GENERATING", 0L).intValue();
-        int ready = statusCounts.getOrDefault("READY", 0L).intValue();
-        int distributed = statusCounts.getOrDefault("DISTRIBUTED", 0L).intValue();
-        int failed = statusCounts.getOrDefault("FAILED", 0L).intValue();
+        int generating = statusCounts.getOrDefault(InitialModelStatus.GENERATING.getCode(), 0L).intValue();
+        int ready = statusCounts.getOrDefault(InitialModelStatus.READY.getCode(), 0L).intValue();
+        int distributed = statusCounts.getOrDefault(InitialModelStatus.DISTRIBUTED.getCode(), 0L).intValue();
+        int failed = statusCounts.getOrDefault(InitialModelStatus.FAILED.getCode(), 0L).intValue();
 
         // 计算成功率
         double successRate = models.isEmpty() ? 0.0 : 
@@ -386,7 +389,7 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         // 计算平均生成时间（仅针对已完成的模型）
         double avgGenerationTime = models.stream()
                 .filter(m -> m.getCreatedAt() != null && m.getUpdatedAt() != null)
-                .filter(m -> !"GENERATING".equals(m.getStatus()))
+                .filter(m -> !InitialModelStatus.GENERATING.equals(m.getStatus()))
                 .mapToDouble(m -> ChronoUnit.SECONDS.between(m.getCreatedAt(), m.getUpdatedAt()))
                 .average()
                 .orElse(0.0);
@@ -422,7 +425,7 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
             Path modelFilePath = modelDir.resolve(fileName);
 
             // 生成随机模型数据（简化实现）
-            byte[] modelData = generateRandomModelData(model.getModelType(), params);
+            byte[] modelData = generateRandomModelData(model.getModelType().getCode(), params);
             Files.write(modelFilePath, modelData);
 
             // 计算文件校验和
@@ -434,7 +437,7 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
                     modelFilePath.toString(),
                     checksum,
                     (long) modelData.length,
-                    "READY"
+                    InitialModelStatus.READY.getCode()
             );
 
             // 发布模型生成完成事件
@@ -504,8 +507,8 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
                 model.getId(),
                 model.getTaskId(),
                 null, // orchestrationId 如需要可从外部传入
-                model.getModelType(),
-                model.getGenerationMethod(),
+                model.getModelType().getCode(),
+                model.getGenerationMethod().getCode(),
                 model.getModelSize(),
                 model.getFilePath(),
                 model.getChecksum(),
@@ -537,7 +540,7 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         String sizeFormatted = formatFileSize(model.getModelSize());
         
         // 状态描述
-        String statusDescription = getStatusDescription(model.getStatus());
+        String statusDescription = getStatusDescription(model.getStatus().getCode());
         
         // 分发状态统计
         InitialModelInfoVO.DistributionStats distStats = InitialModelInfoVO.DistributionStats.builder()
@@ -551,12 +554,12 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         return InitialModelInfoVO.builder()
                 .id(model.getId())
                 .taskId(model.getTaskId())
-                .modelType(model.getModelType())
-                .generationMethod(model.getGenerationMethod())
+                .modelType(model.getModelType().getCode())
+                .generationMethod(model.getGenerationMethod().getCode())
                 .modelSize(model.getModelSize())
                 .modelSizeFormatted(sizeFormatted)
                 .architectureParams(parseJsonToMap(model.getArchitectureParams()))
-                .status(model.getStatus())
+                .status(model.getStatus().getCode())
                 .statusDescription(statusDescription)
                 .filePath(model.getFilePath())
                 .checksum(model.getChecksum())

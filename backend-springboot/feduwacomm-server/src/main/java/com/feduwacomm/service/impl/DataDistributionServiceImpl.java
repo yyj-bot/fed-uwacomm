@@ -1,6 +1,7 @@
 package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.PageResult;
+import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.DataDistributionDTO;
 import com.feduwacomm.entity.DataDistribution;
 import com.feduwacomm.entity.DataDistributionDetail;
@@ -933,7 +934,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     vmData.getErrorMessage() != null ? vmData.getErrorMessage().replace(",", ";") : ""));
         }
         
-        Files.write(reportPath, csv.toString().getBytes());
+        Files.write(reportPath, csv.toString().getBytes(SystemConstants.DEFAULT_CHARSET));
     }
 
     private String convertToJson(Object obj) {

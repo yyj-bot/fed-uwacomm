@@ -2,6 +2,7 @@ package com.feduwacomm.controller;
 
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.common.Result;
+import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.LogCleanupDTO;
 import com.feduwacomm.dto.LogConfigDTO;
 import com.feduwacomm.dto.LogExportDTO;
@@ -133,12 +134,12 @@ public class LogController {
             String filename = generateFilename(exportDTO);
 
             // 根据格式设置正确的Content-Type
-            String contentType = "text/csv; charset=UTF-8";
+            String contentType = SystemConstants.CSV_CONTENT_TYPE;
             if (exportDTO.getFormat() != null) {
                 switch (exportDTO.getFormat()) {
-                    case JSON -> contentType = "application/json; charset=UTF-8";
-                    case EXCEL -> contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; charset=UTF-8";
-                    default -> contentType = "text/csv; charset=UTF-8";
+                    case JSON -> contentType = SystemConstants.JSON_CONTENT_TYPE_WITH_CHARSET;
+                    case EXCEL -> contentType = SystemConstants.EXCEL_CONTENT_TYPE;
+                    default -> contentType = SystemConstants.CSV_CONTENT_TYPE;
                 }
             }
 

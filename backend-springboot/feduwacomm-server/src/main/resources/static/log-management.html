@@ -349,7 +349,7 @@
     </div>
 
     <script>
-        const baseUrl = 'http://localhost:8080/api/log';
+        const baseUrl = `${window.location.protocol}//${window.location.host}/api/log`;
 
         function showTab(evt, tabName) {
             const tabContents = document.getElementsByClassName('tab-content');

@@ -53,6 +53,16 @@ public class JsonTypeHandler extends BaseTypeHandler<Map<String, Object>> {
         if (jsonString == null || jsonString.trim().isEmpty()) {
             return null;
         }
+
+        // 智能判断：如果字符串不是以 { 或 [ 开头，则认为不是JSON，直接返回null
+        // 这避免了将普通字符串（如小时数"00"）误认为JSON进行解析
+        String trimmed = jsonString.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            // 对于非JSON格式的字符串，不进行JSON解析，直接返回null
+            // 这主要是为了兼容统计查询返回的Map结果，避免将字符串值误当作JSON处理
+            return null;
+        }
+
         try {
             return OBJECT_MAPPER.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
         } catch (JsonProcessingException e) {
