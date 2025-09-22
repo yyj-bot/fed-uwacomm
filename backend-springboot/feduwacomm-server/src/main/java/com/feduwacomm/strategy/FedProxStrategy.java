@@ -4,6 +4,8 @@ import com.feduwacomm.config.AggregationConfig;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
+import com.feduwacomm.enums.AggregationMethod;
+import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,7 +40,7 @@ public class FedProxStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return "FEDPROX".equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDPROX.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -52,15 +54,15 @@ public class FedProxStrategy implements AggregationStrategy {
                 .id(UUID.randomUUID().toString().replace("-", ""))
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod("FEDPROX")
-                .status("AGGREGATING")
+                .aggregationMethod(AggregationMethod.FEDPROX)
+                .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
                 .build();
 
         // 执行聚合
-        return engine.aggregate("FEDPROX", localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDPROX.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -129,7 +131,7 @@ public class FedProxStrategy implements AggregationStrategy {
             reasoning += "启用自适应μ调整以动态优化正则化强度。";
         }
 
-        return new AlgorithmConfigSuggestion("FEDPROX", suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDPROX.getCode(), suggestedParams, reasoning);
     }
 
     /**

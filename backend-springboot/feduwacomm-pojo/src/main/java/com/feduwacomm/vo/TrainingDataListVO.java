@@ -29,6 +29,7 @@ public class TrainingDataListVO {
     @Builder
     public static class TrainingDataItemVO {
         private String datasetId;
+        private String vmId;
         private String datasetDescription;
         private String datasetType;
         private String status;

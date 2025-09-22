@@ -9,6 +9,8 @@ import com.feduwacomm.dto.VmQueryDTO;
 import com.feduwacomm.dto.VmUpdateDTO;
 import com.feduwacomm.dto.VmControlDTO;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.enums.VmStatus;
+import com.feduwacomm.enums.ConnectionStatus;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.impl.VmInstanceServiceImpl;
 import com.feduwacomm.utils.VmJwtUtil;
@@ -112,8 +114,8 @@ public class VmInstanceServiceTest {
         vmInstance.setCpuCores(4);
         vmInstance.setMemoryMb(8192);
         vmInstance.setDiskGb(100);
-        vmInstance.setStatus("ACTIVE");
-        vmInstance.setConnectionStatus("CONNECTED");
+        vmInstance.setStatus(VmStatus.fromCode("RUNNING"));
+        vmInstance.setConnectionStatus(ConnectionStatus.fromCode("CONNECTED"));
         vmInstance.setSecretId("$2a$10$hashedRefreshToken"); // BCrypt哈希后的API Key
         vmInstance.setCreatedAt(LocalDateTime.now());
         vmInstance.setUpdatedAt(LocalDateTime.now());
@@ -519,7 +521,7 @@ public class VmInstanceServiceTest {
         Boolean force = false;
 
         // 设置虚拟机状态为已停止
-        vmInstance.setStatus("STOPPED");
+        vmInstance.setStatus(VmStatus.fromCode("STOPPED"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
@@ -552,7 +554,7 @@ public class VmInstanceServiceTest {
         Boolean force = false;
 
         // 设置虚拟机状态为正在运行
-        vmInstance.setStatus("RUNNING");
+        vmInstance.setStatus(VmStatus.fromCode("RUNNING"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
@@ -578,7 +580,7 @@ public class VmInstanceServiceTest {
         Boolean force = true;
 
         // 设置虚拟机状态为正在运行
-        vmInstance.setStatus("RUNNING");
+        vmInstance.setStatus(VmStatus.fromCode("RUNNING"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
@@ -608,7 +610,7 @@ public class VmInstanceServiceTest {
         String userId = "test-user-id";
 
         // 设置虚拟机状态为已停止
-        vmInstance.setStatus("STOPPED");
+        vmInstance.setStatus(VmStatus.fromCode("STOPPED"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
@@ -641,7 +643,7 @@ public class VmInstanceServiceTest {
         String userId = "test-user-id";
 
         // 设置虚拟机状态为正在运行
-        vmInstance.setStatus("RUNNING");
+        vmInstance.setStatus(VmStatus.fromCode("RUNNING"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);
@@ -666,7 +668,7 @@ public class VmInstanceServiceTest {
         String userId = "test-user-id";
 
         // 设置虚拟机状态为正在运行
-        vmInstance.setStatus("RUNNING");
+        vmInstance.setStatus(VmStatus.fromCode("RUNNING"));
 
         // 准备mock数据
         when(vmInstancesMapper.selectByVmId(vmId)).thenReturn(vmInstance);

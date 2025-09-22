@@ -3,6 +3,8 @@ package com.feduwacomm.service;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.AdminMapper;
 import com.feduwacomm.mapper.UserMapper;
@@ -148,14 +150,14 @@ public class AdminServiceTest {
         User viewer1 = TestDataBuilder.Users.validUser()
                 .username("viewer1")
                 .email("viewer1@example.com")
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("ACTIVE"))
                 .build();
         User viewer2 = TestDataBuilder.Users.validUser()
                 .username("viewer2")
                 .email("viewer2@example.com")
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("ACTIVE"))
                 .build();
         User researcher = TestDataBuilder.Users.researcherUser().build();
         
@@ -165,8 +167,8 @@ public class AdminServiceTest {
         
         // 创建查询条件
         UserQueryDTO queryDTO = TestDataBuilder.DTOs.validQueryDTO()
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
+                .role("VIEWER")
+                .status("ACTIVE")
                 .keyword("viewer")
                 .build();
 
@@ -467,8 +469,8 @@ public class AdminServiceTest {
                 .username("testuser")
                 .email("test@example.com")
                 .passwordHash(PasswordUtil.encode("password123"))
-                .role("VIEWER")
-                .status("LOCKED")
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("LOCKED"))
                 .loginAttempts(0)
                 .lastLoginTime(LocalDateTime.now())
                 .lastLoginIp("192.168.1.100")

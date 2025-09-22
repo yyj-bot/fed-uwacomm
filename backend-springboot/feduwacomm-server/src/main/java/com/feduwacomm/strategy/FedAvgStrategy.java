@@ -4,6 +4,9 @@ import com.feduwacomm.config.AggregationConfig;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
+import com.feduwacomm.enums.AggregationMethod;
+import com.feduwacomm.enums.FederatedTaskStatus;
+import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +38,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return "FEDAVG".equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDAVG.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -49,15 +52,15 @@ public class FedAvgStrategy implements AggregationStrategy {
                 .id(UUID.randomUUID().toString().replace("-", ""))
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod("FEDAVG")
-                .status("AGGREGATING")
+                .aggregationMethod(AggregationMethod.FEDAVG)
+                .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
                 .build();
 
         // 执行聚合
-        return engine.aggregate("FEDAVG", localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDAVG.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -81,7 +84,7 @@ public class FedAvgStrategy implements AggregationStrategy {
         }
 
         // 验证任务状态
-        if (task == null || !"RUNNING".equalsIgnoreCase(task.getStatus())) {
+        if (task == null || !FederatedTaskStatus.RUNNING.equals(task.getStatus())) {
             return ValidationResult.invalid("任务状态无效，无法进行聚合");
         }
 
@@ -112,6 +115,6 @@ public class FedAvgStrategy implements AggregationStrategy {
             reasoning += "由于参与者较多，建议启用并行处理以提升性能。";
         }
 
-        return new AlgorithmConfigSuggestion("FEDAVG", suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDAVG.getCode(), suggestedParams, reasoning);
     }
 }

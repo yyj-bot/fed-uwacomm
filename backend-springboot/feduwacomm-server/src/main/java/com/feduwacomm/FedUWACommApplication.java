@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import com.feduwacomm.constants.SystemConstants;
 
 /**
  * 水声联邦学习后端服务主应用程序类
@@ -35,12 +36,16 @@ public class FedUWACommApplication {
         
         // 获取当前环境配置
         String activeProfile = env.getProperty("spring.profiles.active", "default");
-        String port = env.getProperty("server.port", "8080");
+        String port = env.getProperty("server.port", SystemConstants.DEFAULT_SERVER_PORT);
         String contextPath = env.getProperty("server.servlet.context-path", "");
-        
+
         // 构建完整的服务地址
-        String baseUrl = String.format("http://localhost:%s%s", port, contextPath);
-        String apiUrl = baseUrl + "/api";
+        String baseUrl = String.format("%s%s:%s%s",
+            SystemConstants.HTTP_PROTOCOL,
+            SystemConstants.DEFAULT_HOST,
+            port,
+            contextPath);
+        String apiUrl = baseUrl + SystemConstants.API_BASE_PATH;
         
         System.out.println("=================================");
         System.out.println("水声联邦学习后端服务启动成功！");

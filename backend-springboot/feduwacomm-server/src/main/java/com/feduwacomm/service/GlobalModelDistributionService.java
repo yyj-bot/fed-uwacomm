@@ -92,7 +92,7 @@ public class GlobalModelDistributionService {
 
             // 构建全局模型消息
             ProtocolMessage globalModelMessage = buildGlobalModelMessage(
-                    taskId, roundNumber, globalModelId, globalMetrics, task.getAlgorithm());
+                    taskId, roundNumber, globalModelId, globalMetrics, task.getAlgorithm().getCode());
 
             // 并行分发给所有参与客户端
             if (aggregationConfig.getModelDistribution().getParallelDistributionCount() > 1) {

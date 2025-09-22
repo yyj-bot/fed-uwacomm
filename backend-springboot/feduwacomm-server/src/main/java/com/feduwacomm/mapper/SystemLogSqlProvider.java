@@ -74,7 +74,7 @@ public class SystemLogSqlProvider {
             hasWhere = true;
         }
         
-        // 类别条件（使用LIKE模式匹配）
+        // 类别条件（严格按照文档定义：SYSTEM, USER, VM, TASK, DATA, MODEL, SECURITY, PERFORMANCE）
         if (queryDTO.getCategory() != null) {
             sql.append(hasWhere ? " AND " : "WHERE ");
             sql.append("logger LIKE CONCAT(#{category}, '.%')");
@@ -161,7 +161,7 @@ public class SystemLogSqlProvider {
             hasWhere = true;
         }
         
-        // 类别条件优化（使用LIKE模式匹配）
+        // 类别条件（严格按照文档定义：SYSTEM, USER, VM, TASK, DATA, MODEL, SECURITY, PERFORMANCE）
         if (queryDTO.getCategory() != null) {
             sql.append(hasWhere ? " AND " : "WHERE ");
             sql.append("logger LIKE CONCAT(#{category}, '.%')");

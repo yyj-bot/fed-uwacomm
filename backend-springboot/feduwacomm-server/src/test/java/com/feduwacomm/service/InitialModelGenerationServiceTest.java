@@ -2,6 +2,9 @@ package com.feduwacomm.service;
 
 import com.feduwacomm.dto.InitialModelGenerationDTO;
 import com.feduwacomm.entity.InitialModel;
+import com.feduwacomm.enums.GenerationMethod;
+import com.feduwacomm.enums.InitialModelStatus;
+import com.feduwacomm.enums.ModelType;
 import com.feduwacomm.mapper.InitialModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.service.impl.InitialModelGenerationServiceImpl;
@@ -230,7 +233,7 @@ class InitialModelGenerationServiceTest {
     void testGetGenerationProgress_GeneratingStatus() {
         // Given
         InitialModel mockModel = createMockInitialModel();
-        mockModel.setStatus("GENERATING");
+        mockModel.setStatus(InitialModelStatus.fromCode("GENERATING"));
         when(initialModelMapper.selectById(modelId)).thenReturn(mockModel);
         
         // When
@@ -247,7 +250,7 @@ class InitialModelGenerationServiceTest {
     void testGetGenerationProgress_ReadyStatus() {
         // Given
         InitialModel mockModel = createMockInitialModel();
-        mockModel.setStatus("READY");
+        mockModel.setStatus(InitialModelStatus.fromCode("READY"));
         when(initialModelMapper.selectById(modelId)).thenReturn(mockModel);
         
         // When
@@ -264,7 +267,7 @@ class InitialModelGenerationServiceTest {
     void testCancelGeneration_Success() {
         // Given
         InitialModel mockModel = createMockInitialModel();
-        mockModel.setStatus("GENERATING");
+        mockModel.setStatus(InitialModelStatus.fromCode("GENERATING"));
         when(initialModelMapper.selectById(modelId)).thenReturn(mockModel);
         when(initialModelMapper.updateStatus(modelId, "FAILED")).thenReturn(1);
         
@@ -333,10 +336,10 @@ class InitialModelGenerationServiceTest {
         return InitialModel.builder()
                 .id(modelId)
                 .taskId(taskId)
-                .modelType("CNN")
-                .generationMethod("RANDOM")
+                .modelType(ModelType.fromCode("NEURAL_NETWORK"))
+                .generationMethod(GenerationMethod.fromCode("RANDOM"))
                 .modelSize(1024L)
-                .status("READY")
+                .status(InitialModelStatus.fromCode("READY"))
                 .filePath("/tmp/models/test-model.h5")
                 .checksum("test-checksum")
                 .architectureParams("{}")
@@ -348,7 +351,7 @@ class InitialModelGenerationServiceTest {
     
     private InitialModel createMockModelWithStatus(String status) {
         InitialModel model = createMockInitialModel();
-        model.setStatus(status);
+        model.setStatus(InitialModelStatus.fromCode(status));
         return model;
     }
 }

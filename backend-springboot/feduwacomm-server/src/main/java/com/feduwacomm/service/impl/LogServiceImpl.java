@@ -2,6 +2,7 @@ package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.common.PageResult;
+import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.*;
 import com.feduwacomm.enums.*;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.utils.UuidUtil;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,7 +78,7 @@ public class LogServiceImpl implements LogService {
 
     @Override
     public void logInfo(String message, String userId, String username, String requestUri, String clientIp) {
-        logInfo(message, userId, username, requestUri, clientIp, "com.feduwacomm");
+        logInfo(message, userId, username, requestUri, clientIp, "SYSTEM.request");
     }
     
     @Override
@@ -93,7 +95,7 @@ public class LogServiceImpl implements LogService {
 
     @Override
     public void logWarn(String message, String userId, String username, String requestUri, String clientIp) {
-        logWarn(message, userId, username, requestUri, clientIp, "com.feduwacomm");
+        logWarn(message, userId, username, requestUri, clientIp, "SYSTEM.warning");
     }
     
     @Override
@@ -111,7 +113,7 @@ public class LogServiceImpl implements LogService {
     @Override
     public void logError(String message, String userId, String username, String requestUri, String clientIp,
             Throwable throwable) {
-        logError(message, userId, username, requestUri, clientIp, throwable, "com.feduwacomm");
+        logError(message, userId, username, requestUri, clientIp, throwable, "SYSTEM.error");
     }
     
     @Override
@@ -131,7 +133,7 @@ public class LogServiceImpl implements LogService {
 
     @Override
     public void logDebug(String message, String userId, String username, String requestUri, String clientIp) {
-        logDebug(message, userId, username, requestUri, clientIp, "com.feduwacomm");
+        logDebug(message, userId, username, requestUri, clientIp, "SYSTEM.debug");
     }
     
     @Override
@@ -160,7 +162,7 @@ public class LogServiceImpl implements LogService {
                     uuidUtil.generateUuid(),
                     LocalDateTime.now(),
                     level,
-                    category != null ? category : "com.feduwacomm",
+                    category != null ? category : "SYSTEM.default",
                     message,
                     Thread.currentThread().getName(),
                     userId,
@@ -273,7 +275,7 @@ public class LogServiceImpl implements LogService {
                                     .build()).collect(Collectors.toList()))
                     .errorTrend(errorTrend.stream().map(data ->
                             LogStatisticsVO.ErrorTrend.builder()
-                                    .date((String) data.get("hour"))
+                                    .date((String) data.get("date"))
                                     .errorCount(((Number) data.get("count")).longValue())
                                     .build()).collect(Collectors.toList()))
                     .build();
@@ -382,7 +384,7 @@ public class LogServiceImpl implements LogService {
 
             // 根据格式生成文件内容
             String content = generateExportContent(logs.getRecords(), exportDTO);
-            return content.getBytes("UTF-8");
+            return content.getBytes(SystemConstants.DEFAULT_CHARSET);
 
         } catch (Exception e) {
             logger.error("生成日志文件失败: {}", e.getMessage());
@@ -962,21 +964,22 @@ public class LogServiceImpl implements LogService {
     private Map<String, Object> getSystemInfo() {
         try {
             Runtime runtime = Runtime.getRuntime();
-            long startTime = System.currentTimeMillis() - 
-                            (System.currentTimeMillis() - runtime.totalMemory() / (1024 * 1024));
-            
+            long uptimeMillis = java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime();
+            long uptimeSeconds = uptimeMillis / 1000;
+            LocalDateTime startTime = LocalDateTime.now().minusSeconds(uptimeSeconds);
+
             Map<String, Object> systemInfo = new HashMap<>();
             systemInfo.put("version", "1.0.0");
-            systemInfo.put("uptime", (System.currentTimeMillis() - startTime) / 1000);
-            systemInfo.put("startTime", LocalDateTime.now().minusSeconds((System.currentTimeMillis() - startTime) / 1000));
+            systemInfo.put("uptime", uptimeSeconds);
+            systemInfo.put("startTime", startTime);
             systemInfo.put("javaVersion", System.getProperty("java.version"));
             systemInfo.put("osInfo", System.getProperty("os.name") + " " + System.getProperty("os.version"));
             systemInfo.put("availableProcessors", runtime.availableProcessors());
-            
+
             return systemInfo;
         } catch (Exception e) {
             logger.warn("获取系统信息失败: {}", e.getMessage());
-            return Map.of("version", "1.0.0", "uptime", 0L);
+            return Map.of("version", "1.0.0", "uptime", 0L, "startTime", LocalDateTime.now());
         }
     }
     
@@ -1918,8 +1921,8 @@ public class LogServiceImpl implements LogService {
             logger.info("配置已重置为默认值");
             
             // 记录重置操作
-            logInfo("日志配置已重置为默认值", null, "system", 
-                   "/api/log/config/reset", "127.0.0.1", "SYSTEM");
+            logInfo("日志配置已重置为默认值", null, "system",
+                   "/api/log/config/reset", IpUtil.getCurrentIpOrDefault(), "SYSTEM.config");
                    
         } catch (Exception e) {
             logger.error("重置配置失败: {}", e.getMessage());

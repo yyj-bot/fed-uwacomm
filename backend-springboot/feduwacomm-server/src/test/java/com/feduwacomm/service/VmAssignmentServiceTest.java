@@ -3,6 +3,9 @@ package com.feduwacomm.service;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.enums.VmStatus;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.ConnectionStatus;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.impl.VmAssignmentServiceImpl;
@@ -67,8 +70,8 @@ public class VmAssignmentServiceTest {
                 .ipAddress("192.168.1.100")
                 .port(22)
                 .osType("Ubuntu")
-                .status("RUNNING")
-                .connectionStatus("CONNECTED")
+                .status(VmStatus.fromCode("RUNNING"))
+                .connectionStatus(ConnectionStatus.fromCode("CONNECTED"))
                 .build();
 
         // 权限管理已改为基于用户角色
@@ -137,10 +140,10 @@ public class VmAssignmentServiceTest {
     @Test
     void testGetUserAssignedVms_Success() {
         // Given
-        testUser.setRole("RESEARCHER"); // 设置用户角色
+        testUser.setRole(UserRole.fromCode("RESEARCHER")); // 设置用户角色
         when(userMapper.selectById("user123")).thenReturn(testUser);
         when(vmInstancesMapper.selectAll()).thenReturn(List.of(testVm));
-        testVm.setStatus("AVAILABLE"); // 设置虚拟机状态为可用
+        testVm.setStatus(VmStatus.fromCode("RUNNING")); // 设置虚拟机状态为运行中
 
         // When
         PageResult<UserVmListVO> result = vmAssignmentService.getUserAssignedVms(
@@ -154,7 +157,7 @@ public class VmAssignmentServiceTest {
     @Test
     void testHasVmPermission_True() {
         // Given
-        testUser.setRole("RESEARCHER"); // RESEARCHER有READ权限
+        testUser.setRole(UserRole.fromCode("RESEARCHER")); // RESEARCHER有READ权限
         when(userMapper.selectById("user123")).thenReturn(testUser);
 
         // When
@@ -168,7 +171,7 @@ public class VmAssignmentServiceTest {
     @Test
     void testHasVmPermission_False() {
         // Given
-        testUser.setRole("OPERATOR"); // OPERATOR没有WRITE权限
+        testUser.setRole(UserRole.fromCode("OPERATOR")); // OPERATOR没有WRITE权限
         when(userMapper.selectById("user123")).thenReturn(testUser);
 
         // When

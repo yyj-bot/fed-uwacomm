@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.enums.FederatedAlgorithm;
+import com.feduwacomm.enums.FederatedTaskStatus;
+import com.feduwacomm.enums.ParticipantRole;
+import com.feduwacomm.enums.ParticipantStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.impl.FederatedTaskServiceImpl;
@@ -102,7 +106,7 @@ public class FederatedTaskServiceTest {
                 .taskName("联邦学习测试任务")
                 .taskType("CLASSIFICATION")
                 .description("用于测试的联邦学习任务")
-                .algorithm("FedAvg")
+                .algorithm("FEDAVG")
                 .participants(participants)
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .learningRate(0.01)
@@ -118,7 +122,7 @@ public class FederatedTaskServiceTest {
 
         // 准备配置任务DTO
         sampleConfigDTO = TaskConfigDTO.builder()
-                .algorithm("FedAvg")
+                .algorithm("FEDAVG")
                 .hyperparameters(TaskConfigDTO.HyperparametersDTO.builder()
                         .learningRate(0.001)
                         .batchSize(64)
@@ -133,8 +137,8 @@ public class FederatedTaskServiceTest {
                 .taskName("联邦学习测试任务")
                 .taskType("CLASSIFICATION")
                 .description("用于测试的联邦学习任务")
-                .status("CREATED")
-                .algorithm("FedAvg")
+                .status(FederatedTaskStatus.fromCode("CREATED"))
+                .algorithm(FederatedAlgorithm.fromCode("FEDAVG"))
                 .modelType("CNN")
                 .totalRounds(10)
                 .currentRound(0)
@@ -148,9 +152,9 @@ public class FederatedTaskServiceTest {
         sampleParticipant = TaskParticipant.builder()
                 .taskId("task-12345")
                 .vmId("vm-001")
-                .status("CONNECTED")
+                .status(ParticipantStatus.fromCode("CONNECTED"))
                 .dataSource("/data/vm001/dataset")
-                .role("PARTICIPANT")
+                .role(ParticipantRole.fromCode("PARTICIPANT"))
                 .joinedAt(LocalDateTime.now())
                 .build();
     }
@@ -194,7 +198,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidCreateDTO = TaskCreateDTO.builder()
                 .taskName("")  // 空名称
                 .taskType("CLASSIFICATION")
-                .algorithm("FedAvg")
+                .algorithm("FEDAVG")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(-1)  // 无效轮数
                         .minParticipants(0)  // 无效最小参与者数
@@ -290,7 +294,7 @@ public class FederatedTaskServiceTest {
         // 创建状态为RUNNING的任务（不允许配置）
         FederatedTask runningTask = FederatedTask.builder()
                 .id(taskId)
-                .status("RUNNING")
+                .status(FederatedTaskStatus.fromCode("RUNNING"))
                 .build();
         
         when(tasksMapper.selectTaskById(taskId)).thenReturn(runningTask);
@@ -315,7 +319,7 @@ public class FederatedTaskServiceTest {
         // Mock任务存在且状态为CONFIGURED
         FederatedTask configuredTask = FederatedTask.builder()
                 .id(taskId)
-                .status("CONFIGURED")
+                .status(FederatedTaskStatus.fromCode("CONFIGURED"))
                 .build();
         
         List<TaskParticipant> participants = Arrays.asList(
@@ -366,7 +370,7 @@ public class FederatedTaskServiceTest {
         // Mock任务状态为CREATED（需要先配置才能启动）
         FederatedTask createdTask = FederatedTask.builder()
                 .id(taskId)
-                .status("CREATED")
+                .status(FederatedTaskStatus.fromCode("CREATED"))
                 .build();
         
         when(tasksMapper.selectTaskById(taskId)).thenReturn(createdTask);
@@ -394,7 +398,7 @@ public class FederatedTaskServiceTest {
         // Mock任务存在且状态为RUNNING
         FederatedTask runningTask = FederatedTask.builder()
                 .id(taskId)
-                .status("RUNNING")
+                .status(FederatedTaskStatus.fromCode("RUNNING"))
                 .build();
         
         when(tasksMapper.selectTaskById(taskId)).thenReturn(runningTask);
@@ -437,7 +441,7 @@ public class FederatedTaskServiceTest {
         TaskParticipant participant = TaskParticipant.builder()
                 .id(taskId)
                 .vmId("vm-003")
-                .status("PENDING")
+                .status(ParticipantStatus.fromCode("PENDING"))
                 .build();
 
         when(tasksMapper.insertParticipant(participant)).thenReturn(1);
@@ -507,7 +511,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidDTO2 = TaskCreateDTO.builder()
                 .taskName("Test Task")
                 .taskType("CLASSIFICATION")
-                .algorithm("FedAvg")
+                .algorithm("FEDAVG")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(-1)
                         .build())
@@ -518,7 +522,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidDTO3 = TaskCreateDTO.builder()
                 .taskName("Test Task")
                 .taskType("CLASSIFICATION")
-                .algorithm("FedAvg")
+                .algorithm("FEDAVG")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(10)
                         .build())

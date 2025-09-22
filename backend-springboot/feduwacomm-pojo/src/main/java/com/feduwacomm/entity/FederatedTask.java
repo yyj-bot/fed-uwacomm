@@ -1,5 +1,7 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.FederatedAlgorithm;
+import com.feduwacomm.enums.FederatedTaskStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,8 +22,8 @@ public class FederatedTask {
     private String taskName;
     private String taskType;
     private String description;
-    private String algorithm;
-    private String status;
+    private FederatedAlgorithm algorithm;
+    private FederatedTaskStatus status;
     
     // 超参数
     private Double learningRate;

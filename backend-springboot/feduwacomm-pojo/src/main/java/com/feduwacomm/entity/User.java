@@ -1,5 +1,7 @@
 package com.feduwacomm.entity;
 
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,8 +22,8 @@ public class User {
     private String username;
     private String email;
     private String passwordHash;
-    private String role;
-    private String status;
+    private UserRole role;
+    private UserStatus status;
 
     private LocalDateTime lastLoginTime;
     private String lastLoginIp;
