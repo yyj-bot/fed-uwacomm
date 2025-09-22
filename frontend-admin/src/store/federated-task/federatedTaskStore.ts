@@ -18,6 +18,16 @@ import type {
   CancelTaskRequest,
   DeleteTaskRequest
 } from '@/services'
+import type {
+  AvailableVM,
+  AvailableDataset,
+  RoleConfig,
+  AlgorithmTemplate,
+  DistributionPreview,
+  ParticipantValidation,
+  ConfigStatus,
+  ResourceUsage
+} from '@/api/federated-task'
 
 // ==================== 状态类型定义 ====================
 
@@ -60,6 +70,42 @@ interface TaskState {
   
   // 实时状态
   realtimeData: Record<string, any>
+  
+  // 🆕 v1.3 新增：预配置数据
+  availableVMs: AvailableVM[]
+  availableVMsLoading: boolean
+  availableVMsError: string | null
+  
+  availableDatasets: AvailableDataset[]
+  availableDatasetsLoading: boolean
+  availableDatasetsError: string | null
+  
+  roleConfigs: RoleConfig[]
+  roleConfigsLoading: boolean
+  roleConfigsError: string | null
+  
+  algorithmTemplates: AlgorithmTemplate[]
+  algorithmTemplatesLoading: boolean
+  algorithmTemplatesError: string | null
+  
+  // 🆕 v1.3 新增：智能配置状态
+  distributionPreview: DistributionPreview | null
+  distributionPreviewLoading: boolean
+  distributionPreviewError: string | null
+  
+  participantValidation: ParticipantValidation | null
+  participantValidationLoading: boolean
+  participantValidationError: string | null
+  
+  // 🆕 v1.3 新增：增强监控状态
+  configStatus: Record<string, ConfigStatus>
+  configStatusLoading: Record<string, boolean>
+  
+  resourceUsage: Record<string, ResourceUsage>
+  resourceUsageLoading: Record<string, boolean>
+  
+  // 🆕 v1.3 新增：废弃警告
+  deprecationWarnings: string[]
 }
 
 interface TaskActions {
@@ -103,6 +149,53 @@ interface TaskActions {
   
   // 状态重置
   resetState: () => void
+  
+  // 🆕 v1.3 新增：预配置接口
+  fetchAvailableVMs: (params?: {
+    algorithm?: string
+    minCpuCores?: number
+    minMemoryMb?: number
+    status?: string
+    capabilities?: string
+  }) => Promise<void>
+  
+  fetchAvailableDatasets: (params?: {
+    dataType?: string
+    status?: string
+    minSize?: number
+    maxSize?: number
+    keyword?: string
+  }) => Promise<void>
+  
+  fetchRoleConfigs: () => Promise<void>
+  fetchAlgorithmTemplates: () => Promise<void>
+  
+  // 🆕 v1.3 新增：智能配置接口
+  previewDataDistribution: (data: {
+    datasetId: string
+    distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+    participants: Array<{
+      vmId: string
+      requestedRatio: number
+    }>
+  }) => Promise<void>
+  
+  validateParticipants: (data: {
+    algorithm: string
+    taskType: 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION'
+    participants: Array<{
+      vmId: string
+      role: 'PARTICIPANT' | 'AGGREGATOR'
+    }>
+  }) => Promise<void>
+  
+  // 🆕 v1.3 新增：增强监控接口
+  fetchConfigStatus: (taskId: string) => Promise<void>
+  fetchResourceUsage: (taskId: string) => Promise<void>
+  
+  // 🆕 v1.3 新增：废弃警告处理
+  addDeprecationWarning: (warning: string) => void
+  clearDeprecationWarnings: () => void
 }
 
 type TaskStore = TaskState & TaskActions
@@ -136,7 +229,40 @@ const initialState: TaskState = {
   },
   
   queryParams: {},
-  realtimeData: {}
+  realtimeData: {},
+  
+  // 🆕 v1.3 新增状态
+  availableVMs: [],
+  availableVMsLoading: false,
+  availableVMsError: null,
+  
+  availableDatasets: [],
+  availableDatasetsLoading: false,
+  availableDatasetsError: null,
+  
+  roleConfigs: [],
+  roleConfigsLoading: false,
+  roleConfigsError: null,
+  
+  algorithmTemplates: [],
+  algorithmTemplatesLoading: false,
+  algorithmTemplatesError: null,
+  
+  distributionPreview: null,
+  distributionPreviewLoading: false,
+  distributionPreviewError: null,
+  
+  participantValidation: null,
+  participantValidationLoading: false,
+  participantValidationError: null,
+  
+  configStatus: {},
+  configStatusLoading: {},
+  
+  resourceUsage: {},
+  resourceUsageLoading: {},
+  
+  deprecationWarnings: []
 }
 
 // ==================== Store 实现 ====================
@@ -725,6 +851,274 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
    */
   resetState: () => {
     set(initialState)
+  },
+
+  // ==================== v1.3 新增操作 ====================
+  
+  // ==================== 预配置接口 ====================
+  
+  /**
+   * 获取可用虚拟机列表
+   */
+  fetchAvailableVMs: async (params?: {
+    algorithm?: string
+    minCpuCores?: number
+    minMemoryMb?: number
+    status?: string
+    capabilities?: string
+  }) => {
+    set({ availableVMsLoading: true, availableVMsError: null })
+    
+    try {
+      const response = await federatedTaskService.getAvailableVMs(params)
+      
+      set({
+        availableVMs: response.availableVms,
+        availableVMsLoading: false,
+        availableVMsError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取可用虚拟机列表失败'
+      set({
+        availableVMsLoading: false,
+        availableVMsError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 获取可用数据集列表
+   */
+  fetchAvailableDatasets: async (params?: {
+    dataType?: string
+    status?: string
+    minSize?: number
+    maxSize?: number
+    keyword?: string
+  }) => {
+    set({ availableDatasetsLoading: true, availableDatasetsError: null })
+    
+    try {
+      const response = await federatedTaskService.getAvailableDatasets(params)
+      
+      set({
+        availableDatasets: response.availableDatasets,
+        availableDatasetsLoading: false,
+        availableDatasetsError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取可用数据集列表失败'
+      set({
+        availableDatasetsLoading: false,
+        availableDatasetsError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 获取角色配置选项
+   */
+  fetchRoleConfigs: async () => {
+    set({ roleConfigsLoading: true, roleConfigsError: null })
+    
+    try {
+      const response = await federatedTaskService.getRoleConfigs()
+      
+      set({
+        roleConfigs: response.roles,
+        roleConfigsLoading: false,
+        roleConfigsError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取角色配置选项失败'
+      set({
+        roleConfigsLoading: false,
+        roleConfigsError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 获取算法配置模板
+   */
+  fetchAlgorithmTemplates: async () => {
+    set({ algorithmTemplatesLoading: true, algorithmTemplatesError: null })
+    
+    try {
+      const response = await federatedTaskService.getAlgorithmTemplates()
+      
+      set({
+        algorithmTemplates: response.templates,
+        algorithmTemplatesLoading: false,
+        algorithmTemplatesError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取算法配置模板失败'
+      set({
+        algorithmTemplatesLoading: false,
+        algorithmTemplatesError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  // ==================== 智能配置接口 ====================
+  
+  /**
+   * 数据分配预览
+   */
+  previewDataDistribution: async (data: {
+    datasetId: string
+    distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+    participants: Array<{
+      vmId: string
+      requestedRatio: number
+    }>
+  }) => {
+    set({ distributionPreviewLoading: true, distributionPreviewError: null })
+    
+    try {
+      const response = await federatedTaskService.previewDataDistribution(data)
+      
+      set({
+        distributionPreview: response,
+        distributionPreviewLoading: false,
+        distributionPreviewError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '数据分配预览失败'
+      set({
+        distributionPreviewLoading: false,
+        distributionPreviewError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 参与者验证
+   */
+  validateParticipants: async (data: {
+    algorithm: string
+    taskType: 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION'
+    participants: Array<{
+      vmId: string
+      role: 'PARTICIPANT' | 'AGGREGATOR'
+    }>
+  }) => {
+    set({ participantValidationLoading: true, participantValidationError: null })
+    
+    try {
+      const response = await federatedTaskService.validateParticipants(data)
+      
+      set({
+        participantValidation: response,
+        participantValidationLoading: false,
+        participantValidationError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '参与者验证失败'
+      set({
+        participantValidationLoading: false,
+        participantValidationError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  // ==================== 增强监控接口 ====================
+  
+  /**
+   * 获取配置状态监控
+   */
+  fetchConfigStatus: async (taskId: string) => {
+    set((state) => ({
+      configStatusLoading: {
+        ...state.configStatusLoading,
+        [taskId]: true
+      }
+    }))
+    
+    try {
+      const response = await federatedTaskService.getConfigStatus(taskId)
+      
+      set((state) => ({
+        configStatus: {
+          ...state.configStatus,
+          [taskId]: response
+        },
+        configStatusLoading: {
+          ...state.configStatusLoading,
+          [taskId]: false
+        }
+      }))
+    } catch (error) {
+      set((state) => ({
+        configStatusLoading: {
+          ...state.configStatusLoading,
+          [taskId]: false
+        }
+      }))
+      console.error(`获取配置状态监控失败 (${taskId}):`, error)
+      throw error
+    }
+  },
+
+  /**
+   * 获取资源使用监控
+   */
+  fetchResourceUsage: async (taskId: string) => {
+    set((state) => ({
+      resourceUsageLoading: {
+        ...state.resourceUsageLoading,
+        [taskId]: true
+      }
+    }))
+    
+    try {
+      const response = await federatedTaskService.getResourceUsage(taskId)
+      
+      set({
+        resourceUsage: {
+          ...get().resourceUsage,
+          [taskId]: response
+        },
+        resourceUsageLoading: {
+          ...get().resourceUsageLoading,
+          [taskId]: false
+        }
+      })
+    } catch (error) {
+      set((state) => ({
+        resourceUsageLoading: {
+          ...state.resourceUsageLoading,
+          [taskId]: false
+        }
+      }))
+      console.error(`获取资源使用监控失败 (${taskId}):`, error)
+      throw error
+    }
+  },
+
+  // ==================== 废弃警告处理 ====================
+  
+  /**
+   * 添加废弃警告
+   */
+  addDeprecationWarning: (warning: string) => {
+    set((state) => ({
+      deprecationWarnings: [...state.deprecationWarnings, warning]
+    }))
+  },
+
+  /**
+   * 清除废弃警告
+   */
+  clearDeprecationWarnings: () => {
+    set({ deprecationWarnings: [] })
   }
 }))
 

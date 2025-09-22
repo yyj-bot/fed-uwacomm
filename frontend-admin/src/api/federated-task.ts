@@ -24,7 +24,7 @@ interface FederatedTask {
   finalAccuracy?: number
 }
 
-// 任务详情类型
+// 任务详情类型 - v1.3 增强版
 interface FederatedTaskDetails extends FederatedTask {
   algorithm: string
   participants: Array<{
@@ -35,7 +35,15 @@ interface FederatedTaskDetails extends FederatedTask {
     currentEpoch?: number
     loss?: number
     accuracy?: number
+    /** @deprecated 使用 datasetConfig 代替 */
     dataSource?: string
+    // 🆕 v1.3 新增
+    dataRatio?: number
+    capabilities?: string[]
+    constraints?: {
+      maxCpuUsage?: number
+      maxMemoryUsage?: number
+    }
   }>
   metrics?: {
     globalLoss: number
@@ -43,6 +51,16 @@ interface FederatedTaskDetails extends FederatedTask {
     communicationRounds: number
     dataProcessed: number
     estimatedTimeRemaining: number
+  }
+  // 🆕 v1.3 新增：数据集配置信息
+  datasetConfig?: {
+    datasetId: string
+    distributionStrategy: string
+    totalRows: number
+    qualityMetrics?: {
+      iidScore: number
+      balanceScore: number
+    }
   }
 }
 
@@ -101,19 +119,249 @@ interface TaskLog {
   details?: Record<string, unknown>
 }
 
+// ==================== v1.3 新增类型定义 ====================
+
+// 虚拟机类型
+interface AvailableVM {
+  vmId: string
+  name: string
+  ipAddress: string
+  status: 'RUNNING' | 'STOPPED' | 'PAUSED' | 'ERROR'
+  connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
+  osType: string
+  resources: {
+    cpuCores: number
+    memoryMb: number
+    diskGb: number
+    gpuCount: number
+    gpuMemoryMb: number
+  }
+  capabilities: string[]
+  supportedAlgorithms: string[]
+  currentUsage: {
+    cpuUsage: number
+    memoryUsage: number
+    networkUsage: number
+  }
+  networkInfo: {
+    bandwidth: number
+    latency: number
+    uploadSpeed: number
+    downloadSpeed: number
+  }
+  lastHeartbeat: string
+  reliability: {
+    uptime: number
+    avgResponseTime: number
+    taskSuccessRate: number
+  }
+}
+
+// 数据集类型
+interface AvailableDataset {
+  datasetId: string
+  name: string
+  description: string
+  dataType: 'ACOUSTIC' | 'IMAGE' | 'TEXT' | 'NUMERICAL' | 'TIME_SERIES'
+  status: 'READY' | 'PROCESSING' | 'ERROR' | 'UPLOADING'
+  statistics: {
+    totalRows: number
+    totalColumns: number
+    fileSize: number
+    fileSizeFormatted: string
+  }
+  features: {
+    featureColumns: string[]
+    targetColumn: string
+    numericFeatures: number
+    categoricalFeatures: number
+  }
+  quality: {
+    completeness: number
+    consistency: number
+    accuracy: number
+    missingValues: number
+    duplicates: number
+    outliers: number
+  }
+  metadata: {
+    source: string
+    version: string
+    sampleRate?: number
+    frequency?: string
+    environment?: string
+  }
+  tags: string[]
+  uploadTime: string
+  uploadedBy: string
+}
+
+// 角色配置类型
+interface RoleConfig {
+  role: 'PARTICIPANT' | 'AGGREGATOR'
+  name: string
+  description: string
+  requirements: {
+    minCpuCores: number
+    minMemoryMb: number
+    requiredCapabilities: string[]
+  }
+  compatibleAlgorithms: string[]
+}
+
+// 算法模板类型
+interface AlgorithmTemplate {
+  algorithm: string
+  name: string
+  description: string
+  applicableTaskTypes: ('CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION')[]
+  defaultHyperparameters: {
+    learningRate: number
+    batchSize: number
+    epochs: number
+    rounds: number
+    minParticipants: number
+    aggregationMethod: string
+  }
+  parameterRanges: {
+    learningRate: {
+      min: number
+      max: number
+      recommended: number[]
+    }
+    batchSize: {
+      min: number
+      max: number
+      recommended: number[]
+    }
+  }
+}
+
+// 数据分配预览类型
+interface DistributionPreview {
+  distributionResult: {
+    participants: Array<{
+      vmId: string
+      vmName: string
+      allocatedRatio: number
+      allocatedRows: number
+      estimatedTrainingTime: number
+    }>
+  }
+  qualityMetrics: {
+    iidScore: number
+    balanceScore: number
+  }
+}
+
+// 参与者验证类型
+interface ParticipantValidation {
+  overallValid: boolean
+  participantValidations: Array<{
+    vmId: string
+    isValid: boolean
+    validationResults: {
+      connectivity: {
+        status: 'PASS' | 'FAIL'
+        message: string
+      }
+      resources: {
+        status: 'PASS' | 'FAIL'
+        message: string
+      }
+    }
+  }>
+}
+
+// 配置状态类型
+interface ConfigStatus {
+  taskId: string
+  configStatus: 'PENDING' | 'READY' | 'ERROR'
+  configurationSteps: Array<{
+    step: 'DATASET_DISTRIBUTION' | 'PARTICIPANT_VALIDATION' | 'MODEL_INITIALIZATION'
+    status: 'PENDING' | 'COMPLETED' | 'FAILED'
+    completedAt?: string
+  }>
+  participantStatuses: Array<{
+    vmId: string
+    configStatus: 'PENDING' | 'READY' | 'ERROR'
+    dataDistributed: boolean
+    modelInitialized: boolean
+  }>
+}
+
+// 资源使用监控类型
+interface ResourceUsage {
+  taskId: string
+  participantMetrics: Array<{
+    vmId: string
+    currentUsage: {
+      cpu: number
+      memory: number
+      network: {
+        inbound: number
+        outbound: number
+      }
+    }
+    averageUsage: {
+      cpu: number
+      memory: number
+    }
+  }>
+  aggregatedMetrics: {
+    totalCpuUsage: number
+    totalMemoryUsage: number
+    taskProgress: number
+  }
+}
+
 // ==================== 联邦学习任务管理API ====================
 export const federatedTask = {
-  // ==================== 3.1 任务创建接口 ====================
+  // ==================== 3.1 任务创建接口 - v1.3 增强版 ====================
   async createTask(taskData: {
     taskName: string
     taskType: 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION'
     description?: string
     algorithm: string
-    participants: Array<{
+    
+    // 🆕 v1.3 新增：智能数据集配置
+    datasetConfig?: {
+      datasetId: string
+      distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+      distributionRatios: Record<string, number>
+      validationSplit: number
+      testSplit: number
+    }
+    
+    // 🆕 v1.3 新增：智能参与者配置
+    participantConfig?: {
+      selectionMode: 'MANUAL' | 'AUTOMATIC'
+      requirements?: {
+        minParticipants: number
+        maxParticipants: number
+        minCpuCores: number
+        minMemoryMb: number
+      }
+      participants: Array<{
+        vmId: string
+        role: 'PARTICIPANT' | 'AGGREGATOR'
+        dataRatio: number
+        capabilities?: string[]
+        constraints?: {
+          maxCpuUsage?: number
+          maxMemoryUsage?: number
+        }
+      }>
+    }
+    
+    // 兼容旧格式 - 将在 v2.0 中删除
+    /** @deprecated 使用 participantConfig 代替 */
+    participants?: Array<{
       vmId: string
       role: string
       dataSource: string
     }>
+    
     hyperparameters: {
       learningRate: number
       batchSize: number
@@ -141,6 +389,28 @@ export const federatedTask = {
     createdBy: string
     participantCount: number
     estimatedDuration: number
+    
+    // 🆕 v1.3 新增：配置摘要
+    configSummary?: {
+      dataset?: {
+        datasetId: string
+        totalRows: number
+        distributionStrategy: string
+      }
+      participants: Array<{
+        vmId: string
+        vmName: string
+        role: string
+        dataRatio: number
+      }>
+    }
+    
+    // 🆕 v1.3 新增：预计性能指标
+    performanceEstimation?: {
+      expectedAccuracy: number
+      convergenceRounds: number
+      networkTraffic: string
+    }
   }> {
     const response = await federatedTaskApiInstance.post<ApiResponse<{
       taskId: string
@@ -150,6 +420,24 @@ export const federatedTask = {
       createdBy: string
       participantCount: number
       estimatedDuration: number
+      configSummary?: {
+        dataset?: {
+          datasetId: string
+          totalRows: number
+          distributionStrategy: string
+        }
+        participants: Array<{
+          vmId: string
+          vmName: string
+          role: string
+          dataRatio: number
+        }>
+      }
+      performanceEstimation?: {
+        expectedAccuracy: number
+        convergenceRounds: number
+        networkTraffic: string
+      }
     }>>('/tasks', taskData)
     return response.data.data
   },
@@ -393,6 +681,124 @@ export const federatedTask = {
     }>>(`/tasks/${taskId}`, config)
     return response.data.data
   },
+
+  // ==================== v1.3 新增接口组 ====================
+  
+  // ==================== 预配置接口组 ====================
+  
+  /**
+   * 获取可用虚拟机列表
+   */
+  async getAvailableVMs(params: {
+    algorithm?: string
+    minCpuCores?: number
+    minMemoryMb?: number
+    status?: string
+    capabilities?: string
+  } = {}): Promise<{
+    total: number
+    availableVms: AvailableVM[]
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      total: number
+      availableVms: AvailableVM[]
+    }>>('/config/available-vms', { params })
+    return response.data.data
+  },
+
+  /**
+   * 获取可用数据集列表
+   */
+  async getAvailableDatasets(params: {
+    dataType?: string
+    status?: string
+    minSize?: number
+    maxSize?: number
+    keyword?: string
+  } = {}): Promise<{
+    total: number
+    availableDatasets: AvailableDataset[]
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      total: number
+      availableDatasets: AvailableDataset[]
+    }>>('/config/available-datasets', { params })
+    return response.data.data
+  },
+
+  /**
+   * 获取角色配置选项
+   */
+  async getRoleConfigs(): Promise<{
+    roles: RoleConfig[]
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      roles: RoleConfig[]
+    }>>('/config/roles')
+    return response.data.data
+  },
+
+  /**
+   * 获取算法配置模板
+   */
+  async getAlgorithmTemplates(): Promise<{
+    templates: AlgorithmTemplate[]
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      templates: AlgorithmTemplate[]
+    }>>('/config/algorithm-templates')
+    return response.data.data
+  },
+
+  // ==================== 智能配置接口组 ====================
+  
+  /**
+   * 数据分配预览
+   */
+  async previewDataDistribution(data: {
+    datasetId: string
+    distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+    participants: Array<{
+      vmId: string
+      requestedRatio: number
+    }>
+  }): Promise<DistributionPreview> {
+    const response = await federatedTaskApiInstance.post<ApiResponse<DistributionPreview>>('/tasks/preview-distribution', data)
+    return response.data.data
+  },
+
+  /**
+   * 参与者验证
+   */
+  async validateParticipants(data: {
+    algorithm: string
+    taskType: 'CLASSIFICATION' | 'REGRESSION' | 'CLUSTERING' | 'ANOMALY_DETECTION'
+    participants: Array<{
+      vmId: string
+      role: 'PARTICIPANT' | 'AGGREGATOR'
+    }>
+  }): Promise<ParticipantValidation> {
+    const response = await federatedTaskApiInstance.post<ApiResponse<ParticipantValidation>>('/tasks/validate-participants', data)
+    return response.data.data
+  },
+
+  // ==================== 增强监控接口组 ====================
+  
+  /**
+   * 获取配置状态监控
+   */
+  async getConfigStatus(taskId: string): Promise<ConfigStatus> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<ConfigStatus>>(`/tasks/${taskId}/config-status`)
+    return response.data.data
+  },
+
+  /**
+   * 获取资源使用监控
+   */
+  async getResourceUsage(taskId: string): Promise<ResourceUsage> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<ResourceUsage>>(`/tasks/${taskId}/resource-usage`)
+    return response.data.data
+  },
 } as const
 
 // 使用命名导出以保持一致性 
@@ -402,5 +808,14 @@ export type {
   FederatedTask,
   FederatedTaskDetails,
   TaskResults,
-  TaskLog
+  TaskLog,
+  // v1.3 新增类型
+  AvailableVM,
+  AvailableDataset,
+  RoleConfig,
+  AlgorithmTemplate,
+  DistributionPreview,
+  ParticipantValidation,
+  ConfigStatus,
+  ResourceUsage
 }

@@ -11,7 +11,7 @@ import type { PaginationParams, FederatedTask, FederatedTaskDetails, TaskResults
 // ==================== 创建任务相关类型 ====================
 
 /**
- * 创建任务请求
+ * 创建任务请求 - v1.3 增强版
  */
 export interface CreateTaskRequest {
   /** 任务名称 */
@@ -22,12 +22,45 @@ export interface CreateTaskRequest {
   readonly description?: string
   /** 算法名称 */
   readonly algorithm: string
-  /** 参与者列表 */
-  readonly participants: Array<{
+  
+  // 🆕 v1.3 新增：智能数据集配置
+  readonly datasetConfig?: {
+    readonly datasetId: string
+    readonly distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+    readonly distributionRatios: Record<string, number>
+    readonly validationSplit: number
+    readonly testSplit: number
+  }
+  
+  // 🆕 v1.3 新增：智能参与者配置
+  readonly participantConfig?: {
+    readonly selectionMode: 'MANUAL' | 'AUTOMATIC'
+    readonly requirements?: {
+      readonly minParticipants: number
+      readonly maxParticipants: number
+      readonly minCpuCores: number
+      readonly minMemoryMb: number
+    }
+    readonly participants: Array<{
+      readonly vmId: string
+      readonly role: 'PARTICIPANT' | 'AGGREGATOR'
+      readonly dataRatio: number
+      readonly capabilities?: string[]
+      readonly constraints?: {
+        readonly maxCpuUsage?: number
+        readonly maxMemoryUsage?: number
+      }
+    }>
+  }
+  
+  // 兼容旧格式 - 将在 v2.0 中删除
+  /** @deprecated 使用 participantConfig 代替 */
+  readonly participants?: Array<{
     readonly vmId: string
     readonly role: string
     readonly dataSource: string
   }>
+  
   /** 超参数配置 */
   readonly hyperparameters: {
     readonly learningRate: number
@@ -53,7 +86,7 @@ export interface CreateTaskRequest {
 }
 
 /**
- * 创建任务响应
+ * 创建任务响应 - v1.3 增强版
  */
 export interface CreateTaskResponse {
   /** 任务ID */
@@ -70,6 +103,28 @@ export interface CreateTaskResponse {
   readonly participantCount: number
   /** 预估执行时间（秒） */
   readonly estimatedDuration: number
+  
+  // 🆕 v1.3 新增：配置摘要
+  readonly configSummary?: {
+    readonly dataset?: {
+      readonly datasetId: string
+      readonly totalRows: number
+      readonly distributionStrategy: string
+    }
+    readonly participants: Array<{
+      readonly vmId: string
+      readonly vmName: string
+      readonly role: string
+      readonly dataRatio: number
+    }>
+  }
+  
+  // 🆕 v1.3 新增：预计性能指标
+  readonly performanceEstimation?: {
+    readonly expectedAccuracy: number
+    readonly convergenceRounds: number
+    readonly networkTraffic: string
+  }
 }
 
 // ==================== 配置任务相关类型 ====================
@@ -472,7 +527,7 @@ export interface TaskStatistics {
 // ==================== 错误类型 ====================
 
 /**
- * 联邦学习任务服务错误类型
+ * 联邦学习任务服务错误类型 - v1.3 增强版
  */
 export interface FederatedTaskServiceError {
   /** 错误码 */
@@ -483,10 +538,17 @@ export interface FederatedTaskServiceError {
   readonly details?: unknown
   /** 原始错误 */
   readonly originalError?: Error
+  
+  // 🆕 v1.3 新增：废弃警告信息
+  readonly deprecationWarning?: {
+    readonly deprecationVersion: string
+    readonly removalVersion: string
+    readonly migrationGuide: string
+  }
 }
 
 /**
- * 任务操作错误类型
+ * 任务操作错误类型 - v1.3 增强版
  */
 export interface TaskOperationError extends FederatedTaskServiceError {
   /** 任务ID */
@@ -500,6 +562,7 @@ export interface TaskOperationError extends FederatedTaskServiceError {
     | 'TASK_ALREADY_EXISTS'
     | 'TASK_INVALID_STATUS'
     | 'TASK_CONFIG_ERROR'
+    | 'DATASET_CONFIG_ERROR'  // 🆕 v1.3 新增
     | 'INSUFFICIENT_PARTICIPANTS'
     | 'PARTICIPANT_OFFLINE'
     | 'MODEL_ERROR'
