@@ -24,7 +24,6 @@ import { useSystem } from '@/store/system'
 import { LogList, LogFilters, SystemMonitor, LogCleanup, LogStatistics, LogConfig } from './components'
 
 const { Title } = Typography
-const { TabPane } = Tabs
 
 const SystemPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('logs')
@@ -37,6 +36,84 @@ const SystemPage: React.FC = () => {
   const errorLogCount = logList?.filter(log => log.level === 'ERROR').length || 0
   const warningLogCount = logList?.filter(log => log.level === 'WARN').length || 0
   const totalIssues = errorLogCount + warningLogCount
+
+  // 子Tabs的items配置
+  const logTabItems = [
+    {
+      key: 'list',
+      label: '日志查询',
+      children: (
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <LogFilters />
+          <LogList height={500} />
+        </Space>
+      )
+    },
+    {
+      key: 'statistics',
+      label: '日志统计',
+      children: <LogStatistics />
+    },
+    {
+      key: 'cleanup',
+      label: '日志清理',
+      children: <LogCleanup />
+    }
+  ]
+
+  // 主Tabs的items配置
+  const mainTabItems = [
+    {
+      key: 'logs',
+      label: (
+        <Space>
+          <FileTextOutlined />
+          系统日志
+          {totalIssues > 0 && (
+            <Badge 
+              count={totalIssues} 
+              size="small"
+              style={{ backgroundColor: errorLogCount > 0 ? '#ff4d4f' : '#faad14' }}
+            />
+          )}
+        </Space>
+      ),
+      children: (
+        <Tabs 
+          type="card" 
+          size="small"
+          defaultActiveKey="list"
+          items={logTabItems}
+        />
+      )
+    },
+    {
+      key: 'monitor',
+      label: (
+        <Space>
+          <DashboardOutlined />
+          系统监控
+          {systemMonitor?.logMetrics?.errorRate > 1 && (
+            <Badge 
+              status="error" 
+              title={`错误率: ${systemMonitor.logMetrics.errorRate.toFixed(2)}%`}
+            />
+          )}
+        </Space>
+      ),
+      children: <SystemMonitor />
+    },
+    {
+      key: 'config',
+      label: (
+        <Space>
+          <SettingOutlined />
+          日志配置
+        </Space>
+      ),
+      children: <LogConfig />
+    }
+  ]
 
   return (
     <div style={{ padding: '0 24px' }}>
@@ -54,73 +131,8 @@ const SystemPage: React.FC = () => {
         onChange={setActiveTab}
         type="card"
         size="large"
-      >
-        <TabPane
-          tab={
-            <Space>
-              <FileTextOutlined />
-              系统日志
-              {totalIssues > 0 && (
-                <Badge 
-                  count={totalIssues} 
-                  size="small"
-                  style={{ backgroundColor: errorLogCount > 0 ? '#ff4d4f' : '#faad14' }}
-                />
-              )}
-            </Space>
-          }
-          key="logs"
-        >
-          <Tabs 
-            type="card" 
-            size="small"
-            defaultActiveKey="list"
-          >
-            <TabPane tab="日志查询" key="list">
-              <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <LogFilters />
-                <LogList height={500} />
-              </Space>
-            </TabPane>
-            <TabPane tab="日志统计" key="statistics">
-              <LogStatistics />
-            </TabPane>
-            <TabPane tab="日志清理" key="cleanup">
-              <LogCleanup />
-            </TabPane>
-          </Tabs>
-        </TabPane>
-
-        <TabPane
-          tab={
-            <Space>
-              <DashboardOutlined />
-              系统监控
-              {systemMonitor?.logMetrics?.errorRate > 1 && (
-                <Badge 
-                  status="error" 
-                  title={`错误率: ${systemMonitor.logMetrics.errorRate.toFixed(2)}%`}
-                />
-              )}
-            </Space>
-          }
-          key="monitor"
-        >
-          <SystemMonitor />
-        </TabPane>
-
-        <TabPane
-          tab={
-            <Space>
-              <SettingOutlined />
-              日志配置
-            </Space>
-          }
-          key="config"
-        >
-          <LogConfig />
-        </TabPane>
-      </Tabs>
+        items={mainTabItems}
+      />
     </div>
   )
 }

@@ -12,7 +12,7 @@ import { LoadingOutlined } from '@ant-design/icons'
 import classNames from 'classnames'
 import './Button.module.css'
 
-export interface ButtonProps extends Omit<AntdButtonProps, 'loading'> {
+export interface ButtonProps extends Omit<AntdButtonProps, 'loading' | 'variant' | 'iconPosition'> {
   /** 按钮变体 */
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost'
   /** 按钮尺寸 */

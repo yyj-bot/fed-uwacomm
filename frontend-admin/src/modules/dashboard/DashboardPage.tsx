@@ -19,7 +19,7 @@ import {
   WarningOutlined
 } from '@ant-design/icons'
 
-import { useDashboard, useVM, useTask, useWebSocket } from '@/store'
+import { useDashboard, useVM, useTask } from '@/store'
 import { StatusIndicator, Table } from '@/components'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { 
@@ -29,7 +29,7 @@ import {
   RecentActivities,
   PerformanceCharts 
 } from './components'
-import './DashboardPage.module.css'
+import styles from './DashboardPage.module.css'
 
 const { Title, Text } = Typography
 
@@ -46,7 +46,6 @@ const DashboardPage: React.FC = () => {
   
   const { vmList } = useVM()
   const { taskList } = useTask()
-  const { isConnected } = useWebSocket()
   
   // 计算虚拟机统计
   const totalVMs = vmList?.length || 0
@@ -121,24 +120,17 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="fed-dashboard">
+    <div className={styles['fed-dashboard']}>
       {/* 页面标题 */}
-      <div className="fed-dashboard-header">
-        <div className="fed-dashboard-title">
+      <div className={styles['fed-dashboard-header']}>
+        <div className={styles['fed-dashboard-title']}>
           <Title level={2}>仪表盘</Title>
           <Text type="secondary">系统运行状态一览</Text>
         </div>
-        <div className="fed-dashboard-actions">
-          <Space>
-            <StatusIndicator
-              status={isConnected ? 'online' : 'offline'}
-              text={isConnected ? '系统正常' : '连接异常'}
-              variant="badge"
-            />
-            <Button type="primary" onClick={() => window.location.reload()}>
-              刷新数据
-            </Button>
-          </Space>
+        <div className={styles['fed-dashboard-actions']}>
+          <Button type="primary" onClick={() => window.location.reload()}>
+            刷新数据
+          </Button>
         </div>
       </div>
 
@@ -149,7 +141,7 @@ const DashboardPage: React.FC = () => {
       />
 
       {/* 主要内容区域 */}
-      <Row gutter={[24, 24]} className="fed-dashboard-content">
+      <Row gutter={[24, 24]} className={styles['fed-dashboard-content']}>
         {/* 左侧列 */}
         <Col xs={24} lg={16}>
           {/* 系统状态监控 */}
@@ -160,7 +152,7 @@ const DashboardPage: React.FC = () => {
           
           {/* 性能图表 */}
           <ErrorBoundary fallback={
-            <Card title="性能监控" className="fed-dashboard-card">
+            <Card title="性能监控" className={styles['fed-dashboard-card']}>
               <div style={{ textAlign: 'center', padding: '40px' }}>
                 <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
                 <p>图表组件加载失败，请刷新页面重试</p>
@@ -180,7 +172,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="快速操作" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
           >
             <Space direction="vertical" style={{ width: '100%' }}>
               <Button 
@@ -215,7 +207,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="运行中的虚拟机" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
             extra={<Text type="secondary">{runningVMs}/{totalVMs}</Text>}
           >
             <List
@@ -252,7 +244,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="活跃任务" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
             extra={<Text type="secondary">{activeTasks?.length || 0}</Text>}
           >
             <List

@@ -79,7 +79,7 @@ const OverviewCards: React.FC<OverviewCardsProps> = ({
         <Col xs={12} sm={12} lg={6} key={index}>
           <Card 
             className={`fed-overview-card fed-overview-card--${card.type}`}
-            bodyStyle={{ textAlign: 'center' }}
+            styles={{ body: { textAlign: 'center' } }}
           >
             {card.icon}
             <Statistic
