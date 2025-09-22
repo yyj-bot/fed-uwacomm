@@ -3,6 +3,9 @@ package com.feduwacomm.testdata;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
+import com.feduwacomm.enums.VmStatus;
 import com.feduwacomm.utils.PasswordUtil;
 import com.feduwacomm.vo.*;
 
@@ -28,8 +31,8 @@ public class TestDataBuilder {
                     .username("testuser")
                     .email("test@example.com")
                     .passwordHash(PasswordUtil.encode("password123"))
-                    .role("VIEWER")
-                    .status("ACTIVE")
+                    .role(UserRole.fromCode("VIEWER"))
+                    .status(UserStatus.fromCode("ACTIVE"))
                     .loginAttempts(0)
                     .lastLoginTime(LocalDateTime.now().minusHours(1))
                     .lastLoginIp("192.168.1.100")
@@ -43,26 +46,26 @@ public class TestDataBuilder {
             return validUser()
                     .username("admin")
                     .email("admin@example.com")
-                    .role("ADMIN");
+                    .role(UserRole.fromCode("ADMIN"));
         }
         
         public static User.UserBuilder researcherUser() {
             return validUser()
                     .username("researcher")
                     .email("researcher@example.com")
-                    .role("RESEARCHER");
+                    .role(UserRole.fromCode("RESEARCHER"));
         }
         
         public static User.UserBuilder lockedUser() {
             return validUser()
-                    .status("LOCKED")
+                    .status(UserStatus.fromCode("LOCKED"))
                     .loginAttempts(5)
                     .lockedUntil(LocalDateTime.now().plusHours(1));
         }
         
         public static User.UserBuilder expiredLockedUser() {
             return validUser()
-                    .status("LOCKED")
+                    .status(UserStatus.fromCode("LOCKED"))
                     .loginAttempts(3)
                     .lockedUntil(LocalDateTime.now().minusHours(1));
         }
@@ -261,7 +264,7 @@ public class TestDataBuilder {
             return VmInstance.builder()
                     .id(generateTestId())
                     .name("Test VM")
-                    .status("RUNNING")
+                    .status(VmStatus.fromCode("RUNNING"))
                     .ipAddress("192.168.1.10")
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now());
