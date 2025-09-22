@@ -142,7 +142,7 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
         </Button>
       ]}
       width={700}
-      destroyOnClose
+      destroyOnHidden
     >
       <Spin spinning={isLoading}>
         {currentUser ? (

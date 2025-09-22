@@ -87,13 +87,15 @@ export class AdminUserService {
     try {
       this.validateCreateUserRequest(userData)
       
-      const user = await admin.createUser({
+      const createRequest = {
         username: userData.username,
         email: userData.email,
         password: userData.password,
         role: userData.role,
         status: userData.status || 'ACTIVE'
-      })
+      }
+      
+      const user = await admin.createUser(createRequest)
       
       return this.transformUser(user)
     } catch (error) {

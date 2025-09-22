@@ -95,6 +95,7 @@ export const LogCleanup: React.FC = () => {
       }
     } catch (error) {
       console.error('获取清理状态失败:', error)
+      // 静默处理，避免过多错误提示
     }
     return null
   }
@@ -159,6 +160,7 @@ export const LogCleanup: React.FC = () => {
       }
     } catch (error) {
       console.error('获取清理历史失败:', error)
+      message.error('获取清理历史失败，请刷新重试')
     }
   }
 
@@ -218,11 +220,32 @@ export const LogCleanup: React.FC = () => {
               form.resetFields()
               fetchCleanupHistory() // 刷新历史记录
             } else {
-              const error = await response.json()
-              message.error(`清理失败: ${error.message || '未知错误'}`)
+              const errorResult = await response.json().catch(() => ({}))
+              const errorMessage = errorResult.message || '清理失败，请重试'
+              message.error(errorMessage)
             }
           } catch (error) {
-            message.error('清理失败：' + error.message)
+            console.error('清理失败:', error)
+            
+            let errorMessage = '清理失败，请重试'
+            if (error instanceof Error) {
+              errorMessage = error.message
+            } else if (typeof error === 'string') {
+              errorMessage = error
+            }
+            
+            // 提供友好的错误提示
+            if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+              errorMessage = '您没有执行日志清理的权限'
+            } else if (errorMessage.includes('in progress') || errorMessage.includes('进行中')) {
+              errorMessage = '已有清理任务在进行中，请等待完成后再试'
+            } else if (errorMessage.includes('database') || errorMessage.includes('数据库')) {
+              errorMessage = '数据库连接失败，请稍后重试'
+            } else if (errorMessage.includes('disk space') || errorMessage.includes('磁盘空间')) {
+              errorMessage = '磁盘空间不足，无法执行清理操作'
+            }
+            
+            message.error(errorMessage)
           } finally {
             setCleanupLoading(false)
           }

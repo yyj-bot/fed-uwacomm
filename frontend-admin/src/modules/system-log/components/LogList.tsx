@@ -138,11 +138,45 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       if (result.success && result.data) {
         setSelectedLog(result.data)
       } else {
-        message.error(result.error || '获取日志详情失败')
+        let errorMessage = result.error || '获取日志详情失败'
+        
+        // 提供更友好的错误提示
+        if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+          errorMessage = '您没有查看该日志的权限'
+        } else if (errorMessage.includes('not found') || errorMessage.includes('不存在')) {
+          errorMessage = '日志记录不存在或已被删除'
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
+          errorMessage = '请求超时，请稍后重试'
+        }
+        
+        message.error(errorMessage)
         setDetailVisible(false)
       }
     } catch (error) {
-      message.error('获取日志详情失败')
+      console.error('获取日志详情失败:', error)
+      
+      let errorMessage = '获取日志详情失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('network') || errorMessage.includes('网络')) {
+        errorMessage = '网络连接失败，请检查网络状态'
+      } else if (errorMessage.includes('server') || errorMessage.includes('服务器')) {
+        errorMessage = '服务器暂时不可用，请稍后重试'
+      }
+      
+      message.error(errorMessage)
       setDetailVisible(false)
     } finally {
       setDetailLoading(false)
@@ -207,14 +241,36 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
 
         message.success('日志导出成功')
         setExportVisible(false)
-      } else {
-        message.error('导出失败，请重试')
-      }
-    } catch (error) {
-      message.error('导出失败：' + error.message)
-    } finally {
-      setExportLoading(false)
-    }
+            } else {
+              const errorResult = await response.json().catch(() => ({}))
+              const errorMessage = errorResult.message || '导出失败，请重试'
+              message.error(errorMessage)
+            }
+          } catch (error) {
+            console.error('导出失败:', error)
+            
+            let errorMessage = '导出失败，请重试'
+            if (error instanceof Error) {
+              errorMessage = error.message
+            } else if (typeof error === 'string') {
+              errorMessage = error
+            }
+            
+            // 提供友好的错误提示
+            if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+              errorMessage = '您没有导出日志的权限'
+            } else if (errorMessage.includes('too many') || errorMessage.includes('过多')) {
+              errorMessage = '选择的日志数量过多，请缩小范围后重试'
+            } else if (errorMessage.includes('network') || errorMessage.includes('网络')) {
+              errorMessage = '网络连接失败，请检查网络状态'
+            } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
+              errorMessage = '导出超时，请稍后重试'
+            }
+            
+            message.error(errorMessage)
+          } finally {
+            setExportLoading(false)
+          }
   }
 
   // 表格列定义
@@ -359,7 +415,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
         onCancel={() => setDetailVisible(false)}
         footer={null}
         width={800}
-        destroyOnClose
+        destroyOnHidden
       >
         <LogDetail 
           log={selectedLog} 

@@ -93,4 +93,7 @@ export const getStatusColor = (status: string): string => {
     FAILED: '#ff4d4f',
   }
   return statusColors[status] || '#d9d9d9'
-} 
+}
+
+// 导出错误处理工具
+export * from './error-handler' 

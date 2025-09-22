@@ -44,17 +44,49 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
     try {
       const values = await form.validateFields()
       
-      await resetUserPassword(user.userId, {
+      const result = await resetUserPassword(user.userId, {
         newPassword: values.newPassword
       })
       
-      message.success('密码重置成功')
-      form.resetFields()
-      onCancel()
-      onSuccess?.()
+      if (result.success) {
+        message.success('密码重置成功')
+        form.resetFields()
+        onCancel()
+        onSuccess?.()
+      } else {
+        throw new Error(result.error || '重置密码失败')
+      }
     } catch (error) {
       console.error('重置密码失败:', error)
-      // 错误消息已在store中处理
+      
+      let errorMessage = '重置密码失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+        errorMessage = '您没有重置该用户密码的权限'
+      } else if (errorMessage.includes('password policy') || errorMessage.includes('密码策略')) {
+        errorMessage = '新密码不符合安全策略要求'
+      } else if (errorMessage.includes('same password') || errorMessage.includes('相同密码')) {
+        errorMessage = '新密码不能与当前密码相同'
+      } else if (errorMessage.includes('not found') || errorMessage.includes('不存在')) {
+        errorMessage = '用户不存在'
+      } else if (errorMessage.includes('locked') || errorMessage.includes('锁定')) {
+        errorMessage = '用户已被锁定，无法重置密码'
+      }
+      
+      message.error(errorMessage)
     }
   }
 
@@ -87,7 +119,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           重置密码
         </Button>
       ]}
-      destroyOnClose
+      destroyOnHidden
       width={500}
     >
       {user && (

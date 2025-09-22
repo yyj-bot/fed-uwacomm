@@ -75,31 +75,122 @@ const UserManagement: React.FC = () => {
 
   const handleDeleteUser = useCallback(async (user: User) => {
     try {
-      await deleteUser(user.userId)
-      message.success('用户删除成功')
+      const result = await deleteUser(user.userId)
+      
+      if (result.success) {
+        message.success('用户删除成功')
+      } else {
+        throw new Error(result.error || '删除用户失败')
+      }
     } catch (error) {
       console.error('删除用户失败:', error)
-      message.error('删除用户失败')
+      
+      let errorMessage = '删除用户失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+        errorMessage = '您没有删除该用户的权限'
+      } else if (errorMessage.includes('in use') || errorMessage.includes('使用中')) {
+        errorMessage = '该用户正在使用中，无法删除'
+      } else if (errorMessage.includes('admin') || errorMessage.includes('管理员')) {
+        errorMessage = '无法删除管理员用户'
+      } else if (errorMessage.includes('not found') || errorMessage.includes('不存在')) {
+        errorMessage = '用户不存在或已被删除'
+      }
+      
+      message.error(errorMessage)
     }
   }, [deleteUser])
 
   const handleLockUser = useCallback(async (user: User) => {
     try {
-      await lockUser(user.userId)
-      message.success('用户已锁定')
+      const result = await lockUser(user.userId)
+      
+      if (result.success) {
+        message.success('用户已锁定')
+      } else {
+        throw new Error(result.error || '锁定用户失败')
+      }
     } catch (error) {
       console.error('锁定用户失败:', error)
-      message.error('锁定用户失败')
+      
+      let errorMessage = '锁定用户失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+        errorMessage = '您没有锁定该用户的权限'
+      } else if (errorMessage.includes('already locked') || errorMessage.includes('已锁定')) {
+        errorMessage = '该用户已经被锁定'
+      } else if (errorMessage.includes('admin') || errorMessage.includes('管理员')) {
+        errorMessage = '无法锁定管理员用户'
+      } else if (errorMessage.includes('not found') || errorMessage.includes('不存在')) {
+        errorMessage = '用户不存在'
+      }
+      
+      message.error(errorMessage)
     }
   }, [lockUser])
 
   const handleUnlockUser = useCallback(async (user: User) => {
     try {
-      await unlockUser(user.userId)
-      message.success('用户已解锁')
+      const result = await unlockUser(user.userId)
+      
+      if (result.success) {
+        message.success('用户已解锁')
+      } else {
+        throw new Error(result.error || '解锁用户失败')
+      }
     } catch (error) {
       console.error('解锁用户失败:', error)
-      message.error('解锁用户失败')
+      
+      let errorMessage = '解锁用户失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+        errorMessage = '您没有解锁该用户的权限'
+      } else if (errorMessage.includes('not locked') || errorMessage.includes('未锁定')) {
+        errorMessage = '该用户未被锁定'
+      } else if (errorMessage.includes('not found') || errorMessage.includes('不存在')) {
+        errorMessage = '用户不存在'
+      }
+      
+      message.error(errorMessage)
     }
   }, [unlockUser])
 
@@ -158,9 +249,8 @@ const UserManagement: React.FC = () => {
       items.push({
         key: 'delete',
         label: '删除',
-        icon: <DeleteOutlined />,
-        danger: true
-      })
+        icon: <DeleteOutlined />
+      } as any)
     }
 
     return {
@@ -396,9 +486,8 @@ const UserManagement: React.FC = () => {
         dataSource={filteredData}
         loading={userListLoading}
         rowKey="userId"
-        showRefresh
-        showColumnSetting
-        onRefresh={handleRefresh}
+        showRefresh={false}
+        showColumnSetting={false}
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,

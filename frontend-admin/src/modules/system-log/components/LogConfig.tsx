@@ -93,7 +93,32 @@ export const LogConfig: React.FC = () => {
     try {
       await fetchLogConfig()
     } catch (error) {
-      message.error('获取日志配置失败')
+      console.error('获取日志配置失败:', error)
+      
+      let errorMessage = '获取日志配置失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error && typeof error === 'object') {
+        const apiError = error as any
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message
+        } else if (apiError.message) {
+          errorMessage = apiError.message
+        }
+      }
+      
+      // 提供友好的错误提示
+      if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+        errorMessage = '您没有查看日志配置的权限'
+      } else if (errorMessage.includes('network') || errorMessage.includes('网络')) {
+        errorMessage = '网络连接失败，请检查网络状态'
+      } else if (errorMessage.includes('server') || errorMessage.includes('服务器')) {
+        errorMessage = '服务器暂时不可用，请稍后重试'
+      }
+      
+      message.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -111,10 +136,39 @@ export const LogConfig: React.FC = () => {
       // 重新获取配置
       await fetchLogConfig()
     } catch (error) {
+      console.error('保存日志配置失败:', error)
+      
       if (error.errorFields) {
-        message.error('请检查表单输入')
+        message.error('请检查表单输入，确保所有必填项都已正确填写')
       } else {
-        message.error('保存日志配置失败')
+        let errorMessage = '保存日志配置失败'
+        if (error instanceof Error) {
+          errorMessage = error.message
+        } else if (typeof error === 'string') {
+          errorMessage = error
+        } else if (error && typeof error === 'object') {
+          const apiError = error as any
+          if (apiError.response?.data?.message) {
+            errorMessage = apiError.response.data.message
+          } else if (apiError.message) {
+            errorMessage = apiError.message
+          }
+        }
+        
+        // 提供友好的错误提示
+        if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+          errorMessage = '您没有修改日志配置的权限'
+        } else if (errorMessage.includes('validation') || errorMessage.includes('验证')) {
+          errorMessage = '配置参数不合法，请检查输入值的范围'
+        } else if (errorMessage.includes('conflict') || errorMessage.includes('冲突')) {
+          errorMessage = '配置存在冲突，请检查设置是否合理'
+        } else if (errorMessage.includes('network') || errorMessage.includes('网络')) {
+          errorMessage = '网络连接失败，请检查网络状态'
+        } else if (errorMessage.includes('server') || errorMessage.includes('服务器')) {
+          errorMessage = '服务器暂时不可用，请稍后重试'
+        }
+        
+        message.error(errorMessage)
       }
     } finally {
       setSaving(false)

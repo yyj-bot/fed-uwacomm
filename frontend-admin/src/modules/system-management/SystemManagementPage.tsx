@@ -19,11 +19,10 @@ import {
 
 import { useAdmin } from '@/store'
 import { Table, StatusIndicator } from '@/components'
-import { UserManagement, SystemSettings, PermissionManagement } from './components'
+import { UserManagement, PermissionManagement } from './components'
 import './SystemManagementPage.module.css'
 
 const { Title, Text } = Typography
-const { TabPane } = Tabs
 
 const SystemManagementPage: React.FC = () => {
   const { 
@@ -74,7 +73,7 @@ const SystemManagementPage: React.FC = () => {
       <div className="fed-system-management-header">
         <div className="fed-system-management-title">
           <Title level={2}>系统管理</Title>
-          <Text type="secondary">管理用户、权限和系统配置</Text>
+          <Text type="secondary">管理用户和权限</Text>
         </div>
         <div className="fed-system-management-actions">
           <Space>
@@ -83,9 +82,6 @@ const SystemManagementPage: React.FC = () => {
               text="系统正常"
               variant="badge"
             />
-            <Button type="primary" icon={<SettingOutlined />}>
-              系统设置
-            </Button>
           </Space>
         </div>
       </div>
@@ -116,43 +112,32 @@ const SystemManagementPage: React.FC = () => {
 
       {/* 管理功能选项卡 */}
       <Card className="fed-system-management-content">
-        <Tabs defaultActiveKey="users" size="large">
-          <TabPane 
-            tab={
-              <span>
-                <UserOutlined />
-                用户管理
-              </span>
-            } 
-            key="users"
-          >
-            <UserManagement />
-          </TabPane>
-
-          <TabPane 
-            tab={
-              <span>
-                <SafetyOutlined />
-                权限管理
-              </span>
-            } 
-            key="permissions"
-          >
-            <PermissionManagement />
-          </TabPane>
-
-          <TabPane 
-            tab={
-              <span>
-                <SettingOutlined />
-                系统设置
-              </span>
-            } 
-            key="settings"
-          >
-            <SystemSettings />
-          </TabPane>
-        </Tabs>
+        <Tabs 
+          defaultActiveKey="users" 
+          size="large"
+          items={[
+            {
+              key: 'users',
+              label: (
+                <span>
+                  <UserOutlined />
+                  用户管理
+                </span>
+              ),
+              children: <UserManagement />
+            },
+            {
+              key: 'permissions',
+              label: (
+                <span>
+                  <SafetyOutlined />
+                  权限管理
+                </span>
+              ),
+              children: <PermissionManagement />
+            }
+          ]}
+        />
       </Card>
     </div>
   )

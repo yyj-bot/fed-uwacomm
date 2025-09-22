@@ -54,15 +54,30 @@ export const LogStatistics: React.FC = () => {
   }, [])
 
   // 刷新统计数据
-  const handleRefresh = () => {
-    const params = {
-      startTime: timeRange[0].format('YYYY-MM-DDTHH:mm:ss'),
-      endTime: timeRange[1].format('YYYY-MM-DDTHH:mm:ss'),
-      category,
-      vmId,
-      taskId
+  const handleRefresh = async () => {
+    const params: any = {}
+    
+    // 只添加有值的参数，避免传递 undefined
+    if (category) params.category = category
+    if (vmId) params.vmId = vmId
+    if (taskId) params.taskId = taskId
+    
+    // 只有当时间范围有效时才添加时间参数
+    if (timeRange && timeRange[0] && timeRange[1]) {
+      // 使用ISO 8601格式，符合API文档要求
+      params.startTime = timeRange[0].format('YYYY-MM-DDTHH:mm:ss')
+      params.endTime = timeRange[1].format('YYYY-MM-DDTHH:mm:ss')
     }
-    fetchLogStatistics(params)
+    
+    console.log('📊 [LogStatistics] 发送统计查询请求:', params)
+    
+    try {
+      await fetchLogStatistics(params)
+      console.log('✅ [LogStatistics] 统计数据获取成功')
+    } catch (error) {
+      console.error('❌ [LogStatistics] 统计数据获取失败:', error)
+      // 可以在这里添加用户友好的错误提示
+    }
   }
 
   // 应用筛选

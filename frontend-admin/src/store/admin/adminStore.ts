@@ -526,15 +526,16 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
     try {
       const statistics = await adminService.getUserStatistics()
       
-      // 转换为组件需要的格式
+      // 转换为组件需要的格式，添加安全检查
+      const roleDistribution = statistics.roleDistribution || {} as Record<string, number>
       const transformedStats = {
-        totalUsers: statistics.totalUsers,
-        activeUsers: statistics.activeUsers,
-        lockedUsers: statistics.lockedUsers,
-        adminUsers: statistics.roleDistribution.ADMIN,
-        researcherUsers: statistics.roleDistribution.RESEARCHER,
-        operatorUsers: statistics.roleDistribution.OPERATOR,
-        viewerUsers: statistics.roleDistribution.VIEWER
+        totalUsers: statistics.totalUsers || 0,
+        activeUsers: statistics.activeUsers || 0,
+        lockedUsers: statistics.lockedUsers || 0,
+        adminUsers: roleDistribution['ADMIN'] || 0,
+        researcherUsers: roleDistribution['RESEARCHER'] || 0,
+        operatorUsers: roleDistribution['OPERATOR'] || 0,
+        viewerUsers: roleDistribution['VIEWER'] || 0
       }
       
       set({ userStatistics: transformedStats })

@@ -16,6 +16,7 @@ export { default as Loading } from './Loading'
 // ==================== 业务组件 ====================
 export { default as StatusIndicator } from './StatusIndicator'
 export { ErrorBoundary } from './ErrorBoundary'
+export { default as ChartErrorBoundary } from './ChartErrorBoundary'
 
 // ==================== 组件类型导出 ====================
 export type { ButtonProps } from './Button'

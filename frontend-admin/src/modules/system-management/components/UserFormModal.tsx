@@ -17,6 +17,7 @@ import {
 } from 'antd'
 import { UserOutlined, MailOutlined, LockOutlined } from '@ant-design/icons'
 import { useAdmin } from '@/store'
+import { getFriendlyErrorMessage } from '@/utils'
 import type { User } from '@/types'
 
 const { Option } = Select
@@ -38,7 +39,13 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   mode
 }) => {
   const [form] = Form.useForm()
-  const { createUser, updateUser, createUserLoading, operationLoading } = useAdmin()
+  const { 
+    createUser, 
+    updateUser, 
+    createUserLoading, 
+    operationLoading,
+    createUserError 
+  } = useAdmin()
 
   const isLoading = createUserLoading || operationLoading[`update-${editUser?.userId}`] || false
 
@@ -54,9 +61,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         })
       } else {
         form.resetFields()
-        form.setFieldsValue({
-          status: true // 默认激活状态
-        })
+        // 创建模式下，让initialValue生效
       }
     }
   }, [visible, mode, editUser, form])
@@ -65,33 +70,51 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     try {
       const values = await form.validateFields()
       
-      const userData = {
-        username: values.username,
-        email: values.email,
-        role: values.role,
-        status: values.status ? 'ACTIVE' : 'INACTIVE',
-        ...(mode === 'create' ? { password: values.password } : {})
-      }
-
       if (mode === 'create') {
-        await createUser(userData)
-        message.success('用户创建成功')
+        const createData = {
+          username: values.username,
+          email: values.email,
+          role: values.role,
+          status: values.status ? 'ACTIVE' as const : 'INACTIVE' as const,
+          password: values.password
+        }
+        
+        const result = await createUser(createData)
+        
+        if (result.success) {
+          message.success('用户创建成功')
+          form.resetFields()
+          onCancel()
+          onSuccess?.()
+        } else {
+          // 错误处理在下面的catch块中统一处理
+          throw new Error(result.error || '创建用户失败')
+        }
       } else if (editUser) {
         // 编辑模式下，如果提供了新密码才传递
-        const updateData = {
-          ...userData,
+        const updateData: any = {
+          username: values.username,
+          email: values.email,
+          role: values.role,
+          status: values.status ? 'ACTIVE' as const : 'INACTIVE' as const,
           ...(values.password ? { password: values.password } : {})
         }
-        await updateUser(editUser.userId, updateData)
-        message.success('用户更新成功')
+        const result = await updateUser(editUser.userId, updateData)
+        
+        if (result.success) {
+          message.success('用户更新成功')
+          form.resetFields()
+          onCancel()
+          onSuccess?.()
+        } else {
+          // 错误处理在下面的catch块中统一处理
+          throw new Error(result.error || '更新用户失败')
+        }
       }
-
-      form.resetFields()
-      onCancel()
-      onSuccess?.()
     } catch (error) {
       console.error('用户操作失败:', error)
-      // 错误消息已在store中处理，这里不需要额外显示
+      const errorMessage = getFriendlyErrorMessage(error, mode === 'create' ? 'user' : 'user')
+      message.error(errorMessage)
     }
   }
 
@@ -101,10 +124,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
   }
 
   return (
-    <Modal
-      title={mode === 'create' ? '添加用户' : '编辑用户'}
-      open={visible}
-      onCancel={handleCancel}
+      <Modal
+        title={mode === 'create' ? '添加用户' : '编辑用户'}
+        open={visible}
+        onCancel={handleCancel}
       footer={[
         <Button key="cancel" onClick={handleCancel}>
           取消
@@ -118,7 +141,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           {mode === 'create' ? '创建' : '更新'}
         </Button>
       ]}
-      destroyOnClose
+      destroyOnHidden
       width={600}
     >
       <Spin spinning={isLoading}>
@@ -194,6 +217,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             label="账户状态"
             name="status"
             valuePropName="checked"
+            initialValue={true}
           >
             <Switch 
               checkedChildren="激活" 
