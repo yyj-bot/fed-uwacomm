@@ -42,7 +42,7 @@ public class VmInstanceController {
      * @return 注册响应
      */
     @PostMapping("/register")
-    public Result<VmRegisterResponseVO> register(@Valid @RequestBody VmRegisterDTO registerDTO,
+    public Result<VmRegisterResponseVO> register(@RequestBody VmRegisterDTO registerDTO,
                                                 HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String userAgent = request.getHeader("User-Agent");

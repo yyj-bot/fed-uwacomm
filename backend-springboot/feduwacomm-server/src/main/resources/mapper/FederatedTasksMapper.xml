@@ -300,4 +300,16 @@
         FROM federated_tasks WHERE id = #{id}
     </select>
 
+    <!-- v1.3 新增：检查VM占用情况 -->
+    <select id="countTasksByVmIdAndStatuses" resultType="int">
+        SELECT COUNT(DISTINCT ft.id)
+        FROM federated_tasks ft
+        INNER JOIN task_participants tp ON ft.id = tp.task_id
+        WHERE tp.vm_id = #{vmId}
+        AND ft.status IN
+        <foreach collection="statuses" item="status" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+    </select>
+
 </mapper>

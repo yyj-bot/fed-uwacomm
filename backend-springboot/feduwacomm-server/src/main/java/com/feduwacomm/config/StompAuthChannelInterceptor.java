@@ -43,6 +43,8 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+            System.out.println("STOMP CONNECT命令认证开始");
+            System.out.println("Native Headers: " + accessor.toNativeHeaderMap());
             String authorization = firstNonEmpty(
                     accessor.getFirstNativeHeader("Authorization"),
                     accessor.getFirstNativeHeader("authorization"));
@@ -57,7 +59,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                         accessor.getFirstNativeHeader("Token"));
             }
 
+            // 如果STOMP头中没有token，尝试从WebSocket session attributes中获取
+            if (!StringUtils.hasText(token) && accessor.getSessionAttributes() != null) {
+                Object sessionToken = accessor.getSessionAttributes().get("token");
+                if (sessionToken instanceof String) {
+                    token = (String) sessionToken;
+                    System.out.println("从WebSocket session attributes获取到token: " + token.substring(0, Math.min(20, token.length())) + "...");
+                }
+            }
+
             if (!StringUtils.hasText(token)) {
+                System.out.println("STOMP认证失败：缺少Token");
+                System.out.println("Session Attributes: " + accessor.getSessionAttributes());
                 throw new MessagingException("WebSocket/STOMP认证失败：缺少Token");
             }
 

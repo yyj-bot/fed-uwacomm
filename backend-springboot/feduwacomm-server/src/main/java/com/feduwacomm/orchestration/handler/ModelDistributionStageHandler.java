@@ -4,9 +4,12 @@ import com.feduwacomm.orchestration.StageResult;
 import com.feduwacomm.orchestration.WorkflowContext;
 import com.feduwacomm.orchestration.WorkflowStage;
 import com.feduwacomm.service.GlobalModelDistributionService;
+import com.feduwacomm.service.VmInstanceService;
 import com.feduwacomm.entity.ModelDistribution;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.dto.VmQueryDTO;
+import com.feduwacomm.vo.VmListVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,6 +31,7 @@ public class ModelDistributionStageHandler extends AbstractStageHandler {
     private final GlobalModelDistributionService globalModelDistributionService;
     private final ModelDistributionMapper modelDistributionMapper;
     private final UuidUtil uuidUtil;
+    private final VmInstanceService vmInstanceService;
 
     @Override
     public WorkflowStage getSupportedStage() {
@@ -61,8 +65,26 @@ public class ModelDistributionStageHandler extends AbstractStageHandler {
             @SuppressWarnings("unchecked")
             List<String> targetVmIds = (List<String>) context.getVariable("targetVmIds");
             if (targetVmIds == null || targetVmIds.isEmpty()) {
-                log.warn("未找到目标虚拟机列表，使用默认虚拟机");
-                targetVmIds = List.of("vm-1", "vm-2", "vm-3");
+                log.warn("未找到目标虚拟机列表，从服务获取所有可用虚拟机");
+                try {
+                    VmQueryDTO queryDTO = VmQueryDTO.builder()
+                        .page(1)
+                        .size(100)
+                        .build();
+                    List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getRecords();
+                    targetVmIds = availableVms.stream()
+                        .map(VmListVO::getVmId)
+                        .limit(5)  // 限制为前5个VM
+                        .toList();
+                    log.info("从服务获取到 {} 个可用虚拟机: {}", targetVmIds.size(), targetVmIds);
+                } catch (Exception e) {
+                    log.error("获取虚拟机列表失败，模型分发无法继续", e);
+                    throw new RuntimeException("无法获取虚拟机列表进行模型分发: " + e.getMessage(), e);
+                }
+
+                if (targetVmIds.isEmpty()) {
+                    throw new RuntimeException("没有可用的虚拟机进行模型分发");
+                }
             }
             
             // 创建模型分发记录

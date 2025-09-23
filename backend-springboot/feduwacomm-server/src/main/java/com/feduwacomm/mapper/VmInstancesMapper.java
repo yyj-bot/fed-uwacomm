@@ -188,6 +188,24 @@ public interface VmInstancesMapper {
     int updateStatus(@Param("id") String id, @Param("status") String status);
 
     /**
+     * 更新虚拟机系统信息
+     *
+     * @param vmId 虚拟机ID
+     * @param systemInfo 系统信息JSON字符串
+     * @return 更新行数
+     */
+    int updateSystemInfo(@Param("id") String id, @Param("systemInfo") String systemInfo);
+
+    /**
+     * 更新虚拟机能力信息
+     *
+     * @param vmId 虚拟机ID
+     * @param capabilities 能力信息JSON字符串
+     * @return 更新行数
+     */
+    int updateCapabilities(@Param("id") String id, @Param("capabilities") String capabilities);
+
+    /**
      * 批量删除虚拟机
      *
      * @param vmIds 虚拟机ID列表

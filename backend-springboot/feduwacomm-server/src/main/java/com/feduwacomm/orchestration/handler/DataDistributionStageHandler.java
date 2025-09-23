@@ -1,11 +1,18 @@
 package com.feduwacomm.orchestration.handler;
 
 import com.feduwacomm.dto.DataDistributionDTO;
+import com.feduwacomm.dto.TrainingDataQueryDTO;
+import com.feduwacomm.dto.VmQueryDTO;
 import com.feduwacomm.orchestration.StageResult;
 import com.feduwacomm.orchestration.WorkflowContext;
 import com.feduwacomm.orchestration.WorkflowStage;
 import com.feduwacomm.service.DataDistributionService;
+import com.feduwacomm.service.TrainingDataService;
+import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.DataDistributionTaskVO;
+import com.feduwacomm.vo.TrainingDataListVO;
+import com.feduwacomm.vo.VmListVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,6 +31,9 @@ import java.util.Map;
 public class DataDistributionStageHandler extends AbstractStageHandler {
 
     private final DataDistributionService dataDistributionService;
+    private final UuidUtil uuidUtil;
+    private final VmInstanceService vmInstanceService;
+    private final TrainingDataService trainingDataService;
 
     @Override
     public WorkflowStage getSupportedStage() {
@@ -137,9 +147,33 @@ public class DataDistributionStageHandler extends AbstractStageHandler {
     private List<String> getDatasetIds(WorkflowContext context) {
         List<String> datasetIds = (List<String>) context.getVariable("datasetIds");
         if (datasetIds == null || datasetIds.isEmpty()) {
-            // 如果没有指定数据集，使用默认数据集ID
-            log.warn("未找到数据集配置，使用默认数据集");
-            datasetIds = Arrays.asList("dataset-default-" + context.getTaskId());
+            // 如果没有指定数据集，从训练数据服务获取可用的数据集
+            log.warn("未找到数据集配置，从服务获取可用数据集");
+            try {
+                TrainingDataQueryDTO queryDTO = TrainingDataQueryDTO.builder()
+                    .page(1)
+                    .size(100)
+                    .build();
+                TrainingDataListVO result = trainingDataService.queryDataList(queryDTO);
+                List<TrainingDataListVO.TrainingDataItemVO> availableDatasets = result.getDataList();
+                datasetIds = availableDatasets.stream()
+                    .filter(dataset -> "READY".equals(dataset.getStatus()))
+                    .map(TrainingDataListVO.TrainingDataItemVO::getDatasetId)
+                    .limit(1)  // 只取第一个可用的数据集
+                    .toList();
+
+                if (!datasetIds.isEmpty()) {
+                    log.info("从服务获取到 {} 个可用数据集: {}", datasetIds.size(), datasetIds);
+                } else {
+                    log.warn("未找到任何可用的数据集，创建一个示例数据集ID");
+                    String defaultDatasetId = uuidUtil.generateUuid();
+                    datasetIds = Arrays.asList(defaultDatasetId);
+                }
+            } catch (Exception e) {
+                log.error("获取数据集列表失败，使用默认数据集", e);
+                String defaultDatasetId = uuidUtil.generateUuid();
+                datasetIds = Arrays.asList(defaultDatasetId);
+            }
         }
         return datasetIds;
     }
@@ -151,9 +185,22 @@ public class DataDistributionStageHandler extends AbstractStageHandler {
     private List<String> getTargetVmIds(WorkflowContext context) {
         List<String> vmIds = (List<String>) context.getVariable("targetVmIds");
         if (vmIds == null || vmIds.isEmpty()) {
-            // 如果没有指定虚拟机，使用默认虚拟机列表（实际应从虚拟机服务获取）
-            log.warn("未找到目标虚拟机配置，使用默认虚拟机列表");
-            vmIds = Arrays.asList("vm-1", "vm-2", "vm-3");
+            // 如果没有指定虚拟机，从虚拟机服务获取所有可用的虚拟机
+            log.warn("未找到目标虚拟机配置，从服务获取所有可用虚拟机");
+            try {
+                VmQueryDTO queryDTO = VmQueryDTO.builder()
+                    .page(1)
+                    .size(100)
+                    .build();
+                List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getRecords();
+                vmIds = availableVms.stream()
+                    .map(VmListVO::getVmId)
+                    .toList();
+                log.info("从服务获取到 {} 个可用虚拟机: {}", vmIds.size(), vmIds);
+            } catch (Exception e) {
+                log.error("获取虚拟机列表失败，使用空列表", e);
+                vmIds = Arrays.asList();
+            }
         }
         return vmIds;
     }

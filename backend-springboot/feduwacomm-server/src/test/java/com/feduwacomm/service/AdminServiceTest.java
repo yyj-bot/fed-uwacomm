@@ -150,14 +150,10 @@ public class AdminServiceTest {
         User viewer1 = TestDataBuilder.Users.validUser()
                 .username("viewer1")
                 .email("viewer1@example.com")
-                .role(UserRole.fromCode("VIEWER"))
-                .status(UserStatus.fromCode("ACTIVE"))
                 .build();
         User viewer2 = TestDataBuilder.Users.validUser()
                 .username("viewer2")
                 .email("viewer2@example.com")
-                .role(UserRole.fromCode("VIEWER"))
-                .status(UserStatus.fromCode("ACTIVE"))
                 .build();
         User researcher = TestDataBuilder.Users.researcherUser().build();
         

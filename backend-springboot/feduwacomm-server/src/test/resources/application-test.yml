@@ -21,7 +21,7 @@ mybatis:
   type-aliases-package: com.feduwacomm.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl  # 测试环境禁用MyBatis日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 启用MyBatis SQL日志
 
 # 日志配置 - 测试环境简化日志输出
 logging:
@@ -39,7 +39,7 @@ logging:
 jwt:
   user:
     secret: test-user-secret-key-for-unit-testing-only
-    expiration: 86400
+    expiration: 259200
     refresh-expiration: 604800
   vm:
     secret: test-vm-secret-key-for-unit-testing-only

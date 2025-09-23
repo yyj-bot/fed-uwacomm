@@ -375,7 +375,7 @@ public class LogServiceImpl implements LogService {
                     .endTime(exportDTO.getEndTime())
                     .page(1)
                     .size(10000) // 限制最大导出10000条记录
-                    .sort("createdAt")
+                    .sort("created_at")
                     .order("desc")
                     .build();
 

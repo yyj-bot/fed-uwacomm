@@ -68,7 +68,7 @@ public class ModelVersionServiceTest {
             .id(modelId)
             .taskId(taskId)
             .roundNumber(1)
-            .aggregationMethod("FEDAVG")
+            .aggregationMethod("FEDERATED_AVERAGING")
             .clientCount(5)
             .accuracy(new BigDecimal("0.8500"))
             .loss(new BigDecimal("0.1234"))
@@ -172,7 +172,7 @@ public class ModelVersionServiceTest {
             .status("UPLOADED")
             .page(1)
             .size(10)
-            .sort("createdAt")
+            .sort("created_at")
             .order("desc")
             .build();
 

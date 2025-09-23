@@ -38,7 +38,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return AggregationMethod.FEDAVG.getCode().equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDERATED_AVERAGING.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -52,7 +52,7 @@ public class FedAvgStrategy implements AggregationStrategy {
                 .id(UUID.randomUUID().toString().replace("-", ""))
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod(AggregationMethod.FEDAVG)
+                .aggregationMethod(AggregationMethod.FEDERATED_AVERAGING)
                 .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
@@ -60,7 +60,7 @@ public class FedAvgStrategy implements AggregationStrategy {
                 .build();
 
         // 执行聚合
-        return engine.aggregate(AggregationMethod.FEDAVG.getCode(), localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDERATED_AVERAGING.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -115,6 +115,6 @@ public class FedAvgStrategy implements AggregationStrategy {
             reasoning += "由于参与者较多，建议启用并行处理以提升性能。";
         }
 
-        return new AlgorithmConfigSuggestion(AggregationMethod.FEDAVG.getCode(), suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDERATED_AVERAGING.getCode(), suggestedParams, reasoning);
     }
 }

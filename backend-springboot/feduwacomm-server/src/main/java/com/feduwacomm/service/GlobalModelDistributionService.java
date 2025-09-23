@@ -7,6 +7,9 @@ import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.event.AggregationCompletedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
+import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.dto.VmQueryDTO;
+import com.feduwacomm.vo.VmListVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,7 @@ public class GlobalModelDistributionService {
     private final FederatedTasksMapper federatedTasksMapper;
     private final AggregationConfig aggregationConfig;
     private final ObjectMapper objectMapper;
+    private final VmInstanceService vmInstanceService;
 
     /**
      * 监听聚合完成事件，自动分发全局模型
@@ -75,12 +79,55 @@ public class GlobalModelDistributionService {
             }
 
             // 获取参与该轮的所有客户端
-            List<String> participantVmIds = vmRoundModelsMapper
-                    .selectByTaskIdAndRound(taskId, roundNumber)
-                    .stream()
-                    .map(model -> model.getVmId())
-                    .distinct()
-                    .toList();
+            List<String> participantVmIds;
+
+            if (roundNumber == 1) {
+                // 第1轮训练：使用任务的所有参与VM（从任务配置中获取）
+                String configJson = task.getConfig();
+                participantVmIds = new ArrayList<>();
+
+                if (configJson != null && !configJson.trim().isEmpty()) {
+                    try {
+                        // 解析配置JSON，查找参与VM列表
+                        Map<String, Object> config = objectMapper.readValue(configJson, Map.class);
+                        Object vmIds = config.get("participantVmIds");
+                        if (vmIds instanceof List) {
+                            participantVmIds = (List<String>) vmIds;
+                        } else if (vmIds instanceof String) {
+                            participantVmIds = Arrays.asList(objectMapper.readValue((String) vmIds, String[].class));
+                        }
+                    } catch (Exception e) {
+                        log.warn("解析任务配置中的参与VM ID失败: {}", e.getMessage());
+                    }
+                }
+
+                // 如果配置中没有找到，使用前5个可用的VM
+                if (participantVmIds.isEmpty()) {
+                    log.info("配置中未找到参与VM，从VM服务获取前5个可用的虚拟机");
+                    try {
+                        VmQueryDTO queryDTO = VmQueryDTO.builder()
+                            .page(1)
+                            .size(5)
+                            .build();
+                        List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getRecords();
+                        participantVmIds = availableVms.stream()
+                            .map(VmListVO::getVmId)
+                            .toList();
+                        log.info("从VM服务获取到 {} 个可用虚拟机: {}", participantVmIds.size(), participantVmIds);
+                    } catch (Exception e) {
+                        log.error("获取VM列表失败，使用空列表: {}", e.getMessage());
+                        participantVmIds = new ArrayList<>();
+                    }
+                }
+            } else {
+                // 后续轮次：基于上一轮次的参与记录
+                participantVmIds = vmRoundModelsMapper
+                        .selectByTaskIdAndRound(taskId, roundNumber - 1)
+                        .stream()
+                        .map(model -> model.getVmId())
+                        .distinct()
+                        .toList();
+            }
 
             if (participantVmIds.isEmpty()) {
                 log.warn("没有找到参与轮次{}的客户端: 任务ID={}", roundNumber, taskId);

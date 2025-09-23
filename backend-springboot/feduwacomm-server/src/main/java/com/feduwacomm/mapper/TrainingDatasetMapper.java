@@ -4,6 +4,7 @@ import com.feduwacomm.entity.TrainingData;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +16,6 @@ public interface TrainingDatasetMapper {
                       @Param("description") String description,
                       @Param("dataType") String dataType,
                       @Param("status") String status,
-                      @Param("uploadedBy") String uploadedBy,
                       @Param("metadata") String metadataJson);
 
     int insertTrainingData(TrainingData trainingData);
@@ -28,6 +28,22 @@ public interface TrainingDatasetMapper {
     Map<String, Object> selectById(@Param("id") String id);
 
     TrainingData selectByIdEntity(@Param("id") String id);
+
+    // 实体转Map的便捷方法
+    default Map<String, Object> selectByIdAsMap(@Param("id") String id) {
+        TrainingData entity = selectByIdEntity(id);
+        if (entity == null) return null;
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", entity.getId());
+        result.put("name", entity.getName());
+        result.put("description", entity.getDescription());
+        result.put("dataType", entity.getDataType());
+        result.put("status", entity.getStatus());
+        result.put("metadata", entity.getMetadata());
+        result.put("uploadTime", entity.getUploadTime());
+        return result;
+    }
 
     List<TrainingData> selectByQuery(@Param("uploadedBy") String uploadedBy,
                                    @Param("dataType") String dataType,

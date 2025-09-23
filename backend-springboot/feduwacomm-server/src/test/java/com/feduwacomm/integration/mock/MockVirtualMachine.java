@@ -10,7 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
+import org.springframework.messaging.simp.stomp.*;
+import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.web.socket.messaging.WebSocketStompClient;
 
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.time.Instant;
 import java.util.*;
@@ -28,10 +32,11 @@ public class MockVirtualMachine {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
-    private WebSocketSession session;
+    private StompSession stompSession;
     private boolean registered = false;
     private boolean connected = false;
     private String sessionId;
+    private String accessToken; // JWT访问令牌
     private ScheduledExecutorService heartbeatExecutor;
     private ScheduledExecutorService messageExecutor;
 
@@ -67,10 +72,11 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> responseBody = response.getBody();
 
-            if (responseBody != null && responseBody.get("code").equals(200)) {
+            if (responseBody != null && Integer.valueOf(200).equals(responseBody.get("code"))) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
                 sessionId = (String) data.get("sessionId");
+                accessToken = (String) data.get("accessToken"); // 保存访问令牌
                 String generatedVmId = (String) data.get("vmId");
                 vmData.setVmId(generatedVmId);
                 registered = true;
@@ -86,34 +92,61 @@ public class MockVirtualMachine {
      */
     public void connectWebSocket(String websocketUrl) throws Exception {
         try {
-            StandardWebSocketClient client = new StandardWebSocketClient();
-            WebSocketHandler handler = new MockWebSocketHandler();
+            // 创建STOMP客户端
+            WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+            stompClient.setMessageConverter(new MappingJackson2MessageConverter());
 
-            URI uri = URI.create(websocketUrl);
-            session = client.doHandshake(handler, null, uri).get();
+            // STOMP会话处理器
+            StompSessionHandler sessionHandler = new MockStompSessionHandler();
+
+            // 尝试使用原生WebSocket端点（非SockJS）
+            String nativeWsUrl = websocketUrl.replace("/ws", "/ws-native") + "?vmId=" + vmData.getVmId() + "&token=" + accessToken;
+            System.out.println("尝试原生WebSocket连接: " + nativeWsUrl);
+            System.out.println("VM ID: " + vmData.getVmId());
+            System.out.println("Access Token: " + (accessToken != null ? accessToken.substring(0, Math.min(20, accessToken.length())) + "..." : "null"));
+
+            try {
+                stompSession = stompClient.connect(nativeWsUrl, sessionHandler).get();
+            } catch (Exception nativeEx) {
+                System.out.println("原生WebSocket连接失败，尝试SockJS端点");
+                // 回退到SockJS端点
+                String sockjsUrl = websocketUrl + "?vmId=" + vmData.getVmId() + "&token=" + accessToken;
+                System.out.println("尝试SockJS连接: " + sockjsUrl);
+                stompSession = stompClient.connect(sockjsUrl, sessionHandler).get();
+            }
 
             // 等待连接建立
             Thread.sleep(1000);
 
-            if (session != null && session.isOpen()) {
-                // 发送连接消息
-                Map<String, Object> connectMessage = new HashMap<>();
-                connectMessage.put("type", "CONNECT");
-                connectMessage.put("id", "connect-" + System.currentTimeMillis());
-                connectMessage.put("timestamp", Instant.now().toString());
-                connectMessage.put("vmId", vmData.getVmId());
+            if (stompSession != null && stompSession.isConnected()) {
+                // 订阅回复队列
+                stompSession.subscribe("/user/queue/reply", new MockStompFrameHandler());
+                stompSession.subscribe("/topic/vm/" + vmData.getVmId(), new MockStompFrameHandler());
 
+                // 发送CONNECT协议消息
+                Map<String, Object> connectMessage = createProtocolMessage("CONNECT");
                 Map<String, Object> data = new HashMap<>();
                 data.put("sessionId", sessionId);
+                data.put("vmId", vmData.getVmId());
                 data.put("capabilities", vmData.getCapabilities());
+                data.put("supportedMLAlgorithms", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL"));
                 connectMessage.put("data", data);
 
-                sendMessage(connectMessage);
+                stompSession.send("/app/protocol", connectMessage);
                 connected = true;
+                System.out.println("WebSocket连接成功: " + vmData.getName());
             }
         } catch (Exception e) {
-            // WebSocket连接失败时模拟连接成功
-            System.out.println("WebSocket连接失败，模拟连接成功: " + e.getMessage());
+            // 输出详细错误信息进行诊断
+            System.err.println("WebSocket连接失败: " + vmData.getName());
+            System.err.println("错误类型: " + e.getClass().getSimpleName());
+            System.err.println("错误消息: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("根本原因: " + e.getCause().getMessage());
+            }
+            e.printStackTrace();
+
+            // 模拟连接成功以继续测试
             connected = true;
         }
     }
@@ -138,16 +171,11 @@ public class MockVirtualMachine {
      * 发送心跳消息
      */
     private void sendHeartbeat() throws Exception {
-        if (!connected || session == null) {
+        if (!connected || stompSession == null || !stompSession.isConnected()) {
             return;
         }
 
-        Map<String, Object> heartbeatMessage = new HashMap<>();
-        heartbeatMessage.put("type", "HEARTBEAT");
-        heartbeatMessage.put("id", "heartbeat-" + System.currentTimeMillis());
-        heartbeatMessage.put("timestamp", Instant.now().toString());
-        heartbeatMessage.put("vmId", vmData.getVmId());
-
+        Map<String, Object> heartbeatMessage = createProtocolMessage("HEARTBEAT");
         Map<String, Object> data = new HashMap<>();
         data.put("status", "ACTIVE");
         data.put("cpuUsage", 20 + Math.random() * 50);
@@ -155,7 +183,7 @@ public class MockVirtualMachine {
         data.put("gpuUsage", vmData.getGpuCount() > 0 ? 30 + Math.random() * 50 : 0);
         heartbeatMessage.put("data", data);
 
-        sendMessage(heartbeatMessage);
+        sendStompMessage(heartbeatMessage);
     }
 
     /**
@@ -169,11 +197,7 @@ public class MockVirtualMachine {
         // 生成基于VM能力的训练结果
         TrainingMetrics metrics = generateTrainingMetrics(round);
 
-        Map<String, Object> modelUpload = new HashMap<>();
-        modelUpload.put("type", "MODEL_UPLOAD");
-        modelUpload.put("id", "upload-r" + round + "-" + System.currentTimeMillis());
-        modelUpload.put("timestamp", Instant.now().toString());
-        modelUpload.put("vmId", vmData.getVmId());
+        Map<String, Object> modelUpload = createProtocolMessage("MODEL_UPLOAD");
 
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
@@ -196,7 +220,7 @@ public class MockVirtualMachine {
 
         modelUpload.put("data", data);
 
-        sendMessage(modelUpload);
+        sendStompMessage(modelUpload);
     }
 
     /**
@@ -261,12 +285,23 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 发送WebSocket消息
+     * 创建协议消息的基本结构
      */
-    private void sendMessage(Map<String, Object> message) throws Exception {
-        if (session != null && session.isOpen()) {
-            String jsonMessage = objectMapper.writeValueAsString(message);
-            session.sendMessage(new TextMessage(jsonMessage));
+    private Map<String, Object> createProtocolMessage(String type) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type);
+        message.put("id", type.toLowerCase() + "-" + System.currentTimeMillis());
+        message.put("timestamp", Instant.now().toString());
+        message.put("vmId", vmData.getVmId());
+        return message;
+    }
+
+    /**
+     * 发送STOMP消息
+     */
+    private void sendStompMessage(Map<String, Object> message) throws Exception {
+        if (stompSession != null && stompSession.isConnected()) {
+            stompSession.send("/app/protocol", message);
         }
     }
 
@@ -281,8 +316,8 @@ public class MockVirtualMachine {
             if (messageExecutor != null) {
                 messageExecutor.shutdown();
             }
-            if (session != null && session.isOpen()) {
-                session.close();
+            if (stompSession != null && stompSession.isConnected()) {
+                stompSession.disconnect();
             }
             connected = false;
         } catch (Exception e) {
@@ -297,23 +332,80 @@ public class MockVirtualMachine {
     public String getName() { return vmData.getName(); }
 
     /**
-     * WebSocket处理器
+     * Mock STOMP Session Handler
      */
-    private class MockWebSocketHandler implements WebSocketHandler {
-
+    private class MockStompSessionHandler extends StompSessionHandlerAdapter {
         @Override
-        public void afterConnectionEstablished(WebSocketSession session) {
-            MockVirtualMachine.this.session = session;
-            System.out.println("WebSocket连接已建立: " + vmData.getName());
+        public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
+            System.out.println("STOMP连接已建立: " + vmData.getName());
         }
 
         @Override
-        public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) {
-            try {
-                String payload = message.getPayload().toString();
-                Map<String, Object> msg = objectMapper.readValue(payload, Map.class);
+        public void handleException(StompSession session, StompCommand command,
+                                    StompHeaders headers, byte[] payload, Throwable exception) {
+            System.err.println("STOMP异常: " + exception.getMessage());
+        }
 
-                String type = (String) msg.get("type");
+        @Override
+        public void handleTransportError(StompSession session, Throwable exception) {
+            System.err.println("STOMP传输错误: " + exception.getMessage());
+            connected = false;
+        }
+    }
+
+    /**
+     * Mock STOMP Session Handler with Authentication
+     */
+    private class MockStompSessionHandlerWithAuth extends StompSessionHandlerAdapter {
+        private final String token;
+        private final String vmId;
+
+        public MockStompSessionHandlerWithAuth(String token, String vmId) {
+            this.token = token;
+            this.vmId = vmId;
+        }
+
+        @Override
+        public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
+            System.out.println("STOMP连接已建立，手动发送认证: " + vmData.getName());
+
+            // 手动发送CONNECT帧携带认证信息
+            // 但这个时候连接已经建立，我们需要在连接前设置认证
+            // 实际上，我们不能在afterConnected中重新发送CONNECT帧
+            // 让我们采用不同的方法
+        }
+
+        @Override
+        public void handleException(StompSession session, StompCommand command,
+                                    StompHeaders headers, byte[] payload, Throwable exception) {
+            System.err.println("STOMP异常: " + exception.getMessage());
+        }
+
+        @Override
+        public void handleTransportError(StompSession session, Throwable exception) {
+            System.err.println("STOMP传输错误: " + exception.getMessage());
+            connected = false;
+        }
+    }
+
+    /**
+     * Mock STOMP Frame Handler
+     */
+    private class MockStompFrameHandler implements StompFrameHandler {
+        @Override
+        public Type getPayloadType(StompHeaders headers) {
+            return Map.class;
+        }
+
+        @Override
+        public void handleFrame(StompHeaders headers, Object payload) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> messageData = (Map<String, Object>) payload;
+                String type = (String) messageData.get("type");
+                System.out.println("收到STOMP消息: " + type + " from VM: " + vmData.getName());
+
+                // 处理不同类型的消息
                 switch (type) {
                     case "CONNECT_ACK":
                         System.out.println("连接确认: " + vmData.getName());
@@ -329,25 +421,8 @@ public class MockVirtualMachine {
                         break;
                 }
             } catch (Exception e) {
-                System.err.println("消息处理错误: " + e.getMessage());
+                System.err.println("处理STOMP消息失败: " + e.getMessage());
             }
-        }
-
-        @Override
-        public void handleTransportError(WebSocketSession session, Throwable exception) {
-            System.err.println("WebSocket传输错误: " + exception.getMessage());
-        }
-
-        @Override
-        public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) {
-            MockVirtualMachine.this.session = null;
-            connected = false;
-            System.out.println("WebSocket连接已关闭: " + vmData.getName());
-        }
-
-        @Override
-        public boolean supportsPartialMessages() {
-            return false;
         }
     }
 

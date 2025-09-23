@@ -57,7 +57,7 @@ class WebSocketProtocolTransactionTest {
                 .data(createData)
                 .build();
         protocolService.handle(createMsg);
-        assertNotNull(trainingDatasetMapper.selectById(datasetId));
+        assertNotNull(trainingDatasetMapper.selectByIdAsMap(datasetId));
 
         // 2) 构造追加行消息，包含非法 JSON（例如导致 CAST 失败），期望抛出异常并回滚
         Map<String, Object> appendData = new HashMap<>();

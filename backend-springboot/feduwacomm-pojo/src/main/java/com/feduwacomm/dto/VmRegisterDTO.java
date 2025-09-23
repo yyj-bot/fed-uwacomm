@@ -14,9 +14,6 @@ import java.util.Map;
 @Data
 public class VmRegisterDTO {
 
-    @NotBlank(message = "虚拟机ID不能为空")
-    @Size(min = 32, max = 32, message = "虚拟机ID必须为32位UUID格式")
-    @Pattern(regexp = "^[a-f0-9]{32}$", message = "虚拟机ID格式不正确，应为32位UUID格式")
     private String vmId;
 
     @NotBlank(message = "虚拟机名称不能为空")

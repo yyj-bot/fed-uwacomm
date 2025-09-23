@@ -106,7 +106,7 @@ public class FederatedTaskServiceTest {
                 .taskName("联邦学习测试任务")
                 .taskType("CLASSIFICATION")
                 .description("用于测试的联邦学习任务")
-                .algorithm("FEDAVG")
+                .algorithm("FEDERATED_AVERAGING")
                 .participants(participants)
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .learningRate(0.01)
@@ -116,13 +116,13 @@ public class FederatedTaskServiceTest {
                         .minParticipants(2)
                         .build())
                 .modelConfig(TaskCreateDTO.ModelConfigDTO.builder()
-                        .modelType("CNN")
+                        .modelType("NEURAL_NETWORK")
                         .build())
                 .build();
 
         // 准备配置任务DTO
         sampleConfigDTO = TaskConfigDTO.builder()
-                .algorithm("FEDAVG")
+                .algorithm("FEDERATED_AVERAGING")
                 .hyperparameters(TaskConfigDTO.HyperparametersDTO.builder()
                         .learningRate(0.001)
                         .batchSize(64)
@@ -138,8 +138,8 @@ public class FederatedTaskServiceTest {
                 .taskType("CLASSIFICATION")
                 .description("用于测试的联邦学习任务")
                 .status(FederatedTaskStatus.fromCode("CREATED"))
-                .algorithm(FederatedAlgorithm.fromCode("FEDAVG"))
-                .modelType("CNN")
+                .algorithm(FederatedAlgorithm.fromCode("FEDERATED_AVERAGING"))
+                .modelType("NEURAL_NETWORK")
                 .totalRounds(10)
                 .currentRound(0)
                 .minParticipants(2)
@@ -198,7 +198,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidCreateDTO = TaskCreateDTO.builder()
                 .taskName("")  // 空名称
                 .taskType("CLASSIFICATION")
-                .algorithm("FEDAVG")
+                .algorithm("FEDERATED_AVERAGING")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(-1)  // 无效轮数
                         .minParticipants(0)  // 无效最小参与者数
@@ -511,7 +511,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidDTO2 = TaskCreateDTO.builder()
                 .taskName("Test Task")
                 .taskType("CLASSIFICATION")
-                .algorithm("FEDAVG")
+                .algorithm("FEDERATED_AVERAGING")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(-1)
                         .build())
@@ -522,7 +522,7 @@ public class FederatedTaskServiceTest {
         TaskCreateDTO invalidDTO3 = TaskCreateDTO.builder()
                 .taskName("Test Task")
                 .taskType("CLASSIFICATION")
-                .algorithm("FEDAVG")
+                .algorithm("FEDERATED_AVERAGING")
                 .hyperparameters(TaskCreateDTO.HyperparametersDTO.builder()
                         .rounds(10)
                         .build())

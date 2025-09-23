@@ -3,12 +3,17 @@ package com.feduwacomm.service;
 import com.feduwacomm.dto.ProtocolAck;
 import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
+import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.enums.FederatedAlgorithm;
+import com.feduwacomm.enums.FederatedTaskStatus;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
+import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
 import com.feduwacomm.event.ModelUploadEvent;
+import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -20,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -34,8 +38,11 @@ public class WebSocketProtocolService {
     private final FederatedTasksMapper federatedTasksMapper;
     private final VmRoundModelsMapper vmRoundModelsMapper;
     private final VmInstancesMapper vmInstancesMapper;
+    @SuppressWarnings("unused") // 保留用于未来功能扩展
+    private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final UuidUtil uuidUtil;
 
     // in-memory VM 最新状态缓存：vmId -> STATUS_RESPONSE.data（用于快速读，不作为数据源）
     private final ConcurrentHashMap<String, Map<String, Object>> statusCache = new ConcurrentHashMap<>();
@@ -46,16 +53,20 @@ public class WebSocketProtocolService {
                                     FederatedTasksMapper federatedTasksMapper,
                                     VmRoundModelsMapper vmRoundModelsMapper,
                                     VmInstancesMapper vmInstancesMapper,
+                                    UserMapper userMapper,
                                     ObjectMapper objectMapper,
-                                    ApplicationEventPublisher eventPublisher) {
+                                    ApplicationEventPublisher eventPublisher,
+                                    UuidUtil uuidUtil) {
         this.messagingTemplate = messagingTemplate;
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
         this.federatedTasksMapper = federatedTasksMapper;
         this.vmRoundModelsMapper = vmRoundModelsMapper;
         this.vmInstancesMapper = vmInstancesMapper;
+        this.userMapper = userMapper;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.uuidUtil = uuidUtil;
     }
 
     public ProtocolAck handle(ProtocolMessage msg) {
@@ -120,13 +131,57 @@ public class WebSocketProtocolService {
     }
 
     private ProtocolAck onConnect(ProtocolMessage msg) {
+        // v1.3: 处理虚拟机的本地ML算法能力和计算能力
+        Map<String, Object> clientData = msg.getData();
+
+        // 获取客户端上报的ML算法能力和系统信息
+        @SuppressWarnings("unchecked")
+        List<String> supportedMLAlgorithms = (List<String>) clientData.get("supportedMLAlgorithms");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> computeCapabilities = (Map<String, Object>) clientData.get("computeCapabilities");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> systemInfo = (Map<String, Object>) clientData.get("systemInfo");
+
+        String vmId = msg.getVmId();
+        if (vmId != null) {
+            try {
+                // 存储系统信息到数据库
+                if (systemInfo != null) {
+                    String systemInfoJson = objectMapper.writeValueAsString(systemInfo);
+                    vmInstancesMapper.updateSystemInfo(vmId, systemInfoJson);
+                    System.out.println("VM " + vmId + " 系统信息已更新: " + systemInfo);
+                }
+
+                // 存储能力信息到数据库（包含ML算法和计算能力）
+                if (supportedMLAlgorithms != null || computeCapabilities != null) {
+                    Map<String, Object> capabilities = new HashMap<>();
+                    if (supportedMLAlgorithms != null) {
+                        capabilities.put("supportedMLAlgorithms", supportedMLAlgorithms);
+                        System.out.println("VM " + vmId + " 支持的ML算法: " + supportedMLAlgorithms);
+                    }
+                    if (computeCapabilities != null) {
+                        capabilities.put("computeCapabilities", computeCapabilities);
+                        System.out.println("VM " + vmId + " 计算能力: " + computeCapabilities);
+                    }
+
+                    String capabilitiesJson = objectMapper.writeValueAsString(capabilities);
+                    vmInstancesMapper.updateCapabilities(vmId, capabilitiesJson);
+                    System.out.println("VM " + vmId + " 能力信息已更新");
+                }
+            } catch (Exception e) {
+                // 记录错误但不影响连接建立
+                System.err.println("更新VM " + vmId + " 信息失败: " + e.getMessage());
+            }
+        }
+
         Map<String, Object> data = mapOf(
-                "sessionId", "session-" + UUID.randomUUID(),
+                "sessionId", uuidUtil.generateUuid(), // 使用UUIDv7生成32位紧凑会话ID
                 "serverTime", Instant.now().toString(),
                 "heartbeatInterval", 30,
                 "maxMessageSize", 10 * 1024 * 1024,
                 "supportedFeatures", new String[]{"ENCRYPTION", "COMPRESSION", "BATCH_OPERATIONS"}
         );
+
         // 尝试更新 VM 连接状态为 CONNECTED
         if (msg.getVmId() != null) {
             vmInstancesMapper.updateConnection(msg.getVmId(), "CONNECTED", LocalDateTime.now().toString());
@@ -160,6 +215,7 @@ public class WebSocketProtocolService {
         return ackFor(msg, ProtocolType.HEARTBEAT_ACK, data);
     }
 
+    @SuppressWarnings("unused") // 保留用于未来的通用消息处理
     private ProtocolAck onGenericHandled(ProtocolMessage msg) {
         sendToVmTopic(msg.getVmId(), msg);
         return ackFor(msg, deduceAckType(msg.getType()), mapOf("status", "RECEIVED"));
@@ -192,7 +248,8 @@ public class WebSocketProtocolService {
         String dataType = valueAsString(msg.getData(), "datasetType");
         String name = description != null ? description : ("dataset-" + datasetId.substring(0, Math.min(datasetId.length(), 8)));
         String metadataJson = toJsonSafe(valueAsObject(msg.getData(), "metadata"));
-        trainingDatasetMapper.upsertDataset(datasetId, vmId, name, description, dataType, "READY", metadataJson);
+
+        trainingDatasetMapper.upsertDataset(datasetId, name, description, dataType, "READY", metadataJson);
 
         // 转发消息到VM专属频道
         sendToVmTopic(vmId, mapOf(
@@ -214,7 +271,7 @@ public class WebSocketProtocolService {
         String datasetId = valueAsString(msg.getData(), "datasetId");
         List<?> rows = (List<?>) valueAsObject(msg.getData(), "rows");
         int rowsCount = rows == null ? 0 : rows.size();
-        if (rowsCount > 0) {
+        if (rows != null && rowsCount > 0) {
             // 将每条 rowData 对象转为 JSON 字符串
             List<String> rowsJson = rows.stream().map(this::toJsonSafe).toList();
             trainingDatasetRowMapper.insertRows(datasetId, rowsJson);
@@ -226,7 +283,7 @@ public class WebSocketProtocolService {
                 "vmId", msg.getVmId(),
                 "datasetId", datasetId,
                 "rowsAdded", rowsCount,
-                "sampleData", rowsCount > 0 ? rows.get(0) : null
+                "sampleData", (rows != null && rowsCount > 0) ? rows.get(0) : null
         ));
 
         Map<String, Object> ackData = mapOf(
@@ -313,27 +370,61 @@ public class WebSocketProtocolService {
 
         Map<String, Object> d = msg.getData();
         String taskId = valueAsString(d, "taskId");
-        String algorithm = valueAsString(d, "algorithm");
-        Map<String, Object> config = (Map<String, Object>) valueAsObject(d, "config");
-        Integer totalRounds = numberAsInt(config, "totalRounds");
-        String configJson = toJsonSafe(config);
+        // v1.3: 使用mlAlgorithm替代algorithm（联邦学习算法）
+        String mlAlgorithm = valueAsString(d, "mlAlgorithm");
+        // v1.3: 分离超参数和训练配置
+        @SuppressWarnings("unchecked")
+        Map<String, Object> hyperparameters = (Map<String, Object>) valueAsObject(d, "hyperparameters");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trainingConfig = (Map<String, Object>) valueAsObject(d, "trainingConfig");
+
+        // 合并配置用于存储（保持数据库兼容性）
+        Map<String, Object> combinedConfig = new HashMap<>();
+        if (hyperparameters != null) {
+            combinedConfig.put("hyperparameters", hyperparameters);
+        }
+        if (trainingConfig != null) {
+            combinedConfig.put("trainingConfig", trainingConfig);
+        }
+        Integer epochs = trainingConfig != null ? numberAsInt(trainingConfig, "epochs") : 1;
 
         // 创建任务记录，状态为PENDING（等待VM确认）
-        federatedTasksMapper.upsertTask(taskId, taskId, algorithm, "PENDING", totalRounds, 0, configJson);
+        // v1.3: 创建联邦学习任务记录，后端使用默认联邦算法，VM使用mlAlgorithm
+        // 联邦学习算法由后端管理，这里使用默认的FEDERATED_AVERAGING
+        String federatedAlgorithm = "FEDERATED_AVERAGING";
+
+        // 将VM的mlAlgorithm信息保存到config中，供后续使用
+        combinedConfig.put("mlAlgorithm", mlAlgorithm);
+        String updatedConfigJson = toJsonSafe(combinedConfig);
+
+        // 使用新的API：创建FederatedTask对象并插入
+        FederatedTask task = new FederatedTask();
+        task.setId(taskId);
+        task.setTaskName(taskId);
+        task.setAlgorithm(FederatedAlgorithm.valueOf(federatedAlgorithm));
+        task.setStatus(FederatedTaskStatus.PENDING);
+        task.setEpochs(epochs);
+        task.setTotalRounds(epochs);
+        task.setCurrentRound(0);
+        task.setConfig(updatedConfigJson);
+        task.setCreatedAt(java.time.LocalDateTime.now());
+        task.setUpdatedAt(java.time.LocalDateTime.now());
+        federatedTasksMapper.insertTask(task);
 
         // 转发训练开始指令给VM
         sendToVmTopic(msg.getVmId(), mapOf(
                 "type", "TRAINING_START_COMMAND",
                 "vmId", msg.getVmId(),
                 "taskId", taskId,
-                "algorithm", algorithm,
-                "config", config,
-                "message", "请开始训练任务"
+                "mlAlgorithm", mlAlgorithm,
+                "hyperparameters", hyperparameters,
+                "trainingConfig", trainingConfig,
+                "message", "请开始本地ML训练任务"
         ));
 
         return ackFor(msg, ProtocolType.TRAINING_START_ACK, mapOf(
                 "status", "COMMAND_SENT",
-                "message", "训练指令已发送给VM，等待VM确认"));
+                "message", "本地训练指令已发送给VM，等待VM确认"));
     }
 
     // VM响应训练开始确认
@@ -345,7 +436,7 @@ public class WebSocketProtocolService {
 
         if ("SUCCESS".equals(status)) {
             // VM确认训练开始成功，更新数据库状态为RUNNING
-            federatedTasksMapper.updateStatus(taskId, "RUNNING");
+            federatedTasksMapper.updateTaskStatus(taskId, "RUNNING", LocalDateTime.now());
 
             // 通知前端训练已开始
             sendToVmTopic(msg.getVmId(), mapOf(
@@ -357,7 +448,7 @@ public class WebSocketProtocolService {
             ));
         } else {
             // VM确认训练开始失败
-            federatedTasksMapper.updateStatus(taskId, "FAILED");
+            federatedTasksMapper.updateTaskStatus(taskId, "FAILED", LocalDateTime.now());
 
             sendToVmTopic(msg.getVmId(), mapOf(
                     "type", "TRAINING_START_FAILED",
@@ -416,7 +507,8 @@ public class WebSocketProtocolService {
         Double loss = numberAsDouble(d, "loss");
 
         // 更新数据库中的进度信息
-        federatedTasksMapper.updateProgress(taskId, currentRound, status != null ? status : "RUNNING");
+        Double progressPercent = (accuracy != null) ? accuracy : 0.0; // 使用准确率作为进度指标，如果没有则设为0
+        federatedTasksMapper.updateTaskProgress(taskId, currentRound, progressPercent, status != null ? status : "RUNNING");
 
         // 转发进度信息给前端
         sendToVmTopic(msg.getVmId(), mapOf(
@@ -440,14 +532,16 @@ public class WebSocketProtocolService {
         String vmId = msg.getVmId();
         String taskId = valueAsString(d, "taskId");
         Integer round = numberAsInt(d, "round");
+        @SuppressWarnings("unchecked")
         Map<String, Object> parameters = (Map<String, Object>) valueAsObject(d, "parameters");
+        @SuppressWarnings("unchecked")
         Map<String, Object> metrics = (Map<String, Object>) valueAsObject(d, "metrics");
         Double acc = numberAsDouble(metrics, "accuracy");
         Double loss = numberAsDouble(metrics, "loss");
         String parametersJson = toJsonSafe(mapOf("parameters", parameters, "metrics", metrics));
         
         // 以 (task, vm, round) 唯一，id 使用随机UUID
-        vmRoundModelsMapper.upsertRoundModel(UUID.randomUUID().toString().replace("-", ""), taskId, vmId, round, acc, loss, parametersJson);
+        vmRoundModelsMapper.upsertRoundModel(uuidUtil.generateUuid(), taskId, vmId, round, acc, loss, parametersJson);
         
         // 发布模型上传事件，触发聚合检查
         try {
@@ -460,7 +554,8 @@ public class WebSocketProtocolService {
         }
         
         sendToVmTopic(vmId, msg);
-        return ackFor(msg, ProtocolType.MODEL_UPLOAD, mapOf("status", "RECEIVED", "aggregationPending", true));
+        // v1.3: 移除聚合相关信息，专注本地训练结果接收
+        return ackFor(msg, ProtocolType.MODEL_UPLOAD, mapOf("status", "RECEIVED"));
     }
 
     private ProtocolAck onModelDownload(ProtocolMessage msg) {
@@ -489,9 +584,10 @@ public class WebSocketProtocolService {
                                             "checksum", "sha256:global_model_" + System.currentTimeMillis()
                                     )
                             ),
-                            "aggregation", mapOf(
-                                    "method", "FEDAVG",
-                                    "participation", 5
+                            // v1.3: 移除聚合算法信息，专注模型结构和参数传输
+                            "training", mapOf(
+                                    "algorithm", "RandomForest",
+                                    "samples", 1000
                             )
                     ),
                     "compression", "gzip",
@@ -652,7 +748,7 @@ public class WebSocketProtocolService {
         String vmId = msg != null ? msg.getVmId() : null;
         return ProtocolAck.builder()
                 .type(ackType)
-                .id("server-" + System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 6))
+                .id("server-" + System.currentTimeMillis() + "-" + uuidUtil.generateUuid().substring(0, 6))
                 .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data)

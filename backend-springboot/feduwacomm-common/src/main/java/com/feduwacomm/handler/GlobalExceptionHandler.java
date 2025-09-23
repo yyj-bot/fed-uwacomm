@@ -43,12 +43,18 @@ public class GlobalExceptionHandler {
 
     /**
      * 处理运行时异常
-     * 
+     *
      * @param ex 运行时异常
      * @return 错误响应
      */
     @ExceptionHandler(RuntimeException.class)
     public Result<String> handleRuntimeException(RuntimeException ex) {
+        // 添加详细的异常日志
+        System.err.println("=== 全局异常处理器捕获到RuntimeException ===");
+        System.err.println("异常类型: " + ex.getClass().getName());
+        System.err.println("异常消息: " + ex.getMessage());
+        ex.printStackTrace();
+        System.err.println("=== 异常处理结束 ===");
         return Result.failure(500, "服务器内部错误", ex.getMessage());
     }
 

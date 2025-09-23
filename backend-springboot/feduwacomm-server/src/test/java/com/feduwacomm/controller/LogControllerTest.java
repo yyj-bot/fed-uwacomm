@@ -15,6 +15,7 @@ import com.feduwacomm.service.LogService;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.config.TestSecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,6 +45,7 @@ import org.mockito.MockedStatic;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@ContextConfiguration(classes = TestSecurityConfig.class)
 @DisplayName("日志管理控制器测试")
 class LogControllerTest {
 

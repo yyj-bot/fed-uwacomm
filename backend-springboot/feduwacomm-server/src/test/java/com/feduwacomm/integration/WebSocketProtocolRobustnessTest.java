@@ -4,6 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.ProtocolAck;
 import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
+import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.VmStatus;
+import com.feduwacomm.enums.ConnectionStatus;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.mapper.*;
 import com.feduwacomm.service.WebSocketProtocolService;
 import org.junit.jupiter.api.*;
@@ -11,11 +17,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -51,11 +60,25 @@ public class WebSocketProtocolRobustnessTest {
     private VmInstancesMapper vmInstancesMapper;
 
     @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
-    private static final String TEST_VM_ID = "test-vm-" + UUID.randomUUID().toString().substring(0, 8);
-    private static final String TEST_DATASET_ID = "test-ds-" + UUID.randomUUID().toString().substring(0, 8);
-    private static final String TEST_TASK_ID = "test-task-" + UUID.randomUUID().toString().substring(0, 8);
+    private static final String TEST_VM_ID = "test-vm-fixed-id";
+    private static final String TEST_DATASET_ID = "test-ds-fixed-id";
+    private static final String TEST_TASK_ID = "test-task-fixed-id";
+
+    @BeforeEach
+    void setUp() {
+        // 确保测试管理员用户在数据库中存在
+        createTestAdminUser();
+        // 确保测试VM在数据库中存在
+        createTestVmInstance();
+    }
 
     // ==================== 1. 连接管理测试 ====================
     
@@ -65,7 +88,7 @@ public class WebSocketProtocolRobustnessTest {
     void testConnectMessage() {
         Map<String, Object> data = new HashMap<>();
         data.put("version", "1.0.0");
-        data.put("capabilities", Arrays.asList("FEDAVG", "FEDPROX"));
+        data.put("capabilities", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL"));
         
         Map<String, Object> systemInfo = new HashMap<>();
         systemInfo.put("os", "Ubuntu 20.04");
@@ -117,14 +140,25 @@ public class WebSocketProtocolRobustnessTest {
         data.put("datasetType", "ACOUSTIC");
         data.put("metadata", Map.of("source", "test", "version", "1.0"));
 
+        System.out.println("创建数据集请求: " + data);
         ProtocolMessage msg = buildMessage(ProtocolType.DATASET_CREATE, TEST_VM_ID, data);
-        ProtocolAck ack = protocolService.handle(msg);
 
+        // 在新事务中执行WebSocket协议处理
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        ProtocolAck ack = transactionTemplate.execute(status -> {
+            return protocolService.handle(msg);
+        });
+
+        System.out.println("协议响应: " + ack);
         assertEquals(ProtocolType.DATASET_CREATE_ACK, ack.getType());
         assertEquals("READY", ack.getData().get("status"));
 
-        // 验证数据库
-        Map<String, Object> dataset = trainingDatasetMapper.selectById(TEST_DATASET_ID);
+        // 在新事务中验证数据库
+        System.out.println("查询数据集ID: " + TEST_DATASET_ID);
+        Map<String, Object> dataset = transactionTemplate.execute(status -> {
+            return trainingDatasetMapper.selectByIdAsMap(TEST_DATASET_ID);
+        });
+        System.out.println("查询结果: " + dataset);
         assertNotNull(dataset);
         assertEquals("测试数据集", dataset.get("description"));
     }
@@ -217,7 +251,7 @@ public class WebSocketProtocolRobustnessTest {
     void testTrainingStart() {
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", TEST_TASK_ID);
-        data.put("algorithm", "FEDAVG");
+        data.put("algorithm", "FEDERATED_AVERAGING");
         
         Map<String, Object> config = new HashMap<>();
         config.put("batchSize", 32);
@@ -375,7 +409,7 @@ public class WebSocketProtocolRobustnessTest {
                 data.put("index", index);
                 data.put("timestamp", Instant.now());
                 
-                ProtocolMessage msg = buildMessage(type, "vm-" + index, data);
+                ProtocolMessage msg = buildMessage(type, TEST_VM_ID, data);
                 return protocolService.handle(msg);
             });
             futures.add(future);
@@ -495,12 +529,34 @@ public class WebSocketProtocolRobustnessTest {
                 .build();
     }
 
+    private void createTestAdminUser() {
+        // 检查管理员用户是否已存在
+        try {
+            var existingAdmin = userMapper.selectFirstAdmin();
+            if (existingAdmin == null) {
+                User adminUser = new User();
+                adminUser.setId("test-admin-id");
+                adminUser.setUsername("test-admin");
+                adminUser.setEmail("test@example.com");
+                adminUser.setPasswordHash("hashedPassword123");
+                adminUser.setStatus(UserStatus.ACTIVE);
+                adminUser.setRole(UserRole.ADMIN);
+                adminUser.setCreatedAt(java.time.LocalDateTime.now());
+                adminUser.setUpdatedAt(java.time.LocalDateTime.now());
+
+                userMapper.insert(adminUser);
+            }
+        } catch (Exception e) {
+            // 忽略创建错误，可能已存在
+        }
+    }
+
     private void createTestDataset() {
         Map<String, Object> data = new HashMap<>();
         data.put("datasetId", TEST_DATASET_ID);
         data.put("datasetDescription", "测试数据集");
-        data.put("datasetType", "OTHER");
-        
+        data.put("datasetType", "ACOUSTIC");
+
         ProtocolMessage msg = buildMessage(ProtocolType.DATASET_CREATE, TEST_VM_ID, data);
         protocolService.handle(msg);
     }
@@ -508,7 +564,7 @@ public class WebSocketProtocolRobustnessTest {
     private void startTestTraining() {
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", TEST_TASK_ID);
-        data.put("algorithm", "FEDAVG");
+        data.put("algorithm", "FEDERATED_AVERAGING");
         
         Map<String, Object> config = new HashMap<>();
         config.put("totalRounds", 100);
@@ -519,12 +575,39 @@ public class WebSocketProtocolRobustnessTest {
         protocolService.handle(msg);
     }
 
+    private void createTestVmInstance() {
+        // 检查VM实例是否已存在
+        if (vmInstancesMapper.existsByVmId(TEST_VM_ID) == 0) {
+            VmInstance vmInstance = new VmInstance();
+            vmInstance.setId(TEST_VM_ID);
+            vmInstance.setName("Test VM Instance");
+            vmInstance.setIpAddress("127.0.0.1");
+            vmInstance.setPort(8080);
+            vmInstance.setOsType("Linux");
+            vmInstance.setCpuCores(4);
+            vmInstance.setMemoryMb(8192);
+            vmInstance.setDiskGb(500);
+            vmInstance.setStatus(VmStatus.RUNNING);
+            vmInstance.setConnectionStatus(ConnectionStatus.CONNECTED);
+            vmInstance.setCreatedAt(java.time.LocalDateTime.now());
+            vmInstance.setUpdatedAt(java.time.LocalDateTime.now());
+            vmInstance.setCreatedBy("test-admin");
+            vmInstance.setUpdatedBy("test-admin");
+
+            vmInstancesMapper.insert(vmInstance);
+        }
+    }
+
     @AfterEach
     void cleanup() {
         // 清理测试数据
         try {
             trainingDatasetRowMapper.deleteByDataset(TEST_DATASET_ID);
             trainingDatasetMapper.deleteById(TEST_DATASET_ID);
+            // 清理测试VM实例
+            vmInstancesMapper.deleteByVmId(TEST_VM_ID);
+            // 清理测试管理员用户
+            userMapper.deleteById("test-admin-id");
         } catch (Exception e) {
             // 忽略清理错误
         }

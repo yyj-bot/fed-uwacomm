@@ -78,7 +78,7 @@ class InitialModelGenerationServiceTest {
         // Given
         InitialModelGenerationDTO request = InitialModelGenerationDTO.builder()
                 .taskId(taskId)
-                .modelType("CNN")
+                .modelType("NEURAL_NETWORK")
                 .generationMethod("RANDOM")
                 .architectureParams(Map.of("layers", 3, "units", 128))
                 .build();
@@ -94,7 +94,7 @@ class InitialModelGenerationServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(modelId);
         assertThat(result.getTaskId()).isEqualTo(taskId);
-        assertThat(result.getModelType()).isEqualTo("CNN");
+        assertThat(result.getModelType()).isEqualTo("NEURAL_NETWORK");
         assertThat(result.getStatus()).isEqualTo("GENERATING");
         
         verify(initialModelMapper).insertInitialModel(any(InitialModel.class));
@@ -116,7 +116,7 @@ class InitialModelGenerationServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(modelId);
         assertThat(result.getTaskId()).isEqualTo(taskId);
-        assertThat(result.getModelType()).isEqualTo("CNN");
+        assertThat(result.getModelType()).isEqualTo("NEURAL_NETWORK");
         
         verify(initialModelMapper).selectById(modelId);
     }

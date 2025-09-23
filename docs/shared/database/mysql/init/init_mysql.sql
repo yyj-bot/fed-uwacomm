@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS vm_instances (
     disk_gb INT NOT NULL COMMENT '磁盘大小(GB)',
     status ENUM('OFFLINE', 'RUNNING', 'STOPPED', 'STARTING', 'STOPPING', 'ERROR') NOT NULL DEFAULT 'OFFLINE' COMMENT '虚拟机状态',
     connection_status ENUM('DISCONNECTED', 'CONNECTED', 'CONNECTING', 'RECONNECTING') NOT NULL DEFAULT 'DISCONNECTED' COMMENT 'WebSocket连接状态',
-    ws_session_id VARCHAR(32) NULL COMMENT 'WebSocket会话ID',
+    ws_session_id VARCHAR(128) NULL COMMENT 'WebSocket会话ID',
     last_heartbeat TIMESTAMP NULL COMMENT '最后心跳时间',
     secret_id VARCHAR(128) NULL COMMENT '长期刷新凭证',
     secret_expire_time TIMESTAMP NULL COMMENT '刷新凭证过期时间',
@@ -89,18 +89,21 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
     id VARCHAR(32) PRIMARY KEY COMMENT '任务唯一标识(32位UUID)',
     name VARCHAR(100) NOT NULL COMMENT '任务名称',
     algorithm ENUM(
-        'FEDAVG',
-        'FEDPROX',
-        'FEDNOVA',
+        'FEDERATED_AVERAGING',
+        'FEDERATED_PROXIMAL',
+        'FEDERATED_NOVA',
         'SCAFFOLD'
     ) NOT NULL COMMENT '联邦学习算法',
     status ENUM(
+        'CREATED',
+        'CONFIGURED',
         'PENDING',
         'RUNNING',
         'PAUSED',
         'COMPLETED',
         'FAILED',
-        'STOPPED'
+        'STOPPED',
+        'CANCELLED'
     ) DEFAULT 'PENDING',
     total_rounds INT DEFAULT 100 COMMENT '总训练轮数',
     current_round INT DEFAULT 0 COMMENT '当前轮数',
@@ -117,28 +120,53 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
 -- 5. 训练数据集元信息表 (training_dataset，原training_data)
 CREATE TABLE IF NOT EXISTS training_dataset (
     id VARCHAR(32) PRIMARY KEY COMMENT '数据集唯一标识(32位UUID)',
+    vm_id VARCHAR(32) NULL COMMENT '关联虚拟机ID(32位UUID)',
     name VARCHAR(255) NOT NULL COMMENT '数据集名称',
     description TEXT COMMENT '数据集描述',
+    row_count INT DEFAULT 0 COMMENT '数据行数',
     data_type ENUM(
         'ACOUSTIC',
         'ENVIRONMENT',
         'MODEL',
-        'OTHER'
+        'OTHER',
+        'TEST_DATA',
+        'SPECIAL_CHARS',
+        'LONG_TEXT'
     ) NOT NULL COMMENT '数据类型',
-    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    uploaded_by VARCHAR(32) NULL COMMENT '上传者ID(32位UUID)',
     status ENUM(
         'UPLOADING',
         'PROCESSING',
         'READY',
         'ERROR'
-    ) DEFAULT 'UPLOADING',
-    metadata JSON COMMENT '数据集元信息'
+    ) DEFAULT 'UPLOADING' COMMENT '处理状态',
+    file_path VARCHAR(500) COMMENT '文件存储路径',
+    file_size BIGINT COMMENT '文件大小(字节)',
+    file_format VARCHAR(50) COMMENT '文件格式',
+    tags JSON COMMENT '标签列表(JSON格式)',
+    metadata JSON COMMENT '数据集元信息(JSON格式)',
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    uploaded_by VARCHAR(32) NULL COMMENT '上传者ID(32位UUID)',
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    updated_by VARCHAR(32) NULL COMMENT '更新者ID(32位UUID)',
+    is_valid BOOLEAN DEFAULT TRUE COMMENT '数据是否有效',
+    validation_time TIMESTAMP NULL COMMENT '验证时间',
+    validation_result JSON COMMENT '验证结果(JSON格式)',
+    is_processed BOOLEAN DEFAULT FALSE COMMENT '是否已处理',
+    process_time TIMESTAMP NULL COMMENT '处理时间',
+    process_result JSON COMMENT '处理结果(JSON格式)',
+    progress INT DEFAULT 0 COMMENT '处理进度(0-100)',
+    error_message TEXT COMMENT '错误信息'
 );
 
 -- 添加训练数据集表外键约束（在表创建后单独添加）
 ALTER TABLE training_dataset
 ADD CONSTRAINT fk_training_dataset_uploaded_by FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL;
+
+ALTER TABLE training_dataset
+ADD CONSTRAINT fk_training_dataset_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL;
+
+ALTER TABLE training_dataset
+ADD CONSTRAINT fk_training_dataset_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE SET NULL;
 
 -- 6. 训练数据明细表 (training_dataset_row，宽表+JSON)
 CREATE TABLE IF NOT EXISTS training_dataset_row (
@@ -155,15 +183,34 @@ CREATE TABLE IF NOT EXISTS model_versions (
     id VARCHAR(32) PRIMARY KEY COMMENT '版本唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
     round_number INT NOT NULL COMMENT '训练轮数',
+    aggregation_method VARCHAR(50) COMMENT '聚合方法(如FEDAVG、FEDPROX等)',
+    client_count INT COMMENT '参与客户端数量',
+    model_json TEXT COMMENT '聚合后模型参数(JSON格式)',
     accuracy DECIMAL(5, 4) COMMENT '准确率',
     loss DECIMAL(10, 6) COMMENT '损失值',
+    metrics TEXT COMMENT '聚合后评估指标(JSON格式)',
+    status VARCHAR(20) COMMENT '模型状态(UPLOADING/UPLOADED/VALIDATING/VALIDATED/DEPLOYED/DEPRECATED/FAILED)',
+    description TEXT COMMENT '模型描述',
+    file_path VARCHAR(500) COMMENT '模型文件路径',
+    file_size BIGINT COMMENT '模型文件大小(字节)',
+    file_format VARCHAR(50) COMMENT '模型文件格式',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    parameters JSON COMMENT '模型参数(JSON记录所有模型相关信息)'
+    aggregated_at TIMESTAMP NULL COMMENT '聚合完成时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
+    updated_by VARCHAR(32) COMMENT '更新者ID(32位UUID)',
+    parameters JSON COMMENT '扩展参数(JSON格式，存储其他模型相关信息)'
 );
 
 -- 添加外键约束（在表创建后单独添加，避免NULL约束问题）
 ALTER TABLE model_versions
 ADD CONSTRAINT fk_model_versions_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE;
+
+ALTER TABLE model_versions
+ADD CONSTRAINT fk_model_versions_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL;
+
+ALTER TABLE model_versions
+ADD CONSTRAINT fk_model_versions_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL;
 
 -- 7. SpringBoot系统日志表 (system_logs)
 CREATE TABLE IF NOT EXISTS system_logs (
@@ -267,7 +314,12 @@ CREATE TABLE IF NOT EXISTS global_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
     round_number INT NOT NULL COMMENT '轮次编号',
-    aggregation_method ENUM('FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD') NOT NULL COMMENT '聚合算法类型',
+    aggregation_method ENUM(
+        'FEDERATED_AVERAGING',
+        'FEDERATED_PROXIMAL',
+        'FEDERATED_NOVA',
+        'SCAFFOLD'
+    ) NOT NULL COMMENT '聚合算法类型',
     global_parameters JSON COMMENT '全局模型参数(JSON格式)',
     global_loss DECIMAL(10, 8) COMMENT '全局损失值',
     global_accuracy DECIMAL(10, 8) COMMENT '全局准确率',
@@ -378,11 +430,21 @@ CREATE INDEX idx_federated_tasks_status ON federated_tasks (status);
 CREATE INDEX idx_federated_tasks_algorithm ON federated_tasks (algorithm);
 
 -- 训练数据集元信息表索引
+CREATE INDEX idx_training_dataset_vm_id ON training_dataset (vm_id);
+
 CREATE INDEX idx_training_dataset_uploaded_by ON training_dataset (uploaded_by);
 
 CREATE INDEX idx_training_dataset_data_type ON training_dataset (data_type);
 
 CREATE INDEX idx_training_dataset_status ON training_dataset (status);
+
+CREATE INDEX idx_training_dataset_upload_time ON training_dataset (upload_time);
+
+CREATE INDEX idx_training_dataset_update_time ON training_dataset (update_time);
+
+CREATE INDEX idx_training_dataset_is_valid ON training_dataset (is_valid);
+
+CREATE INDEX idx_training_dataset_is_processed ON training_dataset (is_processed);
 
 -- 训练数据明细表索引
 CREATE INDEX idx_training_dataset_row_dataset_id ON training_dataset_row (dataset_id);
@@ -391,6 +453,18 @@ CREATE INDEX idx_training_dataset_row_dataset_id ON training_dataset_row (datase
 CREATE INDEX idx_model_versions_task_id ON model_versions (task_id);
 
 CREATE INDEX idx_model_versions_round_number ON model_versions (round_number);
+
+CREATE INDEX idx_model_versions_aggregation_method ON model_versions (aggregation_method);
+
+CREATE INDEX idx_model_versions_status ON model_versions (status);
+
+CREATE INDEX idx_model_versions_created_at ON model_versions (created_at);
+
+CREATE INDEX idx_model_versions_updated_at ON model_versions (updated_at);
+
+CREATE INDEX idx_model_versions_created_by ON model_versions (created_by);
+
+CREATE INDEX idx_model_versions_task_round ON model_versions (task_id, round_number);
 
 -- 虚拟机轮次模型结果表索引
 CREATE UNIQUE INDEX uq_vm_round_models_task_vm_round ON vm_round_models (task_id, vm_id, round_number);
@@ -594,7 +668,7 @@ CREATE TABLE IF NOT EXISTS task_participants (
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
     vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
     role ENUM('PARTICIPANT', 'COORDINATOR') NOT NULL DEFAULT 'PARTICIPANT' COMMENT '参与者角色',
-    status ENUM('CONNECTED', 'DISCONNECTED', 'TRAINING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'CONNECTED' COMMENT '参与状态',
+    status ENUM('CREATED', 'PENDING', 'CONNECTED', 'DISCONNECTED', 'TRAINING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'CREATED' COMMENT '参与状态',
     data_source VARCHAR(255) COMMENT '数据源',
 
     -- 训练状态字段

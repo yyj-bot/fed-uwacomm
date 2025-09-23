@@ -73,12 +73,20 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Override
     public VmRegisterResponseVO register(VmRegisterDTO registerDTO) {
-        logger.info("开始注册虚拟机: vmId={}, name={}, ip={}", 
+        logger.info("开始注册虚拟机: vmId={}, name={}, ip={}",
                    registerDTO.getVmId(), registerDTO.getName(), registerDTO.getIpAddress());
 
-        // 1. 检查虚拟机是否已存在
-        if (vmInstancesMapper.existsByVmId(registerDTO.getVmId()) > 0) {
-            logger.warn("虚拟机已存在: vmId={}", registerDTO.getVmId());
+        // 1. 生成或使用提供的vmId
+        String vmId = registerDTO.getVmId();
+        if (vmId == null || vmId.trim().isEmpty()) {
+            vmId = UUID.randomUUID().toString().replace("-", "");
+            registerDTO.setVmId(vmId);
+            logger.info("自动生成vmId: {}", vmId);
+        }
+
+        // 2. 检查虚拟机是否已存在
+        if (vmInstancesMapper.existsByVmId(vmId) > 0) {
+            logger.warn("虚拟机已存在: vmId={}", vmId);
             throw new BusinessException("虚拟机已存在");
         }
 
@@ -89,7 +97,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         // 3. 创建虚拟机实例
         VmInstance vmInstance = new VmInstance();
-        vmInstance.setId(registerDTO.getVmId());
+        vmInstance.setId(vmId);
         vmInstance.setName(registerDTO.getName());
         vmInstance.setIpAddress(registerDTO.getIpAddress());
         vmInstance.setPort(registerDTO.getPort());
@@ -121,25 +129,25 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 vmInstance.setMetadata(objectMapper.writeValueAsString(registerDTO.getMetadata()));
             }
         } catch (JsonProcessingException e) {
-            logger.error("JSON序列化失败: vmId={}", registerDTO.getVmId(), e);
+            logger.error("JSON序列化失败: vmId={}", vmId, e);
             throw new BusinessException("数据格式错误");
         }
 
         // 5. 插入数据库
         int result = vmInstancesMapper.insert(vmInstance);
         if (result <= 0) {
-            logger.error("虚拟机注册失败: vmId={}", registerDTO.getVmId());
+            logger.error("虚拟机注册失败: vmId={}", vmId);
             throw new BusinessException("虚拟机注册失败");
         }
 
         // 6. 生成访问令牌（在数据库插入成功后）
-        String accessToken = generateAccessToken(registerDTO.getVmId());
+        String accessToken = generateAccessToken(vmId);
 
-        logger.info("虚拟机注册成功: vmId={}, sessionId={}", registerDTO.getVmId(), sessionId);
+        logger.info("虚拟机注册成功: vmId={}, sessionId={}", vmId, sessionId);
 
         // 7. 构建响应
         return VmRegisterResponseVO.builder()
-                .vmId(registerDTO.getVmId())
+                .vmId(vmId)
                 .name(registerDTO.getName())
                 .status("OFFLINE")
                 .connectionStatus("DISCONNECTED")
