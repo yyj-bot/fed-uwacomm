@@ -9,12 +9,14 @@ import com.feduwacomm.service.VmRoundModelService;
 import com.feduwacomm.vo.VmRoundModelBestVO;
 import com.feduwacomm.vo.VmRoundModelTrendVO;
 import com.feduwacomm.vo.VmRoundModelVO;
+import com.feduwacomm.config.TestSecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@ContextConfiguration(classes = TestSecurityConfig.class)
 public class VmRoundModelControllerTest {
 
     @Autowired

@@ -44,9 +44,9 @@ public class ModelQueryDTO {
     private Integer size = 10;
 
     /**
-     * 排序字段，默认createdAt
+     * 排序字段，默认created_at
      */
-    private String sort = "createdAt";
+    private String sort = "created_at";
 
     /**
      * 排序方向，desc/asc

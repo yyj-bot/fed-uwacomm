@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.ModelVersionService;
 import com.feduwacomm.vo.*;
+import com.feduwacomm.config.TestSecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -40,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@ContextConfiguration(classes = TestSecurityConfig.class)
 public class ModelVersionControllerTest {
 
     @Autowired
@@ -94,7 +97,7 @@ public class ModelVersionControllerTest {
             .modelId(modelId)
             .taskId(taskId)
             .roundNumber(1)
-            .aggregationMethod("FEDAVG")
+            .aggregationMethod("FEDERATED_AVERAGING")
             .clientCount(5)
             .accuracy(new BigDecimal("0.8500"))
             .loss(new BigDecimal("0.1234"))
@@ -183,7 +186,7 @@ public class ModelVersionControllerTest {
                 .param("taskId", taskId)
                 .param("page", "1")
                 .param("size", "10")
-                .param("sort", "createdAt")
+                .param("sort", "created_at")
                 .param("order", "desc"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))

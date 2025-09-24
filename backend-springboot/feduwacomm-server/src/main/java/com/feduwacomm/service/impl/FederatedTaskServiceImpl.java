@@ -10,6 +10,7 @@ import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.controller.FederatedTaskController;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -46,6 +47,12 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
+    @Autowired
+    private com.feduwacomm.service.VmInstanceService vmInstanceService;
+
+    @Autowired
+    private UuidUtil uuidUtil;
+
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
     private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
@@ -68,7 +75,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 生成任务ID
-        String taskId = UUID.randomUUID().toString().replace("-", "");
+        String taskId = uuidUtil.generateUuid();
         LocalDateTime now = LocalDateTime.now();
 
         // 构建任务实体
@@ -165,7 +172,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             throw new UserException("任务不存在");
         }
 
-        if (!STATUS_CONFIGURED.equals(task.getStatus())) {
+        // 允许CREATED和CONFIGURED状态的任务启动
+        if (!STATUS_CREATED.equals(task.getStatus()) && !STATUS_CONFIGURED.equals(task.getStatus())) {
             throw new UserException("任务状态不允许启动，当前状态: " + task.getStatus());
         }
 
@@ -699,7 +707,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     private TaskParticipant buildParticipantFromDTO(TaskCreateDTO.ParticipantDTO participantDTO, String taskId, LocalDateTime now) {
         return TaskParticipant.builder()
-            .id(UUID.randomUUID().toString().replace("-", ""))
+            .id(uuidUtil.generateUuid())
             .taskId(taskId)
             .vmId(participantDTO.getVmId())
             .role(ParticipantRole.fromCode(participantDTO.getRole()))
@@ -869,98 +877,110 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                                                          Integer minMemoryMb, String status, String capabilities) {
         log.info("查询可用虚拟机列表: algorithm={}, minCpu={}, minMemory={}", algorithm, minCpuCores, minMemoryMb);
 
-        // 模拟虚拟机数据，实际应该从数据库查询并过滤
-        List<ConfigPreviewVO.AvailableVmsVO.VmInfoVO> vms = new ArrayList<>();
+        try {
+            // 查询实际的VM数据
+            VmQueryDTO queryDTO = VmQueryDTO.builder()
+                .status(status)
+                .size(100) // 获取所有VM，最大100个
+                .userId(BaseContext.getCurrentId()) // 设置当前用户ID
+                .build();
 
-        // VM 1
-        vms.add(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.builder()
-            .vmId("a1b2c3d4e5f678901234567890123456")
-            .name("水声联邦学习节点-001")
-            .ipAddress("192.168.1.100")
-            .status("RUNNING")
-            .connectionStatus("CONNECTED")
-            .osType("Ubuntu 20.04")
+            com.feduwacomm.common.PageResult<VmListVO> vmPageResult = vmInstanceService.queryVmList(queryDTO);
+            List<VmListVO> vmList = vmPageResult.getRecords();
+
+            log.info("从数据库查询到 {} 个虚拟机", vmList.size());
+
+            // 转换为ConfigPreviewVO.AvailableVmsVO.VmInfoVO格式
+            List<ConfigPreviewVO.AvailableVmsVO.VmInfoVO> vms = vmList.stream()
+                .map(this::convertVmListToVmInfo)
+                .collect(Collectors.toList());
+
+            // 应用过滤条件
+            List<ConfigPreviewVO.AvailableVmsVO.VmInfoVO> filteredVms = vms.stream()
+                .filter(vm -> minCpuCores == null || vm.getResources().getCpuCores() >= minCpuCores)
+                .filter(vm -> minMemoryMb == null || vm.getResources().getMemoryMb() >= minMemoryMb)
+                .filter(vm -> algorithm == null || vm.getSupportedAlgorithms().contains(algorithm))
+                .filter(vm -> status == null || vm.getStatus().equals(status))
+                .filter(vm -> {
+                    if (capabilities == null || capabilities.isEmpty()) return true;
+                    String[] requiredCaps = capabilities.split(",");
+                    return Arrays.stream(requiredCaps)
+                        .allMatch(cap -> vm.getCapabilities().contains(cap.trim()));
+                })
+                .collect(Collectors.toList());
+
+            log.info("过滤后得到 {} 个可用虚拟机", filteredVms.size());
+
+            return ConfigPreviewVO.AvailableVmsVO.builder()
+                .total(filteredVms.size())
+                .availableVms(filteredVms)
+                .build();
+
+        } catch (Exception e) {
+            log.error("查询可用虚拟机失败: {}", e.getMessage(), e);
+            // 如果查询失败，返回空结果
+            return ConfigPreviewVO.AvailableVmsVO.builder()
+                .total(0)
+                .availableVms(new ArrayList<>())
+                .build();
+        }
+    }
+
+    /**
+     * 将VmListVO转换为VmInfoVO
+     */
+    private ConfigPreviewVO.AvailableVmsVO.VmInfoVO convertVmListToVmInfo(VmListVO vmList) {
+        // 设置默认的支持算法列表 - 使用完整的算法名称
+        List<String> supportedAlgorithms = Arrays.asList(
+            "FEDERATED_AVERAGING",
+            "FEDERATED_PROXIMAL",
+            "FEDERATED_NOVA",
+            "FEDERATED_SCAFFOLD"
+        );
+
+        // 设置默认的能力列表
+        List<String> capabilities = new ArrayList<>();
+        if (vmList.getCpuCores() != null && vmList.getCpuCores() >= 8) {
+            capabilities.add("HIGH_CPU");
+        }
+        if (vmList.getMemoryMb() != null && vmList.getMemoryMb() >= 8192) {
+            capabilities.add("HIGH_MEMORY");
+        }
+        capabilities.add("TRAINING"); // 所有VM都支持训练
+
+        return ConfigPreviewVO.AvailableVmsVO.VmInfoVO.builder()
+            .vmId(vmList.getVmId())
+            .name(vmList.getName())
+            .ipAddress(vmList.getIpAddress())
+            .status(vmList.getStatus())
+            .connectionStatus(vmList.getConnectionStatus())
+            .osType(vmList.getOsType())
             .resources(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.ResourcesVO.builder()
-                .cpuCores(8)
-                .memoryMb(16384)
-                .diskGb(500)
-                .gpuCount(1)
-                .gpuMemoryMb(16384)
+                .cpuCores(vmList.getCpuCores())
+                .memoryMb(vmList.getMemoryMb())
+                .diskGb(vmList.getDiskGb())
+                .gpuCount(0) // 默认值，实际应从VM详情获取
+                .gpuMemoryMb(0)
                 .build())
-            .capabilities(Arrays.asList("GPU", "HIGH_MEMORY", "FAST_NETWORK"))
-            .supportedAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA", "SCAFFOLD"))
+            .capabilities(capabilities)
+            .supportedAlgorithms(supportedAlgorithms)
             .currentUsage(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.UsageVO.builder()
-                .cpuUsage(25.5)
-                .memoryUsage(45.2)
-                .networkUsage(15.8)
+                .cpuUsage(vmList.getResourceUsage() != null ? vmList.getResourceUsage().getCpu() : 0.0)
+                .memoryUsage(vmList.getResourceUsage() != null ? vmList.getResourceUsage().getMemory() : 0.0)
+                .networkUsage(15.0) // 默认值
                 .build())
             .networkInfo(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.NetworkInfoVO.builder()
-                .bandwidth(1000)
+                .bandwidth(1000) // 默认值
                 .latency(10)
                 .uploadSpeed(500)
                 .downloadSpeed(800)
                 .build())
-            .lastHeartbeat("2024-01-01T12:30:00.000Z")
+            .lastHeartbeat(vmList.getLastHeartbeat() != null ? vmList.getLastHeartbeat().toString() : null)
             .reliability(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.ReliabilityVO.builder()
-                .uptime(99.8)
+                .uptime(99.0) // 默认值
                 .avgResponseTime(150)
-                .taskSuccessRate(98.5)
+                .taskSuccessRate(98.0)
                 .build())
-            .build());
-
-        // VM 2
-        vms.add(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.builder()
-            .vmId("b2c3d4e5f67890123456789012345678")
-            .name("水声联邦学习节点-002")
-            .ipAddress("192.168.1.101")
-            .status("RUNNING")
-            .connectionStatus("CONNECTED")
-            .osType("Ubuntu 20.04")
-            .resources(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.ResourcesVO.builder()
-                .cpuCores(6)
-                .memoryMb(12288)
-                .diskGb(300)
-                .gpuCount(0)
-                .gpuMemoryMb(0)
-                .build())
-            .capabilities(Arrays.asList("HIGH_MEMORY", "FAST_NETWORK"))
-            .supportedAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA"))
-            .currentUsage(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.UsageVO.builder()
-                .cpuUsage(35.2)
-                .memoryUsage(55.1)
-                .networkUsage(20.3)
-                .build())
-            .networkInfo(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.NetworkInfoVO.builder()
-                .bandwidth(1000)
-                .latency(12)
-                .uploadSpeed(480)
-                .downloadSpeed(750)
-                .build())
-            .lastHeartbeat("2024-01-01T12:29:00.000Z")
-            .reliability(ConfigPreviewVO.AvailableVmsVO.VmInfoVO.ReliabilityVO.builder()
-                .uptime(99.5)
-                .avgResponseTime(160)
-                .taskSuccessRate(97.8)
-                .build())
-            .build());
-
-        // 应用过滤条件
-        List<ConfigPreviewVO.AvailableVmsVO.VmInfoVO> filteredVms = vms.stream()
-            .filter(vm -> minCpuCores == null || vm.getResources().getCpuCores() >= minCpuCores)
-            .filter(vm -> minMemoryMb == null || vm.getResources().getMemoryMb() >= minMemoryMb)
-            .filter(vm -> algorithm == null || vm.getSupportedAlgorithms().contains(algorithm))
-            .filter(vm -> status == null || vm.getStatus().equals(status))
-            .filter(vm -> {
-                if (capabilities == null || capabilities.isEmpty()) return true;
-                String[] requiredCaps = capabilities.split(",");
-                return Arrays.stream(requiredCaps)
-                    .allMatch(cap -> vm.getCapabilities().contains(cap.trim()));
-            })
-            .collect(Collectors.toList());
-
-        return ConfigPreviewVO.AvailableVmsVO.builder()
-            .total(filteredVms.size())
-            .availableVms(filteredVms)
             .build();
     }
 
@@ -1030,7 +1050,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     .minMemoryMb(4096)
                     .requiredCapabilities(Arrays.asList("TRAINING"))
                     .build())
-                .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA", "SCAFFOLD"))
+                .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD"))
                 .build()
         );
 
@@ -1285,7 +1305,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 生成任务ID
-        String taskId = UUID.randomUUID().toString().replace("-", "");
+        String taskId = uuidUtil.generateUuid();
         LocalDateTime now = LocalDateTime.now();
 
         // 构建v1.3任务实体
@@ -1379,7 +1399,10 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private TaskParticipant buildSmartParticipantFromDTO(TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO participantDTO,
                                                         String taskId, LocalDateTime now) {
         TaskParticipant participant = new TaskParticipant();
-        participant.setParticipantId(UUID.randomUUID().toString().replace("-", ""));
+        // 生成主键ID
+        String participantId = uuidUtil.generateUuid();
+        participant.setId(participantId);
+        participant.setParticipantId(participantId);
         participant.setTaskId(taskId);
         participant.setVmId(participantDTO.getVmId());
         participant.setRole(ParticipantRole.fromCode(participantDTO.getRole()));
@@ -1411,11 +1434,75 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 复杂算法增加时间
         double algorithmMultiplier = 1.0;
-        if ("FEDPROX".equals(createDTO.getAlgorithm()) || "SCAFFOLD".equals(createDTO.getAlgorithm())) {
+        if ("FEDERATED_PROXIMAL".equals(createDTO.getAlgorithm()) || "FEDERATED_SCAFFOLD".equals(createDTO.getAlgorithm())) {
             algorithmMultiplier = 1.3;
         }
 
         return (int) (baseTime * participantCount * rounds * algorithmMultiplier / 10);
+    }
+
+    @Override
+    public GlobalModelsVO getTaskGlobalModels(String taskId) {
+        log.info("查询任务全局模型: taskId={}", taskId);
+
+        // 验证任务存在
+        FederatedTask task = getTaskById(taskId);
+        if (task == null) {
+            throw new RuntimeException("任务不存在: " + taskId);
+        }
+
+        // 查询任务的全局模型数据
+        List<GlobalModelsVO.GlobalModelInfo> globalModels = new ArrayList<>();
+
+        try {
+            // 简化实现：创建模拟的全局模型数据
+            // 在实际场景中，这里应该查询真实的全局模型存储
+            if ("COMPLETED".equals(task.getStatus()) || "RUNNING".equals(task.getStatus())) {
+                // 创建模拟的全局模型
+                for (int round = 1; round <= 3; round++) {
+                    // 创建聚合的全局模型信息
+                    GlobalModelsVO.GlobalModelInfo globalModel = GlobalModelsVO.GlobalModelInfo.builder()
+                        .modelId(uuidUtil.generateUuid())
+                        .round(round)
+                        .aggregationMethod(task.getAlgorithm().name()) // 转换枚举为字符串
+                        .participantCount(5) // 模拟参与者数量
+                        .createdAt(LocalDateTime.now().minusHours(3 - round)) // 模拟不同时间
+                        .version("1.0")
+                        .build();
+
+                    // 聚合模型参数和指标
+                    Map<String, Object> aggregatedParams = new HashMap<>();
+                    aggregatedParams.put("round_" + round + "_parameters", "aggregated_from_5_participants");
+                    aggregatedParams.put("layer_weights", "global_weights_round_" + round);
+
+                    Map<String, Object> aggregatedMetrics = new HashMap<>();
+                    aggregatedMetrics.put("average_accuracy", 0.85 + (round * 0.02)); // 模拟递增的准确率
+                    aggregatedMetrics.put("convergence_rate", 0.95);
+                    aggregatedMetrics.put("participant_count", 5);
+                    aggregatedMetrics.put("loss", 0.15 - (round * 0.02)); // 模拟递减的损失
+
+                    globalModel.setParameters(aggregatedParams);
+                    globalModel.setMetrics(aggregatedMetrics);
+                    globalModel.setModelPath("/global/models/" + taskId + "/round_" + round + ".model");
+
+                    globalModels.add(globalModel);
+                }
+            }
+
+            // 按轮次倒序排列（最新的在前面）
+            globalModels.sort((a, b) -> Integer.compare(b.getRound(), a.getRound()));
+
+            log.info("任务全局模型查询完成: taskId={}, modelCount={}", taskId, globalModels.size());
+
+            return GlobalModelsVO.builder()
+                .taskId(taskId)
+                .models(globalModels)
+                .build();
+
+        } catch (Exception e) {
+            log.error("查询任务全局模型失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            throw new RuntimeException("查询任务全局模型失败: " + e.getMessage());
+        }
     }
 
 }

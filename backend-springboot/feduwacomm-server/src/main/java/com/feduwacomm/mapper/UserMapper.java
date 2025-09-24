@@ -35,6 +35,11 @@ public interface UserMapper {
          */
         User selectByLoginIdentifier(@Param("loginIdentifier") String loginIdentifier);
 
+        /**
+         * 查询第一个管理员用户（按创建时间排序）
+         */
+        User selectFirstAdmin();
+
         // 用户自助操作
         /**
          * 插入用户（用户注册时使用）

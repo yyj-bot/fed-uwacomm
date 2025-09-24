@@ -8,6 +8,7 @@ import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.FederatedTaskStatus;
 import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
+import com.feduwacomm.utils.UuidUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class FedAvgStrategy implements AggregationStrategy {
 
     private final AggregationConfig aggregationConfig;
+    private final UuidUtil uuidUtil;
 
     @Override
     public String getStrategyName() {
@@ -38,7 +40,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return AggregationMethod.FEDAVG.getCode().equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDERATED_AVERAGING.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -49,10 +51,10 @@ public class FedAvgStrategy implements AggregationStrategy {
 
         // 创建全局模型记录
         GlobalModel globalModel = GlobalModel.builder()
-                .id(UUID.randomUUID().toString().replace("-", ""))
+                .id(uuidUtil.generateUuid())
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod(AggregationMethod.FEDAVG)
+                .aggregationMethod(AggregationMethod.FEDERATED_AVERAGING)
                 .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
@@ -60,7 +62,7 @@ public class FedAvgStrategy implements AggregationStrategy {
                 .build();
 
         // 执行聚合
-        return engine.aggregate(AggregationMethod.FEDAVG.getCode(), localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDERATED_AVERAGING.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -115,6 +117,6 @@ public class FedAvgStrategy implements AggregationStrategy {
             reasoning += "由于参与者较多，建议启用并行处理以提升性能。";
         }
 
-        return new AlgorithmConfigSuggestion(AggregationMethod.FEDAVG.getCode(), suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDERATED_AVERAGING.getCode(), suggestedParams, reasoning);
     }
 }

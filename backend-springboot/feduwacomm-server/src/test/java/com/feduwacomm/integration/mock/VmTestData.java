@@ -57,9 +57,9 @@ public class VmTestData {
 
         // 基于硬件配置决定算法支持
         java.util.List<String> algorithms = new java.util.ArrayList<>();
-        algorithms.add("FEDAVG");
+        algorithms.add("FEDERATED_AVERAGING");
         if (cpuCores >= 8) {
-            algorithms.add("FEDPROX");
+            algorithms.add("FEDERATED_PROXIMAL");
         }
         if (gpuCount > 0) {
             algorithms.add("FEDOPT");

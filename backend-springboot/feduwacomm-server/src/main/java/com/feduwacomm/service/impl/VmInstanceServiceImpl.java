@@ -62,6 +62,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     @Autowired
     private JwtConfig jwtConfig;
 
+    @Autowired
+    private UuidUtil uuidUtil;
+
     @Value("${server.port:8080}")
     private String serverPort;
 
@@ -73,23 +76,27 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Override
     public VmRegisterResponseVO register(VmRegisterDTO registerDTO) {
-        logger.info("开始注册虚拟机: vmId={}, name={}, ip={}", 
-                   registerDTO.getVmId(), registerDTO.getName(), registerDTO.getIpAddress());
+        logger.info("开始注册虚拟机: name={}, ip={}",
+                   registerDTO.getName(), registerDTO.getIpAddress());
 
-        // 1. 检查虚拟机是否已存在
-        if (vmInstancesMapper.existsByVmId(registerDTO.getVmId()) > 0) {
-            logger.warn("虚拟机已存在: vmId={}", registerDTO.getVmId());
+        // 1. 自动生成vmId
+        String vmId = uuidUtil.generateUuid();
+        logger.info("自动生成vmId: {}", vmId);
+
+        // 2. 检查虚拟机是否已存在
+        if (vmInstancesMapper.existsByVmId(vmId) > 0) {
+            logger.warn("虚拟机已存在: vmId={}", vmId);
             throw new BusinessException("虚拟机已存在");
         }
 
         // 2. 生成API Key和会话ID
         String rawApiKey = ApiKeyUtil.generateApiKey(); // 明文API Key，只返回一次
         String hashedApiKey = ApiKeyUtil.encodeApiKey(rawApiKey); // BCrypt哈希后存储
-        String sessionId = UUID.randomUUID().toString().replace("-", "");
+        String sessionId = uuidUtil.generateUuid();
 
         // 3. 创建虚拟机实例
         VmInstance vmInstance = new VmInstance();
-        vmInstance.setId(registerDTO.getVmId());
+        vmInstance.setId(vmId);
         vmInstance.setName(registerDTO.getName());
         vmInstance.setIpAddress(registerDTO.getIpAddress());
         vmInstance.setPort(registerDTO.getPort());
@@ -121,25 +128,25 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 vmInstance.setMetadata(objectMapper.writeValueAsString(registerDTO.getMetadata()));
             }
         } catch (JsonProcessingException e) {
-            logger.error("JSON序列化失败: vmId={}", registerDTO.getVmId(), e);
+            logger.error("JSON序列化失败: vmId={}", vmId, e);
             throw new BusinessException("数据格式错误");
         }
 
         // 5. 插入数据库
         int result = vmInstancesMapper.insert(vmInstance);
         if (result <= 0) {
-            logger.error("虚拟机注册失败: vmId={}", registerDTO.getVmId());
+            logger.error("虚拟机注册失败: vmId={}", vmId);
             throw new BusinessException("虚拟机注册失败");
         }
 
         // 6. 生成访问令牌（在数据库插入成功后）
-        String accessToken = generateAccessToken(registerDTO.getVmId());
+        String accessToken = generateAccessToken(vmId);
 
-        logger.info("虚拟机注册成功: vmId={}, sessionId={}", registerDTO.getVmId(), sessionId);
+        logger.info("虚拟机注册成功: vmId={}, sessionId={}", vmId, sessionId);
 
         // 7. 构建响应
         return VmRegisterResponseVO.builder()
-                .vmId(registerDTO.getVmId())
+                .vmId(vmId)
                 .name(registerDTO.getName())
                 .status("OFFLINE")
                 .connectionStatus("DISCONNECTED")
@@ -149,7 +156,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .secretId(rawApiKey) // 返回明文API Key，仅此一次
                 .tokenExpireSeconds(tokenExpireSeconds)
                 .websocket(buildWebSocketInfo())
-                .apiEndpoints(buildApiEndpoints(registerDTO.getVmId()))
+                .apiEndpoints(buildApiEndpoints(vmId))
                 .build();
     }
 
@@ -540,7 +547,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
 
             // 4. 生成命令ID
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             // 5. 这里应该通过WebSocket向虚拟机发送启动命令，暂时模拟
             // TODO: 实现WebSocket命令发送
@@ -594,7 +601,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STOPPING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)
@@ -638,7 +645,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)

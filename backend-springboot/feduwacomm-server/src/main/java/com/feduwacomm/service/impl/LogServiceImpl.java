@@ -50,10 +50,6 @@ public class LogServiceImpl implements LogService {
     private SystemLogMapper systemLogMapper;
     
     @Autowired
-    private VmRuntimeLogMapper vmRuntimeLogMapper;
-    
-    
-    @Autowired
     private LogCleanupTaskMapper logCleanupTaskMapper;
     
     @Autowired
@@ -268,13 +264,17 @@ public class LogServiceImpl implements LogService {
                     .totalLogs(totalLogs)
                     .levelDistribution(levelDistribution)
                     .categoryDistribution(categoryDistribution)
-                    .timeDistribution(timeDistribution.stream().map(data ->
-                            LogStatisticsVO.TimeDistribution.builder()
+                    .timeDistribution(timeDistribution.stream()
+                            .filter(Objects::nonNull)
+                            .filter(data -> data.get("hour") != null && data.get("count") != null)
+                            .map(data -> LogStatisticsVO.TimeDistribution.builder()
                                     .hour((String) data.get("hour"))
                                     .count(((Number) data.get("count")).longValue())
                                     .build()).collect(Collectors.toList()))
-                    .errorTrend(errorTrend.stream().map(data ->
-                            LogStatisticsVO.ErrorTrend.builder()
+                    .errorTrend(errorTrend.stream()
+                            .filter(Objects::nonNull)
+                            .filter(data -> data.get("date") != null && data.get("count") != null)
+                            .map(data -> LogStatisticsVO.ErrorTrend.builder()
                                     .date((String) data.get("date"))
                                     .errorCount(((Number) data.get("count")).longValue())
                                     .build()).collect(Collectors.toList()))
@@ -375,7 +375,7 @@ public class LogServiceImpl implements LogService {
                     .endTime(exportDTO.getEndTime())
                     .page(1)
                     .size(10000) // 限制最大导出10000条记录
-                    .sort("createdAt")
+                    .sort("created_at")
                     .order("desc")
                     .build();
 

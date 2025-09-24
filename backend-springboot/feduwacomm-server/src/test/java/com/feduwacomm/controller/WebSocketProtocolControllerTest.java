@@ -53,10 +53,19 @@ public class WebSocketProtocolControllerTest {
     }
 
     private void setupTestData() {
-        // 准备协议消息
+        // v1.3: 准备协议消息，使用新格式
         Map<String, Object> messageData = new HashMap<>();
-        messageData.put("status", "connected");
-        messageData.put("timestamp", Instant.now().toString());
+        messageData.put("version", "1.0.0");
+        messageData.put("supportedMLAlgorithms", java.util.List.of("RandomForest", "SVM", "NeuralNetwork"));
+        messageData.put("systemInfo", Map.of(
+                "os", "Ubuntu 20.04",
+                "python", "3.8.10",
+                "memory", "4GB"
+        ));
+        messageData.put("computeCapabilities", Map.of(
+                "maxBatchSize", 1024,
+                "parallelProcessing", true
+        ));
 
         sampleMessage = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)

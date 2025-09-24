@@ -194,8 +194,7 @@ class StandardFederatedLearningWorkflowTest {
         for (int i = 0; i < 3; i++) {
             try {
                 VmRegisterDTO vmDTO = new VmRegisterDTO();
-                String vmId = String.format("vm%03dvm%03dvm%03dvm%03dvm%03dvm%03d%02d", i+1, i+1, i+1, i+1, i+1, i+1, i+1);
-                vmDTO.setVmId(vmId);
+                // vmId由后端自动生成，不需要在测试中设置
                 vmDTO.setName(vmNames[i]);
                 vmDTO.setIpAddress(ipAddresses[i]);
                 vmDTO.setPort(22);

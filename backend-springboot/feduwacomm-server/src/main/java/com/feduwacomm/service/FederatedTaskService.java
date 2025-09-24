@@ -202,4 +202,9 @@ public interface FederatedTaskService {
      * 支持新的datasetConfig和participantConfig格式
      */
     TaskOperationVO createSmartTask(TaskCreateDTO createDTO, String createdBy);
+
+    /**
+     * 获取任务全局模型列表
+     */
+    GlobalModelsVO getTaskGlobalModels(String taskId);
 }

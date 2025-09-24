@@ -9,6 +9,7 @@ import com.feduwacomm.orchestration.*;
 import com.feduwacomm.orchestration.handler.*;
 import com.feduwacomm.service.FederatedOrchestrationService;
 import com.feduwacomm.utils.UuidUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,7 +43,10 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     
     @Autowired
     private UuidUtil uuidUtil;
-    
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     // 阶段处理器映射
     private Map<WorkflowStage, StageHandler> stageHandlers;
     
@@ -172,13 +176,25 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
             
             // 执行阶段处理逻辑
             StageResult result = handler.execute(context);
-            
+
+            // 检查结果是否为空
+            if (result == null) {
+                log.error("阶段处理器返回了空结果: stage={}, orchestrationId={}", currentStage, orchestrationId);
+                updateStageExecution(stageExecution.getId(),
+                    WorkflowStageExecution.StageExecutionStatus.FAILED,
+                    LocalDateTime.now(),
+                    null,
+                    "阶段处理器返回了空结果");
+                failWorkflow(context, "阶段处理器返回了空结果");
+                return;
+            }
+
             if (result.isSuccess()) {
                 // 阶段执行成功
                 updateStageExecution(stageExecution.getId(),
                     WorkflowStageExecution.StageExecutionStatus.COMPLETED,
                     LocalDateTime.now(),
-                    result.getOutputData() != null ? result.getOutputData().toString() : null,
+                    serializeOutputData(result.getOutputData()),
                     null);
                 
                 // 转换到下一阶段
@@ -338,6 +354,22 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
             workflow.setCompletedAt(LocalDateTime.now());
             orchestrationMapper.update(workflow);
             log.info("工作流已终止: orchestrationId={}", orchestrationId);
+        }
+    }
+
+    /**
+     * 序列化输出数据为JSON字符串
+     */
+    private String serializeOutputData(Map<String, Object> outputData) {
+        if (outputData == null || outputData.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(outputData);
+        } catch (Exception e) {
+            log.warn("序列化输出数据失败，将返回空值: {}", e.getMessage());
+            return null;
         }
     }
 }
