@@ -2,6 +2,7 @@ package com.feduwacomm.config;
 
 import com.feduwacomm.dto.WebSocketMessage;
 import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.utils.UuidUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -29,11 +30,14 @@ public class WebSocketEventListener {
 
     private final SimpMessageSendingOperations messagingTemplate;
     private final VmInstanceService vmInstanceService;
+    private final UuidUtil uuidUtil;
 
     public WebSocketEventListener(SimpMessageSendingOperations messagingTemplate,
-                                 VmInstanceService vmInstanceService) {
+                                 VmInstanceService vmInstanceService,
+                                 UuidUtil uuidUtil) {
         this.messagingTemplate = messagingTemplate;
         this.vmInstanceService = vmInstanceService;
+        this.uuidUtil = uuidUtil;
     }
 
     /**
@@ -49,13 +53,17 @@ public class WebSocketEventListener {
         // 获取会话属性，添加null检查
         Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
         if (sessionAttributes == null) {
-            logger.warn("WebSocket连接事件中session attributes为null - SessionId: {}", headerAccessor.getSessionId());
+            // 直接使用UuidUtil生成32位的会话ID用于日志记录
+            String sessionId = uuidUtil.generateUuid();
+            logger.warn("WebSocket连接事件中session attributes为null - SessionId: {}", sessionId);
             return;
         }
 
         String vmId = (String) sessionAttributes.get("vmId");
         String category = (String) sessionAttributes.get("category");
-        String sessionId = headerAccessor.getSessionId();
+
+        // 直接使用UuidUtil生成32位的会话ID
+        String sessionId = uuidUtil.generateUuid();
 
         logger.info("WebSocket连接建立 - SessionId: {}, Category: {}, VmId: {}", sessionId, category, vmId);
 
@@ -95,23 +103,24 @@ public class WebSocketEventListener {
         // 获取会话属性，添加null检查
         Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
         if (sessionAttributes == null) {
-            logger.warn("WebSocket断开事件中session attributes为null - SessionId: {}", headerAccessor.getSessionId());
+            // 直接使用UuidUtil生成32位的会话ID用于日志记录
+            String sessionId = uuidUtil.generateUuid();
+            logger.warn("WebSocket断开事件中session attributes为null - SessionId: {}", sessionId);
             return;
         }
 
         String vmId = (String) sessionAttributes.get("vmId");
         String category = (String) sessionAttributes.get("category");
         String username = (String) sessionAttributes.get("username");
-        String sessionId = headerAccessor.getSessionId();
 
-        logger.info("WebSocket连接断开 - SessionId: {}, Category: {}, VmId: {}, Username: {}",
-                   sessionId, category, vmId, username);
+        logger.info("WebSocket连接断开 - Category: {}, VmId: {}, Username: {}",
+                   category, vmId, username);
 
         // 如果是VM断开连接，更新连接状态
         if ("vm".equals(category) && StringUtils.hasText(vmId)) {
             try {
                 vmInstanceService.disconnectVm(vmId);
-                logger.info("VM连接状态已更新为DISCONNECTED - VmId: {}, SessionId: {}", vmId, sessionId);
+                logger.info("VM连接状态已更新为DISCONNECTED - VmId: {}", vmId);
 
                 // 发送VM断开消息
                 WebSocketMessage disconnectMessage = new WebSocketMessage();
@@ -122,11 +131,11 @@ public class WebSocketEventListener {
                 messagingTemplate.convertAndSend("/topic/vm-status", disconnectMessage);
 
             } catch (Exception e) {
-                logger.error("更新VM断开状态失败 - VmId: {}, SessionId: {}", vmId, sessionId, e);
+                logger.error("更新VM断开状态失败 - VmId: {}", vmId, e);
             }
         } else if (StringUtils.hasText(username)) {
             // 普通用户断开连接
-            logger.info("用户断开连接 - Username: {}, SessionId: {}", username, sessionId);
+            logger.info("用户断开连接 - Username: {}", username);
 
             // 发送用户离开消息
             WebSocketMessage leaveMessage = new WebSocketMessage();

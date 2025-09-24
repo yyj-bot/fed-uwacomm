@@ -14,10 +14,7 @@ import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.vo.*;
-import com.feduwacomm.common.BaseContext;
-import com.feduwacomm.config.TestSecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,17 +32,13 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.mockStatic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.impl.DefaultClaims;
-import org.mockito.MockedStatic;
+import java.util.Map;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@ContextConfiguration(classes = TestSecurityConfig.class)
 @DisplayName("日志管理控制器测试")
 class LogControllerTest {
 
@@ -56,43 +49,49 @@ class LogControllerTest {
     private ObjectMapper objectMapper;
     
     @MockBean
-    private UserJwtUtil userJwtUtil;
-    
-    @MockBean
-    private JwtConfig jwtConfig;
-    
-    @MockBean
     private LogService logService;
     
     private String validToken;
-    private MockedStatic<BaseContext> baseContextMock;
 
     @BeforeEach
-    void setUp() {
-        // 设置JWT Mock
-        validToken = "test_token";
-        Claims claims = new DefaultClaims();
-        claims.put("userId", "user123");
-        claims.put("username", "testuser");
-        claims.put("role", "RESEARCHER");
-        claims.put("type", "access");
-        
-        when(userJwtUtil.validateToken(validToken)).thenReturn(claims);
-        
-        // Mock BaseContext static method
-        baseContextMock = mockStatic(BaseContext.class);
-        baseContextMock.when(BaseContext::getCurrentId).thenReturn("user123");
-        
+    void setUp() throws Exception {
+        // 使用真实admin登录获取token
+        validToken = getRealAdminToken();
+
         // 设置测试数据Mocks
         setupMockData();
     }
-    
-    @AfterEach
-    void tearDown() {
-        if (baseContextMock != null) {
-            baseContextMock.close();
-        }
+
+    /**
+     * 获取真实的admin用户token
+     */
+    private String getRealAdminToken() throws Exception {
+        String loginJson = """
+            {
+                "loginIdentifier": "admin",
+                "password": "ab123456"
+            }
+            """;
+
+        String response = mockMvc.perform(post("/api/user/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(loginJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应获取token
+        ObjectMapper mapper = new ObjectMapper();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> responseMap = mapper.readValue(response, Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) responseMap.get("data");
+
+        return (String) data.get("token");
     }
+    
     
     private void setupMockData() {
         // Mock PageResult for log list
@@ -213,6 +212,7 @@ class LogControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/log/export")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(exportDTO)))
                 .andExpect(status().isOk())
@@ -226,7 +226,8 @@ class LogControllerTest {
     void testGetExportStatus() throws Exception {
         String exportId = "export_1234567890";
         
-        mockMvc.perform(get("/api/log/export/status/{exportId}", exportId))
+        mockMvc.perform(get("/api/log/export/status/{exportId}", exportId)
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200))
@@ -238,7 +239,8 @@ class LogControllerTest {
     void testDownloadExport() throws Exception {
         String exportId = "export_1234567890";
         
-        mockMvc.perform(get("/api/log/export/download/{exportId}", exportId))
+        mockMvc.perform(get("/api/log/export/download/{exportId}", exportId)
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes("导出文件内容".getBytes()));
     }
@@ -247,6 +249,7 @@ class LogControllerTest {
     @DisplayName("测试导出历史查询")
     void testGetExportHistory() throws Exception {
         mockMvc.perform(get("/api/log/export/history")
+                .header("Authorization", "Bearer " + validToken)
                 .param("page", "1")
                 .param("size", "10"))
                 .andExpect(status().isOk())
@@ -264,6 +267,7 @@ class LogControllerTest {
                 .build();
 
         mockMvc.perform(post("/api/log/cleanup")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(cleanupDTO)))
                 .andExpect(status().isOk())
@@ -277,7 +281,8 @@ class LogControllerTest {
     void testGetCleanupStatus() throws Exception {
         String cleanupId = "cleanup_1234567890";
         
-        mockMvc.perform(get("/api/log/cleanup/status/{cleanupId}", cleanupId))
+        mockMvc.perform(get("/api/log/cleanup/status/{cleanupId}", cleanupId)
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200))
@@ -287,7 +292,8 @@ class LogControllerTest {
     @Test
     @DisplayName("测试系统监控")
     void testGetSystemMonitor() throws Exception {
-        mockMvc.perform(get("/api/log/monitor/system"))
+        mockMvc.perform(get("/api/log/monitor/system")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200));
@@ -297,6 +303,7 @@ class LogControllerTest {
     @DisplayName("测试日志监控")
     void testGetLogMonitor() throws Exception {
         mockMvc.perform(get("/api/log/monitor/logs")
+                .header("Authorization", "Bearer " + validToken)
                 .param("timeRange", "1h")
                 .param("level", "ERROR"))
                 .andExpect(status().isOk())
@@ -307,7 +314,8 @@ class LogControllerTest {
     @Test
     @DisplayName("测试日志配置查询")
     void testGetLogConfig() throws Exception {
-        mockMvc.perform(get("/api/log/config"))
+        mockMvc.perform(get("/api/log/config")
+                .header("Authorization", "Bearer " + validToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.code").value(200));
@@ -323,6 +331,7 @@ class LogControllerTest {
                 .build();
 
         mockMvc.perform(put("/api/log/config")
+                .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(configDTO)))
                 .andExpect(status().isOk())

@@ -55,12 +55,14 @@ public class VmAssignmentServiceTest {
                 .id("user123")
                 .username("testuser")
                 .email("test@example.com")
+                .role(UserRole.ADMIN)
                 .build();
 
         testAdmin = User.builder()
                 .id("admin123")
                 .username("admin")
                 .email("admin@example.com")
+                .role(UserRole.ADMIN)
                 .build();
 
         // 创建测试虚拟机

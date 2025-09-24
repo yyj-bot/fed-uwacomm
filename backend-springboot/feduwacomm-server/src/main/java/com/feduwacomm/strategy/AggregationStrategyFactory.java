@@ -24,7 +24,7 @@ public class AggregationStrategyFactory {
     /**
      * 根据算法名称获取对应的聚合策略
      *
-     * @param algorithm 算法名称（如：FEDAVG, FEDPROX, FEDNOVA）
+     * @param algorithm 算法名称（如：FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA）
      * @return 聚合策略实现
      */
     public AggregationStrategy getStrategy(String algorithm) {
@@ -53,7 +53,7 @@ public class AggregationStrategyFactory {
      */
     public AggregationStrategy getDefaultStrategy() {
         return strategies.stream()
-                .filter(s -> s.supports("FEDAVG"))
+                .filter(s -> s.supports("FEDERATED_AVERAGING"))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("未找到默认的FedAvg策略实现"));
     }
@@ -62,7 +62,7 @@ public class AggregationStrategyFactory {
      * 获取所有支持的算法列表
      */
     public List<String> getSupportedAlgorithms() {
-        return List.of("FEDAVG", "FEDPROX", "FEDNOVA");
+        return List.of("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA");
     }
 
     /**
@@ -92,17 +92,17 @@ public class AggregationStrategyFactory {
 
         if (isHeterogeneous && participantCount > 5) {
             // 数据异构且参与者较多，推荐FedProx
-            recommendedAlgorithm = "FEDPROX";
+            recommendedAlgorithm = "FEDERATED_PROXIMAL";
             reasoning = "数据异构环境下，FedProx的正则化机制有助于提升收敛稳定性";
             priority = 90;
         } else if (participantCount > 20 && totalRounds > 50) {
             // 大规模长期训练，考虑FedNova
-            recommendedAlgorithm = "FEDNOVA";
+            recommendedAlgorithm = "FEDERATED_NOVA";
             reasoning = "大规模长期训练场景下，FedNova能更好处理客户端异构性";
             priority = 85;
         } else {
             // 标准场景，推荐FedAvg
-            recommendedAlgorithm = "FEDAVG";
+            recommendedAlgorithm = "FEDERATED_AVERAGING";
             reasoning = "标准联邦学习场景，FedAvg提供良好的性能和稳定性平衡";
             priority = 80;
         }

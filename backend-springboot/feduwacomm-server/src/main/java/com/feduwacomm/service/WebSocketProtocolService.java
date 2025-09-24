@@ -186,7 +186,7 @@ public class WebSocketProtocolService {
         if (msg.getVmId() != null) {
             vmInstancesMapper.updateConnection(msg.getVmId(), "CONNECTED", LocalDateTime.now().toString());
         }
-        sendToVmTopic(msg.getVmId(), mapOf("event", "CONNECTED", "vmId", msg.getVmId()));
+        // 移除非标准格式的消息发送，使用标准的CONNECT_ACK响应
         return ackFor(msg, ProtocolType.CONNECT_ACK, data);
     }
 

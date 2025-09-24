@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/v1/vm")
-@CrossOrigin(origins = "*")
 public class VmInstanceController {
 
     private static final Logger logger = LoggerFactory.getLogger(VmInstanceController.class);
@@ -42,27 +41,25 @@ public class VmInstanceController {
      * @return 注册响应
      */
     @PostMapping("/register")
-    public Result<VmRegisterResponseVO> register(@RequestBody VmRegisterDTO registerDTO,
+    public Result<VmRegisterResponseVO> register(@Valid @RequestBody VmRegisterDTO registerDTO,
                                                 HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String userAgent = request.getHeader("User-Agent");
 
-        logger.info("收到虚拟机注册请求: vmId={}, name={}, ip={}, clientIp={}", 
-                   registerDTO.getVmId(), registerDTO.getName(), 
-                   registerDTO.getIpAddress(), clientIp);
-        accessLog.info("虚拟机注册请求: vmId={}, name={}, ip={}, clientIp={}, userAgent={}", 
-                      registerDTO.getVmId(), registerDTO.getName(), 
-                      registerDTO.getIpAddress(), clientIp, userAgent);
+        logger.info("收到虚拟机注册请求: name={}, ip={}, clientIp={}",
+                   registerDTO.getName(), registerDTO.getIpAddress(), clientIp);
+        accessLog.info("虚拟机注册请求: name={}, ip={}, clientIp={}, userAgent={}",
+                      registerDTO.getName(), registerDTO.getIpAddress(), clientIp, userAgent);
 
         try {
             VmRegisterResponseVO response = vmInstanceService.register(registerDTO);
-            logger.info("虚拟机注册成功: vmId={}, sessionId={}, clientIp={}", 
-                       registerDTO.getVmId(), response.getSessionId(), clientIp);
+            logger.info("虚拟机注册成功: vmId={}, sessionId={}, clientIp={}",
+                       response.getVmId(), response.getSessionId(), clientIp);
             return Result.success("虚拟机注册成功", response);
             
         } catch (Exception e) {
-            logger.error("虚拟机注册失败: vmId={}, clientIp={}", 
-                        registerDTO.getVmId(), clientIp, e);
+            logger.error("虚拟机注册失败: name={}, ip={}, clientIp={}",
+                        registerDTO.getName(), registerDTO.getIpAddress(), clientIp, e);
             throw e;
         }
     }

@@ -11,14 +11,15 @@ import com.feduwacomm.enums.ParticipantStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.impl.FederatedTaskServiceImpl;
+import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -31,21 +32,29 @@ import static org.mockito.Mockito.*;
  * 联邦任务服务测试类
  * 测试任务生命周期管理、参与者管理等核心功能
  */
-@SpringBootTest
-@SpringJUnitConfig
-@ActiveProfiles("test")
+@ExtendWith(MockitoExtension.class)
 public class FederatedTaskServiceTest {
 
-    @MockBean
+    @Mock
     private FederatedTasksMapper tasksMapper;
 
-    @MockBean
+    @Mock
     private LogService logService;
 
-    @MockBean
+    @Mock
     private ObjectMapper objectMapper;
 
-    private FederatedTaskService federatedTaskService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private VmInstanceService vmInstanceService;
+
+    @Mock
+    private UuidUtil uuidUtil;
+
+    @InjectMocks
+    private FederatedTaskServiceImpl federatedTaskService;
 
     private TaskCreateDTO sampleCreateDTO;
     private TaskConfigDTO sampleConfigDTO;
@@ -54,37 +63,13 @@ public class FederatedTaskServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 重置mock对象
-        reset(tasksMapper, logService, objectMapper);
-
-        // 创建服务实例
-        federatedTaskService = new FederatedTaskServiceImpl();
-        
-        // 通过反射或其他方式注入mock对象（在实际环境中Spring会自动注入）
-        injectMocks();
+        // 配置UuidUtil Mock
+        lenient().when(uuidUtil.generateUuid()).thenReturn("task-12345");
 
         // 准备测试数据
         setupTestData();
     }
 
-    private void injectMocks() {
-        try {
-            // 使用反射注入mock对象
-            var tasksMapperField = FederatedTaskServiceImpl.class.getDeclaredField("tasksMapper");
-            tasksMapperField.setAccessible(true);
-            tasksMapperField.set(federatedTaskService, tasksMapper);
-
-            var logServiceField = FederatedTaskServiceImpl.class.getDeclaredField("logService");
-            logServiceField.setAccessible(true);
-            logServiceField.set(federatedTaskService, logService);
-
-            var objectMapperField = FederatedTaskServiceImpl.class.getDeclaredField("objectMapper");
-            objectMapperField.setAccessible(true);
-            objectMapperField.set(federatedTaskService, objectMapper);
-        } catch (Exception e) {
-            // 在实际测试中，Spring会自动处理依赖注入
-        }
-    }
 
     private void setupTestData() {
         // 准备参与者数据
@@ -167,7 +152,7 @@ public class FederatedTaskServiceTest {
         // Mock mapper操作成功
         when(tasksMapper.insertTask(any(FederatedTask.class))).thenReturn(1);
         when(tasksMapper.insertParticipant(any(TaskParticipant.class))).thenReturn(1);
-        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+        lenient().doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
 
         // 调用服务方法
         TaskOperationVO result = federatedTaskService.createTask(sampleCreateDTO, "admin");
@@ -244,7 +229,7 @@ public class FederatedTaskServiceTest {
         // Mock任务存在且状态为CREATED
         when(tasksMapper.selectTaskById(taskId)).thenReturn(sampleTask);
         when(tasksMapper.updateTask(any(FederatedTask.class))).thenReturn(1);
-        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+        lenient().doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
 
         // 调用服务方法
         TaskOperationVO result = federatedTaskService.configureTask(taskId, sampleConfigDTO, "admin");
@@ -331,7 +316,7 @@ public class FederatedTaskServiceTest {
         when(tasksMapper.selectParticipantsByTaskId(taskId)).thenReturn(participants);
         when(tasksMapper.updateTaskStatus(eq(taskId), eq("RUNNING"), any(LocalDateTime.class))).thenReturn(1);
         when(tasksMapper.updateParticipantStatus(eq(taskId), anyString(), eq("CONNECTED"), any(LocalDateTime.class))).thenReturn(1);
-        doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
+        lenient().doNothing().when(logService).logTask(anyString(), anyString(), anyString(), anyString(), anyString(), any());
 
         // 调用服务方法
         TaskOperationVO result = federatedTaskService.startTask(taskId, "admin");

@@ -27,13 +27,15 @@ mybatis:
 logging:
   level:
     com.feduwacomm: INFO
-    org.springframework: WARN  
+    org.springframework: WARN
     org.springframework.security: WARN
     com.zaxxer.hikari: WARN
     org.mybatis: WARN
     com.mysql: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  db:
+    enabled: true  # 启用数据库日志记录
 
 # JWT配置 - 双套配置（用户JWT和VM JWT）
 jwt:
@@ -45,7 +47,7 @@ jwt:
     secret: test-vm-secret-key-for-unit-testing-only
     expiration: 3600
     refresh-expiration: 86400
-    
+
 # 测试环境特殊配置
 test:
   interceptors:

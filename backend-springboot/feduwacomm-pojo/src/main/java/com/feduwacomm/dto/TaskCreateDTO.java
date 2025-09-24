@@ -30,7 +30,7 @@ public class TaskCreateDTO {
     private String description;
 
     @NotBlank(message = "算法类型不能为空")
-    private String algorithm; // FEDERATED_AVERAGING, FEDPROX, FEDNOVA, SCAFFOLD
+    private String algorithm; // FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA, FEDERATED_SCAFFOLD
 
     // v1.0 废弃：使用新的participantConfig替代
     @Deprecated

@@ -14,7 +14,7 @@ import java.util.Map;
 @Data
 public class VmRegisterDTO {
 
-    private String vmId;
+    // vmId由后端自动生成，不需要前端传递
 
     @NotBlank(message = "虚拟机名称不能为空")
     @Size(max = 100, message = "虚拟机名称不能超过100个字符")

@@ -151,12 +151,12 @@ public class ModelAggregatorEngine {
                                                            FederatedTask task) {
         
         switch (algorithm.toUpperCase()) {
-            case "FEDAVG":
+            case "FEDERATED_AVERAGING":
                 return FederatedAlgorithms.fedAvgAggregate(
                         input.getClientParameters(), 
                         input.getWeights());
                 
-            case "FEDPROX":
+            case "FEDERATED_PROXIMAL":
                 // 获取服务器端参数（上一轮的全局模型）
                 Map<String, Object> serverParameters = getServerParameters(task);
                 double mu = extractMuParameter(task);
@@ -166,7 +166,7 @@ public class ModelAggregatorEngine {
                         input.getWeights(),
                         mu);
                 
-            case "FEDNOVA":
+            case "FEDERATED_NOVA":
                 List<Integer> localSteps = extractLocalSteps(input.getClientMetrics());
                 return FederatedAlgorithms.fedNovaAggregate(
                         input.getClientParameters(),

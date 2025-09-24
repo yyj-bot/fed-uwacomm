@@ -8,6 +8,7 @@ import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.FederatedTaskStatus;
 import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
+import com.feduwacomm.utils.UuidUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class FedAvgStrategy implements AggregationStrategy {
 
     private final AggregationConfig aggregationConfig;
+    private final UuidUtil uuidUtil;
 
     @Override
     public String getStrategyName() {
@@ -49,7 +51,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
         // 创建全局模型记录
         GlobalModel globalModel = GlobalModel.builder()
-                .id(UUID.randomUUID().toString().replace("-", ""))
+                .id(uuidUtil.generateUuid())
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
                 .aggregationMethod(AggregationMethod.FEDERATED_AVERAGING)

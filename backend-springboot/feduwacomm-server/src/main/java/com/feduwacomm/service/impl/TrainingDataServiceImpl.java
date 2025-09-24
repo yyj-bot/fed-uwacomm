@@ -11,6 +11,7 @@ import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
 import com.feduwacomm.service.TrainingDataService;
 import com.feduwacomm.utils.DataValidationUtil;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -49,6 +50,9 @@ public class TrainingDataServiceImpl implements TrainingDataService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UuidUtil uuidUtil;
+
     @Override
     public TrainingDataUploadVO uploadFile(TrainingDataUploadDTO uploadDTO, MultipartFile file, String userId) {
         log.info("开始上传训练数据文件: dataType={}", uploadDTO.getDataType());
@@ -59,7 +63,7 @@ public class TrainingDataServiceImpl implements TrainingDataService {
 
         try {
             // 生成数据集ID
-            String datasetId = UUID.randomUUID().toString().replace("-", "");
+            String datasetId = uuidUtil.generateUuid();
 
             // 读取文件内容并验证
             String fileContent = new String(file.getBytes(), SystemConstants.DEFAULT_CHARSET);
@@ -137,7 +141,7 @@ public class TrainingDataServiceImpl implements TrainingDataService {
 
         try {
             // 生成数据集ID
-            String datasetId = UUID.randomUUID().toString().replace("-", "");
+            String datasetId = uuidUtil.generateUuid();
 
             // 验证文本内容
             DataValidationUtil.ValidationResult validationResult = DataValidationUtil.validateTextContent(textDTO.getContent());
@@ -659,7 +663,7 @@ public class TrainingDataServiceImpl implements TrainingDataService {
                 }
 
                 TrainingDataRow dataRow = TrainingDataRow.builder()
-                        .id(UUID.randomUUID().toString().replace("-", ""))
+                        .id(uuidUtil.generateUuid())
                         .datasetId(datasetId)
                         .rowData(rowData)
                         .createdAt(LocalDateTime.now())
@@ -713,7 +717,7 @@ public class TrainingDataServiceImpl implements TrainingDataService {
                 rowData.put("wordCount", line.split("\\s+").length);
 
                 TrainingDataRow dataRow = TrainingDataRow.builder()
-                        .id(UUID.randomUUID().toString().replace("-", ""))
+                        .id(uuidUtil.generateUuid())
                         .datasetId(datasetId)
                         .rowData(rowData)
                         .createdAt(LocalDateTime.now())

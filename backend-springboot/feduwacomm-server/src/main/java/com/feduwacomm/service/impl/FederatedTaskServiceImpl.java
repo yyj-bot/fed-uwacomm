@@ -10,6 +10,7 @@ import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
+import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.controller.FederatedTaskController;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -49,6 +50,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private com.feduwacomm.service.VmInstanceService vmInstanceService;
 
+    @Autowired
+    private UuidUtil uuidUtil;
+
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
     private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
@@ -71,7 +75,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 生成任务ID
-        String taskId = UUID.randomUUID().toString().replace("-", "");
+        String taskId = uuidUtil.generateUuid();
         LocalDateTime now = LocalDateTime.now();
 
         // 构建任务实体
@@ -703,7 +707,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     private TaskParticipant buildParticipantFromDTO(TaskCreateDTO.ParticipantDTO participantDTO, String taskId, LocalDateTime now) {
         return TaskParticipant.builder()
-            .id(UUID.randomUUID().toString().replace("-", ""))
+            .id(uuidUtil.generateUuid())
             .taskId(taskId)
             .vmId(participantDTO.getVmId())
             .role(ParticipantRole.fromCode(participantDTO.getRole()))
@@ -1046,7 +1050,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     .minMemoryMb(4096)
                     .requiredCapabilities(Arrays.asList("TRAINING"))
                     .build())
-                .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDPROX", "FEDNOVA", "SCAFFOLD"))
+                .compatibleAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD"))
                 .build()
         );
 
@@ -1301,7 +1305,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 生成任务ID
-        String taskId = UUID.randomUUID().toString().replace("-", "");
+        String taskId = uuidUtil.generateUuid();
         LocalDateTime now = LocalDateTime.now();
 
         // 构建v1.3任务实体
@@ -1396,7 +1400,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                                                         String taskId, LocalDateTime now) {
         TaskParticipant participant = new TaskParticipant();
         // 生成主键ID
-        String participantId = UUID.randomUUID().toString().replace("-", "");
+        String participantId = uuidUtil.generateUuid();
         participant.setId(participantId);
         participant.setParticipantId(participantId);
         participant.setTaskId(taskId);
@@ -1430,11 +1434,75 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 复杂算法增加时间
         double algorithmMultiplier = 1.0;
-        if ("FEDPROX".equals(createDTO.getAlgorithm()) || "SCAFFOLD".equals(createDTO.getAlgorithm())) {
+        if ("FEDERATED_PROXIMAL".equals(createDTO.getAlgorithm()) || "FEDERATED_SCAFFOLD".equals(createDTO.getAlgorithm())) {
             algorithmMultiplier = 1.3;
         }
 
         return (int) (baseTime * participantCount * rounds * algorithmMultiplier / 10);
+    }
+
+    @Override
+    public GlobalModelsVO getTaskGlobalModels(String taskId) {
+        log.info("查询任务全局模型: taskId={}", taskId);
+
+        // 验证任务存在
+        FederatedTask task = getTaskById(taskId);
+        if (task == null) {
+            throw new RuntimeException("任务不存在: " + taskId);
+        }
+
+        // 查询任务的全局模型数据
+        List<GlobalModelsVO.GlobalModelInfo> globalModels = new ArrayList<>();
+
+        try {
+            // 简化实现：创建模拟的全局模型数据
+            // 在实际场景中，这里应该查询真实的全局模型存储
+            if ("COMPLETED".equals(task.getStatus()) || "RUNNING".equals(task.getStatus())) {
+                // 创建模拟的全局模型
+                for (int round = 1; round <= 3; round++) {
+                    // 创建聚合的全局模型信息
+                    GlobalModelsVO.GlobalModelInfo globalModel = GlobalModelsVO.GlobalModelInfo.builder()
+                        .modelId(uuidUtil.generateUuid())
+                        .round(round)
+                        .aggregationMethod(task.getAlgorithm().name()) // 转换枚举为字符串
+                        .participantCount(5) // 模拟参与者数量
+                        .createdAt(LocalDateTime.now().minusHours(3 - round)) // 模拟不同时间
+                        .version("1.0")
+                        .build();
+
+                    // 聚合模型参数和指标
+                    Map<String, Object> aggregatedParams = new HashMap<>();
+                    aggregatedParams.put("round_" + round + "_parameters", "aggregated_from_5_participants");
+                    aggregatedParams.put("layer_weights", "global_weights_round_" + round);
+
+                    Map<String, Object> aggregatedMetrics = new HashMap<>();
+                    aggregatedMetrics.put("average_accuracy", 0.85 + (round * 0.02)); // 模拟递增的准确率
+                    aggregatedMetrics.put("convergence_rate", 0.95);
+                    aggregatedMetrics.put("participant_count", 5);
+                    aggregatedMetrics.put("loss", 0.15 - (round * 0.02)); // 模拟递减的损失
+
+                    globalModel.setParameters(aggregatedParams);
+                    globalModel.setMetrics(aggregatedMetrics);
+                    globalModel.setModelPath("/global/models/" + taskId + "/round_" + round + ".model");
+
+                    globalModels.add(globalModel);
+                }
+            }
+
+            // 按轮次倒序排列（最新的在前面）
+            globalModels.sort((a, b) -> Integer.compare(b.getRound(), a.getRound()));
+
+            log.info("任务全局模型查询完成: taskId={}, modelCount={}", taskId, globalModels.size());
+
+            return GlobalModelsVO.builder()
+                .taskId(taskId)
+                .models(globalModels)
+                .build();
+
+        } catch (Exception e) {
+            log.error("查询任务全局模型失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            throw new RuntimeException("查询任务全局模型失败: " + e.getMessage());
+        }
     }
 
 }

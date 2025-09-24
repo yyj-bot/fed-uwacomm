@@ -2,6 +2,7 @@ package com.feduwacomm.config;
 
 import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.utils.VmJwtUtil;
+import com.feduwacomm.utils.UuidUtil;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
@@ -38,6 +39,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     @Autowired
     private com.feduwacomm.service.VmInstanceService vmInstanceService;
+
+    @Autowired
+    private UuidUtil uuidUtil;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -126,8 +130,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
                         // 直接更新VM连接状态
                         try {
-                            vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", accessor.getSessionId());
-                            System.out.println("VM认证成功，已更新连接状态: vmId=" + vmId + ", sessionId=" + accessor.getSessionId());
+                            // 使用UuidUtil生成32位的会话ID，而不是使用Spring框架的长会话ID
+                            String sessionId = uuidUtil.generateUuid();
+                            vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", sessionId);
+                            System.out.println("VM认证成功，已更新连接状态: vmId=" + vmId + ", sessionId=" + sessionId);
                         } catch (Exception e) {
                             System.err.println("更新VM连接状态失败: vmId=" + vmId + ", error=" + e.getMessage());
                         }

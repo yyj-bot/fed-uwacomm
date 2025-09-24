@@ -62,6 +62,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     @Autowired
     private JwtConfig jwtConfig;
 
+    @Autowired
+    private UuidUtil uuidUtil;
+
     @Value("${server.port:8080}")
     private String serverPort;
 
@@ -73,16 +76,12 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Override
     public VmRegisterResponseVO register(VmRegisterDTO registerDTO) {
-        logger.info("开始注册虚拟机: vmId={}, name={}, ip={}",
-                   registerDTO.getVmId(), registerDTO.getName(), registerDTO.getIpAddress());
+        logger.info("开始注册虚拟机: name={}, ip={}",
+                   registerDTO.getName(), registerDTO.getIpAddress());
 
-        // 1. 生成或使用提供的vmId
-        String vmId = registerDTO.getVmId();
-        if (vmId == null || vmId.trim().isEmpty()) {
-            vmId = UUID.randomUUID().toString().replace("-", "");
-            registerDTO.setVmId(vmId);
-            logger.info("自动生成vmId: {}", vmId);
-        }
+        // 1. 自动生成vmId
+        String vmId = uuidUtil.generateUuid();
+        logger.info("自动生成vmId: {}", vmId);
 
         // 2. 检查虚拟机是否已存在
         if (vmInstancesMapper.existsByVmId(vmId) > 0) {
@@ -93,7 +92,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         // 2. 生成API Key和会话ID
         String rawApiKey = ApiKeyUtil.generateApiKey(); // 明文API Key，只返回一次
         String hashedApiKey = ApiKeyUtil.encodeApiKey(rawApiKey); // BCrypt哈希后存储
-        String sessionId = UUID.randomUUID().toString().replace("-", "");
+        String sessionId = uuidUtil.generateUuid();
 
         // 3. 创建虚拟机实例
         VmInstance vmInstance = new VmInstance();
@@ -157,7 +156,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .secretId(rawApiKey) // 返回明文API Key，仅此一次
                 .tokenExpireSeconds(tokenExpireSeconds)
                 .websocket(buildWebSocketInfo())
-                .apiEndpoints(buildApiEndpoints(registerDTO.getVmId()))
+                .apiEndpoints(buildApiEndpoints(vmId))
                 .build();
     }
 
@@ -548,7 +547,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
 
             // 4. 生成命令ID
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             // 5. 这里应该通过WebSocket向虚拟机发送启动命令，暂时模拟
             // TODO: 实现WebSocket命令发送
@@ -602,7 +601,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STOPPING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)
@@ -646,7 +645,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)

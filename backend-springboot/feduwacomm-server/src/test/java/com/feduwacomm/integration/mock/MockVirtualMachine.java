@@ -2,6 +2,7 @@ package com.feduwacomm.integration.mock;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.VmRegisterDTO;
+import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.vo.VmRegisterResponseVO;
 
 import org.springframework.core.ParameterizedTypeReference;
@@ -13,6 +14,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
+import org.springframework.web.socket.WebSocketHttpHeaders;
 
 import java.lang.reflect.Type;
 import java.net.URI;
@@ -75,12 +77,18 @@ public class MockVirtualMachine {
             if (responseBody != null && Integer.valueOf(200).equals(responseBody.get("code"))) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
-                sessionId = (String) data.get("sessionId");
-                accessToken = (String) data.get("accessToken"); // 保存访问令牌
-                String generatedVmId = (String) data.get("vmId");
-                vmData.setVmId(generatedVmId);
-                registered = true;
-                return generatedVmId;
+
+                if (data != null) {
+                    sessionId = (String) data.get("sessionId");
+                    accessToken = (String) data.get("accessToken");
+                    String generatedVmId = (String) data.get("vmId");
+
+                    if (generatedVmId != null) {
+                        vmData.setVmId(generatedVmId);
+                        registered = true;
+                        return generatedVmId;
+                    }
+                }
             }
         }
 
@@ -96,23 +104,39 @@ public class MockVirtualMachine {
             WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
             stompClient.setMessageConverter(new MappingJackson2MessageConverter());
 
-            // STOMP会话处理器
-            StompSessionHandler sessionHandler = new MockStompSessionHandler();
+            // STOMP会话处理器（带认证信息）
+            // 认证信息通过STOMP CONNECT头部的Authorization Bearer传递
+            StompSessionHandler sessionHandler = new MockStompSessionHandlerWithAuth(accessToken, vmData.getVmId());
 
-            // 尝试使用原生WebSocket端点（非SockJS）
-            String nativeWsUrl = websocketUrl.replace("/ws", "/ws-native") + "?vmId=" + vmData.getVmId() + "&token=" + accessToken;
+            // 使用纯净的WebSocket URL，不在URL中暴露敏感信息
+            String nativeWsUrl = websocketUrl.replace("/ws", "/ws-native");
             System.out.println("尝试原生WebSocket连接: " + nativeWsUrl);
             System.out.println("VM ID: " + vmData.getVmId());
-            System.out.println("Access Token: " + (accessToken != null ? accessToken.substring(0, Math.min(20, accessToken.length())) + "..." : "null"));
+            System.out.println("Access Token: " + (accessToken != null && accessToken.length() > 20 ? accessToken.substring(0, 20) + "..." : accessToken));
+            System.out.println("认证方式: STOMP CONNECT Authorization头部 (符合协议规范)");
+
+            // 创建STOMP连接头部
+            StompHeaders connectHeaders = new StompHeaders();
+            connectHeaders.setAcceptVersion("1.1", "1.2");
+            connectHeaders.setHeartbeat(new long[]{0, 0});
+            // 使用标准的Authorization Bearer头部传递JWT token
+            if (accessToken != null) {
+                connectHeaders.add("Authorization", "Bearer " + accessToken);
+            }
+            // 可选传递vmId
+            if (vmData.getVmId() != null) {
+                connectHeaders.add("vmId", vmData.getVmId());
+            }
 
             try {
-                stompSession = stompClient.connect(nativeWsUrl, sessionHandler).get();
+                stompSession = stompClient.connect(nativeWsUrl, (WebSocketHttpHeaders) null, connectHeaders, sessionHandler).get();
             } catch (Exception nativeEx) {
-                System.out.println("原生WebSocket连接失败，尝试SockJS端点");
-                // 回退到SockJS端点
-                String sockjsUrl = websocketUrl + "?vmId=" + vmData.getVmId() + "&token=" + accessToken;
+                System.out.println("原生WebSocket连接失败: " + nativeEx.getMessage());
+                System.out.println("尝试SockJS端点");
+                // 回退到SockJS端点，同样使用STOMP头部认证
+                String sockjsUrl = websocketUrl;
                 System.out.println("尝试SockJS连接: " + sockjsUrl);
-                stompSession = stompClient.connect(sockjsUrl, sessionHandler).get();
+                stompSession = stompClient.connect(sockjsUrl, (WebSocketHttpHeaders) null, connectHeaders, sessionHandler).get();
             }
 
             // 等待连接建立
@@ -124,7 +148,7 @@ public class MockVirtualMachine {
                 stompSession.subscribe("/topic/vm/" + vmData.getVmId(), new MockStompFrameHandler());
 
                 // 发送CONNECT协议消息
-                Map<String, Object> connectMessage = createProtocolMessage("CONNECT");
+                Map<String, Object> connectMessage = createProtocolMessage(ProtocolType.CONNECT);
                 Map<String, Object> data = new HashMap<>();
                 data.put("sessionId", sessionId);
                 data.put("vmId", vmData.getVmId());
@@ -175,7 +199,7 @@ public class MockVirtualMachine {
             return;
         }
 
-        Map<String, Object> heartbeatMessage = createProtocolMessage("HEARTBEAT");
+        Map<String, Object> heartbeatMessage = createProtocolMessage(ProtocolType.HEARTBEAT);
         Map<String, Object> data = new HashMap<>();
         data.put("status", "ACTIVE");
         data.put("cpuUsage", 20 + Math.random() * 50);
@@ -197,7 +221,7 @@ public class MockVirtualMachine {
         // 生成基于VM能力的训练结果
         TrainingMetrics metrics = generateTrainingMetrics(round);
 
-        Map<String, Object> modelUpload = createProtocolMessage("MODEL_UPLOAD");
+        Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.MODEL_UPLOAD);
 
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
@@ -271,26 +295,38 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 生成随机矩阵（模拟）
+     * 生成随机矩阵（实际数值）
      */
-    private String generateRandomMatrix(int rows, int cols) {
-        return String.format("random_matrix_%dx%d_%s", rows, cols, UUID.randomUUID().toString().substring(0, 8));
+    private double[][] generateRandomMatrix(int rows, int cols) {
+        double[][] matrix = new double[rows][cols];
+        Random random = new Random();
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                matrix[i][j] = random.nextGaussian() * 0.1; // 小的随机值
+            }
+        }
+        return matrix;
     }
 
     /**
-     * 生成随机向量（模拟）
+     * 生成随机向量（实际数值）
      */
-    private String generateRandomVector(int size) {
-        return String.format("random_vector_%d_%s", size, UUID.randomUUID().toString().substring(0, 8));
+    private double[] generateRandomVector(int size) {
+        double[] vector = new double[size];
+        Random random = new Random();
+        for (int i = 0; i < size; i++) {
+            vector[i] = random.nextGaussian() * 0.1; // 小的随机值
+        }
+        return vector;
     }
 
     /**
      * 创建协议消息的基本结构
      */
-    private Map<String, Object> createProtocolMessage(String type) {
+    private Map<String, Object> createProtocolMessage(ProtocolType type) {
         Map<String, Object> message = new HashMap<>();
-        message.put("type", type);
-        message.put("id", type.toLowerCase() + "-" + System.currentTimeMillis());
+        message.put("type", type.name()); // 使用字符串格式，真实环境中WebSocket只能传输字符串
+        message.put("id", type.name().toLowerCase() + "-" + System.currentTimeMillis());
         message.put("timestamp", Instant.now().toString());
         message.put("vmId", vmData.getVmId());
         return message;
@@ -365,14 +401,15 @@ public class MockVirtualMachine {
             this.vmId = vmId;
         }
 
+
         @Override
         public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
-            System.out.println("STOMP连接已建立，手动发送认证: " + vmData.getName());
+            System.out.println("STOMP连接已建立: " + vmData.getName());
+            System.out.println("认证信息 - Token: " + (token != null && token.length() > 20 ? token.substring(0, 20) + "..." : token));
+            System.out.println("认证信息 - VmId: " + vmId);
 
-            // 手动发送CONNECT帧携带认证信息
-            // 但这个时候连接已经建立，我们需要在连接前设置认证
-            // 实际上，我们不能在afterConnected中重新发送CONNECT帧
-            // 让我们采用不同的方法
+            // 连接建立后，认证信息已通过STOMP CONNECT帧的Authorization头部传递
+            // 符合协议文档的最佳实践
         }
 
         @Override
@@ -402,7 +439,21 @@ public class MockVirtualMachine {
             try {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> messageData = (Map<String, Object>) payload;
+
+                // 添加空值检查
+                if (messageData == null) {
+                    System.err.println("收到空的STOMP消息: " + vmData.getName());
+                    return;
+                }
+
                 String type = (String) messageData.get("type");
+
+                // 检查type字段是否为null
+                if (type == null) {
+                    System.err.println("收到STOMP消息但type字段为null，消息内容: " + messageData + " from VM: " + vmData.getName());
+                    return;
+                }
+
                 System.out.println("收到STOMP消息: " + type + " from VM: " + vmData.getName());
 
                 // 处理不同类型的消息
@@ -417,11 +468,12 @@ public class MockVirtualMachine {
                         System.out.println("收到全局模型更新: " + vmData.getName());
                         break;
                     default:
-                        // 处理其他消息类型
+                        System.out.println("收到未知类型消息: " + type + " from VM: " + vmData.getName());
                         break;
                 }
             } catch (Exception e) {
                 System.err.println("处理STOMP消息失败: " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }

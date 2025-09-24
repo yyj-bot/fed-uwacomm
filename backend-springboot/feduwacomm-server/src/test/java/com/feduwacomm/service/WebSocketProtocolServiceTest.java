@@ -183,7 +183,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证mock调用
         verify(vmInstancesMapper).updateConnection(eq("vm-001"), eq("CONNECTED"), anyString());
-        verify(messagingTemplate).convertAndSend(eq("/topic/vm/vm-001"), any(Object.class));
+        // 移除非标准格式消息的验证，现在只通过标准的CONNECT_ACK响应
     }
 
     /**

@@ -32,8 +32,8 @@ public class UserController {
     /**
      * 用户注册
      */
-    @PostMapping("/register")
-    public Result<UserRegisterResponseVO> register(@Valid @RequestBody UserRegisterDTO registerDTO, 
+    @PostMapping(value = "/register", consumes = "application/json")
+    public Result<UserRegisterResponseVO> register(@Valid @RequestBody UserRegisterDTO registerDTO,
                                                  HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String userAgent = request.getHeader("User-Agent");

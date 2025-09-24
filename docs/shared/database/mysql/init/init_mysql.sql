@@ -53,7 +53,7 @@ ALTER TABLE users
 ADD CONSTRAINT fk_users_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL;
 
 
--- 3. 虚拟机表 (vm_instances)
+-- 2. 虚拟机表 (vm_instances)
 CREATE TABLE IF NOT EXISTS vm_instances (
     id VARCHAR(32) PRIMARY KEY COMMENT '虚拟机唯一标识(32位UUID)',
     name VARCHAR(100) NOT NULL COMMENT '虚拟机名称',
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS vm_instances (
     INDEX idx_vm_created_at (created_at)
 );
 
--- 4. 联邦学习任务表 (federated_tasks)
+-- 3. 联邦学习任务表 (federated_tasks)
 CREATE TABLE IF NOT EXISTS federated_tasks (
     id VARCHAR(32) PRIMARY KEY COMMENT '任务唯一标识(32位UUID)',
     name VARCHAR(100) NOT NULL COMMENT '任务名称',
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
     config JSON COMMENT '算法配置参数'
 );
 
--- 5. 训练数据集元信息表 (training_dataset，原training_data)
+-- 4. 训练数据集元信息表 (training_dataset，原training_data)
 CREATE TABLE IF NOT EXISTS training_dataset (
     id VARCHAR(32) PRIMARY KEY COMMENT '数据集唯一标识(32位UUID)',
     vm_id VARCHAR(32) NULL COMMENT '关联虚拟机ID(32位UUID)',
@@ -168,7 +168,7 @@ ADD CONSTRAINT fk_training_dataset_updated_by FOREIGN KEY (updated_by) REFERENCE
 ALTER TABLE training_dataset
 ADD CONSTRAINT fk_training_dataset_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE SET NULL;
 
--- 6. 训练数据明细表 (training_dataset_row，宽表+JSON)
+-- 5. 训练数据明细表 (training_dataset_row，宽表+JSON)
 CREATE TABLE IF NOT EXISTS training_dataset_row (
     id VARCHAR(32) PRIMARY KEY COMMENT '数据行唯一标识(32位UUID)',
     dataset_id VARCHAR(32) NOT NULL COMMENT '所属数据集ID',
@@ -238,36 +238,8 @@ CREATE TABLE IF NOT EXISTS system_logs (
     INDEX idx_task_id (task_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'SpringBoot系统日志表';
 
--- 8. 虚拟机运行日志表 (vm_runtime_logs)
-CREATE TABLE IF NOT EXISTS vm_runtime_logs (
-    id VARCHAR(32) PRIMARY KEY COMMENT '日志唯一标识(32位UUID)',
-    level ENUM(
-        'INFO',
-        'WARN',
-        'ERROR',
-        'DEBUG'
-    ) NOT NULL,
-    category VARCHAR(50) NOT NULL COMMENT '日志类别',
-    vm_id VARCHAR(32) NULL COMMENT '虚拟机ID(32位UUID)',
-    task_id VARCHAR(32) NULL COMMENT '任务ID(32位UUID)',
-    message TEXT NOT NULL COMMENT '日志消息',
-    details JSON COMMENT '详细信息',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_level (level),
-    INDEX idx_category (category),
-    INDEX idx_vm_id (vm_id),
-    INDEX idx_task_id (task_id),
-    INDEX idx_created_at (created_at)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '虚拟机运行日志表';
 
--- 添加外键约束（在表创建后单独添加，避免NULL约束问题）
-ALTER TABLE vm_runtime_logs
-ADD CONSTRAINT fk_vm_runtime_logs_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE SET NULL;
-
-ALTER TABLE vm_runtime_logs
-ADD CONSTRAINT fk_vm_runtime_logs_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE SET NULL;
-
--- 9. 虚拟机轮次模型结果表 (vm_round_models)
+-- 8. 虚拟机轮次模型结果表 (vm_round_models)
 CREATE TABLE IF NOT EXISTS vm_round_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
@@ -286,7 +258,7 @@ ADD CONSTRAINT fk_vm_round_models_task_id FOREIGN KEY (task_id) REFERENCES feder
 ALTER TABLE vm_round_models
 ADD CONSTRAINT fk_vm_round_models_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
 
--- 10. 虚拟机刷新凭证表 (vm_secrets)
+-- 9. 虚拟机刷新凭证表 (vm_secrets)
 CREATE TABLE IF NOT EXISTS vm_secrets (
     id VARCHAR(32) PRIMARY KEY COMMENT '凭证唯一标识(32位UUID)',
     vm_id VARCHAR(32) NOT NULL COMMENT '虚拟机ID(32位UUID)',
@@ -309,7 +281,7 @@ CREATE TABLE IF NOT EXISTS vm_secrets (
 ALTER TABLE vm_secrets
 ADD CONSTRAINT fk_vm_secrets_vm_id FOREIGN KEY (vm_id) REFERENCES vm_instances (id) ON DELETE CASCADE;
 
--- 11. 全局模型表 (global_models)
+-- 10. 全局模型表 (global_models)
 CREATE TABLE IF NOT EXISTS global_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
@@ -348,7 +320,7 @@ CREATE TABLE IF NOT EXISTS global_models (
 ALTER TABLE global_models
 ADD CONSTRAINT fk_global_models_task_id FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE;
 
--- 12. 日志导出任务表 (log_export_tasks)
+-- 11. 日志导出任务表 (log_export_tasks)
 CREATE TABLE IF NOT EXISTS log_export_tasks (
     id VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID，32位UUID',
     export_id VARCHAR(50) NOT NULL UNIQUE COMMENT '导出任务ID（用户可见）',
@@ -377,7 +349,7 @@ CREATE TABLE IF NOT EXISTS log_export_tasks (
     INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日志导出任务表';
 
--- 13. 日志清理任务表 (log_cleanup_tasks)
+-- 12. 日志清理任务表 (log_cleanup_tasks)
 CREATE TABLE IF NOT EXISTS log_cleanup_tasks (
     id VARCHAR(32) NOT NULL PRIMARY KEY COMMENT '主键ID，32位UUID',
     cleanup_id VARCHAR(50) NOT NULL UNIQUE COMMENT '清理任务ID（用户可见）',
@@ -406,7 +378,7 @@ CREATE TABLE IF NOT EXISTS log_cleanup_tasks (
 -- =====================================================
 -- 索引创建
 -- =====================================================
--- 注意: system_logs 和 vm_runtime_logs 表的索引已在表定义中包含
+-- 注意: system_logs 表的索引已在表定义中包含
 -- 用户表索引
 CREATE INDEX idx_users_username ON users (username);
 
@@ -510,18 +482,12 @@ CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
 -- CREATE INDEX idx_system_logs_user_id ON system_logs (user_id);
 -- CREATE INDEX idx_system_logs_request_uri ON system_logs (request_uri);
 
--- 虚拟机运行日志表索引（已在表定义中包含）
--- CREATE INDEX idx_vm_runtime_logs_level ON vm_runtime_logs (level);
--- CREATE INDEX idx_vm_runtime_logs_category ON vm_runtime_logs (category);
--- CREATE INDEX idx_vm_runtime_logs_vm_id ON vm_runtime_logs (vm_id);
--- CREATE INDEX idx_vm_runtime_logs_task_id ON vm_runtime_logs (task_id);
--- CREATE INDEX idx_vm_runtime_logs_created_at ON vm_runtime_logs (created_at);
 
 -- =====================================================
 -- 重构扩展 - 新增服务相关表
 -- =====================================================
 
--- 15. 初始模型表
+-- 13. 初始模型表
 CREATE TABLE IF NOT EXISTS initial_models (
     id VARCHAR(32) PRIMARY KEY COMMENT '初始模型唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
@@ -542,7 +508,7 @@ CREATE TABLE IF NOT EXISTS initial_models (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='初始模型表 - 存储联邦学习初始模型信息';
 
--- 16. 模型分发记录表
+-- 14. 模型分发记录表
 CREATE TABLE IF NOT EXISTS model_distributions (
     id VARCHAR(32) PRIMARY KEY COMMENT '分发记录唯一标识(32位UUID)',
     model_id VARCHAR(32) NOT NULL COMMENT '模型ID(32位UUID)',
@@ -561,7 +527,7 @@ CREATE TABLE IF NOT EXISTS model_distributions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='模型分发记录表 - 跟踪模型分发到虚拟机的状态';
 
--- 17. 数据分发任务表
+-- 15. 数据分发任务表
 CREATE TABLE IF NOT EXISTS data_distributions (
     id VARCHAR(32) PRIMARY KEY COMMENT '数据分发任务唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
@@ -580,7 +546,7 @@ CREATE TABLE IF NOT EXISTS data_distributions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='数据分发任务表 - 管理训练数据分发任务';
 
--- 18. 数据分发详情表
+-- 16. 数据分发详情表
 CREATE TABLE IF NOT EXISTS data_distribution_details (
     id VARCHAR(32) PRIMARY KEY COMMENT '分发详情唯一标识(32位UUID)',
     distribution_id VARCHAR(32) NOT NULL COMMENT '分发任务ID(32位UUID)',
@@ -604,7 +570,7 @@ CREATE TABLE IF NOT EXISTS data_distribution_details (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='数据分发详情表 - 跟踪具体数据分发到各虚拟机的状态';
 
--- 19. 工作流编排表
+-- 17. 工作流编排表
 CREATE TABLE IF NOT EXISTS orchestration_workflows (
     id VARCHAR(32) PRIMARY KEY COMMENT '工作流唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
@@ -627,7 +593,7 @@ CREATE TABLE IF NOT EXISTS orchestration_workflows (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
   COMMENT='工作流编排表 - 管理联邦学习工作流执行状态';
 
--- 20. 工作流阶段执行记录表
+-- 18. 工作流阶段执行记录表
 CREATE TABLE IF NOT EXISTS workflow_stage_executions (
     id VARCHAR(32) PRIMARY KEY COMMENT '阶段执行记录唯一标识(32位UUID)',
     orchestration_id VARCHAR(32) NOT NULL COMMENT '工作流ID(32位UUID)',
@@ -662,7 +628,7 @@ ADD COLUMN distribution_status ENUM('PENDING', 'DISTRIBUTING', 'DISTRIBUTED', 'F
 ADD COLUMN distributed_vms JSON COMMENT '已分发的虚拟机列表(JSON格式)',
 ADD COLUMN distribution_completed_at TIMESTAMP NULL COMMENT '分发完成时间';
 
--- 20. 联邦学习任务参与者表 (task_participants)
+-- 19. 联邦学习任务参与者表 (task_participants)
 CREATE TABLE IF NOT EXISTS task_participants (
     id VARCHAR(32) PRIMARY KEY COMMENT '参与者唯一标识(32位UUID)',
     task_id VARCHAR(32) NOT NULL COMMENT '任务ID(32位UUID)',
@@ -724,17 +690,16 @@ CREATE TABLE IF NOT EXISTS task_participants (
 -- 5. training_dataset_row - 训练数据明细表
 -- 6. model_versions - 模型版本表
 -- 7. system_logs - SpringBoot系统日志表
--- 8. vm_runtime_logs - 虚拟机运行日志表
--- 9. vm_round_models - 虚拟机轮次模型结果表
--- 10. vm_secrets - 虚拟机刷新凭证表
--- 11. global_models - 全局模型表（已扩展）
--- 12. log_export_tasks - 日志导出任务表
--- 13. log_cleanup_tasks - 日志清理任务表
--- 14. initial_models - 初始模型表（新增）
--- 15. model_distributions - 模型分发记录表（新增）
--- 16. data_distributions - 数据分发任务表（新增）
--- 17. data_distribution_details - 数据分发详情表（新增）
--- 18. orchestration_workflows - 工作流编排表（新增）
--- 19. workflow_stage_executions - 工作流阶段执行记录表（新增）
--- 20. task_participants - 联邦学习任务参与者表（新增）
+-- 8. vm_round_models - 虚拟机轮次模型结果表
+-- 9. vm_secrets - 虚拟机刷新凭证表
+-- 10. global_models - 全局模型表（已扩展）
+-- 11. log_export_tasks - 日志导出任务表
+-- 12. log_cleanup_tasks - 日志清理任务表
+-- 13. initial_models - 初始模型表（新增）
+-- 14. model_distributions - 模型分发记录表（新增）
+-- 15. data_distributions - 数据分发任务表（新增）
+-- 16. data_distribution_details - 数据分发详情表（新增）
+-- 17. orchestration_workflows - 工作流编排表（新增）
+-- 18. workflow_stage_executions - 工作流阶段执行记录表（新增）
+-- 19. task_participants - 联邦学习任务参与者表（新增）
 -- =====================================================
