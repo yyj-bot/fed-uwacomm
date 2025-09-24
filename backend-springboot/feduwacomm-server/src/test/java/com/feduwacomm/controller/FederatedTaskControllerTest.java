@@ -119,6 +119,34 @@ public class FederatedTaskControllerTest {
             .randomState(42)
             .build();
 
+        // 创建数据集配置
+        TaskCreateDTO.DatasetConfigDTO datasetConfig = TaskCreateDTO.DatasetConfigDTO.builder()
+            .datasetId("dataset-001")
+            .distributionStrategy("BALANCED")
+            .validationSplit(0.2)
+            .testSplit(0.1)
+            .build();
+
+        // 创建参与者配置
+        TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO smartParticipant1 =
+            TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO.builder()
+                .vmId("vm1")
+                .role("PARTICIPANT")
+                .dataRatio(0.5)
+                .build();
+
+        TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO smartParticipant2 =
+            TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO.builder()
+                .vmId("vm2")
+                .role("PARTICIPANT")
+                .dataRatio(0.5)
+                .build();
+
+        TaskCreateDTO.ParticipantConfigDTO participantConfig = TaskCreateDTO.ParticipantConfigDTO.builder()
+            .selectionMode("MANUAL")
+            .participants(Arrays.asList(smartParticipant1, smartParticipant2))
+            .build();
+
         taskCreateDTO = TaskCreateDTO.builder()
             .taskName("测试任务")
             .taskType("CLASSIFICATION")
@@ -127,6 +155,8 @@ public class FederatedTaskControllerTest {
             .participants(Arrays.asList(participant1, participant2))
             .hyperparameters(hyperparameters)
             .modelConfig(modelConfig)
+            .datasetConfig(datasetConfig)
+            .participantConfig(participantConfig)
             .build();
 
         // 创建任务响应VO
@@ -233,7 +263,7 @@ public class FederatedTaskControllerTest {
 
     @Test
     void testCreateTask_Success() throws Exception {
-        when(federatedTaskService.createTask(any(TaskCreateDTO.class), eq("user123")))
+        when(federatedTaskService.createSmartTask(any(TaskCreateDTO.class), eq("user123")))
             .thenReturn(taskOperationVO);
 
         mockMvc.perform(post("/api/federated/tasks")
@@ -526,7 +556,7 @@ public class FederatedTaskControllerTest {
 
     @Test
     void testCreateTask_ServiceException() throws Exception {
-        when(federatedTaskService.createTask(any(TaskCreateDTO.class), anyString()))
+        when(federatedTaskService.createSmartTask(any(TaskCreateDTO.class), anyString()))
             .thenThrow(new RuntimeException("任务创建失败"));
 
         mockMvc.perform(post("/api/federated/tasks")

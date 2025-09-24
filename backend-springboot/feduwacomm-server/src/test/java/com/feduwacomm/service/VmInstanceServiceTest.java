@@ -16,6 +16,8 @@ import com.feduwacomm.service.impl.VmInstanceServiceImpl;
 import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.ApiKeyUtil;
+import com.feduwacomm.config.NetworkProperties;
+import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +55,15 @@ public class VmInstanceServiceTest {
     @Mock
     private ApiKeyUtil apiKeyUtil;
 
+    @Mock
+    private NetworkProperties networkProperties;
+
+    @Mock
+    private JwtConfig jwtConfig;
+
+    @Mock
+    private UuidUtil uuidUtil;
+
     @InjectMocks
     private VmInstanceServiceImpl vmInstanceService;
 
@@ -66,8 +77,28 @@ public class VmInstanceServiceTest {
     @BeforeEach
     void setUp() {
         // 重置mock对象
-        reset(vmInstancesMapper, objectMapper, vmJwtUtil, apiKeyUtil);
-        
+        reset(vmInstancesMapper, objectMapper, vmJwtUtil, apiKeyUtil, networkProperties, jwtConfig, uuidUtil);
+
+        // 配置NetworkProperties Mock
+        NetworkProperties.WebSocketInfo mockWebSocketInfo = new NetworkProperties.WebSocketInfo();
+        mockWebSocketInfo.setSockjs("http://localhost:8080/ws");
+        mockWebSocketInfo.setNativeWs("ws://localhost:8080/ws");
+        lenient().when(networkProperties.getWebSocketInfo()).thenReturn(mockWebSocketInfo);
+
+        // 配置NetworkProperties.Api Mock
+        NetworkProperties.Api mockApi = new NetworkProperties.Api();
+        lenient().when(networkProperties.getApi()).thenReturn(mockApi);
+
+        // 配置JwtConfig Mock
+        JwtConfig.VmConfig mockVmConfig = new JwtConfig.VmConfig();
+        mockVmConfig.setSecret("test-vm-secret-key");
+        mockVmConfig.setExpiration(86400L);
+        lenient().when(jwtConfig.getVm()).thenReturn(mockVmConfig);
+
+        // 配置UuidUtil Mock
+        lenient().when(uuidUtil.generateUuid()).thenReturn("test-uuid-12345678901234567890abcd");
+        lenient().when(uuidUtil.generateUuidWithHyphens()).thenReturn("test-uuid-1234-5678-9012-3456789abcde");
+
         // 设置服务器端口和令牌过期时间
         ReflectionTestUtils.setField(vmInstanceService, "serverPort", "8080");
         ReflectionTestUtils.setField(vmInstanceService, "tokenExpireSeconds", 86400L);
@@ -88,7 +119,7 @@ public class VmInstanceServiceTest {
         systemInfo.put("python", "3.8.10");
 
         registerDTO = new VmRegisterDTO();
-        registerDTO.setVmId("a1b2c3d4e5f678901234567890123456");
+        // vmId由后端自动生成，不需要设置
         registerDTO.setName("TestVM-001");
         registerDTO.setIpAddress("192.168.1.100");
         registerDTO.setPort(22);
@@ -182,7 +213,7 @@ public class VmInstanceServiceTest {
 
             // 验证结果
             assertNotNull(response);
-            assertEquals(registerDTO.getVmId(), response.getVmId());
+            assertNotNull(response.getVmId()); // vmId由后端生成，只验证不为空
             assertEquals(registerDTO.getName(), response.getName());
             assertEquals("OFFLINE", response.getStatus());
             assertEquals("DISCONNECTED", response.getConnectionStatus());
@@ -194,7 +225,7 @@ public class VmInstanceServiceTest {
             assertNotNull(response.getApiEndpoints());
 
             // 验证mock调用
-            verify(vmInstancesMapper).existsByVmId(registerDTO.getVmId());
+            verify(vmInstancesMapper, never()).existsByVmId(anyString()); // vmId由后端生成，不需要检查重复
             verify(vmInstancesMapper).insert(any(VmInstance.class));
         }
     }
@@ -214,7 +245,7 @@ public class VmInstanceServiceTest {
         assertEquals("虚拟机已存在", exception.getMessage());
         
         // 验证mock调用
-        verify(vmInstancesMapper).existsByVmId(registerDTO.getVmId());
+        verify(vmInstancesMapper, never()).existsByVmId(anyString()); // vmId由后端生成，不需要检查重复
         verify(vmInstancesMapper, never()).insert(any(VmInstance.class));
     }
 

@@ -20,14 +20,26 @@ public class WebSocketHandshakeAuthInterceptor implements HandshakeInterceptor {
         URI uri = request.getURI();
         MultiValueMap<String, String> queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
 
+        System.out.println("WebSocket握手开始: " + uri);
+        System.out.println("查询参数: " + queryParams);
+
         String token = first(queryParams.getFirst("token"), queryParams.getFirst("Token"));
         if (token != null && !token.isBlank()) {
             attributes.put("token", token);
+            System.out.println("Token提取成功: " + token.substring(0, Math.min(20, token.length())) + "...");
+        } else {
+            System.out.println("Token提取失败: token参数为空");
         }
+
         String vmId = first(queryParams.getFirst("vmId"), queryParams.getFirst("VMID"));
         if (vmId != null && !vmId.isBlank()) {
             attributes.put("vmId", vmId);
+            System.out.println("VmId提取成功: " + vmId);
+        } else {
+            System.out.println("VmId提取失败: vmId参数为空");
         }
+
+        System.out.println("握手前置检查通过");
         return true;
     }
 

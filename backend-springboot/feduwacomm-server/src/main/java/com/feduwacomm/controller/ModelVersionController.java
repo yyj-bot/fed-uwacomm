@@ -98,7 +98,7 @@ public class ModelVersionController {
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "1") Integer page,
             @RequestParam(value = "size", defaultValue = "10") Integer size,
-            @RequestParam(value = "sort", defaultValue = "createdAt") String sort,
+            @RequestParam(value = "sort", defaultValue = "created_at") String sort,
             @RequestParam(value = "order", defaultValue = "desc") String order) {
         
         log.info("查询模型版本列表: taskId={}, page={}, size={}", taskId, page, size);

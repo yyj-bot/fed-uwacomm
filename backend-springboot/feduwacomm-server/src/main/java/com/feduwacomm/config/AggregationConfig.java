@@ -232,9 +232,9 @@ public class AggregationConfig {
      */
     public Object getAlgorithmConfig(String algorithm) {
         return switch (algorithm.toUpperCase()) {
-            case "FEDAVG" -> fedAvg;
-            case "FEDPROX" -> fedProx;
-            case "FEDNOVA" -> fedNova;
+            case "FEDERATED_AVERAGING" -> fedAvg;
+            case "FEDERATED_PROXIMAL" -> fedProx;
+            case "FEDERATED_NOVA" -> fedNova;
             default -> null;
         };
     }

@@ -134,7 +134,7 @@ class CompleteFederatedLearningIntegrationTest {
         
         // 2.1 注册VM实例（使用真实DTO结构）
         VmRegisterDTO vmRegisterDTO1 = new VmRegisterDTO();
-        vmRegisterDTO1.setVmId("vm001vm001vm001vm001vm001vm00100"); // 32位UUID格式
+        // vmId由后端自动生成，测试时不需要设置
         vmRegisterDTO1.setName("VM-Node-01");
         vmRegisterDTO1.setIpAddress("192.168.1.100");
         vmRegisterDTO1.setPort(22);

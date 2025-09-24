@@ -6,6 +6,7 @@ import com.feduwacomm.entity.TrainingData;
 import com.feduwacomm.enums.DataType;
 import com.feduwacomm.enums.DataStatus;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
+import com.feduwacomm.mapper.TrainingDatasetRowMapper;
 import com.feduwacomm.service.impl.TrainingDataServiceImpl;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +32,10 @@ public class TrainingDataServiceTest {
 
     @Mock
     private TrainingDatasetMapper trainingDatasetMapper;
-    
+
+    @Mock
+    private TrainingDatasetRowMapper trainingDatasetRowMapper;
+
     @Mock
     private ObjectMapper objectMapper;
 

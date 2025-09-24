@@ -7,11 +7,17 @@ import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
+import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
+import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.enums.FederatedAlgorithm;
+import com.feduwacomm.enums.FederatedTaskStatus;
+import com.feduwacomm.utils.UuidUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -50,10 +56,16 @@ public class WebSocketProtocolServiceTest {
     private VmInstancesMapper vmInstancesMapper;
 
     @Mock
+    private UserMapper userMapper;
+
+    @Mock
     private ObjectMapper objectMapper;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private UuidUtil uuidUtil;
 
     private WebSocketProtocolService protocolService;
 
@@ -63,7 +75,7 @@ public class WebSocketProtocolServiceTest {
     void setUp() {
         // 重置mock对象
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
-            federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, objectMapper, eventPublisher);
+            federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, userMapper, objectMapper, eventPublisher, uuidUtil);
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -73,8 +85,10 @@ public class WebSocketProtocolServiceTest {
             federatedTasksMapper,
             vmRoundModelsMapper,
             vmInstancesMapper,
+            userMapper,
             objectMapper,
-            eventPublisher
+            eventPublisher,
+            uuidUtil
         );
 
         // 准备测试数据
@@ -82,9 +96,26 @@ public class WebSocketProtocolServiceTest {
     }
 
     private void setupTestData() {
+        // 设置UuidUtil Mock行为
+        when(uuidUtil.generateUuid()).thenReturn("0199758a5ff272ba8fa24b79c22cbd70"); // 32位紧凑UUIDv7
+
+        // v1.3: 更新CONNECT消息数据格式
         Map<String, Object> messageData = new HashMap<>();
-        messageData.put("status", "connected");
-        messageData.put("timestamp", Instant.now().toString());
+        messageData.put("version", "1.0.0");
+        messageData.put("supportedMLAlgorithms", List.of("RandomForest", "SVM", "NeuralNetwork", "XGBoost"));
+        messageData.put("systemInfo", Map.of(
+                "os", "Ubuntu 20.04",
+                "python", "3.8.10",
+                "memory", "4GB",
+                "cpu", "Intel Xeon E5-2680",
+                "gpu", "NVIDIA Tesla V100"
+        ));
+        messageData.put("computeCapabilities", Map.of(
+                "maxBatchSize", 1024,
+                "gpuMemory", "16GB",
+                "parallelProcessing", true,
+                "frameworks", List.of("sklearn", "pytorch", "tensorflow")
+        ));
 
         sampleMessage = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
@@ -152,7 +183,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证mock调用
         verify(vmInstancesMapper).updateConnection(eq("vm-001"), eq("CONNECTED"), anyString());
-        verify(messagingTemplate).convertAndSend(eq("/topic/vm/vm-001"), any(Object.class));
+        // 移除非标准格式消息的验证，现在只通过标准的CONNECT_ACK响应
     }
 
     /**
@@ -214,13 +245,12 @@ public class WebSocketProtocolServiceTest {
 
         // 验证mock调用
         verify(trainingDatasetMapper).upsertDataset(
-                eq("dataset-001"), 
-                eq("vm-001"), 
-                eq("Test dataset"), 
-                eq("Test dataset"), 
-                eq("ACOUSTIC"), 
-                eq("READY"), 
-                isNull()
+                eq("dataset-001"),
+                eq("Test dataset"),
+                eq("Test dataset"),
+                eq("ACOUSTIC"),
+                eq("READY"),
+                isNull()  // metadataJson
         );
     }
 
@@ -250,7 +280,7 @@ public class WebSocketProtocolServiceTest {
         assertEquals("缺少 datasetId", ack.getData().get("errorMessage"));
 
         // 验证没有调用数据库操作
-        verify(trainingDatasetMapper, never()).upsertDataset(anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(trainingDatasetMapper, never()).upsertDataset(anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     /**
@@ -333,11 +363,15 @@ public class WebSocketProtocolServiceTest {
      */
     @Test
     void testHandle_TrainingStartMessage() {
-        Map<String, Object> config = Map.of("totalRounds", 10, "batchSize", 32);
+        // v1.3: 使用新的消息格式
+        Map<String, Object> hyperparameters = Map.of("n_estimators", 100, "max_depth", 10, "random_state", 42);
+        Map<String, Object> trainingConfig = Map.of("epochs", 5, "batchSize", 32, "timeout", 300);
+
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", "task-001");
-        data.put("algorithm", "RandomForest");
-        data.put("config", config);
+        data.put("mlAlgorithm", "RandomForest");  // v1.3: 使用mlAlgorithm
+        data.put("hyperparameters", hyperparameters);
+        data.put("trainingConfig", trainingConfig);
 
         ProtocolMessage trainingMessage = ProtocolMessage.builder()
                 .type(ProtocolType.TRAINING_START)
@@ -347,9 +381,10 @@ public class WebSocketProtocolServiceTest {
                 .data(data)
                 .build();
 
-        // Mock ObjectMapper
+        // Mock ObjectMapper for combined config (v1.3: 包含mlAlgorithm)
         try {
-            when(objectMapper.writeValueAsString(config)).thenReturn("{\"totalRounds\":10,\"batchSize\":32}");
+            when(objectMapper.writeValueAsString(any()))
+                .thenReturn("{\"hyperparameters\":{\"n_estimators\":100,\"max_depth\":10,\"random_state\":42},\"trainingConfig\":{\"epochs\":5,\"batchSize\":32,\"timeout\":300},\"mlAlgorithm\":\"RandomForest\"}");
         } catch (Exception e) {
             // Mock设置不会抛出异常
         }
@@ -359,19 +394,31 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果
         assertNotNull(ack);
-        assertEquals(ProtocolType.TRAINING_START, ack.getType());
-        assertEquals("RECEIVED", ack.getData().get("status"));
+        assertEquals(ProtocolType.TRAINING_START_ACK, ack.getType());
+        assertEquals("COMMAND_SENT", ack.getData().get("status"));
 
         // 验证mock调用
-        verify(federatedTasksMapper).upsertTask(
-                eq("task-001"), 
-                eq("task-001"), 
-                eq("RandomForest"), 
-                eq("RUNNING"), 
-                eq(10), 
-                eq(0), 
-                anyString()
-        );
+        // v1.3: 验证使用联邦学习算法（后端管理）和epochs
+        // 捕获传递给insertTask的FederatedTask实体
+        ArgumentCaptor<FederatedTask> taskCaptor = ArgumentCaptor.forClass(FederatedTask.class);
+        verify(federatedTasksMapper).insertTask(taskCaptor.capture());
+
+        // 验证FederatedTask实体的属性
+        FederatedTask capturedTask = taskCaptor.getValue();
+        assertNotNull(capturedTask);
+        assertEquals("task-001", capturedTask.getId());
+        assertEquals("task-001", capturedTask.getTaskName());
+        assertEquals(FederatedAlgorithm.FEDERATED_AVERAGING, capturedTask.getAlgorithm());
+        assertEquals(FederatedTaskStatus.PENDING, capturedTask.getStatus());
+        assertEquals(5, capturedTask.getEpochs());
+        assertEquals(0, capturedTask.getCurrentRound());
+
+        // 验证config JSON包含mlAlgorithm信息
+        String config = capturedTask.getConfig();
+        assertNotNull(config);
+        assertTrue(config.contains("mlAlgorithm"));
+        assertTrue(config.contains("RandomForest"));
+
         verify(messagingTemplate).convertAndSend(eq("/topic/vm/vm-001"), any(Object.class));
     }
 

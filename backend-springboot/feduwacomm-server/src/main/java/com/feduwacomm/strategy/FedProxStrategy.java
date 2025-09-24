@@ -7,6 +7,7 @@ import com.feduwacomm.entity.VmRoundModel;
 import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
+import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class FedProxStrategy implements AggregationStrategy {
 
     private final AggregationConfig aggregationConfig;
     private final ObjectMapper objectMapper;
+    private final UuidUtil uuidUtil;
 
     @Override
     public String getStrategyName() {
@@ -40,7 +42,7 @@ public class FedProxStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return AggregationMethod.FEDPROX.getCode().equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDERATED_PROXIMAL.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -51,10 +53,10 @@ public class FedProxStrategy implements AggregationStrategy {
 
         // 创建全局模型记录
         GlobalModel globalModel = GlobalModel.builder()
-                .id(UUID.randomUUID().toString().replace("-", ""))
+                .id(uuidUtil.generateUuid())
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod(AggregationMethod.FEDPROX)
+                .aggregationMethod(AggregationMethod.FEDERATED_PROXIMAL)
                 .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
@@ -62,7 +64,7 @@ public class FedProxStrategy implements AggregationStrategy {
                 .build();
 
         // 执行聚合
-        return engine.aggregate(AggregationMethod.FEDPROX.getCode(), localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDERATED_PROXIMAL.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -131,7 +133,7 @@ public class FedProxStrategy implements AggregationStrategy {
             reasoning += "启用自适应μ调整以动态优化正则化强度。";
         }
 
-        return new AlgorithmConfigSuggestion(AggregationMethod.FEDPROX.getCode(), suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDERATED_PROXIMAL.getCode(), suggestedParams, reasoning);
     }
 
     /**

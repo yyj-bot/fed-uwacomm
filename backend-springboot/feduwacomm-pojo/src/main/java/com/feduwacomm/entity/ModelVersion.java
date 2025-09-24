@@ -33,7 +33,7 @@ public class ModelVersion {
     private Integer roundNumber;
     
     /**
-     * 聚合方式（如FEDAVG、FEDPROX等）
+     * 聚合方式（如FEDERATED_AVERAGING、FEDERATED_PROXIMAL等）
      */
     private String aggregationMethod;
     

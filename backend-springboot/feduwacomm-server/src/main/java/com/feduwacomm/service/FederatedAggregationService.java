@@ -16,6 +16,7 @@ import com.feduwacomm.mapper.GlobalModelMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
 import com.feduwacomm.strategy.AggregationStrategy;
 import com.feduwacomm.strategy.AggregationStrategyFactory;
+import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,7 @@ public class FederatedAggregationService {
     private final AggregationConfig aggregationConfig;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final UuidUtil uuidUtil;
 
     // 聚合状态管理
     private final Map<String, LocalDateTime> roundStartTimes = new ConcurrentHashMap<>();
@@ -337,7 +339,7 @@ public class FederatedAggregationService {
                                       ModelAggregatorEngine.AggregationResult result) {
         try {
             GlobalModel globalModel = GlobalModel.builder()
-                    .id(UUID.randomUUID().toString().replace("-", ""))
+                    .id(uuidUtil.generateUuid())
                     .taskId(task.getId())
                     .roundNumber(roundNumber)
                     .aggregationMethod(AggregationMethod.fromCode(result.getAlgorithm()))

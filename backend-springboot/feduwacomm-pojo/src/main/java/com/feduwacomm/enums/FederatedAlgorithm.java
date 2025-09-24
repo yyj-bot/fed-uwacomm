@@ -1,15 +1,13 @@
 package com.feduwacomm.enums;
 
-import com.fasterxml.jackson.annotation.JsonValue;
-
 /**
  * 联邦学习算法枚举
  */
 public enum FederatedAlgorithm {
-    FEDAVG("FEDAVG", "联邦平均算法"),
-    FEDPROX("FEDPROX", "联邦近端算法"),
-    FEDNOVA("FEDNOVA", "联邦Nova算法"),
-    SCAFFOLD("SCAFFOLD", "SCAFFOLD算法");
+    FEDERATED_AVERAGING("FEDERATED_AVERAGING", "联邦平均算法"),
+    FEDERATED_PROXIMAL("FEDERATED_PROXIMAL", "联邦近端算法"),
+    FEDERATED_NOVA("FEDERATED_NOVA", "联邦Nova算法"),
+    FEDERATED_SCAFFOLD("FEDERATED_SCAFFOLD", "SCAFFOLD算法");
 
     private final String code;
     private final String description;
@@ -19,7 +17,6 @@ public enum FederatedAlgorithm {
         this.description = description;
     }
 
-    @JsonValue
     public String getCode() {
         return code;
     }
@@ -30,13 +27,13 @@ public enum FederatedAlgorithm {
 
     public static FederatedAlgorithm fromCode(String code) {
         if (code == null) {
-            return FEDAVG;
+            return FEDERATED_AVERAGING;
         }
-        for (FederatedAlgorithm algorithm : values()) {
-            if (algorithm.code.equals(code)) {
-                return algorithm;
-            }
+
+        try {
+            return valueOf(code.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid federated algorithm code: " + code);
         }
-        throw new IllegalArgumentException("Invalid federated algorithm code: " + code);
     }
 }

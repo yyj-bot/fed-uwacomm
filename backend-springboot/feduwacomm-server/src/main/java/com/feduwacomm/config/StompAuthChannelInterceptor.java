@@ -2,6 +2,7 @@ package com.feduwacomm.config;
 
 import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.utils.VmJwtUtil;
+import com.feduwacomm.utils.UuidUtil;
 import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
@@ -39,10 +40,15 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     @Autowired
     private com.feduwacomm.service.VmInstanceService vmInstanceService;
 
+    @Autowired
+    private UuidUtil uuidUtil;
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+            System.out.println("STOMP CONNECT命令认证开始");
+            System.out.println("Native Headers: " + accessor.toNativeHeaderMap());
             String authorization = firstNonEmpty(
                     accessor.getFirstNativeHeader("Authorization"),
                     accessor.getFirstNativeHeader("authorization"));
@@ -57,7 +63,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                         accessor.getFirstNativeHeader("Token"));
             }
 
+            // 如果STOMP头中没有token，尝试从WebSocket session attributes中获取
+            if (!StringUtils.hasText(token) && accessor.getSessionAttributes() != null) {
+                Object sessionToken = accessor.getSessionAttributes().get("token");
+                if (sessionToken instanceof String) {
+                    token = (String) sessionToken;
+                    System.out.println("从WebSocket session attributes获取到token: " + token.substring(0, Math.min(20, token.length())) + "...");
+                }
+            }
+
             if (!StringUtils.hasText(token)) {
+                System.out.println("STOMP认证失败：缺少Token");
+                System.out.println("Session Attributes: " + accessor.getSessionAttributes());
                 throw new MessagingException("WebSocket/STOMP认证失败：缺少Token");
             }
 
@@ -113,8 +130,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
                         // 直接更新VM连接状态
                         try {
-                            vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", accessor.getSessionId());
-                            System.out.println("VM认证成功，已更新连接状态: vmId=" + vmId + ", sessionId=" + accessor.getSessionId());
+                            // 使用UuidUtil生成32位的会话ID，而不是使用Spring框架的长会话ID
+                            String sessionId = uuidUtil.generateUuid();
+                            vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", sessionId);
+                            System.out.println("VM认证成功，已更新连接状态: vmId=" + vmId + ", sessionId=" + sessionId);
                         } catch (Exception e) {
                             System.err.println("更新VM连接状态失败: vmId=" + vmId + ", error=" + e.getMessage());
                         }

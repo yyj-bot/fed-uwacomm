@@ -40,7 +40,7 @@ public class GlobalModel {
     private Integer roundNumber;
 
     /**
-     * 聚合算法类型 (FEDAVG, FEDPROX, FEDNOVA等)
+     * 聚合算法类型 (FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA等)
      */
     private AggregationMethod aggregationMethod;
 
