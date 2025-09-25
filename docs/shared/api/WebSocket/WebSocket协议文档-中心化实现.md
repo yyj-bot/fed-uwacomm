@@ -63,7 +63,7 @@
 - **WebSocket (SockJS) URL**: `http://localhost:8080/ws` (开发环境)
 - **WebSocket (原生) URL**: `ws://localhost:8080/ws-native` (开发环境)
 - **WebSocket Secure URL**: `wss://your-domain.com/ws-native` (生产环境)
-- **协议版本**: v1.3 (移除联邦算法配置，保留本地ML算法)
+- **协议版本**: v1.4 (完善ACK响应机制和任务管理消息，补充服务端通知消息)
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
@@ -159,15 +159,54 @@ time.sleep(10)
 - `signature`: 数字签名（必需，用于安全验证）
 
 ### 2.3 消息ID生成规则
-- 客户端消息：`client-{timestamp}-{random}`
-- 服务器消息：`server-{timestamp}-{random}`
-- 命令消息：`cmd-{timestamp}-{random}`
+
+#### 2.3.1 格式定义
+消息ID采用统一格式：`{prefix}-{timestamp}-{random}`
+
+#### 2.3.2 组成部分说明
+- **prefix (前缀)**：消息来源标识
+  - `client`：虚拟机端消息，固定6字符
+  - `server`：后端消息，固定6字符
+  - `cmd`：命令消息，固定3字符
+- **timestamp (时间戳)**：Unix毫秒时间戳，固定13位数字
+  - 格式：1704067200000（表示2024-01-01 00:00:00.000 GMT）
+  - 范围：2000-01-01 至 2286-11-20
+- **random (随机数)**：6位随机数字，范围000000-999999
+  - 不足位数使用前导零补齐
+  - 同一毫秒内应确保随机数唯一性
+
+#### 2.3.3 完整示例
+- 客户端消息：`client-1704067200000-123456` (总长度26字符)
+- 服务器消息：`server-1704067200000-654321` (总长度26字符)
+- 命令消息：`cmd-1704067200000-789012` (总长度23字符)
+
+#### 2.3.4 生成算法
+```pseudocode
+function generateMessageId(prefix) {
+    timestamp = getCurrentMilliseconds() // 13位Unix毫秒时间戳
+    random = generateRandomNumber(0, 999999) // 6位随机数
+    randomPadded = padLeft(random, 6, '0') // 左补零至6位
+    return prefix + "-" + timestamp + "-" + randomPadded
+}
+```
+
+#### 2.3.5 验证规则
+- **格式正则表达式**：`^(client|server)-\d{13}-\d{6}$|^cmd-\d{13}-\d{6}$`
+- **时间戳有效性**：时间戳应为合理的Unix毫秒值
+- **随机数格式**：必须为6位数字，不足位数需补零
+- **前缀有效性**：仅允许client、server、cmd三种前缀
 
 ## 3. 消息类型定义
 
 ### 3.1 连接管理消息
 
-#### 3.1.1 客户端连接请求 (CONNECT)
+> **实现职责说明**:
+> - 🔵 **虚拟机端实现**: 消息由虚拟机端发起或处理
+> - 🟢 **后端实现**: 消息由后端服务器发起或处理
+>
+> **重要说明**: 本节详细说明了每个消息的具体作用，以及虚拟机端和后端应该如何实现相应的处理逻辑。
+
+#### 3.1.1 客户端连接请求 (CONNECT) 🔵
 ```json
 {
   "type": "CONNECT",
@@ -195,7 +234,22 @@ time.sleep(10)
 }
 ```
 
-#### 3.1.2 服务器连接确认 (CONNECT_ACK)
+**消息作用**: 虚拟机启动后向后端服务器发送连接请求，上报自身的系统信息、机器学习能力和计算资源情况。
+
+**虚拟机端实现**:
+- 在WebSocket连接建立后立即发送此消息
+- 收集并上报本机的系统信息（操作系统、Python版本、硬件配置）
+- 列出支持的机器学习算法（RandomForest、SVM、NeuralNetwork等）
+- 上报计算能力信息（最大批次大小、GPU内存、并行处理能力）
+- 包含支持的框架信息（sklearn、pytorch、tensorflow）
+
+**后端实现**:
+- 接收并验证虚拟机的连接请求
+- 将虚拟机信息存储到数据库中
+- 根据虚拟机能力进行资源调度和任务分配
+- 返回CONNECT_ACK确认连接建立
+
+#### 3.1.2 服务器连接确认 (CONNECT_ACK) 🟢
 ```json
 {
   "type": "CONNECT_ACK",
@@ -213,9 +267,31 @@ time.sleep(10)
 }
 ```
 
+**消息作用**: 后端服务器接收到虚拟机连接请求后，发送连接确认消息，提供服务器配置信息和连接会话参数。
+
+**后端实现**:
+- 验证虚拟机的连接请求和身份信息
+- 为虚拟机分配唯一的会话ID
+- 配置心跳间隔、消息大小限制等连接参数
+- 向虚拟机通告服务器支持的功能特性
+- 在数据库中记录虚拟机连接状态为"在线"
+
+**虚拟机端实现**:
+- 接收并解析服务器的连接确认
+- 保存会话ID用于后续通信
+- 根据服务器返回的心跳间隔启动心跳机制
+- 记录服务器支持的功能特性，用于后续协商
+
 ### 3.2 心跳消息
 
-#### 3.2.1 客户端心跳 (HEARTBEAT)
+#### 3.2.1 客户端心跳 (HEARTBEAT) 🔵
+
+**消息作用**: 虚拟机定期发送心跳消息以维持与后端的连接活跃状态，同时报告当前的系统资源使用情况。
+
+**虚拟机端实现**: 每30秒（或根据服务器配置的间隔）自动发送此消息，收集当前的CPU、内存、磁盘、GPU使用率以及网络状态和进程信息。如果检测到资源使用异常或系统状态变化，可以调整心跳频率。
+
+**后端实现**: 接收并记录虚拟机的心跳消息，更新虚拟机的在线状态和资源使用情况。如果超过设定时间（默认90秒）未收到心跳，将标记虚拟机为离线状态。用于系统监控和负载均衡决策。
+
 ```json
 {
   "type": "HEARTBEAT",
@@ -244,7 +320,14 @@ time.sleep(10)
 }
 ```
 
-#### 3.2.2 服务器心跳响应 (HEARTBEAT_ACK)
+#### 3.2.2 服务器心跳响应 (HEARTBEAT_ACK) 🟢
+
+**消息作用**: 后端对虚拟机心跳消息的确认响应，确保双向连接正常，并提供服务器状态信息和下次心跳间隔。
+
+**后端实现**: 收到虚拟机心跳后立即发送此响应消息，包含服务器当前时间用于时钟同步，下次心跳的建议间隔，以及服务器整体系统状态。记录虚拟机的最后心跳时间，用于连接状态监控。
+
+**虚拟机端实现**: 接收心跳响应确认连接正常，根据服务器返回的nextHeartbeat调整心跳发送间隔。如果响应中systemStatus为异常状态，可以调整本地行为或发送告警信息。
+
 ```json
 {
   "type": "HEARTBEAT_ACK",
@@ -262,7 +345,7 @@ time.sleep(10)
 
 ### 3.3 虚拟机控制消息
 
-#### 3.3.1 启动虚拟机命令 (VM_START)
+#### 3.3.1 启动虚拟机命令 (VM_START) 🟢
 ```json
 {
   "type": "VM_START",
@@ -288,7 +371,7 @@ time.sleep(10)
 }
 ```
 
-#### 3.3.2 停止虚拟机命令 (VM_STOP)
+#### 3.3.2 停止虚拟机命令 (VM_STOP) 🟢
 ```json
 {
   "type": "VM_STOP",
@@ -306,7 +389,7 @@ time.sleep(10)
 
 ### 3.4 学习控制消息
 
-#### 3.4.1 开始训练命令 (TRAINING_START)
+#### 3.4.1 开始训练命令 (TRAINING_START) 🟢
 ```json
 {
   "type": "TRAINING_START",
@@ -347,7 +430,91 @@ time.sleep(10)
 }
 ```
 
-#### 3.4.2 停止训练命令 (TRAINING_STOP)
+#### 3.4.2 训练开始确认 (TRAINING_START_ACK) 🟢
+```json
+{
+  "type": "TRAINING_START_ACK",
+  "id": "server-1704067200000-123464",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "COMMAND_SENT",
+    "message": "本地训练指令已发送给VM，等待VM确认"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.4.3 训练开始指令 (TRAINING_START_COMMAND) 🟢
+```json
+{
+  "type": "TRAINING_START_COMMAND",
+  "id": "server-1704067200000-123465",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "mlAlgorithm": "RandomForest",
+    "hyperparameters": {
+      "n_estimators": 100,
+      "max_depth": 10,
+      "random_state": 42
+    },
+    "trainingConfig": {
+      "epochs": 5,
+      "batchSize": 32,
+      "timeout": 300
+    },
+    "message": "请开始本地ML训练任务"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.4.4 训练开始响应 (TRAINING_START_RESPONSE) 🔵
+```json
+{
+  "type": "TRAINING_START_RESPONSE",
+  "id": "client-1704067200000-123466",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "status": "SUCCESS",
+    "message": "训练已成功开始",
+    "actualConfig": {
+      "mlAlgorithm": "RandomForest",
+      "epochs": 5,
+      "batchSize": 32
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.4.5 训练开始响应确认 (TRAINING_START_RESPONSE_ACK) 🟢
+```json
+{
+  "type": "TRAINING_START_RESPONSE_ACK",
+  "id": "server-1704067200000-123467",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "PROCESSED",
+    "message": "训练开始响应已处理"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.4.6 停止训练命令 (TRAINING_STOP) 🟢
+
+**消息作用**: 后端向虚拟机发送停止当前训练任务的指令，支持配置是否保存检查点和执行清理操作。
+
+**虚拟机端实现**: 接收此消息后立即停止正在进行的训练过程，根据 saveCheckpoint 参数决定是否保存当前训练状态，根据 cleanup 参数决定是否清理临时文件，并发送相应的响应消息。
+
+**后端实现**: 当需要停止某个训练任务时，构建并发送此消息给对应的虚拟机，等待虚拟机的确认响应，并更新任务状态记录。
+
 ```json
 {
   "type": "TRAINING_STOP",
@@ -364,9 +531,38 @@ time.sleep(10)
 }
 ```
 
+#### 3.4.7 停止训练确认 (TRAINING_STOP_ACK) 🟢
+
+**消息作用**: 后端对虚拟机发送的训练停止命令进行确认，表示已收到并准备处理停止请求。
+
+**虚拟机端实现**: 无需主动发送此消息，但应处理接收到的确认消息，用于日志记录或状态更新。
+
+**后端实现**: 在发送 TRAINING_STOP 消息后，自动生成并发送此确认消息，表示停止指令已经成功传递给虚拟机。
+
+```json
+{
+  "type": "TRAINING_STOP_ACK",
+  "id": "server-1704067200000-123468",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "COMMAND_SENT",
+    "message": "停止指令已发送给VM"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
 ### 3.5 训练进度消息
 
-#### 3.5.1 训练进度报告 (TRAINING_PROGRESS)
+#### 3.5.1 训练进度报告 (TRAINING_PROGRESS) 🔵
+
+**消息作用**: 虚拟机主动向后端报告当前训练任务的详细进度信息，包括训练轮次、性能指标、资源使用情况等。
+
+**虚拟机端实现**: 在训练过程中定期（例如每完成一个epoch或每隔固定时间间隔）收集并发送当前训练状态，包括准确率、损失值、资源使用率等关键指标。
+
+**后端实现**: 接收并处理虚拟机发送的进度信息，更新数据库中的任务状态，可用于前端展示训练进度图表和系统监控。
+
 ```json
 {
   "type": "TRAINING_PROGRESS",
@@ -401,9 +597,87 @@ time.sleep(10)
 }
 ```
 
+#### 3.5.2 训练进度查询确认 (TRAINING_PROGRESS_ACK) 🟢
+
+**消息作用**: 后端对进度查询命令的确认回复，表示已收到虚拟机的进度查询请求并准备处理。
+
+**虚拟机端实现**: 无需主动发送此消息，但应处理接收到的确认消息，用于确认后端已收到进度查询请求。
+
+**后端实现**: 当收到虚拟机的进度查询请求时，自动生成并发送此确认消息，表示查询请求已被成功接收。
+
+```json
+{
+  "type": "TRAINING_PROGRESS_ACK",
+  "id": "server-1704067200000-123469",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "QUERY_SENT",
+    "message": "进度查询指令已发送给VM"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.5.3 训练进度响应 (TRAINING_PROGRESS_RESPONSE) 🔵
+
+**消息作用**: 虚拟机响应后端的进度查询请求，提供当前训练任务的最新状态和关键指标信息。
+
+**虚拟机端实现**: 当收到后端的进度查询请求时，收集当前训练状态信息并发送此响应消息，包括训练轮次、准确率、损失值等关键数据。
+
+**后端实现**: 接收并处理虚拟机发送的进度响应信息，更新相应的任务记录，并可将信息传递给前端或其他监控系统。
+
+```json
+{
+  "type": "TRAINING_PROGRESS_RESPONSE",
+  "id": "client-1704067200000-123470",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "currentRound": 25,
+    "status": "TRAINING",
+    "accuracy": 0.88,
+    "loss": 0.12,
+    "progress": 50.0,
+    "message": "训练进度更新"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.5.4 训练进度响应确认 (TRAINING_PROGRESS_RESPONSE_ACK) 🟢
+
+**消息作用**: 后端对虚拟机发送的训练进度响应进行确认，表示已成功接收并处理了进度信息。
+
+**虚拟机端实现**: 无需主动发送此消息，但应处理接收到的确认消息，用于确认进度信息已被后端成功处理。
+
+**后端实现**: 当收到虚拟机的 TRAINING_PROGRESS_RESPONSE 消息后，自动生成并发送此确认消息，表示进度信息已被成功处理和存储。
+
+```json
+{
+  "type": "TRAINING_PROGRESS_RESPONSE_ACK",
+  "id": "server-1704067200000-123471",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "PROCESSED",
+    "message": "训练进度响应已处理"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
 ### 3.6 模型传输消息
 
-#### 3.6.1 本地模型上传 (MODEL_UPLOAD)
+#### 3.6.1 本地模型上传 (MODEL_UPLOAD) 🔵
+
+**消息作用**: 虚拟机完成本地训练后，将训练得到的模型参数和相关信息上传至后端，用于联邦学习的模型聚合。
+
+**虚拟机端实现**: 在完成本轮本地训练后，序列化模型参数（权重、偏置等），收集训练指标和元数据，然后发送此消息到后端。支持模型压缩以减少传输开销。
+
+**后端实现**: 接收虚拟机上传的模型数据，进行验证和存储到 `vm_round_models` 表中，等待所有参与节点上传完成后触发联邦聚合算法，生成新的全局模型。
+
 ```json
 {
   "type": "MODEL_UPLOAD",
@@ -446,7 +720,14 @@ time.sleep(10)
 
 > 补充：收到 VM 端 MODEL_UPLOAD 后，服务端根据任务配置的联邦学习算法进行聚合，将本地训练结果存入 `vm_round_models`，聚合后的全局模型存入 `model_versions`。
 
-#### 3.6.2 全局模型下发 (MODEL_DOWNLOAD)
+#### 3.6.2 全局模型下发 (MODEL_DOWNLOAD) 🟢
+
+**消息作用**: 后端完成联邦聚合后向虚拟机推送最新的全局模型参数，用于下一轮本地训练。
+
+**虚拟机端实现**: 接收此消息后验证模型参数的完整性（通过checksum），解压并加载新的全局模型权重到本地模型中，准备开始下一轮本地训练。发送MODEL_UPDATE_ACK确认模型更新完成。
+
+**后端实现**: 当联邦聚合完成生成新的全局模型后，构建并向所有参与的虚拟机推送此消息，包含经过聚合的模型参数。跟踪每个虚拟机的模型更新状态，确保所有节点都成功接收到最新模型。
+
 ```json
 {
   "type": "MODEL_DOWNLOAD",
@@ -477,11 +758,153 @@ time.sleep(10)
 }
 ```
 
-> 说明：v1.3版本优化：模型下发不再包含联邦学习算法信息，只下发经过聚合处理的模型参数和结构。虚拟机无需了解聚合过程，只需接收并使用新模型参数。
+> 说明：v1.4版本优化：模型下发不再包含联邦学习算法信息，只下发经过聚合处理的模型参数和结构。虚拟机无需了解聚合过程，只需接收并使用新模型参数。
 
-### 3.7 状态查询消息
+#### 3.6.3 模型更新确认 (MODEL_UPDATE_ACK) 🔵
 
-#### 3.7.1 状态查询请求 (STATUS_QUERY)
+**消息作用**: 虚拟机确认已成功接收并更新全局模型，通知后端可以继续后续的训练流程。
+
+**虚拟机端实现**: 在成功接收和应用全局模型后发送此确认消息，包含更新状态、模型版本、更新时间等信息。如果模型更新失败，应在status字段中标记为FAILED并提供错误详情。
+
+**后端实现**: 接收虚拟机的模型更新确认，更新数据库中对应虚拟机的模型同步状态。当所有参与节点都确认模型更新完成后，可以触发下一轮训练任务的开始。
+
+```json
+{
+  "type": "MODEL_UPDATE_ACK",
+  "id": "client-1704067200000-123472",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "vmId": "a1b2c3d4e5f678901234567890123456",
+    "modelVersion": "v1.0.1",
+    "updateTime": "2024-01-01T00:00:00.000Z",
+    "status": "SUCCESS",
+    "message": "全局模型更新已确认"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+> 说明：虚拟机收到全局模型更新后，发送此确认消息通知服务器已成功接收并应用新模型。
+
+### 3.7 任务管理消息
+
+#### 3.7.1 通用任务启动 (TASK_START) 🟢
+
+**消息作用**: 后端向虚拟机发送通用任务启动指令，用于启动各种类型的通用任务（非联邦学习特定任务）。
+
+**虚拟机端实现**: 接收任务启动指令，根据taskType执行相应的任务逻辑，发送任务启动确认响应。根据priority调整任务执行优先级，设置timeout监控任务执行时间。
+
+**后端实现**: 构建并发送任务启动消息给指定的虚拟机，包含任务配置信息和执行参数。跟踪任务状态，处理超时和重试逻辑。
+
+```json
+{
+  "type": "TASK_START",
+  "id": "server-1704067200000-123473",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "taskType": "GENERAL",
+    "priority": "NORMAL",
+    "timeout": 600,
+    "config": {
+      "maxRetries": 3,
+      "requiresAck": true
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.7.2 通用任务启动确认 (TASK_START_ACK) 🟢
+
+**消息作用**: 后端对任务启动消息的确认响应，表示已成功接收虚拟机的任务启动请求并准备处理。
+
+**虚拟机端实现**: 无需主动发送此消息，但应处理接收到的确认消息，用于确认任务启动请求已被后端接收。
+
+**后端实现**: 当收到虚拟机的任务启动请求时，自动生成并发送此确认消息，表示启动请求已被成功接收和处理。
+
+```json
+{
+  "type": "TASK_START_ACK",
+  "id": "server-1704067200000-123474",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "ACKNOWLEDGED",
+    "message": "任务启动消息已接收",
+    "timestamp": "2024-01-01T00:00:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.7.3 联邦学习任务启动 (FEDERATED_TASK_START) 🟢
+
+**消息作用**: 后端向虚拟机发送联邦学习任务启动指令，包含完整的联邦学习配置信息和参与者列表。
+
+**虚拟机端实现**: 接收联邦学习任务配置，准备本地训练环境，初始化联邦学习相关参数。发送任务启动确认，等待后续的训练开始指令。
+
+**后端实现**: 当创建联邦学习任务时，向所有参与的虚拟机发送此消息，包含联邦算法配置、聚合方法、参与者信息等。协调所有参与者的任务启动过程。
+
+```json
+{
+  "type": "FEDERATED_TASK_START",
+  "id": "server-1704067200000-123475",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "federatedAlgorithm": "FEDERATED_AVERAGING",
+    "totalRounds": 10,
+    "currentRound": 1,
+    "participants": ["vm1", "vm2", "vm3"],
+    "config": {
+      "aggregationMethod": "WEIGHTED_AVERAGE",
+      "minParticipants": 2,
+      "timeout": 1800
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.7.4 联邦学习任务启动确认 (FEDERATED_TASK_START_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到联邦学习任务启动指令，表示准备就绪可以开始参与联邦学习过程。
+
+**虚拟机端实现**: 在收到 FEDERATED_TASK_START 消息并完成本地准备工作后，发送此确认消息表示已准备好参与联邦学习任务。包含任务ID和虚拟机状态信息。
+
+**后端实现**: 接收所有参与虚拟机的任务启动确认，统计确认状态。当所有必要的参与者都确认就绪后，可以开始启动联邦学习的第一轮训练。
+
+```json
+{
+  "type": "FEDERATED_TASK_START_ACK",
+  "id": "client-1704067200000-123476",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "ACKNOWLEDGED",
+    "taskId": "fedtask-123456",
+    "vmId": "a1b2c3d4e5f678901234567890123456",
+    "message": "联邦学习任务启动消息已接收",
+    "timestamp": "2024-01-01T00:00:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.8 状态查询消息
+
+#### 3.8.1 状态查询请求 (STATUS_QUERY) 🟢
+
+**消息作用**: 后端向虚拟机发送状态查询请求，获取虚拟机的详细运行状态、资源使用情况和系统信息。
+
+**虚拟机端实现**: 接收查询请求后收集相应的状态信息，根据queryType和include参数决定收集的信息范围，在timeout时间内发送STATUS_RESPONSE响应。
+
+**后端实现**: 当需要监控虚拟机状态或进行系统诊断时发送此查询请求，指定需要获取的信息类型和超时时间，用于系统监控和负载均衡决策。
+
 ```json
 {
   "type": "STATUS_QUERY",
@@ -499,7 +922,14 @@ time.sleep(10)
 }
 ```
 
-#### 3.7.2 状态查询响应 (STATUS_RESPONSE)
+#### 3.8.2 状态查询响应 (STATUS_RESPONSE) 🔵
+
+**消息作用**: 虚拟机响应后端的状态查询请求，提供详细的系统状态、资源使用情况、网络信息和进程信息。
+
+**虚拟机端实现**: 收到STATUS_QUERY后，收集系统运行状态、CPU、内存、磁盘、GPU使用率，网络配置信息，进程统计和系统基本信息，然后发送此响应消息。
+
+**后端实现**: 接收虚拟机的状态响应，解析并存储状态信息到数据库或监控系统中，用于生成监控报告、负载均衡决策和系统健康检查。
+
 ```json
 {
   "type": "STATUS_RESPONSE",
@@ -736,6 +1166,227 @@ time.sleep(10)
 }
 ```
 
+## 3.10 服务端通知消息 (v1.4新增)
+
+> **重要说明**: 本节定义的是服务端主动发送的**通知消息**，与前述的**ACK响应消息**不同：
+>
+> - **ACK响应消息**: 对客户端请求的直接确认，遵循请求-响应模式，客户端期待接收
+> - **通知消息**: 服务端主动推送的事件通知，用于实时状态同步，客户端可选择性处理
+>
+> 例如：`DATASET_CREATE` → `DATASET_CREATE_ACK` (ACK响应) + `DATASET_CREATE_NOTIFICATION` (完成通知)
+
+### 3.10.1 数据集创建完成通知 (DATASET_CREATE_NOTIFICATION) 🟢
+```json
+{
+  "type": "DATASET_CREATE_NOTIFICATION",
+  "id": "server-1704067200000-200010",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "description": "水声传播特征数据集",
+    "dataType": "ACOUSTIC",
+    "status": "READY"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.2 数据行添加完成通知 (DATASET_APPEND_ROWS_NOTIFICATION) 🟢
+```json
+{
+  "type": "DATASET_APPEND_ROWS_NOTIFICATION",
+  "id": "server-1704067200000-200011",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "rowsAdded": 2,
+    "sampleData": { "f1": 0.12, "f2": 3.4, "label": 1 }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.3 数据集完成通知 (DATASET_COMPLETE_NOTIFICATION) 🟢
+```json
+{
+  "type": "DATASET_COMPLETE_NOTIFICATION",
+  "id": "server-1704067200000-200012",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "totalRows": 1000,
+    "status": "READY"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.4 训练开始指令通知 (TRAINING_START_COMMAND_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_START_COMMAND_NOTIFICATION",
+  "id": "server-1704067200000-200013",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "mlAlgorithm": "RandomForest",
+    "hyperparameters": {
+      "n_estimators": 100,
+      "max_depth": 10,
+      "random_state": 42
+    },
+    "trainingConfig": {
+      "epochs": 5,
+      "batchSize": 32,
+      "timeout": 300
+    },
+    "message": "请开始本地ML训练任务"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.5 训练开始成功通知 (TRAINING_START_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_START_NOTIFICATION",
+  "id": "server-1704067200000-200014",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "status": "RUNNING",
+    "message": "训练已成功开始"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.6 训练开始失败通知 (TRAINING_START_FAILURE_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_START_FAILURE_NOTIFICATION",
+  "id": "server-1704067200000-200015",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "status": "FAILED",
+    "error": "模型初始化失败：参数错误"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.7 训练停止指令通知 (TRAINING_STOP_COMMAND_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_STOP_COMMAND_NOTIFICATION",
+  "id": "server-1704067200000-200016",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "message": "请停止训练任务"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.8 训练进度查询指令通知 (TRAINING_PROGRESS_QUERY_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_PROGRESS_QUERY_NOTIFICATION",
+  "id": "server-1704067200000-200017",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "message": "请报告训练进度"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.9 训练进度更新通知 (TRAINING_PROGRESS_UPDATE_NOTIFICATION) 🟢
+```json
+{
+  "type": "TRAINING_PROGRESS_UPDATE_NOTIFICATION",
+  "id": "server-1704067200000-200018",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "currentRound": 25,
+    "status": "RUNNING",
+    "accuracy": 0.88,
+    "loss": 0.12,
+    "message": "训练进度已更新"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.10 模型下载通知 (MODEL_DOWNLOAD_NOTIFICATION) 🟢
+```json
+{
+  "type": "MODEL_DOWNLOAD_NOTIFICATION",
+  "id": "server-1704067200000-200019",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "task-123456",
+    "parameters": {
+      "model": {
+        "framework": "pytorch",
+        "format": "state_dict",
+        "weights": {
+          "shape": [784, 256, 128, 10],
+          "dtype": "float32",
+          "checksum": "sha256:global_model_1704067200000"
+        }
+      },
+      "training": {
+        "algorithm": "RandomForest",
+        "samples": 1000
+      }
+    },
+    "compression": "gzip",
+    "downloadTime": "2024-01-01T00:00:00.000Z",
+    "message": "全局模型下载数据"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10.11 状态更新通知 (STATUS_UPDATE_NOTIFICATION) 🟢
+```json
+{
+  "type": "STATUS_UPDATE_NOTIFICATION",
+  "id": "server-1704067200000-200020",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "RUNNING",
+    "uptime": 3600,
+    "resourceUsage": {
+      "cpu": 25.5,
+      "memory": 60.2,
+      "disk": 45.8,
+      "gpu": 15.3
+    },
+    "lastUpdate": "2024-01-01T00:00:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+> **说明**: v1.4版本新增了服务端通知消息类型，这些消息由服务器主动发送给客户端，用于实时通知状态变更、任务进展等信息。客户端应注册相应的消息处理器来处理这些通知。
+
 ## 4. 消息处理流程
 
 ### 4.1 连接建立流程
@@ -758,6 +1409,35 @@ time.sleep(10)
 3. **命令执行**: 客户端执行相应操作
 4. **结果反馈**: 客户端发送执行结果或状态更新
 5. **状态同步**: 服务器更新数据库中的虚拟机状态
+
+### 4.4 通知消息处理流程 (v1.4新增)
+
+通知消息处理遵循**发布-订阅模式**，与请求-响应模式不同：
+
+1. **事件触发**: 服务器端业务逻辑触发特定事件（如数据集创建完成）
+2. **通知广播**: 服务器向相关的虚拟机或前端客户端广播通知消息
+3. **可选处理**: 客户端可选择性处理通知消息（不需要发送ACK）
+4. **状态同步**: 客户端根据通知更新本地状态或UI
+
+#### 4.4.1 双重响应模式
+
+许多操作采用**双重响应模式**：ACK确认 + 事件通知
+
+```
+客户端请求: DATASET_CREATE
+    ↓
+服务器处理: 数据库操作 + 业务逻辑
+    ↓
+双重响应:
+    1. DATASET_CREATE_ACK → 告诉请求方"已接收处理"
+    2. DATASET_CREATE_NOTIFICATION → 通知所有订阅者"数据集已创建"
+```
+
+#### 4.4.2 消息路由
+
+- **ACK消息**: 点对点发送给请求发起者
+- **通知消息**: 广播发送给订阅该类型事件的所有客户端
+- **指令消息**: 定向发送给特定虚拟机
 
 ### 4.4 训练流程
 1. **任务启动**: 服务器发送TRAINING_START命令

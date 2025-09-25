@@ -52,16 +52,11 @@ public class InitialModel {
      * 架构参数(JSON格式)
      */
     private String architectureParams;
-    
+
     /**
-     * 文件存储路径
+     * 模型参数数据(JSON格式)
      */
-    private String filePath;
-    
-    /**
-     * 文件校验和
-     */
-    private String checksum;
+    private String modelData;
     
     /**
      * 状态: GENERATING-生成中, READY-就绪, DISTRIBUTED-已分发, FAILED-失败

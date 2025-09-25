@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS model_versions (
     model_json TEXT COMMENT '聚合后模型参数(JSON格式)',
     accuracy DECIMAL(5, 4) COMMENT '准确率',
     loss DECIMAL(10, 6) COMMENT '损失值',
-    metrics TEXT COMMENT '聚合后评估指标(JSON格式)',
+    metrics JSON COMMENT '聚合后评估指标(JSON格式)',
     status VARCHAR(20) COMMENT '模型状态(UPLOADING/UPLOADED/VALIDATING/VALIDATED/DEPLOYED/DEPRECATED/FAILED)',
     description TEXT COMMENT '模型描述',
     file_path VARCHAR(500) COMMENT '模型文件路径',
@@ -495,8 +495,7 @@ CREATE TABLE IF NOT EXISTS initial_models (
     generation_method ENUM('RANDOM', 'CUSTOM_UPLOAD') NOT NULL COMMENT '生成方式',
     model_size BIGINT COMMENT '模型大小(字节)',
     architecture_params JSON COMMENT '架构参数(JSON格式)',
-    file_path VARCHAR(500) COMMENT '文件存储路径',
-    checksum VARCHAR(128) COMMENT '文件校验和',
+    model_data JSON COMMENT '模型参数数据(JSON格式)',
     status ENUM('GENERATING', 'READY', 'DISTRIBUTED', 'FAILED') DEFAULT 'GENERATING' COMMENT '状态',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
@@ -505,7 +504,7 @@ CREATE TABLE IF NOT EXISTS initial_models (
     INDEX idx_initial_models_status (status),
     INDEX idx_initial_models_created_at (created_at),
     FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='初始模型表 - 存储联邦学习初始模型信息';
 
 -- 14. 模型分发记录表

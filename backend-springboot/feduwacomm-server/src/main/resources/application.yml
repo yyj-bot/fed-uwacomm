@@ -68,6 +68,18 @@ feduwacomm:
       heartbeat-interval: ${WS_HEARTBEAT_INTERVAL:30}
       connection-timeout: ${WS_CONNECTION_TIMEOUT:60}
 
+      # WebSocket传输配置
+      transport:
+        message-size-limit: ${WS_MESSAGE_SIZE_LIMIT:268435456} # 256MB = 256*1024*1024
+        send-buffer-size-limit: ${WS_SEND_BUFFER_SIZE_LIMIT:268435456} # 256MB
+        send-time-limit: ${WS_SEND_TIME_LIMIT:600000} # 10分钟 (毫秒)
+        time-to-first-message: ${WS_TIME_TO_FIRST_MESSAGE:120000} # 2分钟 (毫秒)
+
+      # WebSocket心跳配置
+      heartbeat:
+        value: ${WS_HEARTBEAT_VALUE:60000} # 60秒心跳间隔 (毫秒)
+        scheduler-pool-size: ${WS_HEARTBEAT_SCHEDULER_POOL_SIZE:10} # 心跳调度器线程池大小
+
     api:
       base-path: ${API_BASE_PATH:/api}
       v1-path: ${API_V1_PATH:/api/v1}

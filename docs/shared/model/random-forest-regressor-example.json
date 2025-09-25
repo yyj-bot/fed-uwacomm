@@ -1,0 +1,57 @@
+{
+  "model_metadata": {
+    "model_id": "rf_regressor_20250115_103045",
+    "model_type": "sklearn",
+    "algorithm": "RandomForest",
+    "task_type": "regression",
+    "created_at": "2025-01-15T10:30:45Z",
+    "version": "1.0.0",
+    "description": "RandomForest回归模型用于水声传播损失预测"
+  },
+  "parameters": {
+    "feature_importances_": [0.25, 0.20, 0.15, 0.18, 0.12, 0.10],
+    "n_estimators": 100,
+    "n_features_": 6,
+    "n_outputs_": 1
+  },
+  "training_config": {
+    "max_depth": 10,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt",
+    "bootstrap": true,
+    "criterion": "squared_error",
+    "random_state": 42,
+    "n_jobs": -1,
+    "feature_names": [
+      "frequency_hz",
+      "source_depth_m",
+      "receiver_depth_m",
+      "range_km",
+      "water_temperature_c",
+      "salinity_psu"
+    ],
+    "target_name": "transmission_loss_db",
+    "target_range": [30.0, 120.0],
+    "normalization": "standard_scaler"
+  },
+  "metadata": {
+    "model_purpose": "水声传播损失预测",
+    "expected_performance": {
+      "r2_score": 0.85,
+      "rmse": 3.2,
+      "mae": 2.1
+    },
+    "usage_notes": [
+      "适用于浅水环境的传播损失预测",
+      "频率范围: 100Hz - 10kHz",
+      "距离范围: 0.1km - 50km",
+      "深度范围: 1m - 200m"
+    ],
+    "data_requirements": {
+      "min_samples_per_feature": 20,
+      "feature_scaling": "required",
+      "missing_values": "not_allowed"
+    }
+  }
+}

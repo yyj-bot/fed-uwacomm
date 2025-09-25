@@ -56,4 +56,4 @@ test:
 
 # 服务器配置
 server:
-  port: 0 # 随机端口，避免端口冲突
+  port: 8081 # 固定测试端口，避免WebSocket连接路由混乱
