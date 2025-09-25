@@ -311,13 +311,12 @@ class WebSocketClient:
     def _send_application_connect(self):
         """发送应用层CONNECT消息"""
         connect_data = {
-            "version": "1.0.0",
-            "capabilities": ["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"],
-            "systemInfo": {
-                "os": "Unknown",
-                "python": "3.8+",
-                "memory": "Unknown",
-                "cpu": "Unknown"
+            "supportedMLAlgorithms": ["RandomForest", "SVM", "NeuralNetwork", "XGBoost"],
+            "computeCapabilities": {
+                "maxBatchSize": 1024,
+                "gpuMemory": "16GB",
+                "parallelProcessing": True,
+                "frameworks": ["sklearn", "pytorch", "tensorflow"]
             }
         }
         

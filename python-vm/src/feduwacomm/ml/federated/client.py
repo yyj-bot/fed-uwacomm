@@ -11,7 +11,7 @@ from dataclasses import asdict
 import pandas as pd
 import numpy as np
 
-from .config import FederatedConfig, TrainingState, FederatedAlgorithm
+from .config import MLConfig, TrainingState, MLAlgorithm
 from .model_wrapper import ModelWrapper
 
 # 可选依赖：PyTorch（如果可用）
@@ -28,7 +28,7 @@ class FederatedLearningClient:
     """联邦学习客户端"""
     
     def __init__(self, client_id: str, model, 
-                 model_type: str = "pytorch", config: FederatedConfig = None):
+                 model_type: str = "pytorch", config: MLConfig = None):
         """初始化联邦学习客户端
         
         Args:
@@ -39,7 +39,7 @@ class FederatedLearningClient:
         """
         self.client_id = client_id
         self.model_wrapper = ModelWrapper(model, model_type)
-        self.config = config or FederatedConfig()
+        self.config = config or MLConfig()
         self.training_state = TrainingState()
         self.local_data = None
         self.local_labels = None

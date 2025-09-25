@@ -10,7 +10,7 @@ from typing import Dict, Any, TYPE_CHECKING
 from dataclasses import asdict
 import numpy as np
 
-from .config import FederatedConfig, FederatedAlgorithm
+from .config import MLConfig, MLAlgorithm
 from .aggregator import FederatedAggregator
 
 if TYPE_CHECKING:
@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 class FederatedLearningCoordinator:
     """联邦学习协调器（服务器端逻辑）"""
     
-    def __init__(self, config: FederatedConfig = None):
+    def __init__(self, config: MLConfig = None):
         """初始化联邦学习协调器
         
         Args:
             config: 联邦学习配置
         """
-        self.config = config or FederatedConfig()
+        self.config = config or MLConfig()
         self.global_model_params = None
         self.participating_clients = {}
         self.round_history = []
@@ -97,11 +97,11 @@ class FederatedLearningCoordinator:
         # 聚合模型参数
         client_params = [result['parameters'] for result in client_results]
         
-        if self.config.algorithm == FederatedAlgorithm.FEDAVG:
+        if self.config.algorithm == MLAlgorithm.RANDOM_FOREST:
             self.global_model_params = FederatedAggregator.fedavg_aggregate(
                 client_params, client_weights
             )
-        elif self.config.algorithm == FederatedAlgorithm.FEDPROX:
+        elif self.config.algorithm == MLAlgorithm.SVM:
             self.global_model_params = FederatedAggregator.fedprox_aggregate(
                 client_params, self.global_model_params, client_weights, self.config.mu
             )
