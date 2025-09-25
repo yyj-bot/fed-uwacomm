@@ -29,18 +29,24 @@
 - 支持WebSocket协议
 - 网络延迟 < 100ms（推荐）
 
-### 0.3 安全考虑
+### 0.3 架构职责分工 (v1.3优化)
 
-#### 0.3.1 认证机制
+#### 0.3.1 后端职责
+- 联邦学习算法选择和配置（FEDAVG、FEDPROX等）
+- 全局模型聚合和分发
+- 任务编排和工作流管理
+- 虚拟机资源调度和分配
+
+#### 0.3.2 虚拟机职责
+- 本地机器学习模型训练（RandomForest、SVM等）
+- 数据预处理和特征提取
+- 模型参数上传和下载
+- 系统状态监控和上报
+
+#### 0.3.3 安全考虑
 - 使用JWT Token进行身份验证
-- 服务器端验证虚拟机身份和权限
-- 支持Token过期和刷新机制
-
-#### 0.3.2 网络安全
-- 使用WSS协议（TLS加密）
-- 实现IP白名单
-- 限制连接频率
-- 监控异常连接
+- WSS协议（TLS加密）通信
+- IP白名单和连接频率限制
 
 ### 0.4 前置注册与认证流程
 - 第一步（HTTP）: 虚拟机向后端发起注册请求，注册成功后返回 `accessToken`、`secretId` 和建议的 WebSocket 连接信息
@@ -57,7 +63,7 @@
 - **WebSocket (SockJS) URL**: `http://localhost:8080/ws` (开发环境)
 - **WebSocket (原生) URL**: `ws://localhost:8080/ws-native` (开发环境)
 - **WebSocket Secure URL**: `wss://your-domain.com/ws-native` (生产环境)
-- **协议版本**: v1.0
+- **协议版本**: v1.3 (移除联邦算法配置，保留本地ML算法)
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
@@ -170,7 +176,7 @@ time.sleep(10)
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "version": "1.0.0",
-    "capabilities": ["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"],
+    "supportedMLAlgorithms": ["RandomForest", "SVM", "NeuralNetwork", "XGBoost"],
     "systemInfo": {
       "os": "Ubuntu 20.04",
       "python": "3.8.10",
@@ -178,16 +184,11 @@ time.sleep(10)
       "cpu": "Intel Xeon E5-2680",
       "gpu": "NVIDIA Tesla V100"
     },
-    "supportedAlgorithms": {
-      "FEDAVG": {
-        "version": "1.0",
-        "description": "联邦平均算法"
-      },
-      "FEDPROX": {
-        "version": "1.0",
-        "description": "联邦近端算法",
-        "parameters": ["mu"]
-      }
+    "computeCapabilities": {
+      "maxBatchSize": 1024,
+      "gpuMemory": "16GB",
+      "parallelProcessing": true,
+      "frameworks": ["sklearn", "pytorch", "tensorflow"]
     }
   },
   "signature": "base64_encoded_signature"
@@ -314,14 +315,15 @@ time.sleep(10)
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "task-123456",
-    "algorithm": "FEDAVG",
-    "config": {
+    "mlAlgorithm": "RandomForest",
+    "hyperparameters": {
+      "n_estimators": 100,
+      "max_depth": 10,
+      "random_state": 42
+    },
+    "trainingConfig": {
+      "epochs": 5,
       "batchSize": 32,
-      "learningRate": 0.001,
-      "epochsPerRound": 5,
-      "totalRounds": 100,
-      "currentRound": 0,
-      "minClients": 2,
       "timeout": 300
     },
     "globalModel": {
@@ -440,9 +442,9 @@ time.sleep(10)
 }
 ```
 
-> 说明：从本版本起，上传消息不再包含`modelType`、`modelPath`、`modelSize`字段，模型相关元信息统一归入`parameters`(JSON)中；服务端落库仅保存JSON，不保存二进制路径。
+> 说明：v1.3版本优化：上传消息不再包含联邦学习算法相关信息，虚拟机只负责本地训练，所有联邦聚合算法由后端统一管理。
 
-> 补充：收到 VM 端 MODEL_UPLOAD 后，服务端可将本地轮次结果存入 `vm_round_models`（仅JSON+度量），聚合完成后将全局结果存入 `model_versions`。
+> 补充：收到 VM 端 MODEL_UPLOAD 后，服务端根据任务配置的联邦学习算法进行聚合，将本地训练结果存入 `vm_round_models`，聚合后的全局模型存入 `model_versions`。
 
 #### 3.6.2 全局模型下发 (MODEL_DOWNLOAD)
 ```json
@@ -464,9 +466,9 @@ time.sleep(10)
           "checksum": "sha256:def456..."
         }
       },
-      "aggregation": {
-        "method": "FEDAVG",
-        "participation": 10
+      "training": {
+        "algorithm": "RandomForest",
+        "samples": 1000
       }
     },
     "compression": "gzip"
@@ -475,7 +477,7 @@ time.sleep(10)
 }
 ```
 
-> 说明：服务端不再通过`modelPath`提供下载，而是通过`parameters`内的结构化参数下发必要信息；如需二进制传输，请使用单独的文件传输通道或分片机制。
+> 说明：v1.3版本优化：模型下发不再包含联邦学习算法信息，只下发经过聚合处理的模型参数和结构。虚拟机无需了解聚合过程，只需接收并使用新模型参数。
 
 ### 3.7 状态查询消息
 

@@ -1,6 +1,8 @@
 package com.feduwacomm.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.feduwacomm.enums.AggregationMethod;
+import com.feduwacomm.enums.GlobalModelStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,9 +40,9 @@ public class GlobalModel {
     private Integer roundNumber;
 
     /**
-     * 聚合算法类型 (FEDAVG, FEDPROX, FEDNOVA等)
+     * 聚合算法类型 (FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA等)
      */
-    private String aggregationMethod;
+    private AggregationMethod aggregationMethod;
 
     /**
      * 全局模型参数(JSON格式)
@@ -70,7 +72,7 @@ public class GlobalModel {
     /**
      * 聚合状态 (PENDING, AGGREGATING, COMPLETED, FAILED)
      */
-    private String status;
+    private GlobalModelStatus status;
 
     /**
      * 聚合开始时间

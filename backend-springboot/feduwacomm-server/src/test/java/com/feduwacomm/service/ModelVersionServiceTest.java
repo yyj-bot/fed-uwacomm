@@ -7,6 +7,8 @@ import com.feduwacomm.entity.ModelVersion;
 import com.feduwacomm.mapper.ModelVersionMapper;
 import com.feduwacomm.service.impl.ModelVersionServiceImpl;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.config.NetworkProperties;
+import com.feduwacomm.config.FileUploadProperties;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +33,6 @@ import static org.mockito.Mockito.*;
  * ModelVersionService 单元测试类
  */
 @ExtendWith(MockitoExtension.class)
-@SpringBootTest
-@ActiveProfiles("test")
 public class ModelVersionServiceTest {
 
     @Mock
@@ -40,9 +40,15 @@ public class ModelVersionServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
-    
+
     @Mock
     private UuidUtil uuidUtil;
+
+    @Mock
+    private NetworkProperties networkProperties;
+
+    @Mock
+    private FileUploadProperties fileUploadProperties;
 
     @InjectMocks
     private ModelVersionServiceImpl modelVersionService;
@@ -63,12 +69,23 @@ public class ModelVersionServiceTest {
         // 配置UuidUtil mock
         lenient().when(uuidUtil.generateUuid()).thenReturn(modelId);
 
+        // 配置NetworkProperties mock - 创建Server对象
+        NetworkProperties.Server mockServer = new NetworkProperties.Server();
+        mockServer.setHost("localhost");
+        mockServer.setPort("8080");
+        lenient().when(networkProperties.getServer()).thenReturn(mockServer);
+
+        // 配置FileUploadProperties mock - 创建Upload对象
+        FileUploadProperties.Upload mockUpload = new FileUploadProperties.Upload();
+        lenient().when(fileUploadProperties.getUpload()).thenReturn(mockUpload);
+        lenient().when(fileUploadProperties.isFileSizeValid(anyLong(), any())).thenReturn(true);
+
         // 创建模拟模型版本实体
         mockModelVersion = ModelVersion.builder()
             .id(modelId)
             .taskId(taskId)
             .roundNumber(1)
-            .aggregationMethod("FEDAVG")
+            .aggregationMethod("FEDERATED_AVERAGING")
             .clientCount(5)
             .accuracy(new BigDecimal("0.8500"))
             .loss(new BigDecimal("0.1234"))
@@ -172,7 +189,7 @@ public class ModelVersionServiceTest {
             .status("UPLOADED")
             .page(1)
             .size(10)
-            .sort("createdAt")
+            .sort("created_at")
             .order("desc")
             .build();
 

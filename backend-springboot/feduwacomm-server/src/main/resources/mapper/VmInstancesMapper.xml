@@ -281,4 +281,20 @@
         ORDER BY created_at DESC
     </select>
 
+    <!-- 更新虚拟机系统信息 -->
+    <update id="updateSystemInfo">
+        UPDATE vm_instances SET
+            system_info = #{systemInfo},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新虚拟机能力信息 -->
+    <update id="updateCapabilities">
+        UPDATE vm_instances SET
+            capabilities = #{capabilities},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
 </mapper>

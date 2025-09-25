@@ -5,19 +5,25 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.common.exception.BusinessException;
+import com.feduwacomm.config.JwtConfig;
+import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.enums.ConnectionStatus;
+import com.feduwacomm.enums.VmStatus;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.service.VmInstanceService;
 import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.ApiKeyUtil;
+import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.vo.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.feduwacomm.config.NetworkProperties;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -50,6 +56,15 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     @Autowired
     private VmJwtUtil vmJwtUtil;
 
+    @Autowired
+    private NetworkProperties networkProperties;
+
+    @Autowired
+    private JwtConfig jwtConfig;
+
+    @Autowired
+    private UuidUtil uuidUtil;
+
     @Value("${server.port:8080}")
     private String serverPort;
 
@@ -61,23 +76,27 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Override
     public VmRegisterResponseVO register(VmRegisterDTO registerDTO) {
-        logger.info("开始注册虚拟机: vmId={}, name={}, ip={}", 
-                   registerDTO.getVmId(), registerDTO.getName(), registerDTO.getIpAddress());
+        logger.info("开始注册虚拟机: name={}, ip={}",
+                   registerDTO.getName(), registerDTO.getIpAddress());
 
-        // 1. 检查虚拟机是否已存在
-        if (vmInstancesMapper.existsByVmId(registerDTO.getVmId()) > 0) {
-            logger.warn("虚拟机已存在: vmId={}", registerDTO.getVmId());
+        // 1. 自动生成vmId
+        String vmId = uuidUtil.generateUuid();
+        logger.info("自动生成vmId: {}", vmId);
+
+        // 2. 检查虚拟机是否已存在
+        if (vmInstancesMapper.existsByVmId(vmId) > 0) {
+            logger.warn("虚拟机已存在: vmId={}", vmId);
             throw new BusinessException("虚拟机已存在");
         }
 
         // 2. 生成API Key和会话ID
         String rawApiKey = ApiKeyUtil.generateApiKey(); // 明文API Key，只返回一次
         String hashedApiKey = ApiKeyUtil.encodeApiKey(rawApiKey); // BCrypt哈希后存储
-        String sessionId = UUID.randomUUID().toString().replace("-", "");
+        String sessionId = uuidUtil.generateUuid();
 
         // 3. 创建虚拟机实例
         VmInstance vmInstance = new VmInstance();
-        vmInstance.setId(registerDTO.getVmId());
+        vmInstance.setId(vmId);
         vmInstance.setName(registerDTO.getName());
         vmInstance.setIpAddress(registerDTO.getIpAddress());
         vmInstance.setPort(registerDTO.getPort());
@@ -85,8 +104,8 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         vmInstance.setCpuCores(registerDTO.getCpuCores());
         vmInstance.setMemoryMb(registerDTO.getMemoryMb());
         vmInstance.setDiskGb(registerDTO.getDiskGb());
-        vmInstance.setStatus("OFFLINE");
-        vmInstance.setConnectionStatus("DISCONNECTED");
+        vmInstance.setStatus(VmStatus.OFFLINE);
+        vmInstance.setConnectionStatus(ConnectionStatus.DISCONNECTED);
         vmInstance.setWsSessionId(sessionId);
         // 存储BCrypt哈希后的API Key到secretId字段
         vmInstance.setSecretId(hashedApiKey);
@@ -109,25 +128,25 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 vmInstance.setMetadata(objectMapper.writeValueAsString(registerDTO.getMetadata()));
             }
         } catch (JsonProcessingException e) {
-            logger.error("JSON序列化失败: vmId={}", registerDTO.getVmId(), e);
+            logger.error("JSON序列化失败: vmId={}", vmId, e);
             throw new BusinessException("数据格式错误");
         }
 
         // 5. 插入数据库
         int result = vmInstancesMapper.insert(vmInstance);
         if (result <= 0) {
-            logger.error("虚拟机注册失败: vmId={}", registerDTO.getVmId());
+            logger.error("虚拟机注册失败: vmId={}", vmId);
             throw new BusinessException("虚拟机注册失败");
         }
 
         // 6. 生成访问令牌（在数据库插入成功后）
-        String accessToken = generateAccessToken(registerDTO.getVmId());
+        String accessToken = generateAccessToken(vmId);
 
-        logger.info("虚拟机注册成功: vmId={}, sessionId={}", registerDTO.getVmId(), sessionId);
+        logger.info("虚拟机注册成功: vmId={}, sessionId={}", vmId, sessionId);
 
         // 7. 构建响应
         return VmRegisterResponseVO.builder()
-                .vmId(registerDTO.getVmId())
+                .vmId(vmId)
                 .name(registerDTO.getName())
                 .status("OFFLINE")
                 .connectionStatus("DISCONNECTED")
@@ -136,15 +155,8 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .accessToken(accessToken) // JWT令牌只返回给客户端，不存储
                 .secretId(rawApiKey) // 返回明文API Key，仅此一次
                 .tokenExpireSeconds(tokenExpireSeconds)
-                .websocket(VmRegisterResponseVO.WebSocketInfo.builder()
-                        .sockjs("http://localhost:" + serverPort + "/ws")
-                        .nativeWs("ws://localhost:" + serverPort + "/ws-native")
-                        .build())
-                .apiEndpoints(VmRegisterResponseVO.ApiEndpoints.builder()
-                        .status("/api/v1/vm/" + registerDTO.getVmId() + "/status")
-                        .control("/api/v1/vm/" + registerDTO.getVmId() + "/control")
-                        .tokenRefresh("/api/v1/vm/token/refresh")
-                        .build())
+                .websocket(buildWebSocketInfo())
+                .apiEndpoints(buildApiEndpoints(vmId))
                 .build();
     }
 
@@ -196,7 +208,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         try {
             // JWT令牌验证（自包含，不需要数据库查询）
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(Keys.hmacShaKeyFor("feduwacomm_jwt_secret_key_2024_default_256_bit_length_for_security".getBytes()))
+                    .setSigningKey(Keys.hmacShaKeyFor(jwtConfig.getVm().getSecret().getBytes(SystemConstants.DEFAULT_CHARSET)))
                     .build()
                     .parseClaimsJws(accessToken)
                     .getBody();
@@ -471,7 +483,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         }
 
         // 3. 检查虚拟机状态
-        if (!force && "RUNNING".equals(vmInstance.getStatus())) {
+        if (!force && VmStatus.RUNNING.equals(vmInstance.getStatus())) {
             throw new BusinessException("虚拟机正在运行，请先停止后再删除，或使用强制删除");
         }
 
@@ -526,7 +538,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             throw new BusinessException("虚拟机不存在: " + vmId);
         }
 
-        if ("RUNNING".equals(vmInstance.getStatus())) {
+        if (VmStatus.RUNNING.equals(vmInstance.getStatus())) {
             throw new BusinessException("虚拟机已在运行状态");
         }
 
@@ -535,7 +547,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
 
             // 4. 生成命令ID
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             // 5. 这里应该通过WebSocket向虚拟机发送启动命令，暂时模拟
             // TODO: 实现WebSocket命令发送
@@ -589,7 +601,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STOPPING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)
@@ -633,7 +645,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
         try {
             vmInstancesMapper.updateStatus(vmId, "STARTING");
-            String commandId = UUID.randomUUID().toString();
+            String commandId = uuidUtil.generateUuidWithHyphens();
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)
@@ -684,8 +696,8 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             // 3. 构建状态信息（这里模拟实时数据，实际应该通过WebSocket查询）
             return VmStatusVO.builder()
                 .vmId(vmId)
-                .status(vmInstance.getStatus())
-                .connectionStatus(vmInstance.getConnectionStatus())
+                .status(vmInstance.getStatus().getCode())
+                .connectionStatus(vmInstance.getConnectionStatus().getCode())
                 .uptime(calculateUptime(vmInstance))
                 .resourceUsage(VmStatusVO.RealTimeResourceUsage.builder()
                     .cpu(65.5)
@@ -697,7 +709,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                     .build())
                 .network(VmStatusVO.RealTimeNetwork.builder()
                     .ipAddress(vmInstance.getIpAddress())
-                    .macAddress("00:11:22:33:44:55")
+                    .macAddress(generateMacAddress(vmInstance.getId()))
                     .port(vmInstance.getPort())
                     .uploadSpeed(1024L)
                     .downloadSpeed(2048L)
@@ -760,12 +772,12 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             .name(vmInstance.getName())
             .ipAddress(vmInstance.getIpAddress())
             .port(vmInstance.getPort())
-            .status(vmInstance.getStatus())
+            .status(vmInstance.getStatus().getCode())
             .osType(vmInstance.getOsType())
             .cpuCores(vmInstance.getCpuCores())
             .memoryMb(vmInstance.getMemoryMb())
             .diskGb(vmInstance.getDiskGb())
-            .connectionStatus(vmInstance.getConnectionStatus())
+            .connectionStatus(vmInstance.getConnectionStatus().getCode())
             .lastHeartbeat(vmInstance.getLastHeartbeat())
             .createdAt(vmInstance.getCreatedAt())
             .updatedAt(vmInstance.getUpdatedAt())
@@ -789,12 +801,12 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .name(vmInstance.getName())
                 .ipAddress(vmInstance.getIpAddress())
                 .port(vmInstance.getPort())
-                .status(vmInstance.getStatus())
+                .status(vmInstance.getStatus().getCode())
                 .osType(vmInstance.getOsType())
                 .cpuCores(vmInstance.getCpuCores())
                 .memoryMb(vmInstance.getMemoryMb())
                 .diskGb(vmInstance.getDiskGb())
-                .connectionStatus(vmInstance.getConnectionStatus())
+                .connectionStatus(vmInstance.getConnectionStatus().getCode())
                 .lastHeartbeat(vmInstance.getLastHeartbeat())
                 .wsSessionId(vmInstance.getWsSessionId())
                 .createdAt(vmInstance.getCreatedAt())
@@ -813,7 +825,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                     .latency(50)
                     .build())
                 .network(VmDetailVO.NetworkInfo.builder()
-                    .macAddress("00:11:22:33:44:55")
+                    .macAddress(generateMacAddress(vmInstance.getId()))
                     .bandwidth(1000)
                     .uploadSpeed(1024L)
                     .downloadSpeed(2048L)
@@ -863,7 +875,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
      */
     private Long calculateUptime(VmInstance vmInstance) {
         // 简化计算，实际应该根据状态变化历史计算
-        if ("RUNNING".equals(vmInstance.getStatus()) && vmInstance.getLastHeartbeat() != null) {
+        if (VmStatus.RUNNING.equals(vmInstance.getStatus()) && vmInstance.getLastHeartbeat() != null) {
             return java.time.Duration.between(vmInstance.getCreatedAt(), LocalDateTime.now()).getSeconds();
         }
         return 0L;
@@ -936,7 +948,56 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         if (vmInstance == null) {
             throw new BusinessException("VM实例不存在: " + vmId);
         }
-        return vmJwtUtil.generateAccessToken(vmId, vmInstance.getName(), vmInstance.getStatus());
+        return vmJwtUtil.generateAccessToken(vmId, vmInstance.getName(), vmInstance.getStatus().getCode());
+    }
+
+    /**
+     * 基于虚拟机ID生成MAC地址
+     * 使用固定前缀00:FD:UW，后三位基于vmId哈希生成
+     *
+     * @param vmId 虚拟机ID
+     * @return 生成的MAC地址
+     */
+    private String generateMacAddress(String vmId) {
+        if (vmId == null || vmId.isEmpty()) {
+            return "00:FD:UW:00:00:01";
+        }
+
+        // 使用vmId的hashCode生成后三位
+        int hash = Math.abs(vmId.hashCode());
+        int octet4 = (hash >> 16) & 0xFF;
+        int octet5 = (hash >> 8) & 0xFF;
+        int octet6 = hash & 0xFF;
+
+        return String.format("00:FD:UW:%02X:%02X:%02X", octet4, octet5, octet6);
+    }
+
+    /**
+     * 构建WebSocket连接信息
+     *
+     * @return WebSocket连接信息
+     */
+    private VmRegisterResponseVO.WebSocketInfo buildWebSocketInfo() {
+        NetworkProperties.WebSocketInfo wsInfo = networkProperties.getWebSocketInfo();
+        return VmRegisterResponseVO.WebSocketInfo.builder()
+                .sockjs(wsInfo.getSockjs())
+                .nativeWs(wsInfo.getNativeWs())
+                .build();
+    }
+
+    /**
+     * 构建API端点信息
+     *
+     * @param vmId 虚拟机ID
+     * @return API端点信息
+     */
+    private VmRegisterResponseVO.ApiEndpoints buildApiEndpoints(String vmId) {
+        NetworkProperties.Api apiConfig = networkProperties.getApi();
+        return VmRegisterResponseVO.ApiEndpoints.builder()
+                .status(apiConfig.buildVmStatusPath(vmId))
+                .control(apiConfig.buildVmControlPath(vmId))
+                .tokenRefresh(apiConfig.getTokenRefreshPath())
+                .build();
     }
 
 }

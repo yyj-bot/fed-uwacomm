@@ -55,6 +55,15 @@
         WHERE username = #{loginIdentifier} OR email = #{loginIdentifier}
     </select>
 
+    <!-- 查询第一个管理员用户 -->
+    <select id="selectFirstAdmin" resultMap="UserResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM users
+        WHERE role = 'ADMIN' AND status = 'ACTIVE'
+        ORDER BY created_at ASC
+        LIMIT 1
+    </select>
+
     <!-- 插入用户 -->
     <insert id="insert" parameterType="com.feduwacomm.entity.User">
         INSERT INTO users (

@@ -41,7 +41,7 @@ public class LogQueryDTO {
     private Integer size = 10;
     
     @Builder.Default
-    private String sort = "createdAt";
+    private String sort = "created_at";
     
     @Builder.Default
     private String order = "desc";

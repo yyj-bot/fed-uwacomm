@@ -4,7 +4,11 @@ import com.feduwacomm.config.AggregationConfig;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
+import com.feduwacomm.enums.AggregationMethod;
+import com.feduwacomm.enums.FederatedTaskStatus;
+import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.service.ModelAggregatorEngine;
+import com.feduwacomm.utils.UuidUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,6 +31,7 @@ import java.util.UUID;
 public class FedAvgStrategy implements AggregationStrategy {
 
     private final AggregationConfig aggregationConfig;
+    private final UuidUtil uuidUtil;
 
     @Override
     public String getStrategyName() {
@@ -35,7 +40,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
     @Override
     public boolean supports(String algorithm) {
-        return "FEDAVG".equalsIgnoreCase(algorithm);
+        return AggregationMethod.FEDERATED_AVERAGING.getCode().equalsIgnoreCase(algorithm);
     }
 
     @Override
@@ -46,18 +51,18 @@ public class FedAvgStrategy implements AggregationStrategy {
 
         // 创建全局模型记录
         GlobalModel globalModel = GlobalModel.builder()
-                .id(UUID.randomUUID().toString().replace("-", ""))
+                .id(uuidUtil.generateUuid())
                 .taskId(task.getId())
                 .roundNumber(task.getCurrentRound())
-                .aggregationMethod("FEDAVG")
-                .status("AGGREGATING")
+                .aggregationMethod(AggregationMethod.FEDERATED_AVERAGING)
+                .status(GlobalModelStatus.AGGREGATING)
                 .participantCount(localModels.size())
                 .startedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
                 .build();
 
         // 执行聚合
-        return engine.aggregate("FEDAVG", localModels, task, globalModel);
+        return engine.aggregate(AggregationMethod.FEDERATED_AVERAGING.getCode(), localModels, task, globalModel);
     }
 
     @Override
@@ -81,7 +86,7 @@ public class FedAvgStrategy implements AggregationStrategy {
         }
 
         // 验证任务状态
-        if (task == null || !"RUNNING".equalsIgnoreCase(task.getStatus())) {
+        if (task == null || !FederatedTaskStatus.RUNNING.equals(task.getStatus())) {
             return ValidationResult.invalid("任务状态无效，无法进行聚合");
         }
 
@@ -112,6 +117,6 @@ public class FedAvgStrategy implements AggregationStrategy {
             reasoning += "由于参与者较多，建议启用并行处理以提升性能。";
         }
 
-        return new AlgorithmConfigSuggestion("FEDAVG", suggestedParams, reasoning);
+        return new AlgorithmConfigSuggestion(AggregationMethod.FEDERATED_AVERAGING.getCode(), suggestedParams, reasoning);
     }
 }

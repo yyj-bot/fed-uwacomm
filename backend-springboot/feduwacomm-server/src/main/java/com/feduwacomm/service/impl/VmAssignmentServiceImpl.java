@@ -3,6 +3,8 @@ package com.feduwacomm.service.impl;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.entity.User;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.VmStatus;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.service.VmAssignmentService;
@@ -52,7 +54,7 @@ public class VmAssignmentServiceImpl implements VmAssignmentService {
 
         // 基于角色的权限检查
         if (!hasVmAssignmentPermission(user.getRole())) {
-            throw new RuntimeException("用户角色无权限使用虚拟机: " + user.getRole());
+            throw new RuntimeException("用户角色无权限使用虚拟机: " + user.getRole().getCode());
         }
 
         return VmAssignmentResponseVO.builder()
@@ -91,11 +93,11 @@ public class VmAssignmentServiceImpl implements VmAssignmentService {
         List<VmInstance> allVms = vmInstancesMapper.selectAll();
         List<UserVmListVO> userVms = allVms.stream()
                 .filter(vm -> canUserAccessVm(user.getRole(), vm))
-                .filter(vm -> status == null || status.equals(vm.getStatus()))
+                .filter(vm -> status == null || status.equals(vm.getStatus().getCode()))
                 .map(vm -> UserVmListVO.builder()
                         .vmId(vm.getId())
                         .name(vm.getName())
-                        .status(vm.getStatus())
+                        .status(vm.getStatus().getCode())
                         .permissions(getPermissionsByRole(user.getRole()))
                         .assignedAt(LocalDateTime.now())
                         .build())
@@ -125,12 +127,12 @@ public class VmAssignmentServiceImpl implements VmAssignmentService {
 
         List<VmInstance> allVms = vmInstancesMapper.selectAll();
         List<UnassignedVmListVO> unassignedVms = allVms.stream()
-                .filter(vm -> status == null || status.equals(vm.getStatus()))
-                .filter(vm -> "AVAILABLE".equals(vm.getStatus()))
+                .filter(vm -> status == null || status.equals(vm.getStatus().getCode()))
+                .filter(vm -> VmStatus.RUNNING.getCode().equals(vm.getStatus().getCode()))
                 .map(vm -> UnassignedVmListVO.builder()
                         .vmId(vm.getId())
                         .name(vm.getName())
-                        .status(vm.getStatus())
+                        .status(vm.getStatus().getCode())
                         .createdAt(vm.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
@@ -151,7 +153,7 @@ public class VmAssignmentServiceImpl implements VmAssignmentService {
 
         // 基于角色的权限检查
         if (!hasVmAssignmentPermission(user.getRole())) {
-            throw new RuntimeException("用户角色无权限使用虚拟机: " + user.getRole());
+            throw new RuntimeException("用户角色无权限使用虚拟机: " + user.getRole().getCode());
         }
 
         return VmBatchAssignmentResponseVO.builder()
@@ -224,40 +226,40 @@ public class VmAssignmentServiceImpl implements VmAssignmentService {
 
         return VmAssignmentOverviewVO.builder()
                 .totalVmCount(allVms.size())
-                .assignedVmCount((int) allVms.stream().filter(vm -> "RUNNING".equals(vm.getStatus())).count())
-                .unassignedVmCount((int) allVms.stream().filter(vm -> "AVAILABLE".equals(vm.getStatus())).count())
-                .onlineVmCount((int) allVms.stream().filter(vm -> "RUNNING".equals(vm.getStatus())).count())
-                .offlineVmCount((int) allVms.stream().filter(vm -> "STOPPED".equals(vm.getStatus())).count())
+                .assignedVmCount((int) allVms.stream().filter(vm -> VmStatus.RUNNING.equals(vm.getStatus())).count())
+                .unassignedVmCount((int) allVms.stream().filter(vm -> VmStatus.OFFLINE.equals(vm.getStatus())).count())
+                .onlineVmCount((int) allVms.stream().filter(vm -> VmStatus.RUNNING.equals(vm.getStatus())).count())
+                .offlineVmCount((int) allVms.stream().filter(vm -> VmStatus.STOPPED.equals(vm.getStatus())).count())
                 .build();
     }
 
     /**
      * 检查用户角色是否有虚拟机分配权限
      */
-    private boolean hasVmAssignmentPermission(String role) {
-        return "ADMIN".equals(role) ||
-               "RESEARCHER".equals(role) ||
-               "OPERATOR".equals(role);
+    private boolean hasVmAssignmentPermission(UserRole role) {
+        return UserRole.ADMIN.equals(role) ||
+               UserRole.RESEARCHER.equals(role) ||
+               UserRole.OPERATOR.equals(role);
     }
 
     /**
      * 检查用户是否可以访问指定虚拟机
      */
-    private boolean canUserAccessVm(String role, VmInstance vm) {
+    private boolean canUserAccessVm(UserRole role, VmInstance vm) {
         // 根据角色和VM状态决定访问权限
-        return hasVmAssignmentPermission(role) && "AVAILABLE".equals(vm.getStatus());
+        return hasVmAssignmentPermission(role) && VmStatus.RUNNING.equals(vm.getStatus());
     }
 
     /**
      * 根据用户角色获取权限集合
      */
-    private Set<String> getPermissionsByRole(String role) {
+    private Set<String> getPermissionsByRole(UserRole role) {
         switch (role) {
-            case "ADMIN":
+            case ADMIN:
                 return Set.of("READ", "WRITE", "EXECUTE", "DELETE");
-            case "RESEARCHER":
+            case RESEARCHER:
                 return Set.of("READ", "WRITE", "EXECUTE");
-            case "OPERATOR":
+            case OPERATOR:
                 return Set.of("READ", "EXECUTE");
             default:
                 return Collections.emptySet();

@@ -62,7 +62,7 @@ public class VmInstanceControllerTest {
     private void setupTestData() {
         // 准备注册DTO
         validRegisterDTO = new VmRegisterDTO();
-        validRegisterDTO.setVmId("12345678901234567890123456789012");
+        // vmId由后端自动生成，测试时不需要设置
         validRegisterDTO.setName("TestVM");
         validRegisterDTO.setIpAddress("192.168.1.100");
         validRegisterDTO.setPort(8080);
@@ -185,7 +185,7 @@ public class VmInstanceControllerTest {
     void testVmRegister_ValidationFailed() throws Exception {
         // 创建无效的注册DTO
         VmRegisterDTO invalidDTO = new VmRegisterDTO();
-        invalidDTO.setVmId("invalid"); // 无效的VM ID格式
+        // 移除vmId字段测试，因为vmId现在由后端生成
         invalidDTO.setName("");        // 空名称
         invalidDTO.setIpAddress("invalid-ip"); // 无效IP地址
         invalidDTO.setPort(-1);        // 无效端口
@@ -262,7 +262,7 @@ public class VmInstanceControllerTest {
     void testTokenRefresh_ValidationFailed() throws Exception {
         // 创建无效的刷新DTO
         VmTokenRefreshDTO invalidDTO = new VmTokenRefreshDTO();
-        invalidDTO.setVmId("invalid"); // 无效的VM ID格式
+        // 移除vmId字段测试，因为vmId现在由后端生成
         invalidDTO.setSecretId("");    // 空的secret ID
 
         mockMvc.perform(post("/api/v1/vm/token/refresh")

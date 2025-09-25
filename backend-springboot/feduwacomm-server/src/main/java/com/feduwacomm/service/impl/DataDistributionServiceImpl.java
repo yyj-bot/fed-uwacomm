@@ -1,6 +1,7 @@
 package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.PageResult;
+import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.DataDistributionDTO;
 import com.feduwacomm.entity.DataDistribution;
 import com.feduwacomm.entity.DataDistributionDetail;
@@ -813,7 +814,13 @@ public class DataDistributionServiceImpl implements DataDistributionService {
      */
     private DataDistributionTaskVO convertToTaskVO(DataDistribution distribution, List<DataDistributionDetail> details) {
         Map<String, Object> progressStats = dataDistributionDetailMapper.getDistributionProgress(distribution.getId());
-        
+
+        // 防止progressStats为null的情况
+        if (progressStats == null) {
+            log.warn("数据分发进度统计为null，distribution_id: {}", distribution.getId());
+            progressStats = new HashMap<>();
+        }
+
         Integer total = (Integer) progressStats.getOrDefault("total", 0);
         Integer completed = (Integer) progressStats.getOrDefault("completed", 0);
         Integer failed = (Integer) progressStats.getOrDefault("failed", 0);
@@ -933,7 +940,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     vmData.getErrorMessage() != null ? vmData.getErrorMessage().replace(",", ";") : ""));
         }
         
-        Files.write(reportPath, csv.toString().getBytes());
+        Files.write(reportPath, csv.toString().getBytes(SystemConstants.DEFAULT_CHARSET));
     }
 
     private String convertToJson(Object obj) {
@@ -958,6 +965,12 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     }
 
     private DataDistributionDetail mapToDistributionDetail(Map<String, Object> map) {
+        // 防止map为null的情况
+        if (map == null) {
+            log.warn("数据分发详情映射的map为null，返回空的DataDistributionDetail");
+            return DataDistributionDetail.builder().build();
+        }
+
         return DataDistributionDetail.builder()
                 .id((String) map.get("id"))
                 .distributionId((String) map.get("distribution_id"))

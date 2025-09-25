@@ -556,6 +556,33 @@ public class FederatedTaskController {
     }
 
     /**
+     * 查询任务全局模型列表
+     * GET /api/federated/tasks/{taskId}/global-models
+     */
+    @GetMapping("/tasks/{taskId}/global-models")
+    public Result<GlobalModelsVO> getTaskGlobalModels(@PathVariable String taskId,
+                                                     HttpServletRequest request) {
+        String clientIp = IpUtil.getClientIpAddress(request);
+        String currentUserId = BaseContext.getCurrentId();
+
+        log.info("收到任务全局模型查询请求: taskId={}, userId={}, ip={}",
+            taskId, currentUserId, clientIp);
+
+        try {
+            GlobalModelsVO globalModels = federatedTaskService.getTaskGlobalModels(taskId);
+
+            log.info("任务全局模型查询成功: taskId={}, modelCount={}, userId={}",
+                taskId, globalModels.getModels().size(), currentUserId);
+
+            return Result.success(globalModels);
+        } catch (Exception e) {
+            log.error("任务全局模型查询失败: taskId={}, userId={}, error={}",
+                taskId, currentUserId, e.getMessage(), e);
+            return Result.error("任务全局模型查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 查询任务日志
      * GET /api/federated/tasks/{taskId}/logs
      */

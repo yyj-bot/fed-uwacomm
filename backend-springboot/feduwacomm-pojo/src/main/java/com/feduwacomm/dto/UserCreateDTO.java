@@ -30,4 +30,6 @@ public class UserCreateDTO {
     private String password;
 
     private String role;
+
+    private String status;
 }

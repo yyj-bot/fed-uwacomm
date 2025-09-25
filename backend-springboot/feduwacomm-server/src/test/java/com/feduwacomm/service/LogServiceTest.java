@@ -55,7 +55,7 @@ class LogServiceTest {
 
         assertEquals(1, queryDTO.getPage());
         assertEquals(10, queryDTO.getSize());
-        assertEquals("createdAt", queryDTO.getSort());
+        assertEquals("created_at", queryDTO.getSort());
         assertEquals("desc", queryDTO.getOrder());
     }
 

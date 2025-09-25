@@ -2,6 +2,7 @@ package com.feduwacomm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
+import com.feduwacomm.exception.ResourceNotFoundException;
 import com.feduwacomm.service.AdminService;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -318,13 +319,13 @@ public class AdminControllerTest {
                 // 准备测试数据
                 String userId = "nonexistent_user";
 
-                when(adminService.getUserDetail(userId)).thenThrow(new RuntimeException("用户不存在"));
+                when(adminService.getUserDetail(userId)).thenThrow(new ResourceNotFoundException("用户", userId));
 
                 // 执行测试并打印响应
                 String response = mockMvc.perform(get("/api/admin/user/{userId}", userId))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
+                                .andExpect(status().isNotFound()) // ResourceNotFoundException返回404状态码
+                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("资源不存在"))
                                 .andReturn()
                                 .getResponse()
                                 .getContentAsString();
@@ -370,15 +371,15 @@ public class AdminControllerTest {
                                 .build();
 
                 when(adminService.updateUser(eq(userId), any(UserAdminUpdateDTO.class)))
-                                .thenThrow(new RuntimeException("用户不存在"));
+                                .thenThrow(new ResourceNotFoundException("用户", userId));
 
                 // 执行测试并打印响应
                 String response = mockMvc.perform(put("/api/admin/user/{userId}", userId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(updateDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
+                                .andExpect(status().isNotFound()) // ResourceNotFoundException返回404状态码
+                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("资源不存在"))
                                 .andReturn()
                                 .getResponse()
                                 .getContentAsString();
@@ -393,13 +394,13 @@ public class AdminControllerTest {
                 // 准备测试数据
                 String userId = "nonexistent_user";
 
-                doThrow(new RuntimeException("用户不存在")).when(adminService).deleteUser(userId);
+                doThrow(new ResourceNotFoundException("用户", userId)).when(adminService).deleteUser(userId);
 
                 // 执行测试并打印响应
                 String response = mockMvc.perform(delete("/api/admin/user/{userId}", userId))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
+                                .andExpect(status().isNotFound()) // ResourceNotFoundException返回404状态码
+                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("资源不存在"))
                                 .andReturn()
                                 .getResponse()
                                 .getContentAsString();
@@ -418,15 +419,15 @@ public class AdminControllerTest {
                                 .build();
 
                 when(adminService.lockUser(eq(userId), any(UserLockDTO.class)))
-                                .thenThrow(new RuntimeException("用户不存在"));
+                                .thenThrow(new ResourceNotFoundException("用户", userId));
 
                 // 执行测试并打印响应
                 String response = mockMvc.perform(post("/api/admin/user/{userId}/lock", userId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(lockDTO)))
-                                .andExpect(status().isOk()) // 全局异常处理器返回200状态码
-                                .andExpect(jsonPath("$.code").value(500)) // 业务状态码在响应体中
-                                .andExpect(jsonPath("$.message").value("服务器内部错误"))
+                                .andExpect(status().isNotFound()) // ResourceNotFoundException返回404状态码
+                                .andExpect(jsonPath("$.code").value(404)) // 业务状态码在响应体中
+                                .andExpect(jsonPath("$.message").value("资源不存在"))
                                 .andReturn()
                                 .getResponse()
                                 .getContentAsString();

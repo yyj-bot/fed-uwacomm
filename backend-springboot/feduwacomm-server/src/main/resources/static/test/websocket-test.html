@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket测试页面</title>
+    <title>WebSocket测试页面 v1.3</title>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <style>
@@ -1080,7 +1080,7 @@
                 vmId: vmId,
                 data: {
                     version: '1.0.0',
-                    capabilities: ['FEDAVG', 'FEDPROX', 'FEDNOVA', 'SCAFFOLD'],
+                    supportedMLAlgorithms: ['RandomForest', 'SVM', 'NeuralNetwork', 'XGBoost'],
                     systemInfo: {
                         os: 'Ubuntu 20.04',
                         python: '3.8.10',
@@ -1088,16 +1088,11 @@
                         cpu: 'Intel Xeon E5-2680',
                         gpu: 'NVIDIA Tesla V100'
                     },
-                    supportedAlgorithms: {
-                        FEDAVG: {
-                            version: '1.0',
-                            description: '联邦平均算法'
-                        },
-                        FEDPROX: {
-                            version: '1.0',
-                            description: '联邦近端算法',
-                            parameters: ['mu']
-                        }
+                    computeCapabilities: {
+                        maxBatchSize: 1024,
+                        gpuMemory: '16GB',
+                        parallelProcessing: true,
+                        frameworks: ['sklearn', 'pytorch', 'tensorflow']
                     }
                 },
                 signature: 'test_signature'
@@ -1400,14 +1395,15 @@
                 vmId: vmId,
                 data: {
                     taskId: taskId,
-                    algorithm: 'FEDAVG',
-                    config: {
+                    mlAlgorithm: 'RandomForest',
+                    hyperparameters: {
+                        n_estimators: 100,
+                        max_depth: 10,
+                        random_state: 42
+                    },
+                    trainingConfig: {
+                        epochs: 5,
                         batchSize: 32,
-                        learningRate: 0.001,
-                        epochsPerRound: 5,
-                        totalRounds: 100,
-                        currentRound: 0,
-                        minClients: 2,
                         timeout: 300
                     },
                     globalModel: {
@@ -2349,7 +2345,7 @@
                 vmDescription: vmDescription || 'WebSocket测试虚拟机',
                 vmType: vmType,
                 vmVersion: '1.0.0',
-                capabilities: ['FEDAVG', 'FEDPROX'],
+                supportedMLAlgorithms: ['RandomForest', 'SVM', 'NeuralNetwork'],
                 systemInfo: {
                     os: 'WebSocket Test Environment',
                     source: 'websocket-test-page'
@@ -2845,11 +2841,16 @@
                 vmId: vmId,
                 data: {
                     taskId: workflowState.testTaskId,
-                    algorithm: 'FEDAVG',
-                    config: {
-                        totalRounds: 5,
-                        learningRate: 0.01,
-                        batchSize: 32
+                    mlAlgorithm: 'RandomForest',
+                    hyperparameters: {
+                        n_estimators: 50,
+                        max_depth: 8,
+                        random_state: 42
+                    },
+                    trainingConfig: {
+                        epochs: 5,
+                        batchSize: 32,
+                        timeout: 300
                     }
                 },
                 signature: 'client_signature'

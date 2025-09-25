@@ -3,6 +3,8 @@ package com.feduwacomm.service;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.AdminMapper;
 import com.feduwacomm.mapper.UserMapper;
@@ -10,7 +12,10 @@ import com.feduwacomm.service.impl.AdminServiceImpl;
 import com.feduwacomm.testdata.TestDataBuilder;
 import com.feduwacomm.testdata.TestHelper;
 import com.feduwacomm.utils.PasswordUtil;
+import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.config.TimeProperties;
 import com.feduwacomm.vo.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -48,7 +53,11 @@ public class AdminServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private UuidUtil uuidUtil;
 
+    @Mock
+    private TimeProperties timeProperties;
 
     @InjectMocks
     private AdminServiceImpl adminService;
@@ -60,6 +69,15 @@ public class AdminServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 初始化PasswordUtil的encoder用于测试
+        try {
+            java.lang.reflect.Field encoderField = PasswordUtil.class.getDeclaredField("encoder");
+            encoderField.setAccessible(true);
+            encoderField.set(null, new BCryptPasswordEncoder());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize PasswordUtil encoder for testing", e);
+        }
+
         // 初始化Mock数据库，提供状态一致性
         mockDatabase = new TestHelper.MockDatabase();
         
@@ -135,7 +153,15 @@ public class AdminServiceTest {
         
         when(adminMapper.countByCondition(anyString(), anyString(), anyString()))
                 .thenAnswer(invocation -> mockDatabase.countUsers());
-        
+
+        // 配置UuidUtil Mock - 返回固定的测试UUID
+        when(uuidUtil.generateUuid()).thenReturn("test-uuid-12345678901234567890abcd");
+
+        // 配置TimeProperties Mock - 返回固定的配置值
+        when(timeProperties.getJwtExpireSeconds()).thenReturn(3600); // 1小时
+        when(timeProperties.getVmSecretExpireDays()).thenReturn(30); // 30天
+        when(timeProperties.getLogRetentionDays()).thenReturn(7); // 7天
+
         // 移除权限相关Mock - 现在基于用户角色
     }
 
@@ -148,14 +174,10 @@ public class AdminServiceTest {
         User viewer1 = TestDataBuilder.Users.validUser()
                 .username("viewer1")
                 .email("viewer1@example.com")
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
                 .build();
         User viewer2 = TestDataBuilder.Users.validUser()
                 .username("viewer2")
                 .email("viewer2@example.com")
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
                 .build();
         User researcher = TestDataBuilder.Users.researcherUser().build();
         
@@ -165,8 +187,8 @@ public class AdminServiceTest {
         
         // 创建查询条件
         UserQueryDTO queryDTO = TestDataBuilder.DTOs.validQueryDTO()
-                .role(ROLE_VIEWER)
-                .status(STATUS_ACTIVE)
+                .role("VIEWER")
+                .status("ACTIVE")
                 .keyword("viewer")
                 .build();
 
@@ -467,8 +489,8 @@ public class AdminServiceTest {
                 .username("testuser")
                 .email("test@example.com")
                 .passwordHash(PasswordUtil.encode("password123"))
-                .role("VIEWER")
-                .status("LOCKED")
+                .role(UserRole.fromCode("VIEWER"))
+                .status(UserStatus.fromCode("LOCKED"))
                 .loginAttempts(0)
                 .lastLoginTime(LocalDateTime.now())
                 .lastLoginIp("192.168.1.100")

@@ -3,6 +3,8 @@ package com.feduwacomm.service.impl;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.User;
+import com.feduwacomm.enums.UserRole;
+import com.feduwacomm.enums.UserStatus;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.UserMapper;
 import com.feduwacomm.service.UserService;
@@ -74,8 +76,8 @@ public class UserServiceImpl implements UserService {
             log.info("开始检查系统中是否已有用户");
             // 检查系统中是否已有用户，如果没有则将新用户设为管理员
             int totalUsers = userMapper.countAll();
-            String userRole = (totalUsers == 0) ? "ADMIN" : "VIEWER";
-            log.info("系统中现有用户数: {}, 新用户将被设置为: {}", totalUsers, userRole);
+            UserRole userRole = (totalUsers == 0) ? UserRole.ADMIN : UserRole.VIEWER;
+            log.info("系统中现有用户数: {}, 新用户将被设置为: {}", totalUsers, userRole.getCode());
 
             log.info("开始创建用户对象");
             // 创建用户
@@ -85,7 +87,7 @@ public class UserServiceImpl implements UserService {
                     .email(registerDTO.getEmail())
                     .passwordHash(PasswordUtil.encode(registerDTO.getPassword()))
                     .role(userRole)
-                    .status("ACTIVE")
+                    .status(UserStatus.ACTIVE)
                     .loginAttempts(0)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
@@ -107,8 +109,8 @@ public class UserServiceImpl implements UserService {
                     .userId(user.getId())
                     .username(user.getUsername())
                     .email(user.getEmail())
-                    .role(user.getRole())
-                    .status(user.getStatus())
+                    .role(user.getRole().getCode())
+                    .status(user.getStatus().getCode())
                     .createdAt(user.getCreatedAt())
                     .build();
             log.info("响应对象构建完成，准备返回");
@@ -145,7 +147,7 @@ public class UserServiceImpl implements UserService {
             }
 
             // 检查用户状态
-            if ("LOCKED".equals(user.getStatus())) {
+            if (UserStatus.LOCKED.equals(user.getStatus())) {
                 if (user.getLockedUntil() != null && LocalDateTime.now().isBefore(user.getLockedUntil())) {
                     log.warn("用户登录失败 - 账户已锁定: userId={}, username={}, ip={}, lockedUntil={}", 
                         user.getId(), user.getUsername(), clientIp, user.getLockedUntil());
@@ -154,7 +156,7 @@ public class UserServiceImpl implements UserService {
                     // 锁定时间已过，解锁用户
                     log.info("用户账户自动解锁: userId={}, username={}, ip={}", 
                         user.getId(), user.getUsername(), clientIp);
-                    user.setStatus("ACTIVE");
+                    user.setStatus(UserStatus.ACTIVE);
                     user.setLockedUntil(null);
                     user.setLoginAttempts(0);
                     userMapper.update(user);
@@ -172,7 +174,7 @@ public class UserServiceImpl implements UserService {
 
                 // 如果失败次数达到5次，锁定账户
                 if (user.getLoginAttempts() >= 5) {
-                    user.setStatus("LOCKED");
+                    user.setStatus(UserStatus.LOCKED);
                     user.setLockedUntil(LocalDateTime.now().plusHours(1));
                     userMapper.update(user);
                     
@@ -192,7 +194,7 @@ public class UserServiceImpl implements UserService {
             userMapper.update(user);
 
             // 生成Token
-            String token = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+            String token = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole().getCode());
             String refreshToken = userJwtUtil.generateRefreshToken(user.getId());
 
             // 构建用户信息
@@ -200,8 +202,8 @@ public class UserServiceImpl implements UserService {
                     .userId(user.getId())
                     .username(user.getUsername())
                     .email(user.getEmail())
-                    .role(user.getRole())
-                    .status(user.getStatus())
+                    .role(user.getRole().getCode())
+                    .status(user.getStatus().getCode())
                     .lastLoginTime(LocalDateTime.now())
                     .lastLoginIp(clientIp)
                     .createdAt(user.getCreatedAt())
@@ -257,7 +259,7 @@ public class UserServiceImpl implements UserService {
             }
 
             // 生成新的Token
-            String newToken = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+            String newToken = userJwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole().getCode());
             String newRefreshToken = userJwtUtil.generateRefreshToken(user.getId());
 
             log.info("Token刷新成功: userId={}, username={}, ip={}", 
@@ -324,8 +326,8 @@ public class UserServiceImpl implements UserService {
                     .userId(user.getId())
                     .username(user.getUsername())
                     .email(user.getEmail())
-                    .role(user.getRole())
-                    .status(user.getStatus())
+                    .role(user.getRole().getCode())
+                    .status(user.getStatus().getCode())
                     .lastLoginTime(user.getLastLoginTime())
                     .lastLoginIp(user.getLastLoginIp())
                     .createdAt(user.getCreatedAt())
@@ -426,8 +428,8 @@ public class UserServiceImpl implements UserService {
                     .userId(user.getId())
                     .username(user.getUsername())
                     .email(user.getEmail())
-                    .role(user.getRole())
-                    .status(user.getStatus())
+                    .role(user.getRole().getCode())
+                    .status(user.getStatus().getCode())
                     .updatedAt(user.getUpdatedAt())
                     .build();
 

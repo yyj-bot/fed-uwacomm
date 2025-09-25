@@ -5,6 +5,8 @@ import com.feduwacomm.dto.TaskQueryDTO;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
+import com.feduwacomm.enums.AggregationMethod;
+import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.event.AggregationCompletedEvent;
 import com.feduwacomm.event.AggregationTriggeredEvent;
 import com.feduwacomm.event.ModelUploadEvent;
@@ -14,6 +16,7 @@ import com.feduwacomm.mapper.GlobalModelMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
 import com.feduwacomm.strategy.AggregationStrategy;
 import com.feduwacomm.strategy.AggregationStrategyFactory;
+import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +54,7 @@ public class FederatedAggregationService {
     private final AggregationConfig aggregationConfig;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final UuidUtil uuidUtil;
 
     // 聚合状态管理
     private final Map<String, LocalDateTime> roundStartTimes = new ConcurrentHashMap<>();
@@ -248,7 +252,7 @@ public class FederatedAggregationService {
                     .toList();
             
             AggregationTriggeredEvent triggeredEvent = new AggregationTriggeredEvent(
-                    this, taskId, roundNumber, task.getAlgorithm(), 
+                    this, taskId, roundNumber, task.getAlgorithm().getCode(), 
                     participantVmIds, triggerReason);
             eventPublisher.publishEvent(triggeredEvent);
 
@@ -263,7 +267,7 @@ public class FederatedAggregationService {
             AggregationCompletedEvent failureEvent = AggregationCompletedEvent.failure(
                     this, taskId, roundNumber, e.getMessage(), 
                     vmRoundModelsMapper.countReadyModels(taskId, roundNumber),
-                    0L, task != null ? task.getAlgorithm() : "UNKNOWN");
+                    0L, task != null ? task.getAlgorithm().getCode() : "UNKNOWN");
             eventPublisher.publishEvent(failureEvent);
             
         } finally {
@@ -277,7 +281,7 @@ public class FederatedAggregationService {
      */
     private void executeAggregation(FederatedTask task, List<VmRoundModel> localModels, Integer roundNumber) {
         String taskId = task.getId();
-        String algorithm = task.getAlgorithm();
+        String algorithm = task.getAlgorithm().getCode();
         
         log.info("执行聚合计算: 任务ID={}, 算法={}, 模型数量={}", 
                 taskId, algorithm, localModels.size());
@@ -335,14 +339,14 @@ public class FederatedAggregationService {
                                       ModelAggregatorEngine.AggregationResult result) {
         try {
             GlobalModel globalModel = GlobalModel.builder()
-                    .id(UUID.randomUUID().toString().replace("-", ""))
+                    .id(uuidUtil.generateUuid())
                     .taskId(task.getId())
                     .roundNumber(roundNumber)
-                    .aggregationMethod(result.getAlgorithm())
+                    .aggregationMethod(AggregationMethod.fromCode(result.getAlgorithm()))
                     .globalParameters(objectMapper.writeValueAsString(result.getGlobalParameters()))
                     .participantCount(result.getParticipantCount())
                     .aggregationDuration(result.getAggregationDuration())
-                    .status("COMPLETED")
+                    .status(GlobalModelStatus.COMPLETED)
                     .startedAt(LocalDateTime.now().minus(result.getAggregationDuration(), ChronoUnit.MILLIS))
                     .completedAt(LocalDateTime.now())
                     .createdAt(LocalDateTime.now())

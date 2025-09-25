@@ -30,7 +30,7 @@ public class TaskCreateDTO {
     private String description;
 
     @NotBlank(message = "算法类型不能为空")
-    private String algorithm; // FEDERATED_AVERAGING, FEDPROX, FEDNOVA, SCAFFOLD
+    private String algorithm; // FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA, FEDERATED_SCAFFOLD
 
     // v1.0 废弃：使用新的participantConfig替代
     @Deprecated
@@ -67,7 +67,7 @@ public class TaskCreateDTO {
         private String vmId;
         
         @NotBlank(message = "参与者角色不能为空")
-        private String role; // PARTICIPANT, AGGREGATOR
+        private String role; // PARTICIPANT
         
         private String dataSource;
     }
@@ -229,7 +229,7 @@ public class TaskCreateDTO {
             private String vmId;
 
             @NotBlank(message = "参与者角色不能为空")
-            private String role; // PARTICIPANT, AGGREGATOR
+            private String role; // PARTICIPANT
 
             @DecimalMin(value = "0.0", message = "数据比例不能小于0.0")
             @DecimalMax(value = "1.0", message = "数据比例不能大于1.0")

@@ -3,7 +3,10 @@ package com.feduwacomm.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.TrainingData;
+import com.feduwacomm.enums.DataType;
+import com.feduwacomm.enums.DataStatus;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
+import com.feduwacomm.mapper.TrainingDatasetRowMapper;
 import com.feduwacomm.service.impl.TrainingDataServiceImpl;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +32,10 @@ public class TrainingDataServiceTest {
 
     @Mock
     private TrainingDatasetMapper trainingDatasetMapper;
-    
+
+    @Mock
+    private TrainingDatasetRowMapper trainingDatasetRowMapper;
+
     @Mock
     private ObjectMapper objectMapper;
 
@@ -76,8 +82,8 @@ public class TrainingDataServiceTest {
                 .vmId("a1b2c3d4e5f678901234567890123456")
                 .name("测试数据")
                 .description("测试数据描述")
-                .dataType("ACOUSTIC")
-                .status("READY")
+                .dataType(DataType.fromCode("ACOUSTIC"))
+                .status(DataStatus.fromCode("READY"))
                 .filePath("/path/to/file")
                 .fileSize(1024L)
                 .fileFormat("csv")

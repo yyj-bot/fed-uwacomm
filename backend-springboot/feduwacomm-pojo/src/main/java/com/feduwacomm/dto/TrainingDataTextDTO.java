@@ -20,6 +20,8 @@ public class TrainingDataTextDTO {
     @NotBlank(message = "数据类型不能为空")
     private String dataType;
 
+    private String vmId;
+
     @NotBlank(message = "标题不能为空")
     private String title;
 

@@ -21,6 +21,8 @@ public class TrainingDataUploadDTO {
     @NotBlank(message = "数据类型不能为空")
     private String dataType;
 
+    private String vmId;
+
     private String datasetDescription;
 
     private List<String> tags;

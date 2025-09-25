@@ -3,6 +3,7 @@ package com.feduwacomm.service.alert;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.mapper.SystemLogMapper;
 import com.feduwacomm.dto.LogQueryDTO;
+import com.feduwacomm.utils.IpUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -336,7 +337,7 @@ public class AlertService {
             alertHistory.add(record);
             
             // 记录到系统日志
-            logService.logWarn(message, null, "system", "/alert", "127.0.0.1", "ALERT");
+            logService.logWarn(message, null, "system", "/alert", IpUtil.getCurrentIpOrDefault(), "ALERT");
             
             // 发送通知（这里可以扩展为邮件、短信、webhook等）
             sendAlertNotification(rule, message, currentValue);
@@ -367,7 +368,7 @@ public class AlertService {
                     .ifPresent(r -> r.setResolvedAt(LocalDateTime.now()));
             
             // 记录到系统日志
-            logService.logInfo(message, null, "system", "/alert", "127.0.0.1", "ALERT");
+            logService.logInfo(message, null, "system", "/alert", IpUtil.getCurrentIpOrDefault(), "ALERT");
             
             logger.info("告警解除: {} - {}", rule.getName(), message);
             

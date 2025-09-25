@@ -15,15 +15,21 @@
 
     <!-- Original methods kept unchanged -->
     <insert id="upsertDataset">
-        INSERT INTO training_dataset (id, uploaded_by, name, description, data_type, status, metadata)
-        VALUES (#{id}, #{uploadedBy}, #{name}, #{description}, #{dataType}, #{status}, #{metadata})
+        INSERT INTO training_dataset (
+            id, name, description, data_type, status, metadata,
+            upload_time, update_time, is_valid, is_processed, progress
+        )
+        VALUES (
+            #{id}, #{name}, #{description}, #{dataType}, #{status}, #{metadata},
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE, FALSE, 0
+        )
         ON DUPLICATE KEY UPDATE
-            uploaded_by = VALUES(uploaded_by),
             name = VALUES(name),
             description = VALUES(description),
             data_type = VALUES(data_type),
             status = VALUES(status),
-            metadata = VALUES(metadata)
+            metadata = VALUES(metadata),
+            update_time = CURRENT_TIMESTAMP
     </insert>
 
     <!-- New insert method -->
@@ -53,7 +59,7 @@
     <!-- Note: progress, validation and process related fields don't exist in database -->
 
     <select id="selectById" resultType="map">
-        SELECT id, uploaded_by, name, description, data_type, status, metadata, upload_time
+        SELECT id, name, description, data_type as dataType, status, metadata, upload_time as uploadTime
         FROM training_dataset WHERE id = #{id}
     </select>
 
