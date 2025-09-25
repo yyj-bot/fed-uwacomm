@@ -182,13 +182,11 @@ class VMClient:
         
         return True
     
-    def create_federated_client(self, model, model_type: str = "pytorch", 
-                               config=None) -> bool:
+    def create_federated_client(self, model, config=None) -> bool:
         """创建联邦学习客户端
         
         Args:
-            model: 机器学习模型
-            model_type: 模型类型
+            model: Scikit-learn机器学习模型
             config: 联邦学习配置
             
         Returns:
@@ -198,7 +196,6 @@ class VMClient:
             self.federated_client = FederatedLearningClient(
                 client_id=self.vm_id,
                 model=model,
-                model_type=model_type,
                 config=config
             )
             self.logger.info("联邦学习客户端创建成功")
