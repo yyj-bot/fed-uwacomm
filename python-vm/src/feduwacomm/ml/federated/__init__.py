@@ -5,8 +5,8 @@
 """
 
 from .config import (
-    FederatedAlgorithm,
-    FederatedConfig, 
+    MLAlgorithm,
+    MLConfig, 
     TrainingState,
     VMRegisterRequest,
     SystemInfo,
@@ -22,8 +22,8 @@ from .coordinator import FederatedLearningCoordinator
 
 __all__ = [
     # 配置和数据结构
-    'FederatedAlgorithm',
-    'FederatedConfig',
+    'MLAlgorithm',
+    'MLConfig',
     'TrainingState', 
     'VMRegisterRequest',
     'SystemInfo',

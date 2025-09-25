@@ -94,11 +94,11 @@ class MessageHandler:
         """处理训练开始命令"""
         data = message.get("data", {})
         task_id = data.get("taskId")
-        algorithm = data.get("algorithm", "FEDAVG")
-        config = data.get("config", {})
-        global_model = data.get("globalModel")
+        ml_algorithm = data.get("mlAlgorithm", "RandomForest")
+        hyperparameters = data.get("hyperparameters", {})
+        training_config = data.get("trainingConfig", {})
         
-        self.logger.info(f"收到训练开始命令: taskId={task_id}, algorithm={algorithm}")
+        self.logger.info(f"收到训练开始命令: taskId={task_id}, mlAlgorithm={ml_algorithm}")
         
         if not self.federated_client:
             self.logger.error("联邦学习客户端未初始化")
@@ -109,9 +109,12 @@ class MessageHandler:
             self.training_task_id = task_id
             self.is_training = True
             
-            # 设置全局模型参数
-            if global_model and global_model.get("parameters"):
-                self.federated_client.model_wrapper.set_parameters(global_model["parameters"])
+            # 合并配置参数
+            config = {
+                "mlAlgorithm": ml_algorithm,
+                "hyperparameters": hyperparameters,
+                **training_config
+            }
             
             # 开始本地训练（这里应该在后台线程中执行）
             import threading
@@ -170,16 +173,17 @@ class MessageHandler:
     def handle_model_download(self, message: Dict[str, Any]):
         """处理模型下载消息"""
         data = message.get("data", {})
-        task_id = data.get("taskId")
-        round_num = data.get("round")
-        parameters = data.get("parameters")
+        parameters = data.get("parameters", {})
+        model_info = parameters.get("model", {})
         
-        self.logger.info(f"收到模型下载: taskId={task_id}, round={round_num}")
+        self.logger.info(f"收到模型下载: framework={model_info.get('framework')}, format={model_info.get('format')}")
         
         if self.federated_client and parameters:
             # 更新本地模型参数
-            self.federated_client.model_wrapper.set_parameters(parameters)
-            self.logger.info("全局模型参数已更新")
+            weights = model_info.get("weights", {})
+            if weights:
+                self.federated_client.model_wrapper.set_parameters(weights)
+                self.logger.info("全局模型参数已更新")
     
     def handle_dataset_create(self, message: Dict[str, Any]):
         """处理数据集创建消息"""
@@ -205,8 +209,13 @@ class MessageHandler:
             if not self.federated_client:
                 return
             
-            # 模拟训练过程
-            epochs = config.get("epochsPerRound", 5)
+            # 从新的配置格式中获取参数
+            ml_algorithm = config.get("mlAlgorithm", "RandomForest")
+            hyperparameters = config.get("hyperparameters", {})
+            epochs = config.get("epochs", 5)
+            batch_size = config.get("batchSize", 32)
+            
+            self.logger.info(f"开始本地训练: 算法={ml_algorithm}, epochs={epochs}")
             
             for epoch in range(epochs):
                 if not self.is_training:
@@ -254,8 +263,12 @@ class MessageHandler:
         
         upload_data = {
             "taskId": task_id,
-            "round": 1,
-            "parameters": self.federated_client.model_wrapper.get_parameters(),
+            "parameters": {
+                "training": {
+                    "algorithm": "RandomForest",
+                    "samples": 1000
+                }
+            },
             "metrics": {
                 "accuracy": 0.88,
                 "loss": 0.12
