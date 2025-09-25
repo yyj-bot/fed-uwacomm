@@ -53,17 +53,16 @@
 - 第二步（WebSocket/STOMP）: 虚拟机使用 `accessToken` 建立 WebSocket 连接，并在 STOMP CONNECT 帧或 URL 查询参数中携带 Token
 - 第三步（应用层）: 连接建立后发送应用层 `CONNECT` 消息，进行能力与环境上报
 
-> 说明：后端目前提供 STOMP 端点（`/ws` 带 SockJS、`/ws-native` 原生 WebSocket）。推荐通过 STOMP CONNECT 头部携带 `Authorization: Bearer <token>`，避免在 URL 里暴露 Token。
+> 说明：后端提供统一的原生 STOMP 端点（`/ws`）。推荐通过 STOMP CONNECT 头部携带 `Authorization: Bearer <token>`，避免在 URL 里暴露 Token。
 
 ## 1. 概述
 
 本文档定义了水声联邦学习系统的中心化WebSocket通信协议，用于实现服务器与虚拟机之间的实时双向通信，支持虚拟机控制、学习控制、状态监控等功能。
 
 ### 1.1 基础信息
-- **WebSocket (SockJS) URL**: `http://localhost:8080/ws` (开发环境)
-- **WebSocket (原生) URL**: `ws://localhost:8080/ws-native` (开发环境)
-- **WebSocket Secure URL**: `wss://your-domain.com/ws-native` (生产环境)
-- **协议版本**: v1.4 (完善ACK响应机制和任务管理消息，补充服务端通知消息)
+- **WebSocket URL**: `ws://localhost:8080/ws` (开发环境)
+- **WebSocket Secure URL**: `wss://your-domain.com/ws` (生产环境)
+- **协议版本**: v1.4 (统一WebSocket端点，移除SockJS支持，完善ACK响应机制和任务管理消息，补充服务端通知消息)
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
@@ -84,8 +83,8 @@ import time
 ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 VM_ID = "a1b2c3d4e5f678901234567890123456"
 
-WS_URL = "ws://localhost:8080/ws-native"  # 开发环境
-# 生产环境：WS_URL = "wss://your-domain.com/ws-native"
+WS_URL = "ws://localhost:8080/ws"  # 开发环境
+# 生产环境：WS_URL = "wss://your-domain.com/ws"
 
 
 def build_stomp_connect_frame(host: str, token: str, vm_id: str) -> str:

@@ -107,21 +107,35 @@ public class MockVirtualMachine {
             // 保存WebSocket URL用于重连
             this.websocketUrl = websocketUrl;
 
+            // 创建支持大消息的WebSocket客户端
+            StandardWebSocketClient webSocketClient = new StandardWebSocketClient();
+
+            // 配置客户端消息缓冲区大小为1GB，匹配服务器配置
+            webSocketClient.setUserProperties(Map.of(
+                "org.apache.tomcat.websocket.textBufferSize", 1073741824,     // 1GB文本消息缓冲区
+                "org.apache.tomcat.websocket.binaryBufferSize", 1073741824,   // 1GB二进制消息缓冲区
+                "org.apache.tomcat.websocket.session.timeout", 600000         // 10分钟会话超时
+            ));
+
+            System.out.println("🔧 [" + vmData.getName() + "] 客户端消息缓冲区已配置为1GB");
+
             // 创建STOMP客户端
-            WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+            WebSocketStompClient stompClient = new WebSocketStompClient(webSocketClient);
             stompClient.setMessageConverter(new MappingJackson2MessageConverter());
 
             // STOMP会话处理器（带认证信息）
             // 认证信息通过STOMP CONNECT头部的Authorization Bearer传递
             StompSessionHandler sessionHandler = new MockStompSessionHandlerWithAuth(accessToken, vmData.getVmId());
 
-            // 使用纯净的WebSocket URL，不在URL中暴露敏感信息
-            String nativeWsUrl = websocketUrl.replace("/ws", "/ws-native");
-            System.out.println("尝试原生WebSocket连接: " + nativeWsUrl);
-            System.out.println("VM ID: " + vmData.getVmId());
-            System.out.println("Access Token: " + (accessToken != null && accessToken.length() > 20 ? accessToken.substring(0, 20) + "..." : accessToken));
-            System.out.println("认证方式: WebSocket握手头部 + STOMP头部双重认证");
-            System.out.println("VM 注册状态: " + (registered ? "已注册" : "未注册"));
+            // 使用标准的WebSocket URL，不使用原生端点
+            String wsUrl = websocketUrl;
+            System.out.println("🔌 [" + vmData.getName() + "] 尝试WebSocket连接: " + wsUrl);
+            System.out.println("🆔 [" + vmData.getName() + "] VM ID: " + vmData.getVmId());
+            System.out.println("🔐 [" + vmData.getName() + "] Access Token: " + (accessToken != null && accessToken.length() > 20 ? accessToken.substring(0, 20) + "..." : accessToken));
+            System.out.println("🔑 [" + vmData.getName() + "] 认证方式: WebSocket握手头部 + STOMP头部双重认证");
+            System.out.println("✅ [" + vmData.getName() + "] VM 注册状态: " + (registered ? "已注册" : "未注册"));
+            System.out.println("🕒 [" + vmData.getName() + "] 连接时间: " + new java.util.Date());
+            System.out.println("⚙️  [" + vmData.getName() + "] 配置信息: CPU=" + vmData.getCpuCores() + "核, 内存=" + vmData.getMemoryMb() + "MB, GPU=" + vmData.getGpuCount() + "个");
 
             // 检查关键信息是否可用
             if (vmData.getVmId() == null || accessToken == null) {
@@ -150,26 +164,30 @@ public class MockVirtualMachine {
                 handshakeHeaders.add("X-VM-ID", vmData.getVmId());
             }
 
+            System.out.println("🔄 [" + vmData.getName() + "] 开始建立STOMP连接...");
             try {
-                stompSession = stompClient.connect(nativeWsUrl, handshakeHeaders, connectHeaders, sessionHandler).get();
-            } catch (Exception nativeEx) {
-                System.out.println("原生WebSocket连接失败: " + nativeEx.getMessage());
-                System.out.println("尝试SockJS端点");
-                // 回退到SockJS端点，同样使用STOMP头部认证
-                String sockjsUrl = websocketUrl;
-                System.out.println("尝试SockJS连接: " + sockjsUrl);
-                stompSession = stompClient.connect(sockjsUrl, handshakeHeaders, connectHeaders, sessionHandler).get();
+                System.out.println("📞 [" + vmData.getName() + "] 尝试连接到WebSocket端点: " + wsUrl);
+                stompSession = stompClient.connect(wsUrl, handshakeHeaders, connectHeaders, sessionHandler).get();
+                System.out.println("✅ [" + vmData.getName() + "] WebSocket连接成功！");
+            } catch (Exception ex) {
+                System.err.println("❌ [" + vmData.getName() + "] WebSocket连接失败: " + ex.getMessage());
+                throw ex;
             }
 
             // 等待连接建立
+            System.out.println("⏳ [" + vmData.getName() + "] 等待连接稳定...");
             Thread.sleep(1000);
 
             if (stompSession != null && stompSession.isConnected()) {
+                System.out.println("📡 [" + vmData.getName() + "] 开始订阅消息队列...");
                 // 订阅回复队列
                 stompSession.subscribe("/user/queue/reply", new MockStompFrameHandler());
+                System.out.println("✅ [" + vmData.getName() + "] 已订阅个人回复队列: /user/queue/reply");
                 stompSession.subscribe("/topic/vm/" + vmData.getVmId(), new MockStompFrameHandler());
+                System.out.println("✅ [" + vmData.getName() + "] 已订阅VM专题队列: /topic/vm/" + vmData.getVmId());
 
                 // 发送CONNECT协议消息
+                System.out.println("📤 [" + vmData.getName() + "] 发送CONNECT协议消息...");
                 Map<String, Object> connectMessage = createProtocolMessage(ProtocolType.CONNECT);
                 Map<String, Object> data = new HashMap<>();
                 data.put("sessionId", sessionId);
@@ -179,12 +197,14 @@ public class MockVirtualMachine {
                 connectMessage.put("data", data);
 
                 stompSession.send("/app/protocol", connectMessage);
+                System.out.println("📤 [" + vmData.getName() + "] CONNECT消息发送完成，消息ID: " + connectMessage.get("id"));
+
                 connected = true;
-                System.out.println("WebSocket连接成功: " + vmData.getName());
+                System.out.println("🎉 [" + vmData.getName() + "] WebSocket连接完全建立！");
 
                 // 启动心跳机制
                 startHeartbeat();
-                System.out.println("💓 " + vmData.getName() + " 心跳机制已启动");
+                System.out.println("💓 [" + vmData.getName() + "] 心跳机制已启动");
             }
         } catch (Exception e) {
             // 输出详细错误信息进行诊断
@@ -322,29 +342,26 @@ public class MockVirtualMachine {
     private Map<String, Object> generateMockModelParameters() {
         Map<String, Object> parameters = new HashMap<>();
 
-        // 使用真实联邦学习神经网络模型尺寸
-        // 参数量: 256*784 + 128*256 + 64*128 + 10*64 + 偏置 = 235146 参数
-        // WebSocket消息大小限制已设为1GB，可以支持大型模型参数传输
+        // 临时使用小尺寸模型参数进行WebSocket连接稳定性测试
+        // 减小到最小尺寸以诊断连接问题
         Map<String, Object> weights = new HashMap<>();
-        weights.put("layer1", generateRandomMatrix(256, 784)); // 真实神经网络尺寸：输入层784特征 -> 隐藏层256神经元
-        weights.put("layer2", generateRandomMatrix(128, 256)); // 隐藏层256 -> 128
-        weights.put("layer3", generateRandomMatrix(64, 128));  // 隐藏层128 -> 64
-        weights.put("output", generateRandomMatrix(10, 64));   // 输出层64 -> 10类别
+        weights.put("layer1", generateRandomMatrix(10, 20)); // 简化尺寸：10x20 = 200个参数
+        weights.put("layer2", generateRandomMatrix(5, 10));  // 5x10 = 50个参数
+        weights.put("output", generateRandomMatrix(3, 5));   // 3x5 = 15个参数
         parameters.put("weights", weights);
 
         // 相应减少偏置向量大小
         Map<String, Object> biases = new HashMap<>();
-        biases.put("layer1", generateRandomVector(256)); // 隐藏层256神经元
-        biases.put("layer2", generateRandomVector(128)); // 隐藏层128神经元
-        biases.put("layer3", generateRandomVector(64));  // 隐藏层64神经元
-        biases.put("output", generateRandomVector(10));  // 输出层10类别
+        biases.put("layer1", generateRandomVector(10)); // 10个偏置
+        biases.put("layer2", generateRandomVector(5));  // 5个偏置
+        biases.put("output", generateRandomVector(3));  // 3个偏置
         parameters.put("biases", biases);
 
         // 元数据
         Map<String, Object> metadata = new HashMap<>();
-        // 计算真实参数量: (256*784) + 256 + (128*256) + 128 + (64*128) + 64 + (10*64) + 10 = 235146
-        metadata.put("parameterCount", 235146);
-        metadata.put("modelSize", 941584);
+        // 小尺寸参数量: 200 + 50 + 15 + 10 + 5 + 3 = 283个参数
+        metadata.put("parameterCount", 283);
+        metadata.put("modelSize", 2264); // 大约2KB
         metadata.put("checksum", "sha256:" + vmData.getVmId() + "_" + System.currentTimeMillis());
         parameters.put("metadata", metadata);
 
@@ -406,7 +423,35 @@ public class MockVirtualMachine {
      */
     private void sendStompMessage(Map<String, Object> message) throws Exception {
         String messageType = (String) message.get("type");
+        String messageId = (String) message.get("id");
         int maxRetries = 3;
+
+        System.out.println("📤 [" + vmData.getName() + "] 准备发送消息: " + messageType + " (ID: " + messageId + ")");
+
+        // 计算消息大小
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String jsonMessage = mapper.writeValueAsString(message);
+            int messageSize = jsonMessage.getBytes("UTF-8").length;
+            System.out.println("📊 [" + vmData.getName() + "] 消息大小: " + messageSize + " bytes (" + String.format("%.2f", messageSize / 1024.0) + " KB)");
+
+            // 如果是MODEL_UPLOAD消息，额外打印模型参数信息
+            if ("MODEL_UPLOAD".equals(messageType)) {
+                Map<String, Object> data = (Map<String, Object>) message.get("data");
+                if (data != null && data.containsKey("parameters")) {
+                    Map<String, Object> parameters = (Map<String, Object>) data.get("parameters");
+                    if (parameters != null && parameters.containsKey("metadata")) {
+                        Map<String, Object> metadata = (Map<String, Object>) parameters.get("metadata");
+                        if (metadata != null) {
+                            System.out.println("🧠 [" + vmData.getName() + "] 模型参数量: " + metadata.get("parameterCount"));
+                            System.out.println("💾 [" + vmData.getName() + "] 模型大小: " + metadata.get("modelSize") + " bytes");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ [" + vmData.getName() + "] 无法计算消息大小: " + e.getMessage());
+        }
 
         // 使用同步锁避免并发冲突
         synchronized (sessionLock) {
@@ -414,26 +459,35 @@ public class MockVirtualMachine {
                 try {
                     // 检查并确保WebSocket连接
                     if (stompSession == null || !stompSession.isConnected()) {
-                        System.out.println("🔄 " + vmData.getName() + " WebSocket连接异常，尝试重连 (第" + attempt + "次)");
+                        System.out.println("🔄 [" + vmData.getName() + "] WebSocket连接异常，尝试重连 (第" + attempt + "次)");
                         reconnectWebSocketRobust();
                     }
 
                     // 发送消息
                     if (stompSession != null && stompSession.isConnected()) {
+                        System.out.println("🚀 [" + vmData.getName() + "] 正在发送 " + messageType + " 消息到 /app/protocol...");
+                        long startTime = System.currentTimeMillis();
                         stompSession.send("/app/protocol", message);
-                        System.out.println("📤 " + vmData.getName() + " WebSocket发送成功: " + messageType);
+                        long endTime = System.currentTimeMillis();
+                        System.out.println("✅ [" + vmData.getName() + "] " + messageType + " 消息发送成功！用时: " + (endTime - startTime) + "ms");
                         return; // 成功发送，退出重试循环
                     } else {
                         throw new RuntimeException("WebSocket连接未建立");
                     }
 
                 } catch (Exception e) {
-                    System.err.println("⚠️ " + vmData.getName() + " WebSocket发送失败 (尝试" + attempt + "/" + maxRetries + "): " + e.getMessage());
+                    System.err.println("❌ [" + vmData.getName() + "] " + messageType + " 消息发送失败 (尝试" + attempt + "/" + maxRetries + "): " + e.getMessage());
+                    System.err.println("🔍 [" + vmData.getName() + "] 错误详情: " + e.getClass().getSimpleName());
+
+                    if (e.getCause() != null) {
+                        System.err.println("🔍 [" + vmData.getName() + "] 根本原因: " + e.getCause().getMessage());
+                    }
 
                     if (attempt < maxRetries) {
                         // 等待后重试，增加随机延迟避免雷群效应
                         int baseDelay = 1000 * attempt;
                         int randomDelay = (int)(Math.random() * 1000);
+                        System.out.println("⏳ [" + vmData.getName() + "] 等待 " + (baseDelay + randomDelay) + "ms 后重试...");
                         Thread.sleep(baseDelay + randomDelay);
                     } else {
                         // 最后一次重试失败，抛出异常

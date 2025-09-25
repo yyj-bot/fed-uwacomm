@@ -67,14 +67,9 @@ public final class SystemConstants {
     public static final String API_V1_PATH = "/api/v1";
 
     /**
-     * WebSocket端点路径
+     * WebSocket端点路径 (统一使用原生WebSocket协议)
      */
     public static final String WEBSOCKET_ENDPOINT = "/ws";
-
-    /**
-     * 原生WebSocket端点路径
-     */
-    public static final String WEBSOCKET_NATIVE_ENDPOINT = "/ws-native";
 
     /**
      * 虚拟机API路径前缀

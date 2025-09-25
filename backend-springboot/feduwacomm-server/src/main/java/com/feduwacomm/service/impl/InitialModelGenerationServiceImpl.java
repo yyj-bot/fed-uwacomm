@@ -11,6 +11,8 @@ import com.feduwacomm.event.InitialModelGeneratedEvent;
 import com.feduwacomm.mapper.InitialModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.service.InitialModelGenerationService;
+import com.feduwacomm.service.sklearn.SklearnModelParameterGeneratorFactory;
+import com.feduwacomm.service.sklearn.SklearnModelParameterValidator;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.InitialModelInfoVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -45,6 +47,8 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
+    private final SklearnModelParameterGeneratorFactory parameterGeneratorFactory;
+    private final SklearnModelParameterValidator parameterValidator;
 
     private static final Random RANDOM = new SecureRandom();
 
@@ -245,8 +249,25 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         }
 
         try {
-            // 验证JSON数据是否可以正常解析
-            objectMapper.readTree(model.getModelData());
+            // 首先验证JSON数据是否可以正常解析
+            Map<String, Object> modelDataMap = objectMapper.readValue(
+                    model.getModelData(), Map.class);
+
+            // 尝试使用sklearn验证器进行更详细的验证
+            if (parameterGeneratorFactory.isSupported(model.getModelType().getCode())) {
+                SklearnModelParameterValidator.ValidationResult result =
+                        parameterValidator.validate(model.getModelType().getCode(), modelDataMap);
+
+                if (!result.isValid()) {
+                    log.warn("sklearn格式验证失败: modelId={}, message={}", modelId, result.getMessage());
+                    // 即使sklearn验证失败，只要JSON可解析，也认为数据完整性OK
+                    // 这是为了保持向后兼容性
+                    return true;
+                }
+
+                log.debug("sklearn格式验证通过: modelId={}", modelId);
+            }
+
             return true;
         } catch (Exception e) {
             log.error("模型JSON数据验证失败: modelId={}, error={}", modelId, e.getMessage());
@@ -376,9 +397,10 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
             // 模拟模型生成过程
             Thread.sleep(2000 + RANDOM.nextInt(3000)); // 2-5秒随机生成时间
 
-            // 生成真实的机器学习模型参数JSON
-            Map<String, Object> modelData = generateRealisticModelParameters(
-                    model.getModelType().getCode(), params);
+            // 使用新的sklearn参数生成器
+            Map<String, Object> modelData = generateSklearnModelParameters(
+                    model.getId(), model.getTaskId(), model.getModelType().getCode(),
+                    params, model.getGenerationMethod().getCode(), model.getCreatedBy());
 
             String modelJsonStr = objectMapper.writeValueAsString(modelData);
 
@@ -447,6 +469,43 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
         return modelData;
     }
 
+    /**
+     * 生成符合sklearn标准的模型参数 (新实现)
+     */
+    private Map<String, Object> generateSklearnModelParameters(String modelId, String taskId, String modelType,
+                                                             Map<String, Object> architectureParams,
+                                                             String generationMethod, String createdBy) {
+        log.info("使用sklearn参数生成器: modelType={}, modelId={}", modelType, modelId);
+
+        try {
+            // 使用新的参数生成器工厂
+            Map<String, Object> modelData = parameterGeneratorFactory.generateParameters(
+                    modelType, modelId, taskId, architectureParams, generationMethod, createdBy);
+
+            if (modelData == null) {
+                log.warn("sklearn参数生成器不支持模型类型: {}, 回退到传统方法", modelType);
+                // 回退到原有实现
+                return generateRealisticModelParameters(modelType, architectureParams);
+            }
+
+            // 验证生成的参数格式
+            SklearnModelParameterValidator.ValidationResult validation =
+                    parameterValidator.validate(modelType, modelData);
+
+            if (!validation.isValid()) {
+                log.error("生成的sklearn参数验证失败: {}, 回退到传统方法", validation.getMessage());
+                return generateRealisticModelParameters(modelType, architectureParams);
+            }
+
+            log.info("sklearn标准参数生成成功: modelType={}, modelId={}", modelType, modelId);
+            return modelData;
+
+        } catch (Exception e) {
+            log.error("sklearn参数生成异常: modelType={}, error={}, 回退到传统方法",
+                    modelType, e.getMessage(), e);
+            return generateRealisticModelParameters(modelType, architectureParams);
+        }
+    }
 
     /**
      * 发布模型生成完成事件

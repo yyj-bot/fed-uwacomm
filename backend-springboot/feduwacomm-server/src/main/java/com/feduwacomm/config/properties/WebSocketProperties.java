@@ -31,14 +31,9 @@ public class WebSocketProperties {
     private boolean enableWss = false;
 
     /**
-     * WebSocket端点
+     * WebSocket端点 (统一使用原生WebSocket协议)
      */
     private String endpoint = "/ws";
-
-    /**
-     * 原生WebSocket端点
-     */
-    private String nativeEndpoint = "/ws-native";
 
     /**
      * 心跳间隔(秒)

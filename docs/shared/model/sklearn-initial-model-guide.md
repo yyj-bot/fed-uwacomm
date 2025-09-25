@@ -61,43 +61,50 @@
 
 ### 回归模型参数（RandomForestRegressor）
 
-基于 ModelWrapper 的参数提取逻辑（`model_wrapper.py:58-71`），RandomForest 回归模型的参数包括：
+基于 ModelWrapper 的参数提取逻辑（`model_wrapper.py:36-48`），RandomForest 回归模型的参数包括：
 
 ```json
 {
   "parameters": {
     "feature_importances_": [0.15, 0.23, 0.08, 0.19, 0.35],
-    "n_estimators": 100,
-    "n_features_": 5,
-    "n_outputs_": 1
+    "n_estimators": 100
   }
 }
 ```
+
+**注意**：新的 ModelWrapper 实现对 RandomForest 模型进行了优化处理：
+- 只存储特征重要性（`feature_importances_`）和树的数量（`n_estimators`）
+- 完整的树结构（`estimators_`）因数据量过大不进行传输
+- 如果模型具有其他支持的属性（如 `coef_`, `intercept_`），也会被包含在参数中
 
 ### 分类模型参数（RandomForestClassifier）
 
-分类模型在回归参数基础上，可能包含额外的类别信息：
+分类模型与回归模型使用相同的简化参数格式：
 
 ```json
 {
   "parameters": {
     "feature_importances_": [0.15, 0.23, 0.08, 0.19, 0.35],
-    "n_estimators": 100,
-    "n_features_": 5,
-    "n_classes_": 3,
-    "classes_": ["class_0", "class_1", "class_2"]
+    "n_estimators": 100
   }
 }
 ```
 
+**注意**：分类模型的类别信息（`n_classes_`, `classes_`）通常在训练过程中自动推断，不需要在初始模型参数中指定。如果模型在训练后具有这些属性，ModelWrapper会自动提取。
+
 ### 关键参数说明
 
-- `feature_importances_`：特征重要性数组，长度必须等于特征数量
-- `n_estimators`：决策树的数量
-- `n_features_`：输入特征的数量
-- `n_outputs_`：输出目标的数量（回归模型）
-- `n_classes_`：类别数量（分类模型）
-- `classes_`：类别标签列表（分类模型）
+**核心参数（必需）**：
+- `feature_importances_`：特征重要性数组，长度必须等于特征数量，所有值非负且和接近1.0
+- `n_estimators`：决策树的数量，必须为正整数
+
+**可选参数（根据模型类型自动提取）**：
+- `coef_`：模型系数（如果模型具有此属性，如线性模型）
+- `intercept_`：截距项（如果模型具有此属性）
+- `n_classes_`：类别数量（分类模型训练后自动获得）
+- `classes_`：类别标签列表（分类模型训练后自动获得）
+
+**注意**：新的ModelWrapper实现采用简化的参数格式，只传输核心参数以减少数据传输量。其他模型属性在训练过程中自动推断和设置。
 
 ## 数据类型要求
 
@@ -119,9 +126,9 @@
 - `parameters` 字段必须存在且非空
 
 ### 参数一致性验证
-- `feature_importances_` 数组长度必须等于 `n_features_`
+- `feature_importances_` 数组必须存在且包含有效的特征重要性值
 - `n_estimators` 必须为正整数
-- 分类模型的 `classes_` 数组长度必须等于 `n_classes_`
+- 如果存在 `classes_` 和 `n_classes_`，则数组长度必须相等（通常在训练后自动生成）
 
 ### 数据范围约束
 - `feature_importances_` 中的值必须为非负数，且总和应接近 1.0

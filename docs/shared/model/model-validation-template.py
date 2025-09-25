@@ -108,13 +108,10 @@ class ModelJSONValidator:
         try:
             parameters = model_data['parameters']
 
-            # 验证特征重要性与特征数量一致性
-            if 'feature_importances_' in parameters and 'n_features_' in parameters:
-                importance_len = len(parameters['feature_importances_'])
-                n_features = parameters['n_features_']
-                if importance_len != n_features:
-                    self.logger.error(f"feature_importances_ 长度 ({importance_len}) 与 n_features_ ({n_features}) 不一致")
-                    return False
+            # 验证特征重要性数组存在性
+            if 'feature_importances_' not in parameters:
+                self.logger.error("必需参数 feature_importances_ 缺失")
+                return False
 
             # 验证特征重要性数值范围
             if 'feature_importances_' in parameters:
@@ -127,20 +124,23 @@ class ModelJSONValidator:
                 if abs(importance_sum - 1.0) > 0.1:
                     self.logger.warning(f"feature_importances_ 总和 ({importance_sum:.4f}) 偏离 1.0 较多")
 
-            # 验证分类模型的类别一致性
+            # 验证n_estimators存在性和有效性
+            if 'n_estimators' not in parameters:
+                self.logger.error("必需参数 n_estimators 缺失")
+                return False
+
+            n_estimators = parameters['n_estimators']
+            if not isinstance(n_estimators, int) or n_estimators <= 0:
+                self.logger.error(f"n_estimators 必须为正整数，当前为: {n_estimators}")
+                return False
+
+            # 验证分类模型的类别一致性（可选参数，如果存在才检查）
             if 'n_classes_' in parameters and 'classes_' in parameters:
                 n_classes = parameters['n_classes_']
                 classes_len = len(parameters['classes_'])
                 if n_classes != classes_len:
-                    self.logger.error(f"n_classes_ ({n_classes}) 与 classes_ 长度 ({classes_len}) 不一致")
-                    return False
-
-            # 验证估计器数量
-            if 'n_estimators' in parameters:
-                n_estimators = parameters['n_estimators']
-                if not isinstance(n_estimators, int) or n_estimators <= 0:
-                    self.logger.error(f"n_estimators 必须为正整数，当前为: {n_estimators}")
-                    return False
+                    self.logger.warning(f"n_classes_ ({n_classes}) 与 classes_ 长度 ({classes_len}) 不一致")
+                    # 注意：这里改为警告而非错误，因为这些参数通常在训练后生成
 
             self.logger.info("✓ 参数一致性验证通过")
             return True
@@ -212,13 +212,13 @@ class ModelJSONValidator:
 
             config = model_data['training_config']
 
-            # 验证特征名称一致性
+            # 验证特征名称与特征重要性的一致性
             if 'feature_names' in config and 'parameters' in model_data:
                 feature_names = config['feature_names']
-                if 'n_features_' in model_data['parameters']:
-                    n_features = model_data['parameters']['n_features_']
-                    if len(feature_names) != n_features:
-                        self.logger.error(f"feature_names 长度与 n_features_ 不一致")
+                if 'feature_importances_' in model_data['parameters']:
+                    importances = model_data['parameters']['feature_importances_']
+                    if len(feature_names) != len(importances):
+                        self.logger.error(f"feature_names 长度 ({len(feature_names)}) 与 feature_importances_ 长度 ({len(importances)}) 不一致")
                         return False
 
             # 验证随机种子

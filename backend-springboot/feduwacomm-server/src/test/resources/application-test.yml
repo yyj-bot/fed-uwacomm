@@ -57,3 +57,19 @@ test:
 # 服务器配置
 server:
   port: 8081 # 固定测试端口，避免WebSocket连接路由混乱
+
+# FedUWAComm测试环境配置 - 包含WebSocket大消息配置
+feduwacomm:
+  network:
+    websocket:
+      # 测试环境WebSocket传输配置 - 支持大型模型参数传输
+      transport:
+        message-size-limit: 1073741824 # 1GB = 1024*1024*1024，测试环境使用大限制
+        send-buffer-size-limit: 1073741824 # 1GB
+        send-time-limit: 600000 # 10分钟 (毫秒)，测试环境允许更长传输时间
+        time-to-first-message: 120000 # 2分钟 (毫秒)
+
+      # 测试环境心跳配置
+      heartbeat:
+        value: 60000 # 60秒心跳间隔 (毫秒)
+        scheduler-pool-size: 10 # 心跳调度器线程池大小

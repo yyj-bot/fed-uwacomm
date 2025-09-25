@@ -76,6 +76,15 @@ public class CompleteFederatedLearningFlowTest {
     void setupTest() {
         baseUrl = "http://localhost:" + port;
 
+        // 🚀 打印测试环境信息
+        System.out.println("\n" + "=".repeat(80));
+        System.out.println("🚀 FedUWAComm 联邦学习完整流程测试开始");
+        System.out.println("🌐 服务器地址: " + baseUrl);
+        System.out.println("🔌 WebSocket端点: ws://localhost:" + port + "/ws");
+        System.out.println("🔧 测试环境: Spring Boot Random Port = " + port);
+        System.out.println("🤖 虚拟机数量: " + virtualMachines.size());
+        System.out.println("=".repeat(80) + "\n");
+
         // 清理测试数据 - 删除之前测试遗留的VM
         try {
             // 先清理VM表
@@ -83,13 +92,16 @@ public class CompleteFederatedLearningFlowTest {
             // 由于没有直接的删除API，我们使用数据库操作
             // 这里简化处理，假设后续步骤会覆盖之前的数据
         } catch (Exception e) {
-            System.err.println("清理测试数据失败: " + e.getMessage());
+            System.err.println("❌ 清理测试数据失败: " + e.getMessage());
         }
 
         // 初始化Mock虚拟机
+        System.out.println("🤖 初始化 " + virtualMachines.size() + " 台Mock虚拟机...");
         for (VmTestData vmData : virtualMachines) {
             mockVMs.add(new MockVirtualMachine(vmData));
+            System.out.println("  ➤ " + vmData.getName() + " (IP: " + vmData.getIpAddress() + ")");
         }
+        System.out.println("✅ Mock虚拟机初始化完成\n");
     }
 
     @Test

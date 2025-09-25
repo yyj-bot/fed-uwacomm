@@ -308,13 +308,137 @@ public void notifyDatasetCreated(String vmId, String datasetId) {
 - **后端**：任务调度、模型聚合、状态监控、指令下发
 - **对等通信**：连接建立、心跳维护、错误处理等双方都有职责
 
-## 7. 相关文档
+## 7. 废弃的WebSocket端点配置 (v1.4.2)
+
+### 7.1 移除SockJS支持
+
+**移除原因**: SockJS与StandardWebSocketClient协议不兼容，导致连接失败，且在现代环境中不必要
+
+#### 原有配置 (已废弃)
+
+```java
+// WebSocketConfig.java 中的SockJS配置
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry.addEndpoint("/ws")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*")
+            .withSockJS(); // ❌ 已移除 - 与StandardWebSocketClient不兼容
+}
+```
+
+#### 新的配置方式
+
+```java
+// 统一的原生WebSocket端点配置
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry.addEndpoint("/ws")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*"); // ✅ 原生WebSocket，兼容所有客户端
+}
+```
+
+### 7.2 移除冗余的`/ws-native`端点
+
+**移除原因**: 功能重复，增加配置复杂度，统一使用`/ws`端点
+
+#### 原有双端点配置 (已废弃)
+
+```java
+// 冗余的双端点配置
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    // SockJS端点
+    registry.addEndpoint("/ws").withSockJS();
+
+    // 原生WebSocket端点 - ❌ 功能重复，已移除
+    registry.addEndpoint("/ws-native");
+}
+```
+
+#### 简化后的单端点配置
+
+```java
+// 统一的单端点配置
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    // 所有客户端统一使用 /ws 端点
+    registry.addEndpoint("/ws")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*");
+}
+```
+
+### 7.3 移除的配置属性
+
+#### WebSocketProperties.java 中的冗余属性
+
+```java
+// ❌ 不再使用的属性
+private String nativeEndpoint = "/ws-native"; // 已移除，统一使用endpoint
+
+// ✅ 保留的属性
+private String endpoint = "/ws"; // 统一端点路径
+```
+
+### 7.4 客户端连接URL更新
+
+#### 测试代码更新
+
+```java
+// 原有方式 (已废弃)
+String websocketUrl = "ws://localhost:" + port + "/ws-native"; // ❌ 独立端点已移除
+
+// 新方式
+String websocketUrl = "ws://localhost:" + port + "/ws"; // ✅ 统一端点
+```
+
+### 7.5 移除的fallback机制
+
+#### SockJS Fallback配置 (已移除)
+
+```java
+// ❌ 不再需要的SockJS fallback配置
+.withSockJS()
+    .setStreamBytesLimit(512 * 1024)     // 流字节限制
+    .setSessionCookieNeeded(false)       // 会话cookie
+    .setHeartbeatTime(60000)            // 心跳时间
+    .setDisconnectDelay(30000)          // 断开延迟
+    .setClientLibraryUrl("...") ;       // 客户端库URL
+```
+
+**移除理由**:
+- 现代浏览器和Java客户端都原生支持WebSocket
+- SockJS fallback增加不必要的复杂性
+- 原生WebSocket在大数据传输时性能更优
+
+### 7.6 迁移影响
+
+#### 对现有代码的影响
+
+**Java客户端**:
+- 所有测试代码需要更新WebSocket URL为`/ws`
+- 移除对`/ws-native`的引用
+- StandardWebSocketClient配置保持不变
+
+**配置文件**:
+- WebSocketConfig.java移除SockJS相关配置
+- 不再需要维护两套端点配置
+- WebSocketProperties.java简化属性
+
+**协议兼容性**:
+- 原生WebSocket协议完全兼容STOMP
+- 消息格式和传输机制保持不变
+- 认证和拦截器逻辑不受影响
+
+## 8. 相关文档
 
 - [WebSocket 协议文档 v1.4](../WebSocket协议文档-中心化实现.md)
 - [修改接口说明 v1.4](../modified/modified-interfaces-v1.4.md)
 - [客户端迁移指南](./client-migration-guide-v1.4.md) (待创建)
 
-## 8. 联系支持
+## 9. 联系支持
 
 如果在迁移过程中遇到问题，请：
 1. 查看协议文档和示例代码

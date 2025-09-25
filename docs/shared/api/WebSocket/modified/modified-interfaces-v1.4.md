@@ -352,7 +352,120 @@ public static boolean isValidMessageId(String messageId) {
 - [WebSocket 协议文档 v1.4](../WebSocket协议文档-中心化实现.md) - 已更新消息ID生成规则
 - [废弃接口说明 v1.4](../removed/removed-interfaces-v1.4.md)
 
-## 8. 文档更新
+## 8. WebSocket端点统一优化 (v1.4.2)
+
+### 变更背景
+
+在v1.4版本的实际测试中发现，当前WebSocket配置存在两个端点(`/ws`和`/ws-native`)导致的协议不匹配问题：
+
+- **协议冲突**：`/ws`端点配置了SockJS支持，但`StandardWebSocketClient`只支持原生WebSocket协议
+- **连接失败**：尝试用原生WebSocket客户端连接SockJS端点时出现HTTP 400错误
+- **架构复杂**：维护两套端点增加了配置复杂度和测试负担
+
+### 统一方案
+
+为了解决协议不匹配问题并简化架构，决定采用**单一原生WebSocket端点**策略：
+
+#### 端点配置变更
+
+```java
+// 变更前 - WebSocketConfig.java (双端点配置)
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    // SockJS端点 - 与StandardWebSocketClient不兼容
+    registry.addEndpoint("/ws")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*")
+            .withSockJS(); // ❌ SockJS导致协议不匹配
+
+    // 原生WebSocket端点 - 功能重复
+    registry.addEndpoint("/ws-native")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*"); // ❌ 冗余配置
+}
+
+// 变更后 - WebSocketConfig.java (统一端点配置)
+@Override
+public void registerStompEndpoints(StompEndpointRegistry registry) {
+    // 统一使用原生WebSocket端点，移除SockJS支持
+    registry.addEndpoint("/ws")
+            .addInterceptors(handshakeAuthInterceptor)
+            .setAllowedOriginPatterns("*"); // ✅ 简化配置，避免协议冲突
+
+    // 移除 /ws-native 端点，统一使用 /ws
+}
+```
+
+#### 客户端连接更新
+
+```java
+// 变更前 - CompleteFederatedLearningFlowTest.java
+String websocketUrl = "ws://localhost:" + port + "/ws-native"; // ❌ 使用独立的原生端点
+
+// 变更后 - CompleteFederatedLearningFlowTest.java
+String websocketUrl = "ws://localhost:" + port + "/ws"; // ✅ 使用统一端点，去除SockJS
+```
+
+### 技术优势
+
+#### 性能优化
+- **减少开销**：移除SockJS的额外协议层，降低连接建立时间
+- **内存优化**：单一端点减少资源占用
+- **传输效率**：原生WebSocket协议在大数据传输(如1GB模型参数)时性能更优
+
+#### 架构简化
+- **配置统一**：所有客户端使用相同的连接端点
+- **维护简化**：减少配置项和测试场景
+- **兼容性**：2024年所有现代环境都原生支持WebSocket
+
+#### 联邦学习优化
+- **大文件传输**：原生WebSocket更适合MODEL_UPLOAD等大消息传输
+- **连接稳定性**：避免SockJS fallback机制在稳定网络环境中的不必要复杂性
+- **Java客户端友好**：`StandardWebSocketClient`原生支持，无需额外依赖
+
+### 实施影响
+
+#### 配置文件变更
+- **WebSocketConfig.java**：移除SockJS配置，统一端点路径
+- **WebSocketProperties.java**：保持现有配置，仅使用`endpoint`属性
+
+#### 测试代码更新
+- **CompleteFederatedLearningFlowTest.java**：更新WebSocket连接URL
+- **MockVirtualMachine.java**：确保客户端配置与服务器匹配
+
+#### 文档更新
+- **协议文档**：更新连接示例为统一的`/ws`端点
+- **集成指南**：简化客户端连接说明
+
+### 向后兼容性
+
+**不提供向后兼容性**：直接采用统一端点配置，确保架构清晰和性能最优。
+
+### 迁移检查清单
+
+**服务器端**：
+- [ ] 更新WebSocketConfig.java移除SockJS配置
+- [ ] 移除/ws-native端点注册
+- [ ] 验证/ws端点配置正确
+
+**客户端测试**：
+- [ ] 更新CompleteFederatedLearningFlowTest.java使用/ws端点
+- [ ] 验证MockVirtualMachine.java配置匹配
+- [ ] 测试WebSocket连接建立成功
+
+**功能验证**：
+- [ ] 验证CONNECT协议消息正常工作
+- [ ] 测试MODEL_UPLOAD大消息传输稳定
+- [ ] 确认心跳和状态查询功能正常
+
+### 预期效果
+
+- **解决HTTP 400连接错误**：消除StandardWebSocketClient与SockJS的协议冲突
+- **提升大数据传输稳定性**：原生WebSocket更适合联邦学习的大模型参数传输
+- **简化开发和维护**：统一的端点配置减少复杂性
+- **保持现有性能配置**：维持1GB传输限制和心跳机制设置
+
+## 9. 文档更新
 
 重构完成后需要更新：
 - WebSocket 协议文档

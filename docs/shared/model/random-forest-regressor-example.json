@@ -10,9 +10,7 @@
   },
   "parameters": {
     "feature_importances_": [0.25, 0.20, 0.15, 0.18, 0.12, 0.10],
-    "n_estimators": 100,
-    "n_features_": 6,
-    "n_outputs_": 1
+    "n_estimators": 100
   },
   "training_config": {
     "max_depth": 10,

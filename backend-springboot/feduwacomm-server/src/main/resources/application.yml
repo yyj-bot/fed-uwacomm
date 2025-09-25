@@ -29,6 +29,7 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
   mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.feduwacomm.entity
 
 # 日志配置 - 公共配置
 logging:
@@ -64,7 +65,6 @@ feduwacomm:
       secure-protocol: ${WSS_PROTOCOL:wss://}
       enable-wss: ${ENABLE_WSS:false}
       endpoint: ${WS_ENDPOINT:/ws}
-      native-endpoint: ${WS_NATIVE_ENDPOINT:/ws-native}
       heartbeat-interval: ${WS_HEARTBEAT_INTERVAL:30}
       connection-timeout: ${WS_CONNECTION_TIMEOUT:60}
 

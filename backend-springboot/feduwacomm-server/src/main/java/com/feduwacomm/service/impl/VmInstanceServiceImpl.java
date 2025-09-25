@@ -9,9 +9,12 @@ import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.VmInstance;
+import com.feduwacomm.entity.VmSecret;
 import com.feduwacomm.enums.ConnectionStatus;
 import com.feduwacomm.enums.VmStatus;
+import com.feduwacomm.enums.VmSecretStatus;
 import com.feduwacomm.mapper.VmInstancesMapper;
+import com.feduwacomm.mapper.VmSecretsMapper;
 import com.feduwacomm.service.VmInstanceService;
 import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
@@ -49,6 +52,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Autowired
     private VmInstancesMapper vmInstancesMapper;
+
+    @Autowired
+    private VmSecretsMapper vmSecretsMapper;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -139,12 +145,15 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             throw new BusinessException("虚拟机注册失败");
         }
 
-        // 6. 生成访问令牌（在数据库插入成功后）
+        // 6. 生成vm_secrets表记录，返回secretId用于返回给虚拟机
+        String secretId = insertVmSecret(vmId, hashedApiKey);
+
+        // 7. 生成访问令牌（在数据库插入成功后）
         String accessToken = generateAccessToken(vmId);
 
-        logger.info("虚拟机注册成功: vmId={}, sessionId={}", vmId, sessionId);
+        logger.info("虚拟机注册成功: vmId={}, sessionId={}, secretId={}", vmId, sessionId, secretId);
 
-        // 7. 构建响应
+        // 8. 构建响应
         return VmRegisterResponseVO.builder()
                 .vmId(vmId)
                 .name(registerDTO.getName())
@@ -153,7 +162,8 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .createdAt(vmInstance.getCreatedAt())
                 .sessionId(sessionId)
                 .accessToken(accessToken) // JWT令牌只返回给客户端，不存储
-                .secretId(rawApiKey) // 返回明文API Key，仅此一次
+                .secretId(secretId) // 返回vm_secrets表的ID，供后续认证使用
+                .rawApiKey(rawApiKey) // 返回明文API Key，仅此一次
                 .tokenExpireSeconds(tokenExpireSeconds)
                 .websocket(buildWebSocketInfo())
                 .apiEndpoints(buildApiEndpoints(vmId))
@@ -998,6 +1008,43 @@ public class VmInstanceServiceImpl implements VmInstanceService {
                 .control(apiConfig.buildVmControlPath(vmId))
                 .tokenRefresh(apiConfig.getTokenRefreshPath())
                 .build();
+    }
+
+    /**
+     * 插入vm_secrets表记录
+     *
+     * @param vmId 虚拟机ID
+     * @param secretHash 已哈希的密钥
+     * @return secretId 返回给虚拟机的密钥ID
+     */
+    private String insertVmSecret(String vmId, String secretHash) {
+        String secretId = uuidUtil.generateUuid();
+
+        // 创建VmSecret实体
+        VmSecret vmSecret = VmSecret.builder()
+                .id(secretId)
+                .vmId(vmId)
+                .secretHash(secretHash)
+                .salt(null) // 当前不使用盐值，BCrypt自带盐值
+                .status(VmSecretStatus.ACTIVE)
+                .expiresAt(null) // 不设置过期时间
+                .lastUsedAt(null)
+                .rotatedAt(null)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        try {
+            int result = vmSecretsMapper.insert(vmSecret);
+            if (result <= 0) {
+                logger.error("插入vm_secrets表失败: vmId={}", vmId);
+                throw new BusinessException("VM认证记录创建失败");
+            }
+            logger.info("VM Secret记录创建成功: vmId={}, secretId={}", vmId, secretId);
+            return secretId;
+        } catch (Exception e) {
+            logger.error("插入vm_secrets表异常: vmId={}", vmId, e);
+            throw new BusinessException("VM认证记录创建失败: " + e.getMessage());
+        }
     }
 
 }

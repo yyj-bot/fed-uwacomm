@@ -58,21 +58,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     /**
      * 注册STOMP端点
-     * 
+     *
      * @param registry STOMP端点注册表
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // 注册STOMP端点，客户端通过这个端点进行WebSocket连接
+        // 统一使用原生WebSocket端点，移除SockJS支持以避免协议冲突
+        // 现代环境下原生WebSocket性能更优，特别适合大数据传输(如1GB模型参数)
         registry.addEndpoint(webSocketProperties.getEndpoint())
                 .addInterceptors(handshakeAuthInterceptor)
-                .setAllowedOriginPatterns("*") // 允许跨域访问
-                .withSockJS(); // 启用SockJS支持
-
-        // 也可以不使用SockJS，直接使用原生WebSocket
-        registry.addEndpoint(webSocketProperties.getNativeEndpoint())
-                .addInterceptors(handshakeAuthInterceptor)
-                .setAllowedOriginPatterns("*");
+                .setAllowedOriginPatterns("*"); // 允许跨域访问
     }
 
     /**
