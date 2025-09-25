@@ -26,6 +26,20 @@ public enum ProtocolType {
     GLOBAL_MODEL_UPDATE,
     MODEL_UPDATE_ACK,
 
+    // 联邦学习聚合消息
+    GRADIENT_UPLOAD,
+    GRADIENT_UPLOAD_ACK,
+    GLOBAL_MODEL_BROADCAST,
+    GLOBAL_MODEL_BROADCAST_ACK,
+    AGGREGATION_START,
+    AGGREGATION_START_ACK,
+    AGGREGATION_COMPLETE,
+    AGGREGATION_COMPLETE_ACK,
+    ROUND_START,
+    ROUND_START_ACK,
+    ROUND_COMPLETE,
+    ROUND_COMPLETE_ACK,
+
     TASK_START,
     TASK_START_ACK,
     FEDERATED_TASK_START,
@@ -52,8 +66,20 @@ public enum ProtocolType {
     DATASET_DELETE,
     DATASET_DELETE_ACK,
 
-    // Business layer notification messages (v1.4 additions)
-    // These notifications are sent by server to clients when corresponding operations complete
+    // 联邦学习增强协议 (v1.4版本新增)
+    MODEL_TYPE_NEGOTIATION,
+    MODEL_TYPE_NEGOTIATION_ACK,
+    ALGORITHM_CONFIG,
+    ALGORITHM_CONFIG_ACK,
+    GRADIENT_UPLOAD_PREPARE,
+    GRADIENT_UPLOAD_PREPARE_ACK,
+    AGGREGATION_NOTIFICATION,
+    STRATEGY_SWITCH_NOTIFICATION,
+    STRATEGY_SWITCH_ACK,
+
+
+    // 业务层通知消息 (v1.4版本新增)
+    // 这些通知消息由服务端主动推送给客户端，表明对应操作已完成
     DATASET_CREATE_NOTIFICATION,
     DATASET_APPEND_ROWS_NOTIFICATION,
     DATASET_COMPLETE_NOTIFICATION,

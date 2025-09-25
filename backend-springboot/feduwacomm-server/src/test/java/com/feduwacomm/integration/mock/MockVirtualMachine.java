@@ -27,8 +27,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 模拟虚拟机类
- * 用于测试联邦学习流程中的虚拟机行为
+ * 模拟虚拟机类 v2.0
+ * 支持UniversalAggregationEngine和多策略联邦学习架构
+ *
+ * v2.0新增特性：
+ * - 多模型类型支持：RandomForest + Neural Network
+ * - 多聚合策略：FedAvg, FedProx, FedNova, Scaffold
+ * - 增强WebSocket协议：梯度上传、模型分发、聚合通知
+ * - 性能优化：大规模并发处理
  */
 public class MockVirtualMachine {
 
@@ -45,6 +51,11 @@ public class MockVirtualMachine {
     private ScheduledExecutorService heartbeatExecutor;
     private ScheduledExecutorService messageExecutor;
     private final Object sessionLock = new Object(); // 会话同步锁
+
+    // v2.0新增字段
+    private String currentModelType = "RANDOM_FOREST"; // 当前支持的模型类型
+    private String currentAlgorithm = "FEDERATED_AVERAGING"; // 当前聚合算法
+    private boolean gradientUploadReady = false; // 梯度上传通道状态
 
     public MockVirtualMachine(VmTestData vmData) {
         this.vmData = vmData;
@@ -284,7 +295,7 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 模拟训练轮次
+     * 模拟训练轮次 v2.0 (支持多模型类型和多算法)
      */
     public void simulateTrainingRound(String taskId, int round) throws Exception {
         try {
@@ -295,14 +306,32 @@ public class MockVirtualMachine {
             // 生成基于VM能力的训练结果
             TrainingMetrics metrics = generateTrainingMetrics(round);
 
-            System.out.println("🔄 " + vmData.getName() + " 开始第" + round + "轮训练模拟...");
+            System.out.println("🔄 " + vmData.getName() + " 开始第" + round + "轮训练模拟 [" +
+                currentModelType + " / " + currentAlgorithm + "]...");
 
+            // v2.0: 首先上传梯度
+            uploadGradients(taskId, round);
+
+            // 等待一段时间模拟梯度处理
+            Thread.sleep(500);
+
+            // 然后上传模型参数
             Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.MODEL_UPLOAD);
 
             Map<String, Object> data = new HashMap<>();
             data.put("taskId", taskId);
             data.put("round", round);
-            data.put("parameters", generateMockModelParameters());
+            data.put("modelType", currentModelType); // v2.0新增
+            data.put("algorithm", currentAlgorithm); // v2.0新增
+
+            // 根据模型类型生成参数
+            if ("RANDOM_FOREST".equals(currentModelType)) {
+                data.put("parameters", generateRandomForestParameters());
+            } else if ("NEURAL_NETWORK".equals(currentModelType)) {
+                data.put("parameters", generateNeuralNetworkParameters());
+            } else {
+                data.put("parameters", generateMockModelParameters()); // 兜底方案
+            }
 
             Map<String, Object> metricsMap = new HashMap<>();
             metricsMap.put("accuracy", metrics.getAccuracy());
@@ -310,12 +339,15 @@ public class MockVirtualMachine {
             metricsMap.put("trainingTime", metrics.getTrainingTime());
             metricsMap.put("dataPoints", vmData.getDataPointsForTesting());
             metricsMap.put("epochs", 4);
+            metricsMap.put("modelType", currentModelType); // v2.0新增
+            metricsMap.put("algorithm", currentAlgorithm); // v2.0新增
             data.put("metrics", metricsMap);
 
             Map<String, Object> deviceInfo = new HashMap<>();
             deviceInfo.put("gpuUsed", vmData.getGpuCount() > 0);
             deviceInfo.put("cpuCores", vmData.getCpuCores());
             deviceInfo.put("memoryMb", vmData.getMemoryMb());
+            deviceInfo.put("modelType", currentModelType); // v2.0新增
             data.put("deviceInfo", deviceInfo);
 
             modelUpload.put("data", data);
@@ -323,13 +355,77 @@ public class MockVirtualMachine {
             // 使用正确的连接管理发送消息
             sendStompMessage(modelUpload);
 
-            System.out.println("✅ " + vmData.getName() + " 第" + round + "轮训练完成，精度: " +
-                String.format("%.3f", metrics.getAccuracy()) + ", 损失: " + String.format("%.3f", metrics.getLoss()));
+            System.out.println("✅ " + vmData.getName() + " 第" + round + "轮训练完成 [" + currentModelType + " / " +
+                currentAlgorithm + "], 精度: " + String.format("%.3f", metrics.getAccuracy()) +
+                ", 损失: " + String.format("%.3f", metrics.getLoss()));
 
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 第" + round + "轮训练失败: " + e.getMessage());
             throw e; // 重新抛出异常，让测试能够正确检测到错误
         }
+    }
+
+    /**
+     * 生成RandomForest模型参数
+     */
+    private Map<String, Object> generateRandomForestParameters() {
+        Map<String, Object> parameters = new HashMap<>();
+
+        // RandomForest的参数主要是树的集合
+        java.util.List<Map<String, Object>> trees = new ArrayList<>();
+        Random random = new Random();
+
+        for (int i = 0; i < 10; i++) { // 10棵树
+            Map<String, Object> tree = new HashMap<>();
+            tree.put("treeId", i);
+            tree.put("maxDepth", 5 + random.nextInt(5));
+            tree.put("leafCount", 10 + random.nextInt(20));
+            tree.put("featureImportance", generateRandomForestGradients().get("featureImportance"));
+            trees.add(tree);
+        }
+
+        parameters.put("trees", trees);
+        parameters.put("forestSize", 10);
+        parameters.put("modelType", "RANDOM_FOREST");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("parameterCount", trees.size() * 30); // 估算参数数量
+        metadata.put("modelSize", trees.size() * 1024); // 估算模型大小
+        metadata.put("checksum", "rf_" + vmData.getVmId() + "_" + System.currentTimeMillis());
+        parameters.put("metadata", metadata);
+
+        return parameters;
+    }
+
+    /**
+     * 生成Neural Network模型参数
+     */
+    private Map<String, Object> generateNeuralNetworkParameters() {
+        Map<String, Object> parameters = new HashMap<>();
+
+        // Neural Network的参数是权重和偏置
+        Map<String, Object> weights = new HashMap<>();
+        weights.put("input_layer", generateRandomMatrix(6, 32)); // 6个输入特征 -> 32个隐藏单元
+        weights.put("hidden_layer", generateRandomMatrix(32, 16)); // 32 -> 16
+        weights.put("output_layer", generateRandomMatrix(16, 3)); // 16 -> 3个输出类别
+        parameters.put("weights", weights);
+
+        Map<String, Object> biases = new HashMap<>();
+        biases.put("hidden_bias", generateRandomVector(32));
+        biases.put("output_bias", generateRandomVector(3));
+        parameters.put("biases", biases);
+
+        parameters.put("modelType", "NEURAL_NETWORK");
+        parameters.put("architecture", "MLP");
+        parameters.put("activations", Arrays.asList("ReLU", "ReLU", "Softmax"));
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("parameterCount", 6*32 + 32*16 + 16*3 + 32 + 3); // 计算总参数数量
+        metadata.put("modelSize", (6*32 + 32*16 + 16*3 + 32 + 3) * 4); // 假设float32，4字节每参数
+        metadata.put("checksum", "nn_" + vmData.getVmId() + "_" + System.currentTimeMillis());
+        parameters.put("metadata", metadata);
+
+        return parameters;
     }
 
     /**
@@ -683,11 +779,144 @@ public class MockVirtualMachine {
         }
     }
 
+    // ==================== v2.0新增方法 ====================
+
+    /**
+     * 发送模型类型协商消息
+     * 支持RANDOM_FOREST和NEURAL_NETWORK
+     */
+    public void sendModelTypeNegotiation(String modelType) throws Exception {
+        Map<String, Object> negotiationMessage = createProtocolMessage(ProtocolType.MODEL_TYPE_NEGOTIATION);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("requestedModelType", modelType);
+        data.put("supportedModelTypes", Arrays.asList("RANDOM_FOREST", "NEURAL_NETWORK"));
+        data.put("currentCapabilities", vmData.getCapabilities());
+        negotiationMessage.put("data", data);
+
+        sendStompMessage(negotiationMessage);
+        this.currentModelType = modelType;
+        System.out.println("🤝 [" + vmData.getName() + "] 模型类型协商: " + modelType);
+    }
+
+    /**
+     * 发送算法配置消息
+     * 支持FedAvg, FedProx, FedNova, Scaffold
+     */
+    public void sendAlgorithmConfig(String algorithm) throws Exception {
+        Map<String, Object> configMessage = createProtocolMessage(ProtocolType.ALGORITHM_CONFIG);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("requestedAlgorithm", algorithm);
+        data.put("supportedAlgorithms", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD"));
+        data.put("currentModelType", currentModelType);
+        configMessage.put("data", data);
+
+        sendStompMessage(configMessage);
+        this.currentAlgorithm = algorithm;
+        System.out.println("⚙️ [" + vmData.getName() + "] 算法配置: " + algorithm);
+    }
+
+    /**
+     * 准备梯度上传通道
+     */
+    public void prepareGradientUpload() throws Exception {
+        Map<String, Object> prepareMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD_PREPARE);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("modelType", currentModelType);
+        data.put("algorithm", currentAlgorithm);
+        data.put("bufferSize", 1048576); // 1MB缓冲区
+        prepareMessage.put("data", data);
+
+        sendStompMessage(prepareMessage);
+        this.gradientUploadReady = true;
+        System.out.println("📤 [" + vmData.getName() + "] 梯度上传通道准备就绪");
+    }
+
+    /**
+     * 上传梯度或模型参数（根据模型类型）
+     */
+    public void uploadGradients(String taskId, int round) throws Exception {
+        if (!gradientUploadReady) {
+            prepareGradientUpload();
+        }
+
+        Map<String, Object> gradientMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("round", round);
+        data.put("modelType", currentModelType);
+        data.put("algorithm", currentAlgorithm);
+
+        // 根据模型类型生成不同的梯度数据
+        if ("RANDOM_FOREST".equals(currentModelType)) {
+            data.put("gradients", generateRandomForestGradients());
+        } else if ("NEURAL_NETWORK".equals(currentModelType)) {
+            data.put("gradients", generateNeuralNetworkGradients());
+        }
+
+        gradientMessage.put("data", data);
+        sendStompMessage(gradientMessage);
+        System.out.println("📊 [" + vmData.getName() + "] 梯度上传完成: " + currentModelType + " / " + currentAlgorithm);
+    }
+
+    /**
+     * 生成RandomForest梯度（特征重要性）
+     */
+    private Map<String, Object> generateRandomForestGradients() {
+        Map<String, Object> gradients = new HashMap<>();
+
+        // RandomForest的梯度主要是特征重要性
+        Map<String, Double> featureImportance = new HashMap<>();
+        String[] features = {"frequency", "amplitude", "phase", "snr", "distance", "depth"};
+        Random random = new Random();
+
+        for (String feature : features) {
+            featureImportance.put(feature, random.nextDouble());
+        }
+
+        gradients.put("featureImportance", featureImportance);
+        gradients.put("treeCount", 100);
+        gradients.put("maxDepth", 10);
+        gradients.put("dataPoints", vmData.getDataPointsForTesting());
+
+        return gradients;
+    }
+
+    /**
+     * 生成Neural Network梯度（权重更新）
+     */
+    private Map<String, Object> generateNeuralNetworkGradients() {
+        Map<String, Object> gradients = new HashMap<>();
+
+        // Neural Network的梯度是权重更新
+        Map<String, Object> weightGradients = new HashMap<>();
+        weightGradients.put("input_layer", generateRandomMatrix(6, 32)); // 6个输入特征 -> 32个隐藏单元
+        weightGradients.put("hidden_layer", generateRandomMatrix(32, 16)); // 32 -> 16
+        weightGradients.put("output_layer", generateRandomMatrix(16, 3)); // 16 -> 3个输出类别
+
+        Map<String, Object> biasGradients = new HashMap<>();
+        biasGradients.put("hidden_bias", generateRandomVector(32));
+        biasGradients.put("output_bias", generateRandomVector(3));
+
+        gradients.put("weights", weightGradients);
+        gradients.put("biases", biasGradients);
+        gradients.put("learningRate", 0.01);
+        gradients.put("batchSize", 32);
+
+        return gradients;
+    }
+
     // Getter方法
     public boolean isRegistered() { return registered; }
     public boolean isConnected() { return connected; }
     public String getVmId() { return vmData.getVmId(); }
     public String getName() { return vmData.getName(); }
+    public String getCurrentModelType() { return currentModelType; }
+    public String getCurrentAlgorithm() { return currentAlgorithm; }
+    public boolean isGradientUploadReady() { return gradientUploadReady; }
 
     /**
      * Mock STOMP Session Handler
@@ -778,7 +1007,7 @@ public class MockVirtualMachine {
 
                 System.out.println("收到STOMP消息: " + type + " from VM: " + vmData.getName());
 
-                // 处理不同类型的消息 - 使用ProtocolType枚举比较
+                // 处理不同类型的消息 - 使用ProtocolType枚举比较 (v2.0增强版本)
                 if (isProtocolType(type, ProtocolType.CONNECT_ACK)) {
                     System.out.println("✅ " + vmData.getName() + " 连接确认");
                 } else if (isProtocolType(type, ProtocolType.TRAINING_START_COMMAND_NOTIFICATION) ||
@@ -798,6 +1027,23 @@ public class MockVirtualMachine {
                     System.out.println("📨 " + vmData.getName() + " 收到联邦学习任务启动指令");
                     // 处理联邦学习任务启动
                     handleFederatedTaskStart(messageData);
+                // ========== v2.0新增消息类型处理 ==========
+                } else if (isProtocolType(type, ProtocolType.MODEL_TYPE_NEGOTIATION_ACK)) {
+                    System.out.println("🤝 " + vmData.getName() + " 收到模型类型协商确认");
+                    handleModelTypeNegotiationAck(messageData);
+                } else if (isProtocolType(type, ProtocolType.ALGORITHM_CONFIG_ACK)) {
+                    System.out.println("⚙️ " + vmData.getName() + " 收到算法配置确认");
+                    handleAlgorithmConfigAck(messageData);
+                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
+                    System.out.println("📊 " + vmData.getName() + " 收到梯度上传确认");
+                    handleGradientUploadAck(messageData);
+                } else if (isProtocolType(type, ProtocolType.AGGREGATION_NOTIFICATION)) {
+                    System.out.println("🔄 " + vmData.getName() + " 收到聚合完成通知");
+                    handleAggregationNotification(messageData);
+                } else if (isProtocolType(type, ProtocolType.STRATEGY_SWITCH_NOTIFICATION)) {
+                    System.out.println("🔀 " + vmData.getName() + " 收到策略切换通知");
+                    handleStrategySwitchNotification(messageData);
+                // ========== 原有消息类型继续处理 ==========
                 } else if (isProtocolType(type, ProtocolType.MODEL_UPDATE_ACK) ||
                            isProtocolType(type, ProtocolType.HEARTBEAT_ACK)) {
                     System.out.println("✅ " + vmData.getName() + " 收到确认消息: " + type);
@@ -994,6 +1240,138 @@ public class MockVirtualMachine {
                     System.err.println("❌ " + vmData.getName() + " 主动训练第" + currentRound + "轮失败: " + e.getMessage());
                 }
             });
+        }
+    }
+
+    // ==================== v2.0新增消息处理方法 ====================
+
+    /**
+     * 处理模型类型协商确认
+     */
+    private void handleModelTypeNegotiationAck(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String confirmedModelType = (String) data.get("confirmedModelType");
+                Boolean supported = (Boolean) data.get("supported");
+
+                if (Boolean.TRUE.equals(supported)) {
+                    this.currentModelType = confirmedModelType;
+                    System.out.println("✅ " + vmData.getName() + " 模型类型协商成功: " + confirmedModelType);
+                } else {
+                    System.out.println("❌ " + vmData.getName() + " 模型类型协商失败: " + confirmedModelType);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理模型类型协商确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理算法配置确认
+     */
+    private void handleAlgorithmConfigAck(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String confirmedAlgorithm = (String) data.get("confirmedAlgorithm");
+                Boolean supported = (Boolean) data.get("supported");
+
+                if (Boolean.TRUE.equals(supported)) {
+                    this.currentAlgorithm = confirmedAlgorithm;
+                    System.out.println("✅ " + vmData.getName() + " 算法配置成功: " + confirmedAlgorithm);
+                } else {
+                    System.out.println("❌ " + vmData.getName() + " 算法配置失败: " + confirmedAlgorithm);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理算法配置确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理梯度上传确认
+     */
+    private void handleGradientUploadAck(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                Boolean received = (Boolean) data.get("received");
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+
+                if (Boolean.TRUE.equals(received)) {
+                    System.out.println("✅ " + vmData.getName() + " 梯度上传确认 - 任务:" + taskId + " 轮次:" + round);
+                } else {
+                    System.out.println("❌ " + vmData.getName() + " 梯度上传失败 - 任务:" + taskId + " 轮次:" + round);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理梯度上传确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理聚合完成通知
+     */
+    private void handleAggregationNotification(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+                String algorithm = (String) data.get("algorithm");
+                String status = (String) data.get("status");
+
+                System.out.println("🔄 " + vmData.getName() + " 聚合完成通知:");
+                System.out.println("    任务ID: " + taskId + ", 轮次: " + round);
+                System.out.println("    算法: " + algorithm + ", 状态: " + status);
+
+                // 如果聚合成功，准备下一轮训练
+                if ("COMPLETED".equals(status)) {
+                    System.out.println("✅ " + vmData.getName() + " 聚合成功，准备下一轮训练");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理聚合通知失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理策略切换通知
+     */
+    private void handleStrategySwitchNotification(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String newAlgorithm = (String) data.get("newAlgorithm");
+                String oldAlgorithm = (String) data.get("oldAlgorithm");
+                String taskId = (String) data.get("taskId");
+
+                this.currentAlgorithm = newAlgorithm;
+                System.out.println("🔀 " + vmData.getName() + " 策略切换:");
+                System.out.println("    任务ID: " + taskId);
+                System.out.println("    旧算法: " + oldAlgorithm + " → 新算法: " + newAlgorithm);
+
+                // 发送策略切换确认
+                Map<String, Object> switchAck = createProtocolMessage(ProtocolType.STRATEGY_SWITCH_ACK);
+                Map<String, Object> switchData = new HashMap<>();
+                switchData.put("vmId", vmData.getVmId());
+                switchData.put("taskId", taskId);
+                switchData.put("newAlgorithm", newAlgorithm);
+                switchData.put("switchTime", Instant.now().toString());
+                switchAck.put("data", switchData);
+
+                sendStompMessage(switchAck);
+                System.out.println("✅ " + vmData.getName() + " 策略切换确认已发送");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理策略切换通知失败: " + e.getMessage());
         }
     }
 }

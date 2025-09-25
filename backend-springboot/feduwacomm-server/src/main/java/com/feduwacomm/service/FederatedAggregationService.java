@@ -14,8 +14,11 @@ import com.feduwacomm.event.RoundCompleteEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.GlobalModelMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
-import com.feduwacomm.strategy.AggregationStrategy;
-import com.feduwacomm.strategy.AggregationStrategyFactory;
+import com.feduwacomm.aggregation.AggregationStrategy;
+import com.feduwacomm.aggregation.AggregationStrategyFactory;
+import com.feduwacomm.aggregation.UniversalAggregationEngine;
+import com.feduwacomm.aggregation.UniversalAggregationEngine.AggregationResult;
+import com.feduwacomm.enums.FederatedAlgorithm;
 import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +52,7 @@ public class FederatedAggregationService {
     private final VmRoundModelsMapper vmRoundModelsMapper;
     private final FederatedTasksMapper federatedTasksMapper;
     private final GlobalModelMapper globalModelMapper;
-    private final ModelAggregatorEngine aggregatorEngine;
+    private final UniversalAggregationEngine aggregationEngine;
     private final AggregationStrategyFactory strategyFactory;
     private final AggregationConfig aggregationConfig;
     private final ApplicationEventPublisher eventPublisher;
@@ -252,7 +255,7 @@ public class FederatedAggregationService {
                     .toList();
             
             AggregationTriggeredEvent triggeredEvent = new AggregationTriggeredEvent(
-                    this, taskId, roundNumber, task.getAlgorithm().getCode(), 
+                    this, taskId, roundNumber, task.getAlgorithm().getCode(),
                     participantVmIds, triggerReason);
             eventPublisher.publishEvent(triggeredEvent);
 
@@ -281,47 +284,47 @@ public class FederatedAggregationService {
      */
     private void executeAggregation(FederatedTask task, List<VmRoundModel> localModels, Integer roundNumber) {
         String taskId = task.getId();
-        String algorithm = task.getAlgorithm().getCode();
-        
-        log.info("执行聚合计算: 任务ID={}, 算法={}, 模型数量={}", 
+        FederatedAlgorithm algorithm = task.getAlgorithm();
+
+        log.info("执行聚合计算: 任务ID={}, 算法={}, 模型数量={}",
                 taskId, algorithm, localModels.size());
 
         try {
-            // 获取聚合策略
-            AggregationStrategy strategy = strategyFactory.getStrategy(algorithm);
-            
-            // 验证前置条件
-            AggregationStrategy.ValidationResult validation = 
-                    strategy.validatePreconditions(localModels, task);
-            
-            if (!validation.isValid()) {
-                throw new IllegalArgumentException("聚合前置条件验证失败: " + validation.getErrorMessage());
-            }
+            // 构建任务配置参数
+            Map<String, Object> taskConfig = buildTaskConfig(task, roundNumber);
 
             // 执行聚合
-            ModelAggregatorEngine.AggregationResult result = 
-                    strategy.aggregate(localModels, task, aggregatorEngine);
+            AggregationResult result = aggregationEngine.aggregate(localModels, algorithm, taskConfig);
 
             if (result.isSuccess()) {
                 // 保存全局模型
                 GlobalModel globalModel = saveGlobalModel(task, roundNumber, result);
-                
+
                 // 分发全局模型
                 distributeGlobalModel(task, roundNumber, result.getGlobalParameters());
-                
+
                 // 更新任务进度
                 updateTaskProgress(taskId, roundNumber + 1);
-                
-                // 发布成功事件
+
+                // 发布成功事件 - 转换Map<String, Double>为Map<String, BigDecimal>
+                final Map<String, BigDecimal> metricsAsBigDecimal;
+                if (result.getGlobalMetrics() != null) {
+                    metricsAsBigDecimal = new HashMap<>();
+                    result.getGlobalMetrics().forEach((key, value) ->
+                        metricsAsBigDecimal.put(key, BigDecimal.valueOf(value)));
+                } else {
+                    metricsAsBigDecimal = null;
+                }
+
                 AggregationCompletedEvent successEvent = AggregationCompletedEvent.success(
-                        this, taskId, roundNumber, globalModel.getId(), 
-                        result.getGlobalMetrics(), result.getParticipantCount(),
+                        this, taskId, roundNumber, globalModel.getId(),
+                        metricsAsBigDecimal, result.getParticipantCount(),
                         result.getAggregationDuration(), result.getAlgorithm());
                 eventPublisher.publishEvent(successEvent);
-                
-                log.info("聚合成功完成: 任务ID={}, 轮次={}, 参与者数量={}, 耗时={}ms", 
+
+                log.info("聚合成功完成: 任务ID={}, 轮次={}, 参与者数量={}, 耗时={}ms",
                         taskId, roundNumber, result.getParticipantCount(), result.getAggregationDuration());
-                
+
             } else {
                 throw new RuntimeException("聚合执行失败: " + result.getErrorMessage());
             }
@@ -333,10 +336,40 @@ public class FederatedAggregationService {
     }
 
     /**
+     * 构建任务配置参数
+     */
+    private Map<String, Object> buildTaskConfig(FederatedTask task, Integer roundNumber) {
+        Map<String, Object> config = new HashMap<>();
+
+        // 基本任务信息
+        config.put("taskId", task.getId());
+        config.put("roundNumber", roundNumber);
+        config.put("algorithm", task.getAlgorithm().getCode());
+
+        // 任务超参数
+        config.put("learningRate", task.getLearningRate());
+        config.put("batchSize", task.getBatchSize());
+        config.put("epochs", task.getEpochs());
+        config.put("totalRounds", task.getTotalRounds());
+
+        // 聚合配置
+        config.put("minParticipants", task.getMinParticipants());
+
+        // 模型配置
+        config.put("modelType", task.getModelType());
+        config.put("featureColumns", task.getFeatureColumns());
+        config.put("targetColumn", task.getTargetColumn());
+        config.put("testSize", task.getTestSize());
+        config.put("randomState", task.getRandomState());
+
+        return config;
+    }
+
+    /**
      * 保存全局模型到数据库
      */
-    private GlobalModel saveGlobalModel(FederatedTask task, Integer roundNumber, 
-                                      ModelAggregatorEngine.AggregationResult result) {
+    private GlobalModel saveGlobalModel(FederatedTask task, Integer roundNumber,
+                                      AggregationResult result) {
         try {
             GlobalModel globalModel = GlobalModel.builder()
                     .id(uuidUtil.generateUuid())
@@ -355,19 +388,25 @@ public class FederatedAggregationService {
 
             // 设置全局指标
             if (result.getGlobalMetrics() != null) {
-                globalModel.setGlobalLoss(result.getGlobalMetrics().get("loss"));
-                globalModel.setGlobalAccuracy(result.getGlobalMetrics().get("accuracy"));
+                Double loss = result.getGlobalMetrics().get("average_loss");
+                Double accuracy = result.getGlobalMetrics().get("average_accuracy");
+                if (loss != null) {
+                    globalModel.setGlobalLoss(BigDecimal.valueOf(loss));
+                }
+                if (accuracy != null) {
+                    globalModel.setGlobalAccuracy(BigDecimal.valueOf(accuracy));
+                }
             }
 
             globalModelMapper.insertGlobalModel(globalModel);
-            
-            log.debug("全局模型已保存: ID={}, 任务ID={}, 轮次={}", 
+
+            log.debug("全局模型已保存: ID={}, 任务ID={}, 轮次={}",
                     globalModel.getId(), task.getId(), roundNumber);
-            
+
             return globalModel;
 
         } catch (Exception e) {
-            log.error("保存全局模型失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("保存全局模型失败: 任务ID={}, 轮次={}, 错误={}",
                     task.getId(), roundNumber, e.getMessage(), e);
             throw new RuntimeException("保存全局模型失败", e);
         }
@@ -377,9 +416,9 @@ public class FederatedAggregationService {
      * 分发全局模型给所有参与的客户端
      * 注：实际分发由GlobalModelDistributionService通过事件监听自动处理
      */
-    private void distributeGlobalModel(FederatedTask task, Integer roundNumber, 
-                                     Map<String, Object> globalParameters) {
-        log.info("全局模型分发将通过AggregationCompletedEvent自动触发: 任务ID={}, 轮次={}", 
+    private void distributeGlobalModel(FederatedTask task, Integer roundNumber,
+                                     Map<String, Object> aggregatedModel) {
+        log.info("全局模型分发将通过AggregationCompletedEvent自动触发: 任务ID={}, 轮次={}",
                 task.getId(), roundNumber);
         // 分发逻辑已通过GlobalModelDistributionService的事件监听器实现
     }

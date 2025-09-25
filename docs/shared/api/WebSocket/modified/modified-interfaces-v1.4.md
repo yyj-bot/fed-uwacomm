@@ -465,7 +465,433 @@ String websocketUrl = "ws://localhost:" + port + "/ws"; // ✅ 使用统一端�
 - **简化开发和维护**：统一的端点配置减少复杂性
 - **保持现有性能配置**：维持1GB传输限制和心跳机制设置
 
-## 9. 文档更新
+## 9. 联邦学习聚合协议扩展 (v1.4.3)
+
+### 变更背景
+
+为支持UniversalAggregationEngine v2.0架构，在v1.4.3版本中向ProtocolType枚举新增了专门的联邦学习聚合协议类型。这些协议类型专为高效的分布式模型聚合和同步而设计，支持RandomForest和神经网络等多种模型类型的联邦学习。
+
+### 新增协议类型
+
+#### 9.1 联邦学习聚合消息 (Federated Learning Aggregation Messages)
+
+这一组协议专门用于联邦学习过程中的模型聚合和全局同步：
+
+```java
+// ========== 联邦学习聚合消息 ==========
+GRADIENT_UPLOAD,               // 梯度上传 🔵
+GRADIENT_UPLOAD_ACK,           // 梯度上传确认 🟢
+GLOBAL_MODEL_BROADCAST,        // 全局模型广播 🟢
+GLOBAL_MODEL_BROADCAST_ACK,    // 全局模型广播确认 🔵
+AGGREGATION_START,             // 开始聚合 🟢
+AGGREGATION_START_ACK,         // 聚合开始确认 🔵
+AGGREGATION_COMPLETE,          // 聚合完成 🟢
+AGGREGATION_COMPLETE_ACK,      // 聚合完成确认 🔵
+ROUND_START,                   // 轮次开始 🟢
+ROUND_START_ACK,              // 轮次开始确认 🔵
+ROUND_COMPLETE,               // 轮次完成 🟢
+ROUND_COMPLETE_ACK,           // 轮次完成确认 🔵
+```
+
+**协议实现要求**：
+
+**GRADIENT_UPLOAD** 🔵
+- **作用**: 虚拟机将本地训练后的梯度/参数上传至后端
+- **虚拟机端实现**: 训练完成后序列化模型参数，支持压缩和分块传输
+- **后端实现**: 接收并验证梯度数据，存储到聚合缓冲区
+
+**GLOBAL_MODEL_BROADCAST** 🟢
+- **作用**: 后端向所有参与节点广播聚合后的全局模型
+- **虚拟机端实现**: 接收全局模型，验证完整性并更新本地模型
+- **后端实现**: 聚合完成后向所有参与者并发广播全局模型
+
+**AGGREGATION_START/COMPLETE** 🟢🔵
+- **作用**: 控制联邦聚合过程的启动和完成状态同步
+- **虚拟机端实现**: 响应聚合状态信号，调整本地训练策略
+- **后端实现**: 协调聚合时机，确保所有参与者状态同步
+
+**ROUND_START/COMPLETE** 🟢🔵
+- **作用**: 管理联邦学习的训练轮次生命周期
+- **虚拟机端实现**: 按轮次开始/结束本地训练任务
+- **后端实现**: 全局轮次控制，协调所有参与者的训练节奏
+
+#### 9.2 增强联邦学习协议 (Enhanced Federated Learning Protocol v1.4)
+
+这一组协议支持UniversalAggregationEngine的高级功能，包括模型类型协商和动态策略调整：
+
+```java
+// ========== 联邦学习增强协议 (v1.4版本新增) ==========
+MODEL_TYPE_NEGOTIATION,        // 模型类型协商 🟢
+MODEL_TYPE_NEGOTIATION_ACK,    // 模型类型协商确认 🔵
+ALGORITHM_CONFIG,              // 算法配置 🟢
+ALGORITHM_CONFIG_ACK,          // 算法配置确认 🔵
+GRADIENT_UPLOAD_PREPARE,       // 梯度上传准备 🟢
+GRADIENT_UPLOAD_PREPARE_ACK,   // 梯度上传准备确认 🔵
+AGGREGATION_NOTIFICATION,      // 聚合状态通知 🟢
+STRATEGY_SWITCH_NOTIFICATION,  // 策略切换通知 🟢
+STRATEGY_SWITCH_ACK,           // 策略切换确认 🔵
+```
+
+**高级协议实现要求**：
+
+**MODEL_TYPE_NEGOTIATION** 🟢🔵
+- **作用**: 协商各参与节点支持的模型类型和框架
+- **虚拟机端实现**: 上报本地支持的ML框架（sklearn、pytorch、tensorflow）和模型类型
+- **后端实现**: 收集所有节点能力，选择最优的聚合策略
+
+**ALGORITHM_CONFIG** 🟢🔵
+- **作用**: 配置联邦学习算法参数（FedAvg、FedProx、FedNova等）
+- **虚拟机端实现**: 接收并应用算法参数，调整本地训练超参数
+- **后端实现**: 根据任务特点和节点能力下发最优算法配置
+
+**GRADIENT_UPLOAD_PREPARE** 🟢🔵
+- **作用**: 在聚合窗口开启前通知参与者准备数据上传
+- **虚拟机端实现**: 预处理模型参数，准备压缩和传输
+- **后端实现**: 协调上传时序，避免网络拥塞
+
+**STRATEGY_SWITCH_NOTIFICATION** 🟢🔵
+- **作用**: 动态切换聚合策略（如从FedAvg切换到FedProx）
+- **虚拟机端实现**: 调整本地训练策略以匹配新的聚合算法
+- **后端实现**: 根据训练进展或收敛情况动态调整策略
+
+### 9.3 协议冗余性分析
+
+**与现有协议的关系**：
+
+1. **GRADIENT_UPLOAD vs MODEL_UPLOAD**
+   - **GRADIENT_UPLOAD**: 专用于联邦学习梯度传输，支持增量更新
+   - **MODEL_UPLOAD**: 用于完整模型上传，兼容传统训练
+   - **建议**: 保留两者，联邦学习场景优先使用GRADIENT_UPLOAD
+
+2. **GLOBAL_MODEL_BROADCAST vs MODEL_DOWNLOAD**
+   - **GLOBAL_MODEL_BROADCAST**: 支持一对多广播，效率更高
+   - **MODEL_DOWNLOAD**: 点对点下载，适合单节点场景
+   - **建议**: 联邦学习使用GLOBAL_MODEL_BROADCAST，单机训练使用MODEL_DOWNLOAD
+
+3. **新增通知类消息**
+   - **AGGREGATION_NOTIFICATION**: 纯通知，无需ACK
+   - **STRATEGY_SWITCH_NOTIFICATION**: 关键操作，需要ACK确认
+   - **作用**: 实现事件驱动的状态同步
+
+### 9.4 联邦学习协议流程
+
+**完整的联邦学习训练流程**：
+
+```
+1. 任务初始化
+   FEDERATED_TASK_START → FEDERATED_TASK_START_ACK
+
+2. 能力协商
+   MODEL_TYPE_NEGOTIATION → MODEL_TYPE_NEGOTIATION_ACK
+
+3. 算法配置
+   ALGORITHM_CONFIG → ALGORITHM_CONFIG_ACK
+
+4. 轮次开始
+   ROUND_START → ROUND_START_ACK
+
+5. 本地训练
+   TRAINING_START → TRAINING_START_RESPONSE
+
+6. 梯度准备
+   GRADIENT_UPLOAD_PREPARE → GRADIENT_UPLOAD_PREPARE_ACK
+
+7. 梯度上传
+   GRADIENT_UPLOAD → GRADIENT_UPLOAD_ACK
+
+8. 聚合处理
+   AGGREGATION_START → AGGREGATION_START_ACK
+   AGGREGATION_COMPLETE → AGGREGATION_COMPLETE_ACK
+
+9. 模型广播
+   GLOBAL_MODEL_BROADCAST → GLOBAL_MODEL_BROADCAST_ACK
+
+10. 轮次完成
+    ROUND_COMPLETE → ROUND_COMPLETE_ACK
+
+11. 动态调整（可选）
+    STRATEGY_SWITCH_NOTIFICATION → STRATEGY_SWITCH_ACK
+```
+
+### 9.5 实现优先级建议
+
+**高优先级（必须实现）**：
+- GRADIENT_UPLOAD / GRADIENT_UPLOAD_ACK
+- AGGREGATION_START / AGGREGATION_START_ACK
+- AGGREGATION_COMPLETE / AGGREGATION_COMPLETE_ACK
+- ROUND_START / ROUND_START_ACK
+
+**中优先级（建议实现）**：
+- GLOBAL_MODEL_BROADCAST / GLOBAL_MODEL_BROADCAST_ACK
+- MODEL_TYPE_NEGOTIATION / MODEL_TYPE_NEGOTIATION_ACK
+- ROUND_COMPLETE / ROUND_COMPLETE_ACK
+
+**低优先级（可选实现）**：
+- ALGORITHM_CONFIG 系列
+- GRADIENT_UPLOAD_PREPARE 系列
+- STRATEGY_SWITCH 系列
+- AGGREGATION_NOTIFICATION
+
+### 9.6 性能优化考虑
+
+**网络传输优化**：
+- GRADIENT_UPLOAD支持压缩传输（gzip、lz4）
+- GLOBAL_MODEL_BROADCAST采用分块广播减少内存峰值
+- GRADIENT_UPLOAD_PREPARE提前准备避免聚合等待
+
+**并发处理优化**：
+- 多个GRADIENT_UPLOAD可并行处理
+- GLOBAL_MODEL_BROADCAST支持异步广播
+- ACK消息采用批量确认减少网络开销
+
+**容错机制**：
+- 超时重传机制覆盖所有ACK协议
+- STRATEGY_SWITCH支持失败回滚
+- AGGREGATION异常时自动降级到传统MODEL_UPLOAD/DOWNLOAD
+
+### 9.7 Git提交记录
+
+```diff
++ // 联邦学习聚合消息
++ GRADIENT_UPLOAD,
++ GRADIENT_UPLOAD_ACK,
++ GLOBAL_MODEL_BROADCAST,
++ GLOBAL_MODEL_BROADCAST_ACK,
++ AGGREGATION_START,
++ AGGREGATION_START_ACK,
++ AGGREGATION_COMPLETE,
++ AGGREGATION_COMPLETE_ACK,
++ ROUND_START,
++ ROUND_START_ACK,
++ ROUND_COMPLETE,
++ ROUND_COMPLETE_ACK,
+
++ // 联邦学习增强协议 (v1.4版本新增)
++ MODEL_TYPE_NEGOTIATION,
++ MODEL_TYPE_NEGOTIATION_ACK,
++ ALGORITHM_CONFIG,
++ ALGORITHM_CONFIG_ACK,
++ GRADIENT_UPLOAD_PREPARE,
++ GRADIENT_UPLOAD_PREPARE_ACK,
++ AGGREGATION_NOTIFICATION,
++ STRATEGY_SWITCH_NOTIFICATION,
++ STRATEGY_SWITCH_ACK,
+```
+
+## 9. 联邦学习聚合协议扩展 (v1.4.3)
+
+### 变更背景
+
+为支持UniversalAggregationEngine v2.0架构，在v1.4.3版本中向ProtocolType枚举新增了专门的联邦学习聚合协议类型。这些协议类型专为高效的分布式模型聚合和同步而设计，支持RandomForest和神经网络等多种模型类型的联邦学习。
+
+### 新增协议类型
+
+#### 9.1 联邦学习聚合消息 (Federated Learning Aggregation Messages)
+
+这一组协议专门用于联邦学习过程中的模型聚合和全局同步：
+
+```java
+// ========== 联邦学习聚合消息 ==========
+GRADIENT_UPLOAD,               // 梯度上传 🔵
+GRADIENT_UPLOAD_ACK,           // 梯度上传确认 🟢
+GLOBAL_MODEL_BROADCAST,        // 全局模型广播 🟢
+GLOBAL_MODEL_BROADCAST_ACK,    // 全局模型广播确认 🔵
+AGGREGATION_START,             // 开始聚合 🟢
+AGGREGATION_START_ACK,         // 聚合开始确认 🔵
+AGGREGATION_COMPLETE,          // 聚合完成 🟢
+AGGREGATION_COMPLETE_ACK,      // 聚合完成确认 🔵
+ROUND_START,                   // 轮次开始 🟢
+ROUND_START_ACK,              // 轮次开始确认 🔵
+ROUND_COMPLETE,               // 轮次完成 🟢
+ROUND_COMPLETE_ACK,           // 轮次完成确认 🔵
+```
+
+**协议实现要求**：
+
+**GRADIENT_UPLOAD** 🔵
+- **作用**: 虚拟机将本地训练后的梯度/参数上传至后端
+- **虚拟机端实现**: 训练完成后序列化模型参数，支持压缩和分块传输
+- **后端实现**: 接收并验证梯度数据，存储到聚合缓冲区
+
+**GLOBAL_MODEL_BROADCAST** 🟢
+- **作用**: 后端向所有参与节点广播聚合后的全局模型
+- **虚拟机端实现**: 接收全局模型，验证完整性并更新本地模型
+- **后端实现**: 聚合完成后向所有参与者并发广播全局模型
+
+**AGGREGATION_START/COMPLETE** 🟢🔵
+- **作用**: 控制联邦聚合过程的启动和完成状态同步
+- **虚拟机端实现**: 响应聚合状态信号，调整本地训练策略
+- **后端实现**: 协调聚合时机，确保所有参与者状态同步
+
+**ROUND_START/COMPLETE** 🟢🔵
+- **作用**: 管理联邦学习的训练轮次生命周期
+- **虚拟机端实现**: 按轮次开始/结束本地训练任务
+- **后端实现**: 全局轮次控制，协调所有参与者的训练节奏
+
+#### 9.2 增强联邦学习协议 v2.0 (Enhanced Federated Learning Protocol v2.0)
+
+这一组协议支持UniversalAggregationEngine的高级功能，包括模型类型协商和动态策略调整：
+
+```java
+// ========== 增强联邦学习协议 v2.0 ==========
+MODEL_TYPE_NEGOTIATION,        // 模型类型协商 🟢
+MODEL_TYPE_NEGOTIATION_ACK,    // 模型类型协商确认 🔵
+ALGORITHM_CONFIG,              // 算法配置 🟢
+ALGORITHM_CONFIG_ACK,          // 算法配置确认 🔵
+GRADIENT_UPLOAD_PREPARE,       // 梯度上传准备 🟢
+GRADIENT_UPLOAD_PREPARE_ACK,   // 梯度上传准备确认 🔵
+AGGREGATION_NOTIFICATION,      // 聚合状态通知 🟢
+STRATEGY_SWITCH_NOTIFICATION,  // 策略切换通知 🟢
+STRATEGY_SWITCH_ACK,           // 策略切换确认 🔵
+```
+
+**高级协议实现要求**：
+
+**MODEL_TYPE_NEGOTIATION** 🟢🔵
+- **作用**: 协商各参与节点支持的模型类型和框架
+- **虚拟机端实现**: 上报本地支持的ML框架（sklearn、pytorch、tensorflow）和模型类型
+- **后端实现**: 收集所有节点能力，选择最优的聚合策略
+
+**ALGORITHM_CONFIG** 🟢🔵
+- **作用**: 配置联邦学习算法参数（FedAvg、FedProx、FedNova等）
+- **虚拟机端实现**: 接收并应用算法参数，调整本地训练超参数
+- **后端实现**: 根据任务特点和节点能力下发最优算法配置
+
+**GRADIENT_UPLOAD_PREPARE** 🟢🔵
+- **作用**: 在聚合窗口开启前通知参与者准备数据上传
+- **虚拟机端实现**: 预处理模型参数，准备压缩和传输
+- **后端实现**: 协调上传时序，避免网络拥塞
+
+**STRATEGY_SWITCH_NOTIFICATION** 🟢🔵
+- **作用**: 动态切换聚合策略（如从FedAvg切换到FedProx）
+- **虚拟机端实现**: 调整本地训练策略以匹配新的聚合算法
+- **后端实现**: 根据训练进展或收敛情况动态调整策略
+
+### 9.3 协议冗余性分析
+
+**与现有协议的关系**：
+
+1. **GRADIENT_UPLOAD vs MODEL_UPLOAD**
+   - **GRADIENT_UPLOAD**: 专用于联邦学习梯度传输，支持增量更新
+   - **MODEL_UPLOAD**: 用于完整模型上传，兼容传统训练
+   - **建议**: 保留两者，联邦学习场景优先使用GRADIENT_UPLOAD
+
+2. **GLOBAL_MODEL_BROADCAST vs MODEL_DOWNLOAD**
+   - **GLOBAL_MODEL_BROADCAST**: 支持一对多广播，效率更高
+   - **MODEL_DOWNLOAD**: 点对点下载，适合单节点场景
+   - **建议**: 联邦学习使用GLOBAL_MODEL_BROADCAST，单机训练使用MODEL_DOWNLOAD
+
+3. **新增通知类消息**
+   - **AGGREGATION_NOTIFICATION**: 纯通知，无需ACK
+   - **STRATEGY_SWITCH_NOTIFICATION**: 关键操作，需要ACK确认
+   - **作用**: 实现事件驱动的状态同步
+
+### 9.4 联邦学习协议流程
+
+**完整的联邦学习训练流程**：
+
+```
+1. 任务初始化
+   FEDERATED_TASK_START → FEDERATED_TASK_START_ACK
+
+2. 能力协商
+   MODEL_TYPE_NEGOTIATION → MODEL_TYPE_NEGOTIATION_ACK
+
+3. 算法配置
+   ALGORITHM_CONFIG → ALGORITHM_CONFIG_ACK
+
+4. 轮次开始
+   ROUND_START → ROUND_START_ACK
+
+5. 本地训练
+   TRAINING_START → TRAINING_START_RESPONSE
+
+6. 梯度准备
+   GRADIENT_UPLOAD_PREPARE → GRADIENT_UPLOAD_PREPARE_ACK
+
+7. 梯度上传
+   GRADIENT_UPLOAD → GRADIENT_UPLOAD_ACK
+
+8. 聚合处理
+   AGGREGATION_START → AGGREGATION_START_ACK
+   AGGREGATION_COMPLETE → AGGREGATION_COMPLETE_ACK
+
+9. 模型广播
+   GLOBAL_MODEL_BROADCAST → GLOBAL_MODEL_BROADCAST_ACK
+
+10. 轮次完成
+    ROUND_COMPLETE → ROUND_COMPLETE_ACK
+
+11. 动态调整（可选）
+    STRATEGY_SWITCH_NOTIFICATION → STRATEGY_SWITCH_ACK
+```
+
+### 9.5 实现优先级建议
+
+**高优先级（必须实现）**：
+- GRADIENT_UPLOAD / GRADIENT_UPLOAD_ACK
+- AGGREGATION_START / AGGREGATION_START_ACK
+- AGGREGATION_COMPLETE / AGGREGATION_COMPLETE_ACK
+- ROUND_START / ROUND_START_ACK
+
+**中优先级（建议实现）**：
+- GLOBAL_MODEL_BROADCAST / GLOBAL_MODEL_BROADCAST_ACK
+- MODEL_TYPE_NEGOTIATION / MODEL_TYPE_NEGOTIATION_ACK
+- ROUND_COMPLETE / ROUND_COMPLETE_ACK
+
+**低优先级（可选实现）**：
+- ALGORITHM_CONFIG 系列
+- GRADIENT_UPLOAD_PREPARE 系列
+- STRATEGY_SWITCH 系列
+- AGGREGATION_NOTIFICATION
+
+### 9.6 性能优化考虑
+
+**网络传输优化**：
+- GRADIENT_UPLOAD支持压缩传输（gzip、lz4）
+- GLOBAL_MODEL_BROADCAST采用分块广播减少内存峰值
+- GRADIENT_UPLOAD_PREPARE提前准备避免聚合等待
+
+**并发处理优化**：
+- 多个GRADIENT_UPLOAD可并行处理
+- GLOBAL_MODEL_BROADCAST支持异步广播
+- ACK消息采用批量确认减少网络开销
+
+**容错机制**：
+- 超时重传机制覆盖所有ACK协议
+- STRATEGY_SWITCH支持失败回滚
+- AGGREGATION异常时自动降级到传统MODEL_UPLOAD/DOWNLOAD
+
+### 9.7 Git提交记录
+
+```diff
++ // 联邦学习聚合消息
++ GRADIENT_UPLOAD,
++ GRADIENT_UPLOAD_ACK,
++ GLOBAL_MODEL_BROADCAST,
++ GLOBAL_MODEL_BROADCAST_ACK,
++ AGGREGATION_START,
++ AGGREGATION_START_ACK,
++ AGGREGATION_COMPLETE,
++ AGGREGATION_COMPLETE_ACK,
++ ROUND_START,
++ ROUND_START_ACK,
++ ROUND_COMPLETE,
++ ROUND_COMPLETE_ACK,
+
++ // 联邦学习增强协议 (v1.4版本新增)
++ MODEL_TYPE_NEGOTIATION,
++ MODEL_TYPE_NEGOTIATION_ACK,
++ ALGORITHM_CONFIG,
++ ALGORITHM_CONFIG_ACK,
++ GRADIENT_UPLOAD_PREPARE,
++ GRADIENT_UPLOAD_PREPARE_ACK,
++ AGGREGATION_NOTIFICATION,
++ STRATEGY_SWITCH_NOTIFICATION,
++ STRATEGY_SWITCH_ACK,
+```
+
+## 10. 文档更新
 
 重构完成后需要更新：
 - WebSocket 协议文档

@@ -970,9 +970,722 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.8 错误和状态消息
+#### 3.8.3 批量状态查询请求 (BATCH_STATUS_QUERY) 🟢
 
-#### 3.8.1 错误报告 (ERROR)
+**消息作用**: 后端向多个虚拟机同时发送状态查询请求，用于获取集群整体状态信息和统计数据。
+
+**虚拟机端实现**: 接收批量查询请求，收集本机状态信息，在指定时间内响应查询。参与批量统计分析，提供必要的系统指标。
+
+**后端实现**: 当需要进行集群监控或生成整体报告时发送批量查询，收集所有虚拟机的状态数据，进行汇总分析和统计计算。
+
+```json
+{
+  "type": "BATCH_STATUS_QUERY",
+  "id": "cmd-1704067200000-123480",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "queryId": "batch-query-001",
+    "targets": ["vm-001", "vm-002", "vm-003"],
+    "queryType": "SUMMARY",
+    "includeMetrics": ["cpu", "memory", "network"],
+    "timeout": 15
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.8.4 批量状态查询响应 (BATCH_STATUS_RESPONSE) 🟢
+
+**消息作用**: 后端汇总多个虚拟机的状态查询结果，提供集群整体状态摘要和统计信息。
+
+**虚拟机端实现**: 无需主动发送此消息，但应理解此消息格式用于接收集群状态汇总信息。
+
+**后端实现**: 收集所有虚拟机的状态响应后，进行数据汇总和统计分析，生成集群整体状态报告并发送给查询发起者或监控系统。
+
+```json
+{
+  "type": "BATCH_STATUS_RESPONSE",
+  "id": "server-1704067200000-123481",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "query-initiator",
+  "data": {
+    "queryId": "batch-query-001",
+    "summary": {
+      "totalVms": 3,
+      "onlineVms": 2,
+      "offlineVms": 1,
+      "averageCpuUsage": 35.7,
+      "averageMemoryUsage": 65.3,
+      "totalTrainingTasks": 2
+    },
+    "details": [
+      {
+        "vmId": "vm-001",
+        "status": "RUNNING",
+        "cpu": 25.5,
+        "memory": 60.2
+      },
+      {
+        "vmId": "vm-002",
+        "status": "RUNNING",
+        "cpu": 45.8,
+        "memory": 70.4
+      },
+      {
+        "vmId": "vm-003",
+        "status": "OFFLINE",
+        "lastSeen": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.9 联邦学习聚合消息 (v1.4新增)
+
+#### 3.9.1 梯度上传 (GRADIENT_UPLOAD) 🔵
+
+**消息作用**: 虚拟机将本轮训练产生的梯度信息上传至后端，用于联邦学习的梯度聚合算法。
+
+**虚拟机端实现**: 本地训练完成后，提取模型梯度或参数更新信息，序列化并上传到后端。支持梯度压缩和差分隐私处理，确保数据传输效率和隐私保护。
+
+**后端实现**: 接收虚拟机上传的梯度数据，进行验证和存储。当收集到足够数量的梯度后，触发联邦聚合算法执行，生成全局模型更新。
+
+```json
+{
+  "type": "GRADIENT_UPLOAD",
+  "id": "client-1704067200000-130001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "gradientData": {
+      "weights": {
+        "layer1": [0.001, -0.002, 0.003],
+        "layer2": [0.004, -0.005, 0.006]
+      },
+      "biases": {
+        "layer1": [0.001],
+        "layer2": [0.002]
+      }
+    },
+    "trainingMetrics": {
+      "samplesCount": 1000,
+      "localLoss": 0.25,
+      "localAccuracy": 0.87
+    },
+    "compressionMethod": "gzip",
+    "privacyLevel": "differential"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.2 梯度上传确认 (GRADIENT_UPLOAD_ACK) 🟢
+
+**消息作用**: 后端确认已成功接收虚拟机上传的梯度数据，通知虚拟机可以继续后续操作。
+
+**虚拟机端实现**: 接收此确认消息，了解梯度上传状态。如果状态为失败，可根据错误信息重新上传或调整参数。
+
+**后端实现**: 在成功接收和验证梯度数据后发送此确认消息。包含接收状态、数据验证结果和下一步操作指示。
+
+```json
+{
+  "type": "GRADIENT_UPLOAD_ACK",
+  "id": "server-1704067200000-130001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "SUCCESS",
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "receivedBytes": 2048,
+    "validationResult": "PASSED",
+    "nextStep": "WAIT_AGGREGATION"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.3 全局模型广播 (GLOBAL_MODEL_BROADCAST) 🟢
+
+**消息作用**: 后端完成联邦聚合后，向所有参与的虚拟机广播最新的全局模型参数和聚合结果。
+
+**虚拟机端实现**: 接收全局模型广播，验证模型参数完整性，更新本地全局模型副本。为下一轮本地训练做准备，发送确认消息。
+
+**后端实现**: 联邦聚合算法完成后，构建全局模型广播消息发送给所有参与节点。包含聚合后的模型参数、聚合统计信息和下轮训练配置。
+
+```json
+{
+  "type": "GLOBAL_MODEL_BROADCAST",
+  "id": "server-1704067200000-130010",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "globalModel": {
+      "weights": {
+        "layer1": [0.125, -0.087, 0.234],
+        "layer2": [0.156, -0.203, 0.298]
+      },
+      "biases": {
+        "layer1": [0.045],
+        "layer2": [0.078]
+      }
+    },
+    "aggregationInfo": {
+      "algorithm": "FEDERATED_AVERAGING",
+      "participantCount": 5,
+      "convergenceScore": 0.92
+    },
+    "nextRoundConfig": {
+      "startTime": "2024-01-01T00:05:00.000Z",
+      "epochs": 3,
+      "learningRate": 0.01
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.4 全局模型广播确认 (GLOBAL_MODEL_BROADCAST_ACK) 🔵
+
+**消息作用**: 虚拟机确认已成功接收全局模型广播，表示准备就绪可以开始下一轮训练。
+
+**虚拟机端实现**: 在成功接收和应用全局模型后发送此确认消息。包含模型更新状态、本地验证结果和准备就绪状态。
+
+**后端实现**: 接收虚拟机的广播确认，统计确认状态。当所有参与者都确认接收后，可以启动下一轮联邦学习训练。
+
+```json
+{
+  "type": "GLOBAL_MODEL_BROADCAST_ACK",
+  "id": "client-1704067200000-130010",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "SUCCESS",
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "modelUpdateTime": "2024-01-01T00:00:00.000Z",
+    "validationAccuracy": 0.89,
+    "readyForNextRound": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.5 聚合开始通知 (AGGREGATION_START) 🟢
+
+**消息作用**: 后端通知虚拟机联邦聚合过程即将开始，虚拟机应停止发送新的梯度数据并等待聚合结果。
+
+**虚拟机端实现**: 接收此通知后停止发送模型更新，进入等待聚合状态。可以进行本地资源清理或准备下轮训练环境。
+
+**后端实现**: 当收集到足够的梯度数据并准备开始聚合时发送此通知。通知所有参与者聚合即将开始，包含预计完成时间和聚合方法信息。
+
+```json
+{
+  "type": "AGGREGATION_START",
+  "id": "server-1704067200000-130020",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "aggregationMethod": "FEDERATED_AVERAGING",
+    "participantCount": 5,
+    "estimatedDuration": 120,
+    "startTime": "2024-01-01T00:00:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.6 聚合开始确认 (AGGREGATION_START_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到聚合开始通知，表示已进入等待聚合完成状态。
+
+**虚拟机端实现**: 收到聚合开始通知后发送此确认消息，表明已停止发送梯度数据，准备接收聚合结果。
+
+**后端实现**: 接收虚拟机的聚合开始确认，确保所有参与者都已准备好进入聚合阶段。
+
+```json
+{
+  "type": "AGGREGATION_START_ACK",
+  "id": "client-1704067200000-130020",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "ACKNOWLEDGED",
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "waitingForAggregation": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.7 聚合完成通知 (AGGREGATION_COMPLETE) 🟢
+
+**消息作用**: 后端通知虚拟机联邦聚合过程已完成，提供聚合结果摘要信息。
+
+**虚拟机端实现**: 接收聚合完成通知，了解本轮聚合的结果和统计信息。准备接收新的全局模型参数。
+
+**后端实现**: 联邦聚合算法执行完成后发送此通知，包含聚合统计信息、收敛情况和全局模型性能指标。
+
+```json
+{
+  "type": "AGGREGATION_COMPLETE",
+  "id": "server-1704067200000-130030",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "aggregationResults": {
+      "participantCount": 5,
+      "convergenceScore": 0.92,
+      "globalAccuracy": 0.88,
+      "globalLoss": 0.15
+    },
+    "duration": 95,
+    "nextStep": "GLOBAL_MODEL_BROADCAST"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.8 聚合完成确认 (AGGREGATION_COMPLETE_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到聚合完成通知，表示准备接收新的全局模型。
+
+**虚拟机端实现**: 收到聚合完成通知后发送此确认消息，表明已了解聚合结果，准备接收全局模型更新。
+
+**后端实现**: 接收虚拟机的聚合完成确认，确保通知已成功传达给所有参与者。
+
+```json
+{
+  "type": "AGGREGATION_COMPLETE_ACK",
+  "id": "client-1704067200000-130030",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "ACKNOWLEDGED",
+    "taskId": "fedtask-123456",
+    "roundNumber": 5,
+    "readyForGlobalModel": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.9 轮次开始通知 (ROUND_START) 🟢
+
+**消息作用**: 后端通知虚拟机新的联邦学习训练轮次即将开始，提供轮次配置和训练参数。
+
+**虚拟机端实现**: 接收轮次开始通知，根据提供的配置参数准备本地训练环境。设置训练参数，初始化数据加载器，准备开始本轮训练。
+
+**后端实现**: 当准备启动新的联邦学习轮次时发送此通知，包含轮次编号、训练配置、超参数设置和目标性能指标。
+
+```json
+{
+  "type": "ROUND_START",
+  "id": "server-1704067200000-130040",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "trainingConfig": {
+      "epochs": 3,
+      "batchSize": 32,
+      "learningRate": 0.01,
+      "timeout": 600
+    },
+    "targetMetrics": {
+      "minAccuracy": 0.85,
+      "maxLoss": 0.20
+    },
+    "expectedParticipants": 5
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.10 轮次开始确认 (ROUND_START_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到轮次开始通知，表示准备就绪可以开始本轮训练。
+
+**虚拟机端实现**: 收到轮次开始通知并完成本地准备后发送此确认消息。包含本地配置状态和预计训练开始时间。
+
+**后端实现**: 接收虚拟机的轮次开始确认，统计参与者准备状态。当足够数量的参与者确认就绪后，可以正式开始训练轮次。
+
+```json
+{
+  "type": "ROUND_START_ACK",
+  "id": "client-1704067200000-130040",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "READY",
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "localConfigStatus": "INITIALIZED",
+    "estimatedStartTime": "2024-01-01T00:00:30.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.11 轮次完成通知 (ROUND_COMPLETE) 🟢
+
+**消息作用**: 后端通知虚拟机当前联邦学习训练轮次已完成，提供轮次结果摘要和下轮计划。
+
+**虚拟机端实现**: 接收轮次完成通知，了解本轮训练的整体结果。清理本轮训练资源，为下轮训练或任务结束做准备。
+
+**后端实现**: 当前轮次的所有训练和聚合过程完成后发送此通知。包含轮次统计、全局性能指标和下轮训练计划。
+
+```json
+{
+  "type": "ROUND_COMPLETE",
+  "id": "server-1704067200000-130050",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "roundResults": {
+      "participantCount": 5,
+      "globalAccuracy": 0.91,
+      "globalLoss": 0.12,
+      "convergenceImprovement": 0.03
+    },
+    "nextRound": {
+      "planned": true,
+      "roundNumber": 7,
+      "scheduledStart": "2024-01-01T00:10:00.000Z"
+    },
+    "duration": 450
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.12 轮次完成确认 (ROUND_COMPLETE_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到轮次完成通知，表示已了解本轮结果并准备下轮训练或任务结束。
+
+**虚拟机端实现**: 收到轮次完成通知后发送此确认消息。清理本轮资源，更新本地统计信息，为下轮训练做准备。
+
+**后端实现**: 接收虚拟机的轮次完成确认，确保所有参与者都已了解轮次结果。用于协调下轮训练的开始时机。
+
+```json
+{
+  "type": "ROUND_COMPLETE_ACK",
+  "id": "client-1704067200000-130050",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "ACKNOWLEDGED",
+    "taskId": "fedtask-123456",
+    "roundNumber": 6,
+    "resourcesCleared": true,
+    "readyForNextRound": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.13 模型类型协商 (MODEL_TYPE_NEGOTIATION) 🟢
+
+**消息作用**: 后端与虚拟机协商联邦学习任务中使用的模型类型和架构参数。
+
+**虚拟机端实现**: 接收模型类型协商请求，检查本地支持的模型类型和框架，返回兼容性信息和建议配置。
+
+**后端实现**: 在开始联邦学习任务前发送模型类型协商请求，收集所有参与者的模型支持情况，确定最佳的统一模型配置。
+
+```json
+{
+  "type": "MODEL_TYPE_NEGOTIATION",
+  "id": "server-1704067200000-130060",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "proposedModelTypes": ["RandomForest", "NeuralNetwork", "SVM"],
+    "frameworks": ["sklearn", "pytorch", "tensorflow"],
+    "modelRequirements": {
+      "inputDimension": 784,
+      "outputClasses": 10,
+      "maxComplexity": "MEDIUM"
+    },
+    "negotiationTimeout": 60
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.14 模型类型协商确认 (MODEL_TYPE_NEGOTIATION_ACK) 🔵
+
+**消息作用**: 虚拟机响应后端的模型类型协商请求，提供本地支持的模型类型和建议配置。
+
+**虚拟机端实现**: 检查本地机器学习环境，评估提议的模型类型支持情况，返回兼容性报告和性能预估。
+
+**后端实现**: 接收虚拟机的协商响应，汇总所有参与者的模型支持情况，确定最终的统一模型配置方案。
+
+```json
+{
+  "type": "MODEL_TYPE_NEGOTIATION_ACK",
+  "id": "client-1704067200000-130060",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "supportedModels": ["RandomForest", "NeuralNetwork"],
+    "recommendedModel": "RandomForest",
+    "supportedFrameworks": ["sklearn", "pytorch"],
+    "performanceEstimate": {
+      "RandomForest": "HIGH",
+      "NeuralNetwork": "MEDIUM"
+    },
+    "resourceConstraints": {
+      "maxMemoryUsage": "4GB",
+      "maxTrainingTime": 300
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.15 算法配置 (ALGORITHM_CONFIG) 🟢
+
+**消息作用**: 后端向虚拟机发送联邦学习算法的详细配置参数和超参数设置。
+
+**虚拟机端实现**: 接收算法配置，根据配置参数调整本地训练算法设置。验证配置兼容性，如有问题及时反馈。
+
+**后端实现**: 在开始联邦学习任务前发送统一的算法配置，确保所有参与者使用相同的算法参数和训练策略。
+
+```json
+{
+  "type": "ALGORITHM_CONFIG",
+  "id": "server-1704067200000-130070",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "algorithm": "FEDERATED_AVERAGING",
+    "hyperparameters": {
+      "learningRate": 0.01,
+      "batchSize": 32,
+      "localEpochs": 5,
+      "momentum": 0.9
+    },
+    "aggregationConfig": {
+      "method": "WEIGHTED_AVERAGE",
+      "minParticipants": 3,
+      "convergenceThreshold": 0.001
+    },
+    "privacyConfig": {
+      "differentialPrivacy": true,
+      "epsilon": 1.0,
+      "delta": 0.0001
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.16 算法配置确认 (ALGORITHM_CONFIG_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到并应用算法配置，表示本地训练环境已按配置准备就绪。
+
+**虚拟机端实现**: 收到算法配置后验证配置参数，应用到本地训练环境，发送配置应用结果和状态确认。
+
+**后端实现**: 接收虚拟机的算法配置确认，确保所有参与者都已正确应用算法配置。统计确认状态决定是否开始训练。
+
+```json
+{
+  "type": "ALGORITHM_CONFIG_ACK",
+  "id": "client-1704067200000-130070",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "SUCCESS",
+    "taskId": "fedtask-123456",
+    "configApplied": true,
+    "validationResults": {
+      "hyperparametersValid": true,
+      "aggregationConfigValid": true,
+      "privacyConfigValid": true
+    },
+    "estimatedReadyTime": "2024-01-01T00:00:30.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.17 梯度上传准备 (GRADIENT_UPLOAD_PREPARE) 🟢
+
+**消息作用**: 后端通知虚拟机准备上传梯度，提供上传配置和优化建议。
+
+**虚拟机端实现**: 接收上传准备通知，根据配置优化梯度数据的格式和压缩方式。准备上传通道，预估上传时间和资源需求。
+
+**后端实现**: 在虚拟机本地训练接近完成时发送此通知，帮助优化梯度上传过程。提供网络优化建议和上传策略。
+
+```json
+{
+  "type": "GRADIENT_UPLOAD_PREPARE",
+  "id": "server-1704067200000-130080",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 7,
+    "uploadConfig": {
+      "compressionMethod": "gzip",
+      "batchSize": 1024,
+      "maxUploadTime": 120
+    },
+    "optimizationHints": {
+      "networkOptimization": true,
+      "prioritizeAccuracy": false
+    },
+    "expectedUploadStart": "2024-01-01T00:02:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.18 梯度上传准备确认 (GRADIENT_UPLOAD_PREPARE_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到梯度上传准备通知，表示已优化上传配置并准备就绪。
+
+**虚拟机端实现**: 收到上传准备通知后应用优化配置，测试上传通道，发送准备就绪确认和预估信息。
+
+**后端实现**: 接收虚拟机的上传准备确认，了解各节点的准备状态和预估上传时间，优化全局上传调度。
+
+```json
+{
+  "type": "GRADIENT_UPLOAD_PREPARE_ACK",
+  "id": "client-1704067200000-130080",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "READY",
+    "taskId": "fedtask-123456",
+    "roundNumber": 7,
+    "uploadEstimate": {
+      "dataSize": 2048,
+      "estimatedTime": 30,
+      "networkSpeed": 1024
+    },
+    "optimizationApplied": true,
+    "readyToUpload": true
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.19 聚合进度通知 (AGGREGATION_NOTIFICATION) 🟢
+
+**消息作用**: 后端向虚拟机发送联邦聚合的实时进度信息和状态更新。
+
+**虚拟机端实现**: 接收聚合进度通知，更新本地状态显示。可根据进度信息调整资源使用或准备下一步操作。
+
+**后端实现**: 在联邦聚合执行过程中定期发送进度通知，让参与者了解聚合状态。包含进度百分比、预计完成时间和中间结果。
+
+```json
+{
+  "type": "AGGREGATION_NOTIFICATION",
+  "id": "server-1704067200000-130090",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "roundNumber": 7,
+    "progress": {
+      "percentage": 65,
+      "currentStep": "GRADIENT_AGGREGATION",
+      "totalSteps": 4
+    },
+    "intermediateResults": {
+      "processedParticipants": 3,
+      "totalParticipants": 5,
+      "convergenceScore": 0.87
+    },
+    "estimatedCompletion": "2024-01-01T00:03:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.20 策略切换通知 (STRATEGY_SWITCH_NOTIFICATION) 🟢
+
+**消息作用**: 后端通知虚拟机联邦学习策略即将发生变更，提供新策略的配置信息。
+
+**虚拟机端实现**: 接收策略切换通知，评估新策略对本地环境的影响。调整本地配置以适应新策略，发送切换确认。
+
+**后端实现**: 当系统决定切换联邦学习策略时发送此通知。可能由于性能优化、收敛问题或资源变化触发策略调整。
+
+```json
+{
+  "type": "STRATEGY_SWITCH_NOTIFICATION",
+  "id": "server-1704067200000-130100",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "broadcast",
+  "data": {
+    "taskId": "fedtask-123456",
+    "currentStrategy": "FEDERATED_AVERAGING",
+    "newStrategy": "FEDERATED_PROXIMAL",
+    "switchReason": "CONVERGENCE_OPTIMIZATION",
+    "newConfig": {
+      "proximalTerm": 0.1,
+      "adaptiveLearningRate": true,
+      "regularizationStrength": 0.01
+    },
+    "effectiveRound": 8,
+    "migrationGuidance": "GRADUAL_TRANSITION"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+#### 3.9.21 策略切换确认 (STRATEGY_SWITCH_ACK) 🔵
+
+**消息作用**: 虚拟机确认已收到策略切换通知，表示已准备好适应新的联邦学习策略。
+
+**虚拟机端实现**: 收到策略切换通知后评估本地适配能力，调整算法配置，发送切换准备就绪确认。
+
+**后端实现**: 接收虚拟机的策略切换确认，统计所有参与者的适配状态。当所有节点都确认就绪后，正式启用新策略。
+
+```json
+{
+  "type": "STRATEGY_SWITCH_ACK",
+  "id": "client-1704067200000-130100",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "status": "READY",
+    "taskId": "fedtask-123456",
+    "newStrategy": "FEDERATED_PROXIMAL",
+    "adaptationResult": {
+      "configurationUpdated": true,
+      "performanceEstimate": "GOOD",
+      "resourceImpact": "MINIMAL"
+    },
+    "readyForSwitch": true,
+    "estimatedSwitchTime": "2024-01-01T00:01:00.000Z"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+### 3.10 错误和状态消息
+
+#### 3.10.1 错误报告 (ERROR)
 ```json
 {
   "type": "ERROR",
@@ -1001,11 +1714,11 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.9 训练数据同步消息
+### 3.11 训练数据同步消息
 
 > 自v1.1起，训练数据采用宽表+JSON存储：数据集元信息写入 `training_dataset`，数据行写入 `training_dataset_row`（`row_data` JSON，`dataset_id` 外键）。以下消息用于通过WebSocket进行数据集创建与增量同步。
 
-#### 3.9.1 创建数据集 (DATASET_CREATE)
+#### 3.11.1 创建数据集 (DATASET_CREATE)
 ```json
 {
   "type": "DATASET_CREATE",
@@ -1039,7 +1752,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-#### 3.9.2 追加数据行（批量）(DATASET_APPEND_ROWS)
+#### 3.11.2 追加数据行（批量）(DATASET_APPEND_ROWS)
 ```json
 {
   "type": "DATASET_APPEND_ROWS",
@@ -1075,7 +1788,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-#### 3.9.3 完成数据集上传 (DATASET_COMPLETE)
+#### 3.11.3 完成数据集上传 (DATASET_COMPLETE)
 ```json
 {
   "type": "DATASET_COMPLETE",
@@ -1105,7 +1818,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-#### 3.9.4 数据集状态查询 (DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE)
+#### 3.11.4 数据集状态查询 (DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE)
 请求：
 ```json
 {
@@ -1136,7 +1849,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-#### 3.9.5 删除数据集 (DATASET_DELETE)
+#### 3.11.5 删除数据集 (DATASET_DELETE)
 ```json
 {
   "type": "DATASET_DELETE",
@@ -1165,7 +1878,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-## 3.10 服务端通知消息 (v1.4新增)
+## 3.12 服务端通知消息 (v1.4新增)
 
 > **重要说明**: 本节定义的是服务端主动发送的**通知消息**，与前述的**ACK响应消息**不同：
 >
@@ -1174,7 +1887,7 @@ function generateMessageId(prefix) {
 >
 > 例如：`DATASET_CREATE` → `DATASET_CREATE_ACK` (ACK响应) + `DATASET_CREATE_NOTIFICATION` (完成通知)
 
-### 3.10.1 数据集创建完成通知 (DATASET_CREATE_NOTIFICATION) 🟢
+### 3.12.1 数据集创建完成通知 (DATASET_CREATE_NOTIFICATION) 🟢
 ```json
 {
   "type": "DATASET_CREATE_NOTIFICATION",
@@ -1191,7 +1904,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.2 数据行添加完成通知 (DATASET_APPEND_ROWS_NOTIFICATION) 🟢
+### 3.12.2 数据行添加完成通知 (DATASET_APPEND_ROWS_NOTIFICATION) 🟢
 ```json
 {
   "type": "DATASET_APPEND_ROWS_NOTIFICATION",
@@ -1207,7 +1920,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.3 数据集完成通知 (DATASET_COMPLETE_NOTIFICATION) 🟢
+### 3.12.3 数据集完成通知 (DATASET_COMPLETE_NOTIFICATION) 🟢
 ```json
 {
   "type": "DATASET_COMPLETE_NOTIFICATION",
@@ -1223,7 +1936,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.4 训练开始指令通知 (TRAINING_START_COMMAND_NOTIFICATION) 🟢
+### 3.12.4 训练开始指令通知 (TRAINING_START_COMMAND_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_START_COMMAND_NOTIFICATION",
@@ -1249,7 +1962,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.5 训练开始成功通知 (TRAINING_START_NOTIFICATION) 🟢
+### 3.12.5 训练开始成功通知 (TRAINING_START_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_START_NOTIFICATION",
@@ -1265,7 +1978,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.6 训练开始失败通知 (TRAINING_START_FAILURE_NOTIFICATION) 🟢
+### 3.12.6 训练开始失败通知 (TRAINING_START_FAILURE_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_START_FAILURE_NOTIFICATION",
@@ -1281,7 +1994,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.7 训练停止指令通知 (TRAINING_STOP_COMMAND_NOTIFICATION) 🟢
+### 3.12.7 训练停止指令通知 (TRAINING_STOP_COMMAND_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_STOP_COMMAND_NOTIFICATION",
@@ -1296,7 +2009,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.8 训练进度查询指令通知 (TRAINING_PROGRESS_QUERY_NOTIFICATION) 🟢
+### 3.12.8 训练进度查询指令通知 (TRAINING_PROGRESS_QUERY_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_PROGRESS_QUERY_NOTIFICATION",
@@ -1311,7 +2024,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.9 训练进度更新通知 (TRAINING_PROGRESS_UPDATE_NOTIFICATION) 🟢
+### 3.12.9 训练进度更新通知 (TRAINING_PROGRESS_UPDATE_NOTIFICATION) 🟢
 ```json
 {
   "type": "TRAINING_PROGRESS_UPDATE_NOTIFICATION",
@@ -1330,7 +2043,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.10 模型下载通知 (MODEL_DOWNLOAD_NOTIFICATION) 🟢
+### 3.12.10 模型下载通知 (MODEL_DOWNLOAD_NOTIFICATION) 🟢
 ```json
 {
   "type": "MODEL_DOWNLOAD_NOTIFICATION",
@@ -1362,7 +2075,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.10.11 状态更新通知 (STATUS_UPDATE_NOTIFICATION) 🟢
+### 3.12.11 状态更新通知 (STATUS_UPDATE_NOTIFICATION) 🟢
 ```json
 {
   "type": "STATUS_UPDATE_NOTIFICATION",
