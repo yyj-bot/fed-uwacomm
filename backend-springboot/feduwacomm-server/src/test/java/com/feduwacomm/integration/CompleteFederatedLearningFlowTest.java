@@ -75,8 +75,8 @@ public class CompleteFederatedLearningFlowTest {
         new VmTestData(null, "VM-Node-5", "192.168.1.105", 8085, 16, 32768, 4)
     );
 
-    // 存储注册后的虚拟机ID
-    private final List<String> registeredVmIds = new ArrayList<>();
+    // 存储注册后的虚拟机ID (线程安全)
+    private final List<String> registeredVmIds = Collections.synchronizedList(new ArrayList<>());
 
     // WebSocket客户端
     private final List<MockVirtualMachine> mockVMs = new ArrayList<>();
@@ -156,12 +156,14 @@ public class CompleteFederatedLearningFlowTest {
             .map(vm -> CompletableFuture.runAsync(() -> {
                 try {
                     String vmId = vm.register(baseUrl); // 注册并获取后端生成的vmId
-                    registeredVmIds.add(vmId); // 存储注册后的vmId
+                    registeredVmIds.add(vmId); // 线程安全的添加到列表
                     assertThat(vm.isRegistered()).isTrue();
                     assertThat(vmId).isNotNull().matches("[a-f0-9]{32}"); // 验证自动生成的32位UUID格式
                     System.out.println("✅ " + vm.getName() + " 注册成功，vmId: " + vmId);
                 } catch (Exception e) {
-                    fail("VM registration failed: " + e.getMessage());
+                    System.err.println("❌ " + vm.getName() + " 注册失败: " + e.getMessage());
+                    e.printStackTrace();
+                    fail("VM registration failed for " + vm.getName() + ": " + e.getMessage());
                 }
             }))
             .collect(Collectors.toList());
@@ -514,14 +516,14 @@ public class CompleteFederatedLearningFlowTest {
                 .map(vm -> CompletableFuture.runAsync(() -> {
                     try {
                         String vmId = vm.register(baseUrl); // 注册并获取后端生成的vmId
-                        synchronized (registeredVmIds) {
-                            registeredVmIds.add(vmId); // 线程安全地添加到列表
-                        }
+                        registeredVmIds.add(vmId); // 使用线程安全集合，无需手动同步
                         assertThat(vm.isRegistered()).isTrue();
                         assertThat(vmId).isNotNull().matches("[a-f0-9]{32}"); // 验证自动生成的32位UUID格式
                         System.out.println("✅ " + vm.getName() + " 注册成功，vmId: " + vmId);
                     } catch (Exception e) {
-                        fail("VM registration failed: " + e.getMessage());
+                        System.err.println("❌ " + vm.getName() + " 注册失败: " + e.getMessage());
+                        e.printStackTrace();
+                        fail("VM registration failed for " + vm.getName() + ": " + e.getMessage());
                     }
                 }))
                 .collect(Collectors.toList());
@@ -681,11 +683,16 @@ public class CompleteFederatedLearningFlowTest {
 
             if (strategyData != null && strategyData.get("strategies") instanceof java.util.List) {
                 @SuppressWarnings("unchecked")
-                java.util.List<String> strategies = (java.util.List<String>) strategyData.get("strategies");
+                java.util.List<Map<String, Object>> strategiesObjects = (java.util.List<Map<String, Object>>) strategyData.get("strategies");
+
+                // 从策略对象中提取算法名称
+                java.util.List<String> algorithms = strategiesObjects.stream()
+                        .map(strategy -> (String) strategy.get("algorithm"))
+                        .collect(java.util.stream.Collectors.toList());
 
                 // 验证支持的策略
-                assertThat(strategies).contains("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD");
-                System.out.println("✅ 策略工厂验证通过，支持策略: " + strategies);
+                assertThat(algorithms).contains("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD");
+                System.out.println("✅ 策略工厂验证通过，支持策略: " + algorithms);
             }
         } else {
             System.out.println("⚠️ 策略查询接口暂未实现，跳过验证");
@@ -1587,6 +1594,7 @@ public class CompleteFederatedLearningFlowTest {
                 .build())
             // 新增：聚合引擎配置
             .aggregationConfig(TaskCreateDTO.AggregationConfigDTO.builder()
+                .strategy("FEDERATED_AVERAGING") // 必需字段：聚合策略
                 .engineType("UNIVERSAL")
                 .supportedModelTypes(Arrays.asList("RANDOM_FOREST", "NEURAL_NETWORK"))
                 .supportedAlgorithms(Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD"))

@@ -44,10 +44,25 @@ public class FedAvgStrategy implements AggregationStrategy {
             // 获取第一个模型的参数结构，用于确定模型类型
             Map<String, Object> firstParams = parseParameters(models.get(0));
             @SuppressWarnings("unchecked")
-            Map<String, Object> modelParams = (Map<String, Object>) firstParams.get("model_parameters");
+            Map<String, Object> parametersWrapper = (Map<String, Object>) firstParams.get("parameters");
 
+            if (parametersWrapper == null) {
+                log.warn("parameters字段为空，尝试model_parameters字段");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> alternativeParams = (Map<String, Object>) firstParams.get("model_parameters");
+                if (alternativeParams == null) {
+                    log.error("解析后的参数结构: {}", firstParams.keySet());
+                    throw new AggregationException("模型参数为空，既没有parameters字段也没有model_parameters字段");
+                }
+                parametersWrapper = alternativeParams;
+            }
+
+            // 根据协议规范，模型参数位于 parameters.model 字段下
+            @SuppressWarnings("unchecked")
+            Map<String, Object> modelParams = (Map<String, Object>) parametersWrapper.get("model");
             if (modelParams == null) {
-                throw new AggregationException("模型参数为空");
+                log.warn("parameters.model字段为空，直接使用parameters作为模型参数");
+                modelParams = parametersWrapper;
             }
 
             // 根据参数类型选择聚合方法
@@ -81,18 +96,30 @@ public class FedAvgStrategy implements AggregationStrategy {
         for (VmRoundModel model : models) {
             Map<String, Object> params = parseParameters(model);
             @SuppressWarnings("unchecked")
-            Map<String, Object> metadata = (Map<String, Object>) params.get("training_metadata");
-
-            if (metadata != null && metadata.containsKey("samples_count")) {
-                Object samplesObj = metadata.get("samples_count");
-                if (samplesObj instanceof Number) {
-                    sampleCounts.add(((Number) samplesObj).intValue());
-                } else {
-                    sampleCounts.add(1000); // 默认样本数
-                }
-            } else {
-                sampleCounts.add(1000); // 默认样本数
+            Map<String, Object> metadata = (Map<String, Object>) params.get("metrics");
+            if (metadata == null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> altMetadata = (Map<String, Object>) params.get("training_metadata");
+                metadata = altMetadata;
             }
+
+            // 优先查找samples_count，然后查找dataPoints字段
+            Integer samplesCount = null;
+            if (metadata != null) {
+                if (metadata.containsKey("samples_count")) {
+                    Object samplesObj = metadata.get("samples_count");
+                    if (samplesObj instanceof Number) {
+                        samplesCount = ((Number) samplesObj).intValue();
+                    }
+                } else if (metadata.containsKey("dataPoints")) {
+                    Object dataPointsObj = metadata.get("dataPoints");
+                    if (dataPointsObj instanceof Number) {
+                        samplesCount = ((Number) dataPointsObj).intValue();
+                    }
+                }
+            }
+
+            sampleCounts.add(samplesCount != null ? samplesCount : 1000);
         }
 
         // 计算归一化权重
@@ -120,8 +147,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
             for (VmRoundModel model : models) {
                 Map<String, Object> params = parseParameters(model);
-                @SuppressWarnings("unchecked")
-                Map<String, Object> modelParams = (Map<String, Object>) params.get("model_parameters");
+                Map<String, Object> modelParams = extractModelParameters(params);
 
                 @SuppressWarnings("unchecked")
                 List<Double> importances = (List<Double>) modelParams.get("feature_importances_");
@@ -196,8 +222,7 @@ public class FedAvgStrategy implements AggregationStrategy {
 
             for (VmRoundModel model : models) {
                 Map<String, Object> params = parseParameters(model);
-                @SuppressWarnings("unchecked")
-                Map<String, Object> modelParams = (Map<String, Object>) params.get("model_parameters");
+                Map<String, Object> modelParams = extractModelParameters(params);
 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> weightsMap = (Map<String, Object>) modelParams.get("weights");
@@ -248,8 +273,8 @@ public class FedAvgStrategy implements AggregationStrategy {
 
         // 简单策略：使用第一个模型的参数作为基础，添加聚合元信息
         Map<String, Object> firstParams = parseParameters(models.get(0));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = new HashMap<>((Map<String, Object>) firstParams.get("model_parameters"));
+        Map<String, Object> modelParams = extractModelParameters(firstParams);
+        Map<String, Object> result = new HashMap<>(modelParams);
 
         result.put("aggregation_method", "FedAvg-Generic");
         result.put("participants", models.size());
@@ -370,5 +395,33 @@ public class FedAvgStrategy implements AggregationStrategy {
         } catch (Exception e) {
             throw new AggregationException("解析模型参数失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 根据协议规范提取模型参数
+     */
+    private Map<String, Object> extractModelParameters(Map<String, Object> parsedData) throws AggregationException {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parametersWrapper = (Map<String, Object>) parsedData.get("parameters");
+
+        if (parametersWrapper == null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> altParams = (Map<String, Object>) parsedData.get("model_parameters");
+            if (altParams == null) {
+                log.error("无法找到模型参数，可用字段: {}", parsedData.keySet());
+                throw new AggregationException("模型参数为空");
+            }
+            parametersWrapper = altParams;
+        }
+
+        // 根据协议规范，模型参数位于 parameters.model 字段下
+        @SuppressWarnings("unchecked")
+        Map<String, Object> modelParams = (Map<String, Object>) parametersWrapper.get("model");
+        if (modelParams == null) {
+            log.debug("parameters.model字段为空，直接使用parameters作为模型参数");
+            modelParams = parametersWrapper;
+        }
+
+        return modelParams;
     }
 }

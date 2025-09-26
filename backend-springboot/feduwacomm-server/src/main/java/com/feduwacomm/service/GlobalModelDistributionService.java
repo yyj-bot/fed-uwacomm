@@ -184,7 +184,7 @@ public class GlobalModelDistributionService {
         return ProtocolMessage.builder()
                 .type(ProtocolType.GLOBAL_MODEL_UPDATE)
                 .id("global-model-" + System.currentTimeMillis())
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .data(data)
                 .build();
     }
@@ -246,7 +246,7 @@ public class GlobalModelDistributionService {
         ProtocolMessage vmMessage = ProtocolMessage.builder()
                 .type(globalModelMessage.getType())
                 .id(globalModelMessage.getId() + "-" + vmId)
-                .timestamp(globalModelMessage.getTimestamp())
+                .timestamp(globalModelMessage.getTimestamp().toString()) // 转换Instant到String
                 .vmId(vmId)
                 .data(globalModelMessage.getData())
                 .build();

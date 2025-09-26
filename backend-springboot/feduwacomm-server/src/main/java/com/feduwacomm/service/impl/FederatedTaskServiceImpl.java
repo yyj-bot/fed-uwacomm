@@ -13,6 +13,9 @@ import com.feduwacomm.service.LogService;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.controller.FederatedTaskController;
+import com.feduwacomm.cache.MetricsCacheService;
+import com.feduwacomm.cache.GlobalMetrics;
+import com.feduwacomm.cache.CacheValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -52,6 +55,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     @Autowired
     private UuidUtil uuidUtil;
+
+    @Autowired
+    private MetricsCacheService metricsCacheService;
 
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
@@ -694,7 +700,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
         
         task.setCurrentRound(0);
-        task.setProgress(0.0);
+        // progress现在通过getProgress()方法自动计算，无需设置
         task.setParticipantCount(createDTO.getParticipants().size());
         task.setEstimatedDuration(estimateTaskDuration(createDTO));
         task.setCreatedAt(now);
@@ -759,6 +765,64 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     private TaskDetailVO.MetricsVO buildTaskMetrics(FederatedTask task, List<TaskParticipant> participants) {
+        String taskId = task.getId();
+
+        try {
+            // 第一优先级：从全局指标缓存获取
+            log.debug("尝试从全局指标缓存获取数据: taskId={}", taskId);
+            GlobalMetrics cachedGlobalMetrics = metricsCacheService.validateAndGetGlobalMetrics(taskId);
+
+            log.info("从全局指标缓存获取成功: taskId={}, globalAccuracy={}, globalLoss={}, rounds={}",
+                    taskId, cachedGlobalMetrics.getGlobalAccuracy(), cachedGlobalMetrics.getGlobalLoss(),
+                    cachedGlobalMetrics.getCommunicationRounds());
+
+            return convertGlobalMetricsToVO(cachedGlobalMetrics);
+
+        } catch (CacheValidationException e) {
+            log.debug("全局指标缓存无效，尝试从参与者缓存计算: taskId={}, 原因={}", taskId, e.getMessage());
+
+            try {
+                // 第二优先级：从参与者缓存计算全局指标
+                GlobalMetrics computedMetrics = metricsCacheService.computeAndUpdateGlobalMetrics(
+                        taskId, task.getTotalRounds());
+
+                log.info("从参与者缓存计算全局指标成功: taskId={}, globalAccuracy={}, globalLoss={}",
+                        taskId, computedMetrics.getGlobalAccuracy(), computedMetrics.getGlobalLoss());
+
+                return convertGlobalMetricsToVO(computedMetrics);
+
+            } catch (Exception cacheException) {
+                log.warn("从缓存计算全局指标失败，降级到数据库查询: taskId={}, 错误={}",
+                        taskId, cacheException.getMessage());
+            }
+        }
+
+        // 第三优先级：降级到数据库查询（原有逻辑）
+        log.info("使用数据库降级查询构建度量指标: taskId={}", taskId);
+        return buildTaskMetricsFromDatabase(task, participants);
+    }
+
+    /**
+     * 将全局指标缓存对象转换为VO
+     */
+    private TaskDetailVO.MetricsVO convertGlobalMetricsToVO(GlobalMetrics globalMetrics) {
+        if (globalMetrics == null) {
+            throw new CacheValidationException("GlobalMetrics", "unknown", "缓存对象为null");
+        }
+
+        return TaskDetailVO.MetricsVO.builder()
+                .globalLoss(globalMetrics.getGlobalLoss())
+                .globalAccuracy(globalMetrics.getGlobalAccuracy())
+                .communicationRounds(globalMetrics.getCommunicationRounds())
+                .dataProcessed(globalMetrics.getDataProcessed())
+                .estimatedTimeRemaining(globalMetrics.getEstimatedTimeRemaining())
+                .build();
+    }
+
+    /**
+     * 从数据库构建度量指标（原有逻辑，作为降级方案）
+     */
+    private TaskDetailVO.MetricsVO buildTaskMetricsFromDatabase(FederatedTask task, List<TaskParticipant> participants) {
         // 计算全局指标
         double globalLoss = participants.stream()
             .filter(p -> p.getLoss() != null)
@@ -778,7 +842,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             estimatedTimeRemaining = remainingRounds * 180; // 假设每轮3分钟
         }
 
-        return TaskDetailVO.MetricsVO.builder()
+        TaskDetailVO.MetricsVO metricsVO = TaskDetailVO.MetricsVO.builder()
             .globalLoss(globalLoss)
             .globalAccuracy(globalAccuracy)
             .communicationRounds(task.getCurrentRound())
@@ -788,6 +852,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .sum())
             .estimatedTimeRemaining(estimatedTimeRemaining)
             .build();
+
+        log.debug("数据库降级查询构建度量指标完成: taskId={}, globalAccuracy={}, globalLoss={}",
+                task.getId(), globalAccuracy, globalLoss);
+
+        return metricsVO;
     }
 
     private TaskVO convertToTaskVO(FederatedTask task) {
@@ -1377,7 +1446,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         task.setParticipantCount(createDTO.getParticipantConfig().getParticipants().size());
         task.setCurrentRound(0);
         task.setTotalRounds(createDTO.getHyperparameters() != null ? createDTO.getHyperparameters().getRounds() : 10);
-        task.setProgress(0.0);
+        // progress现在通过getProgress()方法自动计算，无需设置
 
         // 设置v1.3特有字段
         task.setDatasetId(createDTO.getDatasetConfig().getDatasetId());

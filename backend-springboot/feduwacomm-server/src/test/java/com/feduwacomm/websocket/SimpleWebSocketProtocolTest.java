@@ -37,7 +37,7 @@ class SimpleWebSocketProtocolTest {
             .type(ProtocolType.GRADIENT_UPLOAD)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
 
         // Then
@@ -213,7 +213,7 @@ class SimpleWebSocketProtocolTest {
             .type(type)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
     }
 

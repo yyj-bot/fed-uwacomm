@@ -81,18 +81,44 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     private int secretExpireDays;
 
     @Override
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public VmRegisterResponseVO register(VmRegisterDTO registerDTO) {
-        logger.info("开始注册虚拟机: name={}, ip={}",
-                   registerDTO.getName(), registerDTO.getIpAddress());
+        logger.info("开始注册虚拟机: name={}, ip={} [线程: {}]",
+                   registerDTO.getName(), registerDTO.getIpAddress(), Thread.currentThread().getName());
 
         // 1. 自动生成vmId
         String vmId = uuidUtil.generateUuid();
-        logger.info("自动生成vmId: {}", vmId);
+        logger.info("自动生成vmId: {} [线程: {}]", vmId, Thread.currentThread().getName());
 
-        // 2. 检查虚拟机是否已存在
-        if (vmInstancesMapper.existsByVmId(vmId) > 0) {
-            logger.warn("虚拟机已存在: vmId={}", vmId);
-            throw new BusinessException("虚拟机已存在");
+        // 2. 检查虚拟机是否已存在 (带重试机制)
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                if (vmInstancesMapper.existsByVmId(vmId) > 0) {
+                    logger.warn("虚拟机已存在: vmId={}, 第{}\u6b21检查", vmId, attempt);
+                    if (attempt < maxRetries) {
+                        // 重新生成vmId重试
+                        vmId = uuidUtil.generateUuid();
+                        logger.info("重新生成vmId: {} (第{}\u6b21重试)", vmId, attempt);
+                        continue;
+                    } else {
+                        throw new BusinessException("虚拟机注册失败: 多次生成vmId均已存在");
+                    }
+                }
+                break; // vmId唯一，退出重试循环
+            } catch (Exception e) {
+                logger.error("检查vmId存在性失败: vmId={}, 第{}\u6b21尝试, 错误: {}", vmId, attempt, e.getMessage());
+                if (attempt >= maxRetries) {
+                    throw new BusinessException("虚拟机注册失败: 数据库检查错误", e);
+                }
+                // 等待一段时间后重试
+                try {
+                    Thread.sleep(100 * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new BusinessException("虚拟机注册被中断");
+                }
+            }
         }
 
         // 2. 生成API Key和会话ID
@@ -138,11 +164,22 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             throw new BusinessException("数据格式错误");
         }
 
-        // 5. 插入数据库
-        int result = vmInstancesMapper.insert(vmInstance);
-        if (result <= 0) {
-            logger.error("虚拟机注册失败: vmId={}", vmId);
-            throw new BusinessException("虚拟机注册失败");
+        // 5. 插入数据库 (带并发处理)
+        try {
+            int result = vmInstancesMapper.insert(vmInstance);
+            if (result <= 0) {
+                logger.error("虚拟机注册失败: vmId={} [线程: {}]", vmId, Thread.currentThread().getName());
+                throw new BusinessException("虚拟机注册失败: 数据库插入失败");
+            }
+            logger.info("虚拟机数据库插入成功: vmId={} [线程: {}]", vmId, Thread.currentThread().getName());
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // 处理数据库唯一性约束冲突
+            logger.warn("数据库唯一性约束冲突: vmId={}, 错误: {} [线程: {}]",
+                       vmId, e.getMessage(), Thread.currentThread().getName());
+            throw new BusinessException("虚拟机注册失败: vmId已存在或数据冲突");
+        } catch (Exception e) {
+            logger.error("虚拟机数据库插入异常: vmId={} [线程: {}]", vmId, Thread.currentThread().getName(), e);
+            throw new BusinessException("虚拟机注册失败: 数据库异常", e);
         }
 
         // 6. 生成vm_secrets表记录，返回secretId用于返回给虚拟机
@@ -151,7 +188,8 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         // 7. 生成访问令牌（在数据库插入成功后）
         String accessToken = generateAccessToken(vmId);
 
-        logger.info("虚拟机注册成功: vmId={}, sessionId={}, secretId={}", vmId, sessionId, secretId);
+        logger.info("虚拟机注册成功: vmId={}, sessionId={}, secretId={} [线程: {}]",
+                   vmId, sessionId, secretId, Thread.currentThread().getName());
 
         // 8. 构建响应
         return VmRegisterResponseVO.builder()
@@ -1011,7 +1049,7 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     }
 
     /**
-     * 插入vm_secrets表记录
+     * 插入vm_secrets表记录 (支持并发)
      *
      * @param vmId 虚拟机ID
      * @param secretHash 已哈希的密钥
@@ -1019,6 +1057,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
      */
     private String insertVmSecret(String vmId, String secretHash) {
         String secretId = uuidUtil.generateUuid();
+
+        logger.debug("开始创建VM Secret记录: vmId={}, secretId={} [线程: {}]",
+                    vmId, secretId, Thread.currentThread().getName());
 
         // 创建VmSecret实体
         VmSecret vmSecret = VmSecret.builder()
@@ -1036,13 +1077,19 @@ public class VmInstanceServiceImpl implements VmInstanceService {
         try {
             int result = vmSecretsMapper.insert(vmSecret);
             if (result <= 0) {
-                logger.error("插入vm_secrets表失败: vmId={}", vmId);
+                logger.error("插入vm_secrets表失败: vmId={} [线程: {}]", vmId, Thread.currentThread().getName());
                 throw new BusinessException("VM认证记录创建失败");
             }
-            logger.info("VM Secret记录创建成功: vmId={}, secretId={}", vmId, secretId);
+            logger.info("VM Secret记录创建成功: vmId={}, secretId={} [线程: {}]",
+                       vmId, secretId, Thread.currentThread().getName());
             return secretId;
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // 处理数据库唯一性约束冲突
+            logger.warn("VM Secret数据库约束冲突: vmId={}, secretId={}, 错误: {} [线程: {}]",
+                       vmId, secretId, e.getMessage(), Thread.currentThread().getName());
+            throw new BusinessException("VM认证记录创建失败: 数据冲突");
         } catch (Exception e) {
-            logger.error("插入vm_secrets表异常: vmId={}", vmId, e);
+            logger.error("插入vm_secrets表异常: vmId={} [线程: {}]", vmId, Thread.currentThread().getName(), e);
             throw new BusinessException("VM认证记录创建失败: " + e.getMessage());
         }
     }

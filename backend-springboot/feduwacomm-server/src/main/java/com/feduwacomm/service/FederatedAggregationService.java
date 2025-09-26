@@ -13,6 +13,7 @@ import com.feduwacomm.event.ModelUploadEvent;
 import com.feduwacomm.event.RoundCompleteEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.GlobalModelMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
 import com.feduwacomm.aggregation.AggregationStrategy;
 import com.feduwacomm.aggregation.AggregationStrategyFactory;
@@ -52,6 +53,7 @@ public class FederatedAggregationService {
     private final VmRoundModelsMapper vmRoundModelsMapper;
     private final FederatedTasksMapper federatedTasksMapper;
     private final GlobalModelMapper globalModelMapper;
+    private final TaskParticipantsMapper taskParticipantsMapper;
     private final UniversalAggregationEngine aggregationEngine;
     private final AggregationStrategyFactory strategyFactory;
     private final AggregationConfig aggregationConfig;
@@ -175,33 +177,64 @@ public class FederatedAggregationService {
 
     /**
      * 检查是否应该触发聚合
+     * 采用动态轮次检测策略：检测参与者的最新完成轮次并触发相应的聚合
      */
     private boolean shouldTriggerAggregation(String taskId, Integer roundNumber) {
         try {
-            // 获取期望参与者数量
-            int expectedParticipants = getExpectedParticipantCount(taskId);
-            
-            // 获取当前已上传模型数量
-            int currentParticipants = vmRoundModelsMapper.countReadyModels(taskId, roundNumber);
-            
+            // 获取任务总参与者数量
+            int totalParticipants = taskParticipantsMapper.countTotalParticipants(taskId);
+            if (totalParticipants == 0) {
+                log.warn("任务{}没有参与者，无法进行聚合", taskId);
+                return false;
+            }
+
+            // 🔧 修复：动态检测参与者实际完成的轮次
+            // 首先检查传入的roundNumber是否有完成的参与者
+            int completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
+
+            // 如果传入轮次没有完成参与者，检查参与者实际完成的轮次
+            if (completedParticipants == 0) {
+                // 查询参与者实际完成的最新轮次
+                Integer actualCompletedRound = getLatestCompletedRound(taskId);
+                if (actualCompletedRound != null && !actualCompletedRound.equals(roundNumber)) {
+                    log.warn("轮次不匹配检测: 任务ID={}, 期望轮次={}, 参与者实际完成轮次={}",
+                            taskId, roundNumber, actualCompletedRound);
+                    // 使用参与者实际完成的轮次重新检查
+                    completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, actualCompletedRound);
+                    roundNumber = actualCompletedRound; // 更新为实际轮次
+                    log.info("使用实际轮次重新检查聚合条件: 任务ID={}, 实际轮次={}, 已完成参与者={}",
+                            taskId, actualCompletedRound, completedParticipants);
+                }
+            }
+
+            // 添加详细调试信息
+            log.debug("聚合条件详细信息: 任务ID={}, 检查轮次={}, 总参与者={}, 已完成参与者={}",
+                    taskId, roundNumber, totalParticipants, completedParticipants);
+
             // 计算等待时间
             String aggregationKey = buildAggregationKey(taskId, roundNumber);
             LocalDateTime startTime = roundStartTimes.get(aggregationKey);
-            long waitTimeSeconds = startTime != null ? 
+            long waitTimeSeconds = startTime != null ?
                     ChronoUnit.SECONDS.between(startTime, LocalDateTime.now()) : 0;
 
-            boolean shouldTrigger = aggregationConfig.shouldTriggerAggregation(
-                    currentParticipants, expectedParticipants, waitTimeSeconds);
+            // 严格的同步策略：所有参与者必须完成当前轮次
+            boolean allParticipantsCompleted = (completedParticipants == totalParticipants);
 
-            log.debug("聚合条件检查: 任务ID={}, 轮次={}, 当前参与者={}, 期望参与者={}, " +
-                      "等待时间={}秒, 是否触发={}", 
-                    taskId, roundNumber, currentParticipants, expectedParticipants, 
-                    waitTimeSeconds, shouldTrigger);
+            // 超时处理：如果等待时间过长，允许部分参与者的聚合
+            boolean isTimeout = waitTimeSeconds >= aggregationConfig.getMaxWaitTimeSeconds();
+            boolean hasMinParticipants = completedParticipants >= aggregationConfig.getMinParticipants();
+
+            boolean shouldTrigger = allParticipantsCompleted || (isTimeout && hasMinParticipants);
+
+            log.info("聚合条件检查: 任务ID={}, 轮次={}, 已完成参与者={}/{}, 等待时间={}秒, " +
+                      "所有完成={}, 超时={}, 满足最少参与者={}, 是否触发={}",
+                    taskId, roundNumber, completedParticipants, totalParticipants, waitTimeSeconds,
+                    allParticipantsCompleted, isTimeout, hasMinParticipants, shouldTrigger);
 
             return shouldTrigger;
 
         } catch (Exception e) {
-            log.error("检查聚合条件失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("检查聚合条件失败: 任务ID={}, 轮次={}, 错误={}",
                     taskId, roundNumber, e.getMessage(), e);
             return false;
         }
@@ -424,12 +457,18 @@ public class FederatedAggregationService {
     }
 
     /**
-     * 更新任务进度
+     * 更新任务进度并重置参与者状态准备新轮次
      */
     private void updateTaskProgress(String taskId, Integer nextRound) {
         try {
-            federatedTasksMapper.updateTaskProgress(taskId, nextRound, null, "RUNNING");
-            log.debug("任务进度已更新: 任务ID={}, 下一轮次={}", taskId, nextRound);
+            // 更新任务轮次
+            federatedTasksMapper.updateTaskProgress(taskId, nextRound, "RUNNING");
+
+            // 重置所有参与者状态准备新轮次训练
+            int resetCount = taskParticipantsMapper.resetParticipantsForNewRound(taskId, nextRound);
+
+            log.info("任务进度已更新: 任务ID={}, 下一轮次={}, 重置参与者状态数量={}",
+                     taskId, nextRound, resetCount);
         } catch (Exception e) {
             log.error("更新任务进度失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
         }
@@ -446,6 +485,18 @@ public class FederatedAggregationService {
         } catch (Exception e) {
             log.warn("获取期望参与者数量失败，使用默认值: {}", e.getMessage());
             return aggregationConfig.getMinParticipants();
+        }
+    }
+
+    /**
+     * 获取指定任务中参与者实际完成的最新轮次
+     */
+    private Integer getLatestCompletedRound(String taskId) {
+        try {
+            return taskParticipantsMapper.getLatestCompletedRound(taskId);
+        } catch (Exception e) {
+            log.error("获取最新完成轮次失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
+            return null;
         }
     }
 

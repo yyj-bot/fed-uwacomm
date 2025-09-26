@@ -6,7 +6,7 @@
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/federated`
-- **API版本**: v1.3
+- **API版本**: v1.4
 - **认证方式**: JWT Token
 - **数据格式**: JSON
 
@@ -871,7 +871,224 @@ Authorization: Bearer {token}
 }
 ```
 
-### 3.14 任务删除接口
+### 3.14 聚合引擎状态查询接口 (v1.4 新增)
+
+**接口地址**: `GET /api/federated/engine/status`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**查询参数**:
+- `taskId`: 任务ID (可选)
+- `engineId`: 引擎ID (可选)
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "engineStatus": "RUNNING",
+    "currentTasks": [
+      {
+        "taskId": "c3d4e5f6789012345678901234567890",
+        "status": "AGGREGATING",
+        "currentRound": 5,
+        "algorithm": "FEDERATED_AVERAGING",
+        "participantCount": 3
+      }
+    ],
+    "systemMetrics": {
+      "cpuUsage": 45.2,
+      "memoryUsage": 68.5,
+      "diskUsage": 23.8
+    },
+    "aggregationMetrics": {
+      "totalAggregations": 125,
+      "successRate": 0.98,
+      "averageAggregationTime": 2.3,
+      "lastAggregationTime": "2024-01-01T12:30:00.000Z"
+    },
+    "supportedAlgorithms": [
+      "FEDERATED_AVERAGING",
+      "FEDERATED_PROXIMAL",
+      "FEDERATED_NOVA",
+      "FEDERATED_SCAFFOLD"
+    ]
+  }
+}
+```
+
+### 3.15 可用聚合策略查询接口 (v1.4 新增)
+
+**接口地址**: `GET /api/federated/strategies/available`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+```
+
+**查询参数**:
+- `modelType`: 模型类型过滤 (可选)
+- `category`: 策略分类过滤 (可选)
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "total": 4,
+    "strategies": [
+      {
+        "algorithm": "FEDERATED_AVERAGING",
+        "name": "联邦平均算法",
+        "description": "经典的FedAvg算法，适用于大多数联邦学习场景",
+        "category": "AVERAGING",
+        "supportedModelTypes": ["RANDOM_FOREST", "NEURAL_NETWORK"],
+        "parameters": [
+          {
+            "name": "learningRate",
+            "type": "DOUBLE",
+            "description": "学习率",
+            "defaultValue": 0.01,
+            "range": { "min": 0.0001, "max": 1.0 }
+          },
+          {
+            "name": "momentum",
+            "type": "DOUBLE",
+            "description": "动量参数",
+            "defaultValue": 0.9,
+            "range": { "min": 0.0, "max": 1.0 }
+          },
+          {
+            "name": "batchSize",
+            "type": "INTEGER",
+            "description": "批处理大小",
+            "defaultValue": 32,
+            "range": { "min": 1, "max": 1024 }
+          }
+        ],
+        "requirements": {
+          "minParticipants": 2,
+          "maxParticipants": 100,
+          "recommendedParticipants": 5
+        }
+      },
+      {
+        "algorithm": "FEDERATED_PROXIMAL",
+        "name": "联邦近端算法",
+        "description": "FedProx算法，适用于非独立同分布数据的联邦学习",
+        "category": "PROXIMAL",
+        "supportedModelTypes": ["NEURAL_NETWORK"],
+        "parameters": [
+          {
+            "name": "learningRate",
+            "type": "DOUBLE",
+            "description": "学习率",
+            "defaultValue": 0.01,
+            "range": { "min": 0.0001, "max": 1.0 }
+          },
+          {
+            "name": "proximalMu",
+            "type": "DOUBLE",
+            "description": "近端参数μ",
+            "defaultValue": 0.1,
+            "range": { "min": 0.0, "max": 10.0 }
+          }
+        ],
+        "requirements": {
+          "minParticipants": 3,
+          "maxParticipants": 50,
+          "recommendedParticipants": 8
+        }
+      },
+      {
+        "algorithm": "FEDERATED_NOVA",
+        "name": "联邦Nova算法",
+        "description": "FedNova算法，解决客户端异构性问题",
+        "category": "NORMALIZATION",
+        "supportedModelTypes": ["NEURAL_NETWORK"],
+        "parameters": [
+          {
+            "name": "learningRate",
+            "type": "DOUBLE",
+            "description": "学习率",
+            "defaultValue": 0.01,
+            "range": { "min": 0.0001, "max": 1.0 }
+          },
+          {
+            "name": "momentumFactor",
+            "type": "DOUBLE",
+            "description": "动量因子",
+            "defaultValue": 0.9,
+            "range": { "min": 0.0, "max": 1.0 }
+          }
+        ],
+        "requirements": {
+          "minParticipants": 2,
+          "maxParticipants": 30,
+          "recommendedParticipants": 6
+        }
+      },
+      {
+        "algorithm": "FEDERATED_SCAFFOLD",
+        "name": "SCAFFOLD算法",
+        "description": "SCAFFOLD算法，使用控制变量减少客户端漂移",
+        "category": "VARIANCE_REDUCTION",
+        "supportedModelTypes": ["NEURAL_NETWORK"],
+        "parameters": [
+          {
+            "name": "learningRate",
+            "type": "DOUBLE",
+            "description": "学习率",
+            "defaultValue": 0.01,
+            "range": { "min": 0.0001, "max": 1.0 }
+          },
+          {
+            "name": "clientLearningRate",
+            "type": "DOUBLE",
+            "description": "客户端学习率",
+            "defaultValue": 0.1,
+            "range": { "min": 0.01, "max": 1.0 }
+          }
+        ],
+        "requirements": {
+          "minParticipants": 3,
+          "maxParticipants": 20,
+          "recommendedParticipants": 5
+        }
+      }
+    ],
+    "categories": [
+      {
+        "category": "AVERAGING",
+        "name": "平均类算法",
+        "description": "基于模型参数平均的联邦学习算法"
+      },
+      {
+        "category": "PROXIMAL",
+        "name": "近端类算法",
+        "description": "使用近端项处理数据异构性的算法"
+      },
+      {
+        "category": "NORMALIZATION",
+        "name": "归一化类算法",
+        "description": "通过归一化解决客户端差异的算法"
+      },
+      {
+        "category": "VARIANCE_REDUCTION",
+        "name": "方差减少类算法",
+        "description": "通过控制变量减少训练方差的算法"
+      }
+    ]
+  }
+}
+```
+
+### 3.16 任务删除接口
 
 **接口地址**: `DELETE /api/federated/tasks/{taskId}`
 
@@ -995,6 +1212,14 @@ Authorization: Bearer {token}
 
 ## 7. 版本更新历史
 
+### v1.4 (2025年)
+- ✅ 新增聚合引擎状态查询接口：`GET /api/federated/engine/status`
+- ✅ 新增可用聚合策略查询接口：`GET /api/federated/strategies/available`
+- ✅ 支持聚合引擎运行时监控和性能指标查询
+- ✅ 提供完整的联邦学习算法参数配置信息
+- ✅ 增强系统可观测性和策略配置的动态发现能力
+- ✅ 完善UniversalAggregationEngine的REST接口暴露
+
 ### v1.3 (2024年)
 - ✅ 新增图形化任务创建支持的9个配置接口
 - ✅ 增强任务创建接口，支持智能数据集和参与者配置
@@ -1011,6 +1236,7 @@ Authorization: Bearer {token}
 
 **API 文档**:
 - [HTTP接口导览.md](../HTTP接口导览.md) - 系统整体API接口
+- [修改接口文档 v1.4](../modified/modified-interfaces-v1.4.md) - v1.4新增和修改的接口详情
 - [修改接口文档 v1.3](../modified/modified-interfaces-v1.3.md) - v1.3新增和修改的接口详情
 - [废弃接口文档 v1.3](../removed/removed-interfaces-v1.3.md) - v1.3废弃接口和迁移指南
 - [用户管理API参考文档](../user/user-api-reference.md) - 用户管理相关接口

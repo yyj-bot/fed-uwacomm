@@ -1,209 +1,216 @@
 package com.feduwacomm.utils;
 
+import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
-import lombok.experimental.UtilityClass;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * WebSocket消息构建工具类
+ * 符合协议v1.4标准，集成MessageIdGenerator
  * 提供统一的消息构建接口，确保类型安全和一致性
- * 包含符合协议v1.4.1标准的消息ID生成功能
+ *
+ * @author FedUWAComm Team
+ * @version 1.4.0
  */
-@UtilityClass
+@Component
+@RequiredArgsConstructor
 public class MessageBuilder {
 
-    private static final SecureRandom RANDOM = new SecureRandom();
+    private final MessageIdGenerator messageIdGenerator;
 
     /**
-     * 创建基础消息
-     * @param type 消息类型
-     * @return 消息Map
-     */
-    public static Map<String, Object> createMessage(ProtocolType type) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", type.name());
-        message.put("id", generateServerId());
-        message.put("timestamp", java.time.Instant.now().toString());
-        return message;
-    }
-
-    /**
-     * 创建包含数据的消息
-     * @param type 消息类型
-     * @param data 数据内容
-     * @return 消息Map
-     */
-    public static Map<String, Object> createMessage(ProtocolType type, Object data) {
-        Map<String, Object> message = createMessage(type);
-        message.put("data", data);
-        return message;
-    }
-
-    /**
-     * 创建响应消息
-     * @param type 消息类型
-     * @param success 是否成功
-     * @param message 响应消息
-     * @return 消息Map
-     */
-    public static Map<String, Object> createResponse(ProtocolType type, boolean success, String message) {
-        Map<String, Object> response = createMessage(type);
-        response.put("success", success);
-        response.put("message", message);
-        return response;
-    }
-
-    /**
-     * 创建响应消息（包含数据）
-     * @param type 消息类型
-     * @param success 是否成功
-     * @param message 响应消息
-     * @param data 数据内容
-     * @return 消息Map
-     */
-    public static Map<String, Object> createResponse(ProtocolType type, boolean success, String message, Object data) {
-        Map<String, Object> response = createResponse(type, success, message);
-        response.put("data", data);
-        return response;
-    }
-
-    /**
-     * 创建错误消息
-     * @param type 消息类型
-     * @param errorMessage 错误信息
-     * @return 消息Map
-     */
-    public static Map<String, Object> createError(ProtocolType type, String errorMessage) {
-        return createResponse(type, false, errorMessage);
-    }
-
-    /**
-     * 创建成功消息
-     * @param type 消息类型
-     * @param successMessage 成功信息
-     * @return 消息Map
-     */
-    public static Map<String, Object> createSuccess(ProtocolType type, String successMessage) {
-        return createResponse(type, true, successMessage);
-    }
-
-    /**
-     * 创建成功消息（包含数据）
-     * @param type 消息类型
-     * @param successMessage 成功信息
-     * @param data 数据内容
-     * @return 消息Map
-     */
-    public static Map<String, Object> createSuccess(ProtocolType type, String successMessage, Object data) {
-        return createResponse(type, true, successMessage, data);
-    }
-
-    /**
-     * 创建通知消息
-     * @param notificationType 通知类型
-     * @param title 通知标题
-     * @param content 通知内容
-     * @return 消息Map
-     */
-    public static Map<String, Object> createNotification(ProtocolType notificationType, String title, String content) {
-        Map<String, Object> notification = createMessage(notificationType);
-        notification.put("title", title);
-        notification.put("content", content);
-        notification.put("timestamp", System.currentTimeMillis());
-        return notification;
-    }
-
-    /**
-     * 创建通知消息（包含数据）
-     * @param notificationType 通知类型
-     * @param title 通知标题
-     * @param content 通知内容
-     * @param data 附加数据
-     * @return 消息Map
-     */
-    public static Map<String, Object> createNotification(ProtocolType notificationType, String title, String content, Object data) {
-        Map<String, Object> notification = createNotification(notificationType, title, content);
-        notification.put("data", data);
-        return notification;
-    }
-
-    // ========== 消息ID生成方法 (v1.4.1协议标准) ==========
-
-    /**
-     * 生成客户端消息ID
-     * @return 格式: client-{timestamp}-{random}
-     */
-    public static String generateClientId() {
-        return generateMessageId("client");
-    }
-
-    /**
-     * 生成服务器端消息ID
-     * @return 格式: server-{timestamp}-{random}
-     */
-    public static String generateServerId() {
-        return generateMessageId("server");
-    }
-
-    /**
-     * 生成命令消息ID
-     * @return 格式: cmd-{timestamp}-{random}
-     */
-    public static String generateCommandId() {
-        return generateMessageId("cmd");
-    }
-
-    /**
-     * 生成标准化消息ID
-     * 符合协议v1.4.1标准：{prefix}-{timestamp}-{random}
+     * 创建服务端标准协议消息
+     * 符合协议v1.4标准格式
      *
-     * @param prefix 前缀 (client/server/cmd)
-     * @return 标准化消息ID
+     * @param type 消息类型
+     * @param vmId 虚拟机ID
+     * @param data 消息数据
+     * @return 标准ProtocolMessage对象
      */
-    private static String generateMessageId(String prefix) {
-        long timestamp = System.currentTimeMillis(); // 13位Unix毫秒时间戳
-        int random = RANDOM.nextInt(1000000); // 0-999999的随机数
-        return String.format("%s-%d-%06d", prefix, timestamp, random);
+    public ProtocolMessage buildServerMessage(ProtocolType type, String vmId, Map<String, Object> data) {
+        return ProtocolMessage.builder()
+                .type(type)
+                .id(messageIdGenerator.generateServerMessageId())
+                .timestamp(Instant.now().toString())
+                .vmId(vmId)
+                .data(data != null ? data : new HashMap<>())
+                .signature(generateSignature(type, vmId, data)) // TODO: 实现签名生成
+                .build();
     }
 
     /**
-     * 验证消息ID格式是否符合协议标准
-     * @param messageId 待验证的消息ID
-     * @return 是否符合标准格式
+     * 创建命令消息
+     * 符合协议v1.4标准格式
+     *
+     * @param type 消息类型
+     * @param vmId 虚拟机ID
+     * @param data 消息数据
+     * @return 标准ProtocolMessage对象
      */
-    public static boolean isValidMessageId(String messageId) {
-        if (messageId == null) {
+    public ProtocolMessage buildCommandMessage(ProtocolType type, String vmId, Map<String, Object> data) {
+        return ProtocolMessage.builder()
+                .type(type)
+                .id(messageIdGenerator.generateCommandMessageId())
+                .timestamp(Instant.now().toString())
+                .vmId(vmId)
+                .data(data != null ? data : new HashMap<>())
+                .signature(generateSignature(type, vmId, data))
+                .build();
+    }
+
+
+    /**
+     * 创建ACK响应消息
+     * 根据原始消息类型自动生成对应的ACK类型
+     *
+     * @param originalType 原始消息类型
+     * @param vmId 虚拟机ID
+     * @param status 状态信息
+     * @param message 响应消息
+     * @return ACK响应消息
+     */
+    public ProtocolMessage buildAckMessage(ProtocolType originalType, String vmId, String status, String message) {
+        ProtocolType ackType = getAckType(originalType);
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", status);
+        data.put("message", message);
+        data.put("originalType", originalType.name());
+
+        return buildServerMessage(ackType, vmId, data);
+    }
+
+    /**
+     * 创建成功ACK响应
+     *
+     * @param originalType 原始消息类型
+     * @param vmId 虚拟机ID
+     * @param message 成功消息
+     * @return 成功ACK响应
+     */
+    public ProtocolMessage buildSuccessAck(ProtocolType originalType, String vmId, String message) {
+        return buildAckMessage(originalType, vmId, "SUCCESS", message);
+    }
+
+    /**
+     * 创建失败ACK响应
+     *
+     * @param originalType 原始消息类型
+     * @param vmId 虚拟机ID
+     * @param errorMessage 错误消息
+     * @return 失败ACK响应
+     */
+    public ProtocolMessage buildErrorAck(ProtocolType originalType, String vmId, String errorMessage) {
+        return buildAckMessage(originalType, vmId, "ERROR", errorMessage);
+    }
+
+    // ==================== 辅助方法 ====================
+
+    /**
+     * 根据原始消息类型获取对应的ACK类型
+     *
+     * @param originalType 原始消息类型
+     * @return 对应的ACK消息类型
+     */
+    private ProtocolType getAckType(ProtocolType originalType) {
+        switch (originalType) {
+            case CONNECT:
+                return ProtocolType.CONNECT_ACK;
+            case HEARTBEAT:
+                return ProtocolType.HEARTBEAT_ACK;
+            case TRAINING_START:
+                return ProtocolType.TRAINING_START_ACK;
+            case TRAINING_START_RESPONSE:
+                return ProtocolType.TRAINING_START_RESPONSE_ACK;
+            case TRAINING_STOP:
+                return ProtocolType.TRAINING_STOP_ACK;
+            case TRAINING_PROGRESS:
+                return ProtocolType.TRAINING_PROGRESS_ACK;
+            case TRAINING_PROGRESS_RESPONSE:
+                return ProtocolType.TRAINING_PROGRESS_RESPONSE_ACK;
+            case MODEL_UPLOAD:
+            case MODEL_DOWNLOAD:
+            case GLOBAL_MODEL_UPDATE:
+                return ProtocolType.MODEL_UPDATE_ACK;
+            case GRADIENT_UPLOAD:
+                return ProtocolType.GRADIENT_UPLOAD_ACK;
+            case AGGREGATION_START:
+                return ProtocolType.AGGREGATION_START_ACK;
+            case AGGREGATION_COMPLETE:
+                return ProtocolType.AGGREGATION_COMPLETE_ACK;
+            case GLOBAL_MODEL_BROADCAST:
+                return ProtocolType.GLOBAL_MODEL_BROADCAST_ACK;
+            case ROUND_START:
+                return ProtocolType.ROUND_START_ACK;
+            case ROUND_COMPLETE:
+                return ProtocolType.ROUND_COMPLETE_ACK;
+            case MODEL_TYPE_NEGOTIATION:
+                return ProtocolType.MODEL_TYPE_NEGOTIATION_ACK;
+            case ALGORITHM_CONFIG:
+                return ProtocolType.ALGORITHM_CONFIG_ACK;
+            case GRADIENT_UPLOAD_PREPARE:
+                return ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK;
+            case STRATEGY_SWITCH_NOTIFICATION:
+                return ProtocolType.STRATEGY_SWITCH_ACK;
+            case TASK_START:
+                return ProtocolType.TASK_START_ACK;
+            case FEDERATED_TASK_START:
+                return ProtocolType.FEDERATED_TASK_START_ACK;
+            case DATASET_CREATE:
+                return ProtocolType.DATASET_CREATE_ACK;
+            case DATASET_APPEND_ROWS:
+                return ProtocolType.DATASET_APPEND_ROWS_ACK;
+            case DATASET_COMPLETE:
+                return ProtocolType.DATASET_COMPLETE_ACK;
+            case DATASET_DELETE:
+                return ProtocolType.DATASET_DELETE_ACK;
+            default:
+                // 如果没有对应的ACK类型，返回通用的响应类型
+                return ProtocolType.STATUS_RESPONSE;
+        }
+    }
+
+    /**
+     * 生成消息签名（占位实现）
+     * TODO: 实现真实的数字签名算法
+     *
+     * @param type 消息类型
+     * @param vmId 虚拟机ID
+     * @param data 消息数据
+     * @return 签名字符串
+     */
+    private String generateSignature(ProtocolType type, String vmId, Map<String, Object> data) {
+        // 临时实现：生成简单的哈希值作为签名
+        // 生产环境中应该实现真实的数字签名算法
+        String content = type.name() + vmId + (data != null ? data.toString() : "");
+        return "sig_" + Math.abs(content.hashCode());
+    }
+
+    /**
+     * 验证消息格式是否符合协议标准
+     *
+     * @param message 协议消息
+     * @return 验证结果
+     */
+    public boolean validateMessage(ProtocolMessage message) {
+        if (message == null) {
             return false;
         }
-        return messageId.matches("^(client|server)-\\d{13}-\\d{6}$|^cmd-\\d{13}-\\d{6}$");
-    }
 
-    /**
-     * 创建带有客户端ID的消息
-     * @param type 消息类型
-     * @return 消息Map
-     */
-    public static Map<String, Object> createClientMessage(ProtocolType type) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", type.name());
-        message.put("id", generateClientId());
-        message.put("timestamp", java.time.Instant.now().toString());
-        return message;
-    }
+        // 检查必需字段
+        if (message.getType() == null ||
+            message.getId() == null ||
+            message.getTimestamp() == null ||
+            message.getVmId() == null ||
+            message.getData() == null) {
+            return false;
+        }
 
-    /**
-     * 创建带有命令ID的消息
-     * @param type 消息类型
-     * @return 消息Map
-     */
-    public static Map<String, Object> createCommandMessage(ProtocolType type) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("type", type.name());
-        message.put("id", generateCommandId());
-        message.put("timestamp", java.time.Instant.now().toString());
-        return message;
+        // 验证消息ID格式
+        return messageIdGenerator.validateMessageId(message.getId());
     }
 }

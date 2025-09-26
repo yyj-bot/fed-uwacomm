@@ -9,6 +9,8 @@ import com.feduwacomm.event.ModelUploadEvent;
 import com.feduwacomm.mapper.*;
 import com.feduwacomm.service.WebSocketProtocolService;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.utils.MessageBuilder;
+import com.feduwacomm.utils.MessageIdGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,6 +73,15 @@ class EnhancedWebSocketProtocolServiceTest {
     @Mock
     private UuidUtil uuidUtil;
 
+    @Mock
+    private MessageBuilder messageBuilder;
+
+    @Mock
+    private MessageIdGenerator messageIdGenerator;
+
+    @Mock
+    private TaskParticipantsMapper taskParticipantsMapper;
+
     @InjectMocks
     private WebSocketProtocolService webSocketProtocolService;
 
@@ -79,6 +90,17 @@ class EnhancedWebSocketProtocolServiceTest {
     @BeforeEach
     void setUp() {
         // 初始化依赖项
+        when(messageIdGenerator.generateServerMessageId()).thenReturn("server-1706281200000-123456");
+        lenient().when(messageBuilder.buildSuccessAck(any(), any(), any())).thenReturn(
+            ProtocolMessage.builder()
+                .type(ProtocolType.GRADIENT_UPLOAD_ACK)
+                .id("server-1706281200000-123456")
+                .timestamp(Instant.now().toString())
+                .vmId("test-vm")
+                .data(Map.of("status", "SUCCESS"))
+                .signature("test-signature")
+                .build()
+        );
     }
 
     @Test
@@ -159,7 +181,7 @@ class EnhancedWebSocketProtocolServiceTest {
                 "round", 5,
                 "training_result", "invalid json string" // 无效JSON
             ))
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
 
         when(uuidUtil.generateUuid()).thenReturn("model-uuid-123");
@@ -189,7 +211,7 @@ class EnhancedWebSocketProtocolServiceTest {
                 "taskId", "task-001"
                 // 缺少 "round" 字段
             ))
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
 
         // When
@@ -377,7 +399,9 @@ class EnhancedWebSocketProtocolServiceTest {
                         .type(message.getType())
                         .vmId("vm-" + String.format("%03d", threadIndex))
                         .data(message.getData())
-                        .timestamp(message.getTimestamp())
+                        .timestamp(message.getTimestamp().toString()) // 转换为String
+                        .id(message.getId())
+                        .signature(message.getSignature())
                         .build();
 
                     ProtocolAck ack = webSocketProtocolService.handle(message);
@@ -461,7 +485,7 @@ class EnhancedWebSocketProtocolServiceTest {
             .type(ProtocolType.GRADIENT_UPLOAD)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
     }
 
@@ -470,7 +494,7 @@ class EnhancedWebSocketProtocolServiceTest {
             .type(type)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now())
+            .timestamp(Instant.now().toString())
             .build();
     }
 }

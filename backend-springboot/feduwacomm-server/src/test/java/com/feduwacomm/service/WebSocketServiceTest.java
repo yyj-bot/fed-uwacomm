@@ -2,6 +2,7 @@ package com.feduwacomm.service;
 
 import com.feduwacomm.dto.WebSocketMessage;
 import com.feduwacomm.exception.UserException;
+import com.feduwacomm.utils.UuidUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -27,15 +29,21 @@ public class WebSocketServiceTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private UuidUtil uuidUtil;
+
     private WebSocketService webSocketService;
 
     @BeforeEach
     void setUp() {
         // 重置mock对象
-        reset(messagingTemplate);
+        reset(messagingTemplate, uuidUtil);
+
+        // 设置UuidUtil Mock行为 (使用lenient避免unnecessary stubbing警告)
+        lenient().when(uuidUtil.generateUuid()).thenReturn("test-uuid-123456");
 
         // 创建服务实例
-        webSocketService = new WebSocketService(messagingTemplate);
+        webSocketService = new WebSocketService(messagingTemplate, uuidUtil);
     }
 
     /**
@@ -55,8 +63,8 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("BROADCAST", capturedMessage.getType());
-        assertEquals(message, capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
+        assertEquals(message, capturedMessage.getData().get("message"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 
@@ -78,9 +86,9 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("PRIVATE", capturedMessage.getType());
-        assertEquals(message, capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
-        assertEquals(username, capturedMessage.getReceiver());
+        assertEquals(message, capturedMessage.getData().get("message"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
+        assertEquals(username, capturedMessage.getData().get("receiver"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 
@@ -135,8 +143,8 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("NOTIFICATION", capturedMessage.getType());
-        assertEquals(notification, capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
+        assertEquals(notification, capturedMessage.getData().get("notification"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 
@@ -157,8 +165,8 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("FEDERATED_LEARNING", capturedMessage.getType());
-        assertEquals(message, capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
+        assertEquals(message, capturedMessage.getData().get("message"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 
@@ -183,7 +191,8 @@ public class WebSocketServiceTest {
         // 验证发送了广播消息
         ArgumentCaptor<WebSocketMessage> messageCaptor = ArgumentCaptor.forClass(WebSocketMessage.class);
         verify(messagingTemplate).convertAndSend(eq("/topic/public"), messageCaptor.capture());
-        assertTrue(messageCaptor.getValue().getContent().contains("上线了"));
+        String messageText = (String) messageCaptor.getValue().getData().get("message");
+        assertTrue(messageText.contains("上线了"));
     }
 
     /**
@@ -211,7 +220,8 @@ public class WebSocketServiceTest {
         // 验证发送了广播消息
         ArgumentCaptor<WebSocketMessage> messageCaptor = ArgumentCaptor.forClass(WebSocketMessage.class);
         verify(messagingTemplate).convertAndSend(eq("/topic/public"), messageCaptor.capture());
-        assertTrue(messageCaptor.getValue().getContent().contains("下线了"));
+        String messageText = (String) messageCaptor.getValue().getData().get("message");
+        assertTrue(messageText.contains("下线了"));
     }
 
     /**
@@ -255,9 +265,9 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("FL_PROGRESS", capturedMessage.getType());
-        assertEquals(message, capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
-        assertEquals(progress, capturedMessage.getData());
+        assertEquals(message, capturedMessage.getData().get("message"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
+        assertEquals(progress, capturedMessage.getData().get("progress"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 
@@ -312,9 +322,9 @@ public class WebSocketServiceTest {
         // 验证消息内容
         WebSocketMessage capturedMessage = messageCaptor.getValue();
         assertEquals("FL_RESULT", capturedMessage.getType());
-        assertEquals("联邦学习完成", capturedMessage.getContent());
-        assertEquals("System", capturedMessage.getSender());
-        assertEquals(result, capturedMessage.getData());
+        assertEquals("联邦学习完成", capturedMessage.getData().get("message"));
+        assertEquals("System", capturedMessage.getData().get("sender"));
+        assertEquals(result, capturedMessage.getData().get("result"));
         assertNotNull(capturedMessage.getTimestamp());
     }
 

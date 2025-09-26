@@ -57,6 +57,18 @@ public class MockVirtualMachine {
     private String currentAlgorithm = "FEDERATED_AVERAGING"; // 当前聚合算法
     private boolean gradientUploadReady = false; // 梯度上传通道状态
 
+    // 协议违规和失败模拟相关字段
+    private int protocolViolationCount = 0; // 协议违规计数
+    private boolean simulateUploadFailure = false; // 是否模拟上传失败
+    private double uploadFailureRate = 0.0; // 上传失败率 (0.0 - 1.0)
+
+    // 错误统计相关字段
+    private int messageErrorCount = 0; // MESSAGE_ERROR消息计数
+    private int connectionErrorCount = 0; // CONNECTION_ERROR消息计数
+    private int statusQueryErrorCount = 0; // STATUS_QUERY_ERROR消息计数
+    private int genericErrorCount = 0; // 通用ERROR消息计数
+    private final Map<String, Integer> errorCodeCounts = new HashMap<>(); // 错误码统计
+
     public MockVirtualMachine(VmTestData vmData) {
         this.vmData = vmData;
         this.heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -324,14 +336,32 @@ public class MockVirtualMachine {
             data.put("modelType", currentModelType); // v2.0新增
             data.put("algorithm", currentAlgorithm); // v2.0新增
 
-            // 根据模型类型生成参数
+            // 按照协议规范生成模型参数结构
+            Map<String, Object> parameters = new HashMap<>();
+            Map<String, Object> modelData = new HashMap<>();
+
             if ("RANDOM_FOREST".equals(currentModelType)) {
-                data.put("parameters", generateRandomForestParameters());
+                Map<String, Object> rfParams = generateRandomForestParameters();
+                modelData.put("framework", "sklearn");
+                modelData.put("format", "model_state");
+                modelData.put("modelType", "RANDOM_FOREST");
+                modelData.putAll(rfParams); // 将随机森林参数合并到model字段
             } else if ("NEURAL_NETWORK".equals(currentModelType)) {
-                data.put("parameters", generateNeuralNetworkParameters());
+                Map<String, Object> nnParams = generateNeuralNetworkParameters();
+                modelData.put("framework", "pytorch");
+                modelData.put("format", "state_dict");
+                modelData.put("modelType", "NEURAL_NETWORK");
+                modelData.putAll(nnParams); // 将神经网络参数合并到model字段
             } else {
-                data.put("parameters", generateMockModelParameters()); // 兜底方案
+                Map<String, Object> genericParams = generateMockModelParameters();
+                modelData.put("framework", "generic");
+                modelData.put("format", "custom");
+                modelData.put("modelType", currentModelType);
+                modelData.putAll(genericParams); // 将通用参数合并到model字段
             }
+
+            parameters.put("model", modelData);
+            data.put("parameters", parameters);
 
             Map<String, Object> metricsMap = new HashMap<>();
             metricsMap.put("accuracy", metrics.getAccuracy());
@@ -505,12 +535,33 @@ public class MockVirtualMachine {
      * 创建协议消息的基本结构
      * 使用符合协议v1.4.1标准的客户端消息ID格式
      */
+    /**
+     * 创建符合协议v1.4标准的协议消息
+     * 包含所有必需字段：type, id, timestamp, vmId, data, signature
+     */
     private Map<String, Object> createProtocolMessage(ProtocolType type) {
         Map<String, Object> message = new HashMap<>();
         message.put("type", type.name()); // 使用字符串格式，真实环境中WebSocket只能传输字符串
         message.put("id", generateClientMessageId()); // 使用标准化的客户端ID格式
         message.put("timestamp", Instant.now().toString());
         message.put("vmId", vmData.getVmId());
+        message.put("data", new HashMap<>()); // 初始化空data对象，调用者可以获取并填充
+        message.put("signature", generateClientSignature(type.name(), vmData.getVmId())); // 添加客户端签名
+        return message;
+    }
+
+    /**
+     * 创建符合协议v1.4标准的协议消息（带数据）
+     * 包含所有必需字段：type, id, timestamp, vmId, data, signature
+     */
+    private Map<String, Object> createProtocolMessage(ProtocolType type, Map<String, Object> data) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("type", type.name());
+        message.put("id", generateClientMessageId());
+        message.put("timestamp", Instant.now().toString());
+        message.put("vmId", vmData.getVmId());
+        message.put("data", data != null ? data : new HashMap<>());
+        message.put("signature", generateClientSignature(type.name(), vmData.getVmId()));
         return message;
     }
 
@@ -523,6 +574,19 @@ public class MockVirtualMachine {
         long timestamp = System.currentTimeMillis(); // 13位Unix毫秒时间戳
         int random = new SecureRandom().nextInt(1000000); // 0-999999的随机数
         return String.format("client-%d-%06d", timestamp, random);
+    }
+
+    /**
+     * 生成客户端签名 (简单实现)
+     * TODO: 在生产环境中应该使用真正的数字签名算法
+     * @param messageType 消息类型
+     * @param vmId VM标识
+     * @return 简化的签名字符串
+     */
+    private String generateClientSignature(String messageType, String vmId) {
+        // 简单的哈希签名实现，用于测试和开发环境
+        String data = messageType + ":" + vmId + ":" + System.currentTimeMillis();
+        return "client_sig_" + Math.abs(data.hashCode());
     }
 
     /**
@@ -654,6 +718,12 @@ public class MockVirtualMachine {
         try {
             String messageType = (String) message.get("type");
 
+            // 检查是否应该模拟上传失败
+            if (shouldSimulateUploadFailure(messageType)) {
+                simulateUploadFailureScenario(messageType);
+                return false; // 模拟失败
+            }
+
             // 根据消息类型进行相应的模拟处理
             switch (messageType) {
                 case "HEARTBEAT":
@@ -670,6 +740,17 @@ public class MockVirtualMachine {
 
                     // 模拟一个短暂的网络延迟
                     Thread.sleep(50 + (int)(Math.random() * 100));
+                    return true;
+
+                case "GRADIENT_UPLOAD":
+                    // 模拟GRADIENT_UPLOAD消息成功发送
+                    Map<String, Object> gradData = (Map<String, Object>) message.get("data");
+                    String gradTaskId = (String) gradData.get("taskId");
+                    Integer gradRound = (Integer) gradData.get("round");
+                    System.out.println("🔢 [" + vmData.getName() + "] 梯度上传消息已发送 - 任务ID: " + gradTaskId + ", 轮次: " + gradRound);
+
+                    // 模拟网络延迟
+                    Thread.sleep(30 + (int)(Math.random() * 70));
                     return true;
 
                 case "CONNECT":
@@ -786,17 +867,10 @@ public class MockVirtualMachine {
      * 支持RANDOM_FOREST和NEURAL_NETWORK
      */
     public void sendModelTypeNegotiation(String modelType) throws Exception {
-        Map<String, Object> negotiationMessage = createProtocolMessage(ProtocolType.MODEL_TYPE_NEGOTIATION);
-        Map<String, Object> data = new HashMap<>();
-        data.put("vmId", vmData.getVmId());
-        data.put("requestedModelType", modelType);
-        data.put("supportedModelTypes", Arrays.asList("RANDOM_FOREST", "NEURAL_NETWORK"));
-        data.put("currentCapabilities", vmData.getCapabilities());
-        negotiationMessage.put("data", data);
-
-        sendStompMessage(negotiationMessage);
+        // 修复协议违规：根据WebSocket协议文档，MODEL_TYPE_NEGOTIATION应该由服务器发送给虚拟机
+        // 虚拟机不应该主动发送此消息，而是等待服务器发送并响应ACK
         this.currentModelType = modelType;
-        System.out.println("🤝 [" + vmData.getName() + "] 模型类型协商: " + modelType);
+        System.out.println("🤝 [" + vmData.getName() + "] 模型类型准备就绪: " + modelType + "（等待服务器发送MODEL_TYPE_NEGOTIATION）");
     }
 
     /**
@@ -804,34 +878,20 @@ public class MockVirtualMachine {
      * 支持FedAvg, FedProx, FedNova, Scaffold
      */
     public void sendAlgorithmConfig(String algorithm) throws Exception {
-        Map<String, Object> configMessage = createProtocolMessage(ProtocolType.ALGORITHM_CONFIG);
-        Map<String, Object> data = new HashMap<>();
-        data.put("vmId", vmData.getVmId());
-        data.put("requestedAlgorithm", algorithm);
-        data.put("supportedAlgorithms", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "FEDERATED_SCAFFOLD"));
-        data.put("currentModelType", currentModelType);
-        configMessage.put("data", data);
-
-        sendStompMessage(configMessage);
+        // 修复协议违规：根据WebSocket协议文档，ALGORITHM_CONFIG应该由服务器发送给虚拟机
+        // 虚拟机不应该主动发送此消息，而是等待服务器发送并响应ACK
         this.currentAlgorithm = algorithm;
-        System.out.println("⚙️ [" + vmData.getName() + "] 算法配置: " + algorithm);
+        System.out.println("⚙️ [" + vmData.getName() + "] 算法配置准备就绪: " + algorithm + "（等待服务器发送ALGORITHM_CONFIG）");
     }
 
     /**
      * 准备梯度上传通道
      */
     public void prepareGradientUpload() throws Exception {
-        Map<String, Object> prepareMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD_PREPARE);
-        Map<String, Object> data = new HashMap<>();
-        data.put("vmId", vmData.getVmId());
-        data.put("modelType", currentModelType);
-        data.put("algorithm", currentAlgorithm);
-        data.put("bufferSize", 1048576); // 1MB缓冲区
-        prepareMessage.put("data", data);
-
-        sendStompMessage(prepareMessage);
+        // 修复协议违规：根据WebSocket协议文档，GRADIENT_UPLOAD_PREPARE应该由服务器发送给虚拟机
+        // 虚拟机不应该主动发送此消息，而是等待服务器发送并响应ACK
         this.gradientUploadReady = true;
-        System.out.println("📤 [" + vmData.getName() + "] 梯度上传通道准备就绪");
+        System.out.println("📤 [" + vmData.getName() + "] 梯度上传通道准备就绪（等待服务器发送GRADIENT_UPLOAD_PREPARE）");
     }
 
     /**
@@ -846,20 +906,47 @@ public class MockVirtualMachine {
         Map<String, Object> data = new HashMap<>();
         data.put("vmId", vmData.getVmId());
         data.put("taskId", taskId);
-        data.put("round", round);
+        data.put("roundNumber", round);  // 修复：按协议文档使用 roundNumber
         data.put("modelType", currentModelType);
         data.put("algorithm", currentAlgorithm);
 
         // 根据模型类型生成不同的梯度数据
+        Map<String, Object> gradientData = null;
         if ("RANDOM_FOREST".equals(currentModelType)) {
-            data.put("gradients", generateRandomForestGradients());
+            gradientData = generateRandomForestGradients();
         } else if ("NEURAL_NETWORK".equals(currentModelType)) {
-            data.put("gradients", generateNeuralNetworkGradients());
+            gradientData = generateNeuralNetworkGradients();
+        } else {
+            // 为其他模型类型生成通用梯度数据
+            gradientData = new HashMap<>();
+            gradientData.put("genericGradients", generateRandomMatrix(10, 10));
+            gradientData.put("learningRate", 0.01);
+            gradientData.put("batchSize", 32);
         }
+
+        if (gradientData != null && !gradientData.isEmpty()) {
+            data.put("gradientData", gradientData);  // 修复：按协议文档使用 gradientData
+            System.out.println("🔢 [" + vmData.getName() + "] 梯度数据生成成功，参数数量: " + gradientData.size());
+        } else {
+            System.err.println("❌ [" + vmData.getName() + "] 梯度数据生成失败，使用默认数据");
+            // 生成默认梯度数据防止上传失败
+            Map<String, Object> defaultGradients = new HashMap<>();
+            defaultGradients.put("weights", generateRandomMatrix(5, 5));
+            defaultGradients.put("biases", generateRandomVector(5));
+            defaultGradients.put("learningRate", 0.01);
+            data.put("gradientData", defaultGradients);  // 修复：按协议文档使用 gradientData
+        }
+
+        // 添加训练指标数据（按协议文档要求）
+        Map<String, Object> trainingMetrics = new HashMap<>();
+        trainingMetrics.put("samplesCount", 800 + (int)(Math.random() * 400)); // 模拟样本数 800-1200
+        trainingMetrics.put("localLoss", 0.1 + Math.random() * 0.4); // 模拟损失 0.1-0.5
+        trainingMetrics.put("localAccuracy", 0.7 + Math.random() * 0.25); // 模拟准确率 0.7-0.95
+        data.put("trainingMetrics", trainingMetrics);
 
         gradientMessage.put("data", data);
         sendStompMessage(gradientMessage);
-        System.out.println("📊 [" + vmData.getName() + "] 梯度上传完成: " + currentModelType + " / " + currentAlgorithm);
+        System.out.println("📊 [" + vmData.getName() + "] 梯度上传完成: " + currentModelType + " / " + currentAlgorithm + " (协议兼容格式)");
     }
 
     /**
@@ -998,6 +1085,8 @@ public class MockVirtualMachine {
                 }
 
                 String type = (String) messageData.get("type");
+                String messageId = (String) messageData.get("id");
+                String timestamp = (String) messageData.get("timestamp");
 
                 // 检查type字段是否为null
                 if (type == null) {
@@ -1005,7 +1094,18 @@ public class MockVirtualMachine {
                     return;
                 }
 
-                System.out.println("收到STOMP消息: " + type + " from VM: " + vmData.getName());
+                // 详细的消息接收日志
+                System.out.println("📡 [" + vmData.getName() + "] 收到STOMP消息:");
+                System.out.println("    消息类型: " + type);
+                System.out.println("    消息ID: " + messageId);
+                System.out.println("    时间戳: " + timestamp);
+                if (messageData.containsKey("data")) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+                    if (data != null && data.containsKey("status")) {
+                        System.out.println("    状态: " + data.get("status"));
+                    }
+                }
 
                 // 处理不同类型的消息 - 使用ProtocolType枚举比较 (v2.0增强版本)
                 if (isProtocolType(type, ProtocolType.CONNECT_ACK)) {
@@ -1028,12 +1128,24 @@ public class MockVirtualMachine {
                     // 处理联邦学习任务启动
                     handleFederatedTaskStart(messageData);
                 // ========== v2.0新增消息类型处理 ==========
+                } else if (isProtocolType(type, ProtocolType.MODEL_TYPE_NEGOTIATION)) {
+                    System.out.println("🤝 " + vmData.getName() + " 收到模型类型协商请求");
+                    handleModelTypeNegotiation(messageData);
                 } else if (isProtocolType(type, ProtocolType.MODEL_TYPE_NEGOTIATION_ACK)) {
                     System.out.println("🤝 " + vmData.getName() + " 收到模型类型协商确认");
                     handleModelTypeNegotiationAck(messageData);
+                } else if (isProtocolType(type, ProtocolType.ALGORITHM_CONFIG)) {
+                    System.out.println("⚙️ " + vmData.getName() + " 收到算法配置请求");
+                    handleAlgorithmConfig(messageData);
                 } else if (isProtocolType(type, ProtocolType.ALGORITHM_CONFIG_ACK)) {
                     System.out.println("⚙️ " + vmData.getName() + " 收到算法配置确认");
                     handleAlgorithmConfigAck(messageData);
+                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_PREPARE)) {
+                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传准备请求");
+                    handleGradientUploadPrepare(messageData);
+                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK)) {
+                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传准备确认");
+                    handleGradientUploadPrepareAck(messageData);
                 } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
                     System.out.println("📊 " + vmData.getName() + " 收到梯度上传确认");
                     handleGradientUploadAck(messageData);
@@ -1044,10 +1156,33 @@ public class MockVirtualMachine {
                     System.out.println("🔀 " + vmData.getName() + " 收到策略切换通知");
                     handleStrategySwitchNotification(messageData);
                 // ========== 原有消息类型继续处理 ==========
+                } else if (isProtocolType(type, ProtocolType.ERROR) ||
+                           isProtocolType(type, ProtocolType.CONNECTION_ERROR) ||
+                           isProtocolType(type, ProtocolType.MESSAGE_ERROR) ||
+                           isProtocolType(type, ProtocolType.STATUS_QUERY_ERROR)) {
+                    System.err.println("❌ " + vmData.getName() + " 收到错误消息: " + type);
+                    handleErrorMessage(messageData);
                 } else if (isProtocolType(type, ProtocolType.MODEL_UPDATE_ACK) ||
+                           isProtocolType(type, ProtocolType.MODEL_UPLOAD_ACK) ||
                            isProtocolType(type, ProtocolType.HEARTBEAT_ACK)) {
                     System.out.println("✅ " + vmData.getName() + " 收到确认消息: " + type);
                     // 对于ACK消息，只需要记录，不需要特殊处理
+                } else if ("MODEL_UPLOAD".equals(type)) {
+                    // 检查是否为ACK消息 - ACK消息通常包含status字段且数据结构不同
+                    if (isLikelyAckMessage(messageData)) {
+                        System.out.println("✅ " + vmData.getName() + " 收到疑似MODEL_UPLOAD_ACK确认消息");
+                    } else {
+                        // 根据协议文档，MODEL_UPLOAD(🔵)应该由虚拟机向服务端发送，服务端不应该发送此消息
+                        handleProtocolViolation(type, "MODEL_UPLOAD消息只能由虚拟机发送到服务端，服务端不应发送此消息");
+                    }
+                } else if ("GRADIENT_UPLOAD".equals(type)) {
+                    // 检查是否为ACK消息
+                    if (isLikelyAckMessage(messageData)) {
+                        System.out.println("✅ " + vmData.getName() + " 收到疑似GRADIENT_UPLOAD_ACK确认消息");
+                    } else {
+                        // 根据协议文档，GRADIENT_UPLOAD(🔵)应该由虚拟机向服务端发送，服务端不应该发送此消息
+                        handleProtocolViolation(type, "GRADIENT_UPLOAD消息只能由虚拟机发送到服务端，服务端不应发送此消息");
+                    }
                 } else {
                     System.out.println("📨 " + vmData.getName() + " 收到未知类型消息: " + type);
                     // 对于未知消息，尝试作为通用训练指令处理
@@ -1246,6 +1381,47 @@ public class MockVirtualMachine {
     // ==================== v2.0新增消息处理方法 ====================
 
     /**
+     * 处理模型类型协商请求 - 服务器发送的MODEL_TYPE_NEGOTIATION消息
+     */
+    private void handleModelTypeNegotiation(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String modelType = (String) data.get("modelType");
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+
+                System.out.println("🤝 " + vmData.getName() + " 处理模型类型协商请求: " + modelType);
+
+                // 设置模型类型
+                this.currentModelType = modelType;
+
+                // 发送模型类型协商确认（ACK）
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.MODEL_TYPE_NEGOTIATION_ACK);
+                Map<String, Object> ackData = new HashMap<>();
+                ackData.put("vmId", vmData.getVmId());
+                ackData.put("finalModelType", modelType);
+                ackData.put("supportedModelTypes", Arrays.asList("RANDOM_FOREST", "NEURAL_NETWORK"));
+                if (taskId != null) {
+                    ackData.put("taskId", taskId);
+                }
+                if (round != null) {
+                    ackData.put("round", round);
+                }
+                ackData.put("status", "ACCEPTED");  // 表示虚拟机接受了协商的模型类型
+                ackData.put("negotiatedTime", Instant.now().toString());
+                ackMessage.put("data", ackData);
+
+                sendStompMessage(ackMessage);
+                System.out.println("✅ " + vmData.getName() + " 模型类型协商确认已发送: " + modelType);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理模型类型协商请求失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 处理模型类型协商确认
      */
     private void handleModelTypeNegotiationAck(Map<String, Object> messageData) {
@@ -1253,18 +1429,59 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             if (data != null) {
-                String confirmedModelType = (String) data.get("confirmedModelType");
-                Boolean supported = (Boolean) data.get("supported");
+                // 适配服务端实际返回的字段名
+                String finalModelType = (String) data.get("finalModelType");
+                String status = (String) data.get("status");
 
-                if (Boolean.TRUE.equals(supported)) {
-                    this.currentModelType = confirmedModelType;
-                    System.out.println("✅ " + vmData.getName() + " 模型类型协商成功: " + confirmedModelType);
+                if ("ACCEPTED".equals(status)) {
+                    this.currentModelType = finalModelType;
+                    System.out.println("✅ " + vmData.getName() + " 模型类型协商成功: " + finalModelType);
                 } else {
-                    System.out.println("❌ " + vmData.getName() + " 模型类型协商失败: " + confirmedModelType);
+                    System.out.println("❌ " + vmData.getName() + " 模型类型协商失败: " + finalModelType + " (状态: " + status + ")");
                 }
             }
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 处理模型类型协商确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理算法配置请求 - 服务器发送的ALGORITHM_CONFIG消息
+     */
+    private void handleAlgorithmConfig(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String algorithm = (String) data.get("algorithm");
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+
+                System.out.println("⚙️ " + vmData.getName() + " 处理算法配置请求: " + algorithm);
+
+                // 设置算法配置
+                this.currentAlgorithm = algorithm;
+
+                // 发送算法配置确认（ACK）
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ALGORITHM_CONFIG_ACK);
+                Map<String, Object> ackData = new HashMap<>();
+                ackData.put("vmId", vmData.getVmId());
+                ackData.put("algorithm", algorithm);
+                if (taskId != null) {
+                    ackData.put("taskId", taskId);
+                }
+                if (round != null) {
+                    ackData.put("round", round);
+                }
+                ackData.put("status", "CONFIGURED");  // 表示虚拟机已成功配置算法
+                ackData.put("configuredTime", Instant.now().toString());
+                ackMessage.put("data", ackData);
+
+                sendStompMessage(ackMessage);
+                System.out.println("✅ " + vmData.getName() + " 算法配置确认已发送: " + algorithm);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理算法配置请求失败: " + e.getMessage());
         }
     }
 
@@ -1276,18 +1493,89 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             if (data != null) {
-                String confirmedAlgorithm = (String) data.get("confirmedAlgorithm");
-                Boolean supported = (Boolean) data.get("supported");
+                // 适配服务端实际返回的字段名
+                String algorithm = (String) data.get("algorithm");
+                String status = (String) data.get("status");
 
-                if (Boolean.TRUE.equals(supported)) {
-                    this.currentAlgorithm = confirmedAlgorithm;
-                    System.out.println("✅ " + vmData.getName() + " 算法配置成功: " + confirmedAlgorithm);
+                if ("CONFIG_APPLIED".equals(status)) {
+                    this.currentAlgorithm = algorithm;
+                    System.out.println("✅ " + vmData.getName() + " 算法配置成功: " + algorithm);
                 } else {
-                    System.out.println("❌ " + vmData.getName() + " 算法配置失败: " + confirmedAlgorithm);
+                    System.out.println("❌ " + vmData.getName() + " 算法配置失败: " + algorithm + " (状态: " + status + ")");
                 }
             }
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 处理算法配置确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理梯度上传准备请求 - 服务器发送的GRADIENT_UPLOAD_PREPARE消息
+     */
+    private void handleGradientUploadPrepare(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+                String uploadToken = (String) data.get("uploadToken");
+                String uploadEndpoint = (String) data.get("uploadEndpoint");
+                Boolean resourceAvailable = (Boolean) data.get("resourceAvailable");
+
+                System.out.println("📤 " + vmData.getName() + " 处理梯度上传准备请求: taskId=" + taskId + ", round=" + round);
+
+                // 设置梯度上传准备状态
+                this.gradientUploadReady = true;
+
+                // 发送梯度上传准备确认（ACK）
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK);
+                Map<String, Object> ackData = new HashMap<>();
+                ackData.put("vmId", vmData.getVmId());
+                ackData.put("taskId", taskId);
+                ackData.put("round", round);
+                ackData.put("status", "READY");  // 表示虚拟机已准备好进行梯度上传
+                ackData.put("readyTime", Instant.now().toString());
+                ackMessage.put("data", ackData);
+
+                sendStompMessage(ackMessage);
+                System.out.println("✅ " + vmData.getName() + " 梯度上传准备确认已发送");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理梯度上传准备请求失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理梯度上传准备确认
+     */
+    private void handleGradientUploadPrepareAck(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                // 适配服务端实际返回的字段名
+                Boolean resourceAvailable = (Boolean) data.get("resourceAvailable");
+                String status = (String) data.get("status");
+                String taskId = (String) data.get("taskId");
+                Integer round = (Integer) data.get("round");
+                String uploadToken = (String) data.get("uploadToken");
+                String uploadEndpoint = (String) data.get("uploadEndpoint");
+
+                if (Boolean.TRUE.equals(resourceAvailable) && "READY".equals(status)) {
+                    System.out.println("✅ " + vmData.getName() + " 梯度上传准备确认 - 任务:" + taskId + " 轮次:" + round);
+                    if (uploadToken != null) {
+                        System.out.println("    上传Token: " + uploadToken);
+                    }
+                    if (uploadEndpoint != null) {
+                        System.out.println("    上传端点: " + uploadEndpoint);
+                    }
+                } else {
+                    System.out.println("❌ " + vmData.getName() + " 梯度上传准备失败 - 任务:" + taskId + " 轮次:" + round + " (状态: " + status + ")");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理梯度上传准备确认失败: " + e.getMessage());
         }
     }
 
@@ -1299,11 +1587,11 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             if (data != null) {
-                Boolean received = (Boolean) data.get("received");
+                String status = (String) data.get("status");
                 String taskId = (String) data.get("taskId");
                 Integer round = (Integer) data.get("round");
 
-                if (Boolean.TRUE.equals(received)) {
+                if ("SUCCESS".equals(status)) {
                     System.out.println("✅ " + vmData.getName() + " 梯度上传确认 - 任务:" + taskId + " 轮次:" + round);
                 } else {
                     System.out.println("❌ " + vmData.getName() + " 梯度上传失败 - 任务:" + taskId + " 轮次:" + round);
@@ -1373,5 +1661,513 @@ public class MockVirtualMachine {
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 处理策略切换通知失败: " + e.getMessage());
         }
+    }
+
+    // ==================== 协议违规检测和失败模拟方法 ====================
+
+    /**
+     * 处理协议违规情况
+     * @param messageType 违规消息类型
+     * @param reason 违规原因
+     */
+    private void handleProtocolViolation(String messageType, String reason) {
+        protocolViolationCount++;
+        System.err.println("🚫 [协议违规 #" + protocolViolationCount + "] " + vmData.getName() + " 检测到协议违规:");
+        System.err.println("    消息类型: " + messageType);
+        System.err.println("    违规原因: " + reason);
+        System.err.println("    违规时间: " + Instant.now());
+
+        // 记录违规到测试日志（可以在测试中断言这些）
+        logProtocolViolation(messageType, reason);
+
+        // 在严重的协议违规情况下，可以选择断开连接或发送错误响应
+        if (protocolViolationCount > 5) {
+            System.err.println("⛔ [" + vmData.getName() + "] 协议违规次数过多，考虑断开连接");
+            // 可以实现自动断开逻辑
+        }
+    }
+
+    /**
+     * 记录协议违规信息
+     */
+    private void logProtocolViolation(String messageType, String reason) {
+        // 可以写入文件或存储到内存中，供测试断言使用
+        System.out.println("📋 [" + vmData.getName() + "] 协议违规已记录: " + messageType + " - " + reason);
+    }
+
+    /**
+     * 检测更多的协议违规情况
+     * @param messageType 消息类型
+     * @param messageData 消息数据
+     * @return 是否存在协议违规
+     */
+    private boolean detectAdditionalViolations(String messageType, Map<String, Object> messageData) {
+        // 检查服务端是否发送了只应由虚拟机发送的消息类型
+        if (isVmOnlyMessage(messageType)) {
+            handleProtocolViolation(messageType, "此消息类型只能由虚拟机发送，服务端不应发送");
+            return true;
+        }
+
+        // 检查消息格式是否符合协议要求
+        if (!validateMessageFormat(messageType, messageData)) {
+            handleProtocolViolation(messageType, "消息格式不符合协议要求");
+            return true;
+        }
+
+        // 检查消息顺序是否正确
+        if (!validateMessageSequence(messageType)) {
+            handleProtocolViolation(messageType, "消息发送顺序不正确");
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 检测消息是否像ACK响应
+     * ACK消息通常具有以下特征：
+     * - 包含status字段
+     * - 包含简单的确认数据而不是复杂的业务数据
+     * - 不包含大量的业务参数(如parameters、gradients等)
+     */
+    private boolean isLikelyAckMessage(Map<String, Object> messageData) {
+        if (messageData == null) {
+            return false;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        if (data == null) {
+            return false;
+        }
+
+        // ACK消息特征：包含status字段
+        boolean hasStatus = data.containsKey("status");
+
+        // ACK消息特征：不包含大量的业务数据
+        boolean hasComplexBusinessData = data.containsKey("parameters") ||
+                                        data.containsKey("gradients") ||
+                                        data.containsKey("gradientData") ||
+                                        data.containsKey("trainingMetrics");
+
+        // ACK消息特征：通常包含简单的确认信息
+        boolean hasSimpleAckFields = data.containsKey("taskId") &&
+                                   data.containsKey("round") &&
+                                   data.containsKey("vmId");
+
+        // 判断：有status字段，没有复杂业务数据，可能有简单确认字段
+        return hasStatus && !hasComplexBusinessData;
+    }
+
+    /**
+     * 检查是否是只能由虚拟机发送的消息类型
+     */
+    private boolean isVmOnlyMessage(String messageType) {
+        // 根据协议文档，这些消息类型标记为🔵，只能由虚拟机发送
+        return "MODEL_UPLOAD".equals(messageType) ||
+               "GRADIENT_UPLOAD".equals(messageType) ||
+               "CONNECT".equals(messageType) ||
+               "HEARTBEAT".equals(messageType) ||
+               "TRAINING_PROGRESS_RESPONSE".equals(messageType) ||
+               "MODEL_UPDATE_ACK".equals(messageType) ||
+               "TRAINING_START_RESPONSE".equals(messageType);
+    }
+
+    /**
+     * 验证消息格式
+     */
+    private boolean validateMessageFormat(String messageType, Map<String, Object> messageData) {
+        if (messageData == null) {
+            return false;
+        }
+
+        // 检查必需字段
+        if (!messageData.containsKey("type") ||
+            !messageData.containsKey("id") ||
+            !messageData.containsKey("timestamp") ||
+            !messageData.containsKey("vmId") ||
+            !messageData.containsKey("data")) {
+            return false;
+        }
+
+        // 检查特定消息类型的必需字段
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        if (data == null) {
+            return false;
+        }
+
+        switch (messageType) {
+            case "TRAINING_START":
+                return data.containsKey("taskId") && data.containsKey("epochs");
+            case "MODEL_UPDATE":
+                return data.containsKey("taskId") && data.containsKey("parameters");
+            case "GLOBAL_MODEL_BROADCAST":
+                return data.containsKey("taskId") && data.containsKey("round");
+            default:
+                return true; // 对于未知消息类型，假设格式正确
+        }
+    }
+
+    /**
+     * 验证消息发送顺序
+     */
+    private boolean validateMessageSequence(String messageType) {
+        // 简化的顺序检查：某些消息只能在特定状态下发送
+        switch (messageType) {
+            case "TRAINING_START":
+                return connected; // 训练开始消息只能在连接建立后发送
+            case "MODEL_UPDATE":
+                // 模型更新只能在有正在进行的训练任务时发送
+                return connected;
+            default:
+                return true; // 对于其他消息，假设顺序正确
+        }
+    }
+
+    // ==================== 上传失败模拟方法 ====================
+
+    /**
+     * 设置是否模拟上传失败
+     */
+    public void setSimulateUploadFailure(boolean simulateFailure) {
+        this.simulateUploadFailure = simulateFailure;
+    }
+
+    /**
+     * 设置上传失败率
+     * @param failureRate 失败率，范围0.0-1.0
+     */
+    public void setUploadFailureRate(double failureRate) {
+        this.uploadFailureRate = Math.max(0.0, Math.min(1.0, failureRate));
+    }
+
+    /**
+     * 模拟上传失败情况
+     * @param messageType 消息类型
+     * @return 是否应该模拟失败
+     */
+    private boolean shouldSimulateUploadFailure(String messageType) {
+        if (!simulateUploadFailure) {
+            return false;
+        }
+
+        // 只对上传类消息进行失败模拟
+        if (!"MODEL_UPLOAD".equals(messageType) && !"GRADIENT_UPLOAD".equals(messageType)) {
+            return false;
+        }
+
+        // 根据失败率决定是否失败
+        return Math.random() < uploadFailureRate;
+    }
+
+    /**
+     * 模拟各种上传失败情况
+     * @param messageType 消息类型
+     * @return 失败类型描述
+     */
+    private String simulateUploadFailureScenario(String messageType) {
+        String[] failureScenarios = {
+            "网络连接超时",
+            "服务器拒绝连接",
+            "数据包丢失",
+            "身份验证失败",
+            "磁盘空间不足",
+            "文件格式错误",
+            "数据校验失败",
+            "并发冲突",
+            "服务器内部错误",
+            "请求过于频繁"
+        };
+
+        int randomIndex = (int) (Math.random() * failureScenarios.length);
+        String failureType = failureScenarios[randomIndex];
+
+        System.err.println("❌ [模拟失败] " + vmData.getName() + " " + messageType + " 失败: " + failureType);
+        return failureType;
+    }
+
+    // ==================== Getter方法用于测试断言 ====================
+
+    /**
+     * 获取协议违规次数（用于测试断言）
+     */
+    public int getProtocolViolationCount() {
+        return protocolViolationCount;
+    }
+
+    /**
+     * 重置协议违规计数
+     */
+    public void resetProtocolViolationCount() {
+        this.protocolViolationCount = 0;
+    }
+
+    /**
+     * 获取当前是否模拟上传失败
+     */
+    public boolean isSimulatingUploadFailure() {
+        return simulateUploadFailure;
+    }
+
+    /**
+     * 获取当前上传失败率
+     */
+    public double getUploadFailureRate() {
+        return uploadFailureRate;
+    }
+
+    // ==================== 错误消息处理方法 ====================
+
+    /**
+     * 处理服务端发送的错误消息
+     */
+    private void handleErrorMessage(Map<String, Object> messageData) {
+        try {
+            String messageType = (String) messageData.get("type");
+            String messageId = (String) messageData.get("id");
+            String timestamp = (String) messageData.get("timestamp");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+
+            if (data != null) {
+                String errorCode = (String) data.get("errorCode");
+                String errorMessage = (String) data.get("errorMessage");
+                String status = (String) data.get("status");
+                String suggestion = (String) data.get("suggestion");
+
+                System.err.println("🚨 [" + vmData.getName() + "] 服务端错误消息:");
+                System.err.println("    错误类型: " + messageType);
+                System.err.println("    消息ID: " + messageId);
+                System.err.println("    时间戳: " + timestamp);
+                System.err.println("    错误代码: " + errorCode);
+                System.err.println("    错误信息: " + errorMessage);
+                System.err.println("    状态: " + status);
+                if (suggestion != null) {
+                    System.err.println("    建议: " + suggestion);
+                }
+
+                // 记录错误统计
+                recordError(messageType, errorCode);
+
+                // 根据具体错误类型进行处理
+                handleSpecificError(messageType, errorCode, errorMessage, data);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理错误消息失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据具体错误类型进行处理
+     */
+    private void handleSpecificError(String messageType, String errorCode, String errorMessage, Map<String, Object> data) {
+        switch (messageType) {
+            case "MESSAGE_ERROR":
+                handleMessageError(errorCode, errorMessage, data);
+                break;
+            case "CONNECTION_ERROR":
+                handleConnectionError(errorCode, errorMessage, data);
+                break;
+            case "STATUS_QUERY_ERROR":
+                handleStatusQueryError(errorCode, errorMessage, data);
+                break;
+            case "ERROR":
+                handleGenericError(errorCode, errorMessage, data);
+                break;
+            default:
+                System.err.println("⚠️ " + vmData.getName() + " 未知错误类型: " + messageType);
+        }
+    }
+
+    /**
+     * 处理消息错误
+     */
+    private void handleMessageError(String errorCode, String errorMessage, Map<String, Object> data) {
+        switch (errorCode) {
+            case "INVALID_MESSAGE":
+                System.err.println("🔧 " + vmData.getName() + " 消息格式错误，检查消息结构");
+                break;
+            case "UNSUPPORTED_TYPE":
+                System.err.println("🔧 " + vmData.getName() + " 发送了不支持的消息类型");
+                // 可以记录不支持的消息类型，避免重复发送
+                String unsupportedType = (String) data.get("unsupportedType");
+                if (unsupportedType != null) {
+                    System.err.println("    不支持的类型: " + unsupportedType);
+                }
+                break;
+            case "INVALID_SIGNATURE":
+                System.err.println("🔐 " + vmData.getName() + " 消息签名验证失败，检查密钥配置");
+                break;
+            case "INVALID_DATASET_ID":
+                System.err.println("📊 " + vmData.getName() + " 数据集ID无效");
+                break;
+            case "MODEL_DOWNLOAD_FAILED":
+                System.err.println("📥 " + vmData.getName() + " 模型下载失败");
+                break;
+            case "INVALID_VM_LIST":
+                System.err.println("📋 " + vmData.getName() + " VM ID列表无效");
+                break;
+            default:
+                System.err.println("⚠️ " + vmData.getName() + " 未知消息错误码: " + errorCode);
+        }
+    }
+
+    /**
+     * 处理连接错误
+     */
+    private void handleConnectionError(String errorCode, String errorMessage, Map<String, Object> data) {
+        switch (errorCode) {
+            case "CONNECTION_TIMEOUT":
+                System.err.println("⏱️ " + vmData.getName() + " 连接超时，准备重连");
+                // 可以触发重连逻辑
+                try {
+                    reconnectWebSocketRobust();
+                } catch (Exception e) {
+                    System.err.println("❌ " + vmData.getName() + " 重连失败: " + e.getMessage());
+                }
+                break;
+            case "AUTHENTICATION_FAILED":
+                System.err.println("🔑 " + vmData.getName() + " 认证失败，检查访问令牌");
+                break;
+            case "PROTOCOL_VIOLATION":
+                System.err.println("🚫 " + vmData.getName() + " 协议违规");
+                break;
+            default:
+                System.err.println("⚠️ " + vmData.getName() + " 未知连接错误码: " + errorCode);
+        }
+    }
+
+    /**
+     * 处理状态查询错误
+     */
+    private void handleStatusQueryError(String errorCode, String errorMessage, Map<String, Object> data) {
+        switch (errorCode) {
+            case "QUERY_TIMEOUT":
+                System.err.println("⏱️ " + vmData.getName() + " 状态查询超时");
+                break;
+            case "STATUS_COLLECTION_FAILED":
+                System.err.println("📊 " + vmData.getName() + " 状态信息收集失败");
+                if (data.containsKey("failedComponents")) {
+                    Object failedComponents = data.get("failedComponents");
+                    System.err.println("    失败组件: " + failedComponents);
+                }
+                break;
+            case "INVALID_QUERY_TYPE":
+                System.err.println("❓ " + vmData.getName() + " 无效的查询类型");
+                break;
+            case "RESOURCE_UNAVAILABLE":
+                System.err.println("🚫 " + vmData.getName() + " 资源不可用");
+                break;
+            case "PERMISSION_DENIED":
+                System.err.println("🔒 " + vmData.getName() + " 权限不足");
+                break;
+            case "VM_OFFLINE":
+                System.err.println("📴 " + vmData.getName() + " 虚拟机离线");
+                break;
+            default:
+                System.err.println("⚠️ " + vmData.getName() + " 未知状态查询错误码: " + errorCode);
+        }
+    }
+
+    /**
+     * 处理通用错误
+     */
+    private void handleGenericError(String errorCode, String errorMessage, Map<String, Object> data) {
+        System.err.println("⚠️ " + vmData.getName() + " 通用错误: " + errorCode + " - " + errorMessage);
+
+        // 检查是否有特定的错误类型
+        if ("STRATEGY_SWITCH_FAILED".equals(data.get("errorType"))) {
+            System.err.println("🔀 " + vmData.getName() + " 策略切换失败");
+        }
+    }
+
+    /**
+     * 记录错误统计
+     */
+    private void recordError(String messageType, String errorCode) {
+        // 按消息类型计数
+        switch (messageType) {
+            case "MESSAGE_ERROR":
+                messageErrorCount++;
+                break;
+            case "CONNECTION_ERROR":
+                connectionErrorCount++;
+                break;
+            case "STATUS_QUERY_ERROR":
+                statusQueryErrorCount++;
+                break;
+            case "ERROR":
+                genericErrorCount++;
+                break;
+        }
+
+        // 按错误码计数
+        if (errorCode != null) {
+            errorCodeCounts.put(errorCode, errorCodeCounts.getOrDefault(errorCode, 0) + 1);
+        }
+
+        // 输出错误统计
+        System.out.println("📈 [" + vmData.getName() + "] 错误统计: " +
+            "消息错误=" + messageErrorCount +
+            ", 连接错误=" + connectionErrorCount +
+            ", 状态错误=" + statusQueryErrorCount +
+            ", 通用错误=" + genericErrorCount);
+    }
+
+    // ==================== 错误统计获取方法（用于测试断言） ====================
+
+    /**
+     * 获取消息错误次数
+     */
+    public int getMessageErrorCount() {
+        return messageErrorCount;
+    }
+
+    /**
+     * 获取连接错误次数
+     */
+    public int getConnectionErrorCount() {
+        return connectionErrorCount;
+    }
+
+    /**
+     * 获取状态查询错误次数
+     */
+    public int getStatusQueryErrorCount() {
+        return statusQueryErrorCount;
+    }
+
+    /**
+     * 获取通用错误次数
+     */
+    public int getGenericErrorCount() {
+        return genericErrorCount;
+    }
+
+    /**
+     * 获取错误码统计
+     */
+    public Map<String, Integer> getErrorCodeCounts() {
+        return new HashMap<>(errorCodeCounts);
+    }
+
+    /**
+     * 重置错误统计
+     */
+    public void resetErrorStatistics() {
+        messageErrorCount = 0;
+        connectionErrorCount = 0;
+        statusQueryErrorCount = 0;
+        genericErrorCount = 0;
+        errorCodeCounts.clear();
+        System.out.println("🔄 [" + vmData.getName() + "] 错误统计已重置");
+    }
+
+    /**
+     * 获取总错误次数
+     */
+    public int getTotalErrorCount() {
+        return messageErrorCount + connectionErrorCount + statusQueryErrorCount + genericErrorCount;
     }
 }
