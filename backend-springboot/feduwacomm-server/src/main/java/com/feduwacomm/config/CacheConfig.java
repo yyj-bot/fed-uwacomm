@@ -1,11 +1,11 @@
 package com.feduwacomm.config;
 
-import com.feduwacomm.cache.CacheLifecycleManager;
+import com.feduwacomm.service.CacheLifecycleManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 
 /**
  * 缓存配置类

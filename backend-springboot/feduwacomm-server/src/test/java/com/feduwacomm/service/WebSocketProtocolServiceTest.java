@@ -17,6 +17,7 @@ import com.feduwacomm.enums.FederatedTaskStatus;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.MessageIdGenerator;
+import com.feduwacomm.cache.MetricsCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +80,9 @@ public class WebSocketProtocolServiceTest {
     @Mock
     private MessageIdGenerator messageIdGenerator;
 
+    @Mock
+    private MetricsCacheService metricsCacheService;
+
     private WebSocketProtocolService protocolService;
 
     private ProtocolMessage sampleMessage;
@@ -88,7 +92,8 @@ public class WebSocketProtocolServiceTest {
         // 重置mock对象
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
             federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, taskParticipantsMapper,
-            userMapper, objectMapper, eventPublisher, uuidUtil, messageBuilder, messageIdGenerator);
+            userMapper, objectMapper, eventPublisher, uuidUtil, messageBuilder, messageIdGenerator,
+            metricsCacheService);
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -104,7 +109,8 @@ public class WebSocketProtocolServiceTest {
             eventPublisher,
             uuidUtil,
             messageBuilder,
-            messageIdGenerator
+            messageIdGenerator,
+            metricsCacheService
         );
 
         // 准备测试数据
