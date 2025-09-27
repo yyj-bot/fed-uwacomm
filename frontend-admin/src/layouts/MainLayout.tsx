@@ -99,8 +99,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: '联邦学习',
       children: [
         { key: '/federated-learning/tasks', label: '任务管理' },
-        { key: '/federated-learning/participants', label: '参与者' },
-        { key: '/federated-learning/progress', label: '进度监控' }
+        { key: '/federated-learning/orchestrations', label: '流程编排' }
       ]
     },
     {
