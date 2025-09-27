@@ -401,28 +401,33 @@ public class WebSocketProtocolServiceTest {
      */
     @Test
     void testHandle_TrainingStartMessage() {
-        // v1.3: 使用新的消息格式
-        Map<String, Object> hyperparameters = Map.of("n_estimators", 100, "max_depth", 10, "random_state", 42);
+        // v1.4: 使用协议标准化消息格式，包含所有必需字段
+        Map<String, Object> hyperparameters = Map.of("learningRate", 0.01, "batchSize", 32, "epochs", 100, "timeout", 300);
+        Map<String, Object> globalModel = Map.of("modelId", "global-model-task-001-round-1", "version", "v1.0", "downloadUrl", "/api/federated/models/task-001/global/round/1");
         Map<String, Object> trainingConfig = Map.of("epochs", 5, "batchSize", 32, "timeout", 300);
 
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", "task-001");
-        data.put("mlAlgorithm", "RandomForest");  // v1.3: 使用mlAlgorithm
+        data.put("roundNumber", 1); // v1.4: 使用roundNumber代替round
+        data.put("mlAlgorithm", "FEDERATED_AVERAGING");  // v1.4: 标准mlAlgorithm
         data.put("hyperparameters", hyperparameters);
-        data.put("trainingConfig", trainingConfig);
+        data.put("globalModel", globalModel); // v1.4: 新增globalModel对象
+        data.put("message", "请开始本地ML训练任务"); // v1.4: 新增message字段
+        data.put("timestamp", Instant.now().toString());
 
         ProtocolMessage trainingMessage = ProtocolMessage.builder()
                 .type(ProtocolType.TRAINING_START)
-                .id("training-001")
+                .id("cmd-1234567890-abcd1234") // v1.4: 标准ID格式
                 .timestamp(Instant.now().toString())
                 .vmId("vm-001")
                 .data(data)
+                .signature("") // v1.4: 包含签名字段
                 .build();
 
-        // Mock ObjectMapper for combined config (v1.3: 包含mlAlgorithm)
+        // Mock ObjectMapper for combined config (v1.4: 包含所有标准字段)
         try {
             when(objectMapper.writeValueAsString(any()))
-                .thenReturn("{\"hyperparameters\":{\"n_estimators\":100,\"max_depth\":10,\"random_state\":42},\"trainingConfig\":{\"epochs\":5,\"batchSize\":32,\"timeout\":300},\"mlAlgorithm\":\"RandomForest\"}");
+                .thenReturn("{\"hyperparameters\":{\"learningRate\":0.01,\"batchSize\":32,\"epochs\":100,\"timeout\":300},\"trainingConfig\":{\"epochs\":5,\"batchSize\":32,\"timeout\":300},\"mlAlgorithm\":\"FEDERATED_AVERAGING\"}");
         } catch (Exception e) {
             // Mock设置不会抛出异常
         }
@@ -436,7 +441,7 @@ public class WebSocketProtocolServiceTest {
         assertEquals("COMMAND_SENT", ack.getData().get("status"));
 
         // 验证mock调用
-        // v1.3: 验证使用联邦学习算法（后端管理）和epochs
+        // v1.4: 验证使用标准联邦学习算法和配置
         // 捕获传递给insertTask的FederatedTask实体
         ArgumentCaptor<FederatedTask> taskCaptor = ArgumentCaptor.forClass(FederatedTask.class);
         verify(federatedTasksMapper).insertTask(taskCaptor.capture());
@@ -451,11 +456,12 @@ public class WebSocketProtocolServiceTest {
         assertEquals(5, capturedTask.getEpochs());
         assertEquals(0, capturedTask.getCurrentRound());
 
-        // 验证config JSON包含mlAlgorithm信息
+        // 验证config JSON包含mlAlgorithm和标准字段
         String config = capturedTask.getConfig();
         assertNotNull(config);
         assertTrue(config.contains("mlAlgorithm"));
-        assertTrue(config.contains("RandomForest"));
+        assertTrue(config.contains("FEDERATED_AVERAGING"));
+        assertTrue(config.contains("hyperparameters"));
 
         verify(messagingTemplate).convertAndSend(eq("/topic/vm/vm-001"), any(Object.class));
     }
@@ -1151,5 +1157,226 @@ public class WebSocketProtocolServiceTest {
         // 这个测试主要用于代码覆盖率，实际运行时ProtocolType枚举会限制可能的值
         // 但我们仍然测试default分支的逻辑是否正确
         assertTrue(true, "未知消息类型的处理逻辑已在协议合规性检查中实现");
+    }
+
+    // ==================== 协议v1.4标准化验证测试 ====================
+
+    /**
+     * 测试标准TRAINING_START消息格式验证
+     * 验证MessageBuilder构建的消息是否符合协议v1.4标准
+     */
+    @Test
+    void testStandardTrainingStartMessage() {
+        // 使用MessageBuilder构建标准TRAINING_START消息
+        ProtocolMessage message = MessageBuilder.buildTrainingStartMessage(
+            "vm-test-001",
+            "task-123",
+            1,
+            "FEDERATED_AVERAGING",
+            Map.of("learningRate", 0.01, "batchSize", 32, "epochs", 100, "timeout", 300),
+            Map.of("modelId", "global-1", "version", "v1.0", "downloadUrl", "/api/models/global-1"),
+            "请开始本地ML训练任务"
+        );
+
+        // 验证消息结构符合协议标准
+        assertNotNull(message, "消息不能为null");
+        assertEquals(ProtocolType.TRAINING_START, message.getType());
+
+        // 验证ID格式符合协议标准：cmd-{timestamp}-{random}
+        assertNotNull(message.getId());
+        assertTrue(message.getId().matches("cmd-\\d+-[a-f0-9]{8}"),
+            "ID格式不符合标准：" + message.getId());
+
+        assertEquals("vm-test-001", message.getVmId());
+
+        // 验证数据字段符合协议v1.4标准
+        Map<String, Object> data = message.getData();
+        assertNotNull(data);
+
+        // 验证必需的标准字段
+        assertEquals("task-123", data.get("taskId"));
+        assertEquals(1, data.get("roundNumber"));
+        assertEquals("FEDERATED_AVERAGING", data.get("mlAlgorithm"));
+        assertEquals("请开始本地ML训练任务", data.get("message"));
+
+        // 验证复杂对象字段
+        assertNotNull(data.get("hyperparameters"));
+        assertTrue(data.get("hyperparameters") instanceof Map);
+
+        assertNotNull(data.get("globalModel"));
+        assertTrue(data.get("globalModel") instanceof Map);
+
+        assertNotNull(data.get("timestamp"));
+
+        // 验证签名字段存在（即使当前为空）
+        assertNotNull(message.getSignature());
+    }
+
+    /**
+     * 测试标准ROUND_START消息格式验证
+     * 验证MessageBuilder构建的ROUND_START消息是否符合协议v1.4标准
+     */
+    @Test
+    void testStandardRoundStartMessage() {
+        // 使用MessageBuilder构建标准ROUND_START消息
+        Map<String, Object> trainingConfig = Map.of("learningRate", 0.01, "timeout", 300);
+        Map<String, Object> targetMetrics = Map.of("minAccuracy", 0.85, "maxLoss", 0.15, "convergenceThreshold", 0.001);
+
+        ProtocolMessage message = MessageBuilder.buildRoundStartMessage(
+            "broadcast",
+            "task-123",
+            2,
+            trainingConfig,
+            targetMetrics,
+            5
+        );
+
+        // 验证消息结构符合协议标准
+        assertNotNull(message, "消息不能为null");
+        assertEquals(ProtocolType.ROUND_START, message.getType());
+
+        // 验证ID格式符合协议标准：server-{timestamp}-{random}
+        assertNotNull(message.getId());
+        assertTrue(message.getId().matches("server-\\d+-[a-f0-9]{8}"),
+            "ID格式不符合标准：" + message.getId());
+
+        assertEquals("broadcast", message.getVmId());
+
+        // 验证数据字段符合协议v1.4标准
+        Map<String, Object> data = message.getData();
+        assertNotNull(data);
+
+        // 验证必需的标准字段
+        assertEquals("task-123", data.get("taskId"));
+        assertEquals(2, data.get("roundNumber"));
+        assertEquals(5, data.get("expectedParticipants"));
+
+        // 验证复杂对象字段
+        assertNotNull(data.get("trainingConfig"));
+        assertTrue(data.get("trainingConfig") instanceof Map);
+
+        assertNotNull(data.get("targetMetrics"));
+        assertTrue(data.get("targetMetrics") instanceof Map);
+
+        assertNotNull(data.get("timestamp"));
+
+        // 验证签名字段存在
+        assertNotNull(message.getSignature());
+    }
+
+    /**
+     * 测试协议v1.4标准ID生成格式
+     * 验证generateStandardId方法生成的ID格式是否符合协议要求
+     */
+    @Test
+    void testStandardIdGeneration() {
+        // 测试不同前缀的ID生成
+        String[] prefixes = {"cmd", "server", "resp", "ack"};
+
+        for (String prefix : prefixes) {
+            String id = MessageBuilder.generateStandardId(prefix);
+
+            // 验证ID不为空
+            assertNotNull(id, "生成的ID不能为null");
+            assertFalse(id.isEmpty(), "生成的ID不能为空字符串");
+
+            // 验证ID格式：{prefix}-{timestamp}-{random}
+            String expectedPattern = prefix + "-\\d+-[a-f0-9]{8}";
+            assertTrue(id.matches(expectedPattern),
+                String.format("ID格式不符合标准 %s：%s", expectedPattern, id));
+
+            // 验证ID的各个部分
+            String[] parts = id.split("-");
+            assertEquals(3, parts.length, "ID应该包含3个部分");
+            assertEquals(prefix, parts[0], "前缀不匹配");
+
+            // 验证时间戳部分是数字
+            assertTrue(parts[1].matches("\\d+"), "时间戳部分应该是数字");
+
+            // 验证随机部分是8位十六进制
+            assertEquals(8, parts[2].length(), "随机部分应该是8位");
+            assertTrue(parts[2].matches("[a-f0-9]{8}"), "随机部分应该是小写十六进制");
+        }
+    }
+
+    /**
+     * 测试协议v1.4字段映射正确性
+     * 验证从旧格式到新格式的字段映射是否正确
+     */
+    @Test
+    void testProtocolV14FieldMapping() {
+        // 测试字段映射的正确性
+
+        // 1. 测试TRAINING_START消息的字段映射
+        ProtocolMessage trainingMessage = MessageBuilder.buildTrainingStartMessage(
+            "vm-001",
+            "task-456",
+            3,
+            "FEDERATED_PROXIMAL",
+            Map.of("learningRate", 0.001),
+            Map.of("modelId", "global-456"),
+            "开始训练"
+        );
+
+        Map<String, Object> trainingData = trainingMessage.getData();
+
+        // 验证新字段存在
+        assertTrue(trainingData.containsKey("mlAlgorithm"), "应包含mlAlgorithm字段");
+        assertTrue(trainingData.containsKey("roundNumber"), "应包含roundNumber字段");
+        assertTrue(trainingData.containsKey("hyperparameters"), "应包含hyperparameters字段");
+        assertTrue(trainingData.containsKey("globalModel"), "应包含globalModel字段");
+        assertTrue(trainingData.containsKey("message"), "应包含message字段");
+
+        // 验证旧字段不存在（这些是非标准字段）
+        assertFalse(trainingData.containsKey("algorithm"), "不应包含algorithm字段");
+        assertFalse(trainingData.containsKey("instruction"), "不应包含instruction字段");
+        assertFalse(trainingData.containsKey("participantId"), "不应包含participantId字段");
+
+        // 2. 测试ROUND_START消息的字段映射
+        ProtocolMessage roundMessage = MessageBuilder.buildRoundStartMessage(
+            "broadcast",
+            "task-456",
+            2,
+            Map.of("timeout", 600),
+            Map.of("accuracy", 0.9),
+            3
+        );
+
+        Map<String, Object> roundData = roundMessage.getData();
+
+        // 验证新字段存在
+        assertTrue(roundData.containsKey("roundNumber"), "应包含roundNumber字段");
+        assertTrue(roundData.containsKey("trainingConfig"), "应包含trainingConfig字段");
+        assertTrue(roundData.containsKey("targetMetrics"), "应包含targetMetrics字段");
+        assertTrue(roundData.containsKey("expectedParticipants"), "应包含expectedParticipants字段");
+
+        // 验证旧字段不存在
+        assertFalse(roundData.containsKey("round"), "不应包含round字段");
+        assertFalse(roundData.containsKey("roundStartTime"), "不应包含roundStartTime字段");
+        assertFalse(roundData.containsKey("totalRounds"), "不应包含totalRounds字段");
+    }
+
+    /**
+     * 测试协议v1.4消息签名字段
+     * 验证所有标准消息都包含签名字段
+     */
+    @Test
+    void testProtocolV14MessageSignature() {
+        // 测试TRAINING_START消息包含签名
+        ProtocolMessage trainingMessage = MessageBuilder.buildTrainingStartMessage(
+            "vm-001", "task-789", 1, "FEDERATED_AVERAGING",
+            Map.of("lr", 0.01), Map.of("id", "model-1"), "开始"
+        );
+        assertNotNull(trainingMessage.getSignature(), "TRAINING_START消息应包含签名字段");
+
+        // 测试ROUND_START消息包含签名
+        ProtocolMessage roundMessage = MessageBuilder.buildRoundStartMessage(
+            "broadcast", "task-789", 1,
+            Map.of("timeout", 300), Map.of("acc", 0.8), 2
+        );
+        assertNotNull(roundMessage.getSignature(), "ROUND_START消息应包含签名字段");
+
+        // 虽然当前签名为空字符串，但字段必须存在
+        // 这为将来实现真实签名算法预留了接口
     }
 }

@@ -211,6 +211,85 @@ public class WebSocketProtocolService {
                 return onTaskStart(msg);
             case FEDERATED_TASK_START:
                 return onFederatedTaskStart(msg);
+            case FEDERATED_TASK_START_ACK:
+                return onFederatedTaskStartAck(msg);
+            // v1.4协议新增消息处理
+            case TASK_STOP:
+                return onTaskStop(msg);
+            case TASK_STOP_ACK:
+                return onTaskStopAck(msg);
+            case TASK_RESUME:
+                return onTaskResume(msg);
+            case TASK_RESUME_ACK:
+                return onTaskResumeAck(msg);
+            case TASK_DELETE:
+                return onTaskDelete(msg);
+            case TASK_DELETE_ACK:
+                return onTaskDeleteAck(msg);
+            // v1.4协议通知消息处理
+            case GLOBAL_MODEL_BROADCAST_NOTIFICATION:
+                return onGlobalModelBroadcastNotification(msg);
+            case AGGREGATION_START_NOTIFICATION:
+                return onAggregationStartNotification(msg);
+            case AGGREGATION_COMPLETE_NOTIFICATION:
+                return onAggregationCompleteNotification(msg);
+            case ROUND_START_NOTIFICATION:
+                return onRoundStartNotification(msg);
+            case ROUND_COMPLETE_NOTIFICATION:
+                return onRoundCompleteNotification(msg);
+            // 数据集相关ACK消息
+            case DATASET_CREATE_ACK:
+                return onDatasetCreateAck(msg);
+            case DATASET_APPEND_ROWS_ACK:
+                return onDatasetAppendRowsAck(msg);
+            case DATASET_COMPLETE_ACK:
+                return onDatasetCompleteAck(msg);
+            case DATASET_DELETE_ACK:
+                return onDatasetDeleteAck(msg);
+            case DATASET_STATUS_RESPONSE:
+                return onDatasetStatusResponse(msg);
+            // 训练相关ACK消息
+            case TRAINING_START_ACK:
+                return onTrainingStartAck(msg);
+            case TRAINING_STOP_ACK:
+                return onTrainingStopAck(msg);
+            case TRAINING_PROGRESS_ACK:
+                return onTrainingProgressAck(msg);
+            // 模型相关ACK消息
+            case MODEL_UPLOAD_ACK:
+                return onModelUploadAck(msg);
+            case MODEL_DOWNLOAD_ACK:
+                return onModelDownloadAck(msg);
+            case GLOBAL_MODEL_UPDATE_ACK:
+                return onGlobalModelUpdateAck(msg);
+            // 连接相关ACK消息
+            case CONNECT_ACK:
+                return onConnectAck(msg);
+            case HEARTBEAT_ACK:
+                return onHeartbeatAck(msg);
+            // v1.4协议业务通知消息
+            case DATASET_CREATE_NOTIFICATION:
+                return onDatasetCreateNotification(msg);
+            case DATASET_APPEND_ROWS_NOTIFICATION:
+                return onDatasetAppendRowsNotification(msg);
+            case DATASET_COMPLETE_NOTIFICATION:
+                return onDatasetCompleteNotification(msg);
+            case TRAINING_START_COMMAND_NOTIFICATION:
+                return onTrainingStartCommandNotification(msg);
+            case TRAINING_START_NOTIFICATION:
+                return onTrainingStartNotification(msg);
+            case TRAINING_START_FAILURE_NOTIFICATION:
+                return onTrainingStartFailureNotification(msg);
+            case TRAINING_STOP_COMMAND_NOTIFICATION:
+                return onTrainingStopCommandNotification(msg);
+            case TRAINING_PROGRESS_QUERY_NOTIFICATION:
+                return onTrainingProgressQueryNotification(msg);
+            case TRAINING_PROGRESS_UPDATE_NOTIFICATION:
+                return onTrainingProgressUpdateNotification(msg);
+            case MODEL_DOWNLOAD_NOTIFICATION:
+                return onModelDownloadNotification(msg);
+            case STATUS_UPDATE_NOTIFICATION:
+                return onStatusUpdateNotification(msg);
             case ERROR:
             case CONNECTION_ERROR:
             case MESSAGE_ERROR:
@@ -219,7 +298,7 @@ public class WebSocketProtocolService {
             default:
                 return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
                         "errorCode", "UNSUPPORTED_TYPE",
-                        "errorMessage", "不支持的消息类型: " + msg.getType()));
+                        "errorMessage", "v1.4协议不支持的消息类型: " + msg.getType()));
         }
     }
 
@@ -1556,26 +1635,47 @@ public class WebSocketProtocolService {
                 vmId, taskId, round, totalRounds, algorithm);
 
         try {
-            // 发送轮次开始通知给所有参与的VM
-            ProtocolMessage roundStartMsg = ProtocolMessage.builder()
-                    .type(ProtocolType.ROUND_START)
-                    .vmId("server")
-                    .timestamp(Instant.now().toString())
-                    .data(mapOf(
-                        "taskId", taskId,
-                        "round", round,
-                        "totalRounds", totalRounds,
-                        "algorithm", algorithm != null ? algorithm : "FedAvg",
-                        "message", "开始第" + round + "轮训练（共" + totalRounds + "轮）",
-                        "roundStartTime", Instant.now().toString()
-                    ))
-                    .build();
+            // 获取任务信息以构建标准消息
+            Map<String, Object> taskData = federatedTasksMapper.selectById(taskId);
+            if (taskData == null) {
+                log.error("任务{}不存在，无法发送轮次开始通知", taskId);
+                return ackFor(msg, ProtocolType.ROUND_START_ACK, mapOf(
+                    "status", "ERROR",
+                    "message", "Task not found: " + taskId
+                ));
+            }
+
+            // 获取预期参与者数量 - 使用现有的查询方法
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+            int expectedParticipants = participants != null ? participants.size() : 0;
+
+            // 构建训练配置和目标指标对象
+            Map<String, Object> trainingConfig = Map.of(
+                "learningRate", 0.01,
+                "timeout", 300
+            );
+
+            Map<String, Object> targetMetrics = Map.of(
+                "minAccuracy", 0.85,
+                "maxLoss", 0.15,
+                "convergenceThreshold", 0.001
+            );
+
+            // 使用MessageBuilder构建标准ROUND_START消息，符合协议v1.4标准
+            ProtocolMessage roundStartMsg = MessageBuilder.buildRoundStartMessage(
+                "broadcast", // vmId使用broadcast标识广播消息
+                taskId,
+                round, // roundNumber
+                trainingConfig, // trainingConfig对象
+                targetMetrics, // targetMetrics对象
+                expectedParticipants // expectedParticipants字段
+            );
 
             // 广播给所有VM
             messagingTemplate.convertAndSend("/topic/vm", roundStartMsg);
 
-            log.info("轮次开始通知已发送: taskId={}, round={}/{}, algorithm={}",
-                    taskId, round, totalRounds, algorithm);
+            log.info("标准化轮次开始通知已发送: taskId={}, roundNumber={}, expectedParticipants={}, algorithm={}",
+                    taskId, round, expectedParticipants, algorithm);
 
             return ackFor(msg, ProtocolType.ROUND_START_ACK, mapOf(
                 "status", "ROUND_STARTED",
@@ -2929,6 +3029,488 @@ public class WebSocketProtocolService {
                 .timestamp(Instant.now())
                 .data(errorData)
                 .build();
+    }
+
+    // ====================== v1.4协议新增消息处理方法 ======================
+
+    /**
+     * 处理FEDERATED_TASK_START_ACK - v1.4协议
+     */
+    private ProtocolAck onFederatedTaskStartAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+        String message = valueAsString(msg.getData(), "message");
+        String vmCapabilities = valueAsString(msg.getData(), "vmCapabilities");
+
+        log.info("收到联邦任务启动确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        if ("SUCCESS".equals(status)) {
+            // 记录VM任务启动确认
+            vmAckTracker.recordTaskStartAck(taskId, vmId, vmCapabilities);
+        } else {
+            log.error("VM任务启动失败: vmId={}, taskId={}, status={}, message={}",
+                     vmId, taskId, status, message);
+            vmAckTracker.recordTaskStartFailure(taskId, vmId, status, message);
+        }
+
+        // v1.4协议: FEDERATED_TASK_START_ACK不需要再次ACK
+        return null;
+    }
+
+    /**
+     * 处理TASK_STOP - v1.4协议服务端主动停止任务
+     */
+    private ProtocolAck onTaskStop(ProtocolMessage msg) {
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String reason = valueAsString(msg.getData(), "reason");
+
+        log.info("v1.4任务停止指令: taskId={}, reason={}", taskId, reason);
+
+        // 这是服务端发送给VM的消息，在这里不应该被处理
+        // 只是为了协议完整性记录日志
+        log.warn("收到服务端发出的TASK_STOP消息，这通常表示配置错误");
+
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "TASK_STOP应该由服务端发送给VM"
+        ));
+    }
+
+    /**
+     * 处理TASK_STOP_ACK - v1.4协议VM确认停止任务
+     */
+    private ProtocolAck onTaskStopAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+        String message = valueAsString(msg.getData(), "message");
+
+        log.info("收到任务停止确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        if ("SUCCESS".equals(status)) {
+            vmAckTracker.recordTaskStopAck(taskId, vmId);
+        } else {
+            log.error("VM任务停止失败: vmId={}, taskId={}, status={}, message={}",
+                     vmId, taskId, status, message);
+            vmAckTracker.recordTaskStopFailure(taskId, vmId, status, message);
+        }
+
+        return null;
+    }
+
+    /**
+     * 处理TASK_RESUME - v1.4协议服务端主动恢复任务
+     */
+    private ProtocolAck onTaskResume(ProtocolMessage msg) {
+        String taskId = valueAsString(msg.getData(), "taskId");
+        Integer currentRound = valueAsInteger(msg.getData(), "currentRound");
+
+        log.info("v1.4任务恢复指令: taskId={}, currentRound={}", taskId, currentRound);
+
+        // 这是服务端发送给VM的消息，在这里不应该被处理
+        log.warn("收到服务端发出的TASK_RESUME消息，这通常表示配置错误");
+
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "TASK_RESUME应该由服务端发送给VM"
+        ));
+    }
+
+    /**
+     * 处理TASK_RESUME_ACK - v1.4协议VM确认恢复任务
+     */
+    private ProtocolAck onTaskResumeAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+        String message = valueAsString(msg.getData(), "message");
+
+        log.info("收到任务恢复确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        if ("SUCCESS".equals(status)) {
+            vmAckTracker.recordTaskResumeAck(taskId, vmId);
+        } else {
+            log.error("VM任务恢复失败: vmId={}, taskId={}, status={}, message={}",
+                     vmId, taskId, status, message);
+            vmAckTracker.recordTaskResumeFailure(taskId, vmId, status, message);
+        }
+
+        return null;
+    }
+
+    /**
+     * 处理TASK_DELETE - v1.4协议服务端主动删除任务
+     */
+    private ProtocolAck onTaskDelete(ProtocolMessage msg) {
+        String taskId = valueAsString(msg.getData(), "taskId");
+        Boolean preserveData = valueAsBoolean(msg.getData(), "preserveData");
+
+        log.info("v1.4任务删除指令: taskId={}, preserveData={}", taskId, preserveData);
+
+        // 这是服务端发送给VM的消息，在这里不应该被处理
+        log.warn("收到服务端发出的TASK_DELETE消息，这通常表示配置错误");
+
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "TASK_DELETE应该由服务端发送给VM"
+        ));
+    }
+
+    /**
+     * 处理TASK_DELETE_ACK - v1.4协议VM确认删除任务
+     */
+    private ProtocolAck onTaskDeleteAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+        String message = valueAsString(msg.getData(), "message");
+
+        log.info("收到任务删除确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        if ("SUCCESS".equals(status)) {
+            vmAckTracker.recordTaskDeleteAck(taskId, vmId);
+        } else {
+            log.error("VM任务删除失败: vmId={}, taskId={}, status={}, message={}",
+                     vmId, taskId, status, message);
+            vmAckTracker.recordTaskDeleteFailure(taskId, vmId, status, message);
+        }
+
+        return null;
+    }
+
+    // ====================== v1.4协议通知消息处理方法 ======================
+
+    /**
+     * 处理GLOBAL_MODEL_BROADCAST_NOTIFICATION - v1.4协议全局模型广播通知
+     */
+    private ProtocolAck onGlobalModelBroadcastNotification(ProtocolMessage msg) {
+        log.info("收到全局模型广播通知，但这是服务端发出的通知消息");
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "GLOBAL_MODEL_BROADCAST_NOTIFICATION是服务端发出的通知"
+        ));
+    }
+
+    /**
+     * 处理AGGREGATION_START_NOTIFICATION - v1.4协议聚合开始通知
+     */
+    private ProtocolAck onAggregationStartNotification(ProtocolMessage msg) {
+        log.info("收到聚合开始通知，但这是服务端发出的通知消息");
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "AGGREGATION_START_NOTIFICATION是服务端发出的通知"
+        ));
+    }
+
+    /**
+     * 处理AGGREGATION_COMPLETE_NOTIFICATION - v1.4协议聚合完成通知
+     */
+    private ProtocolAck onAggregationCompleteNotification(ProtocolMessage msg) {
+        log.info("收到聚合完成通知，但这是服务端发出的通知消息");
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "AGGREGATION_COMPLETE_NOTIFICATION是服务端发出的通知"
+        ));
+    }
+
+    /**
+     * 处理ROUND_START_NOTIFICATION - v1.4协议轮次开始通知
+     */
+    private ProtocolAck onRoundStartNotification(ProtocolMessage msg) {
+        log.info("收到轮次开始通知，但这是服务端发出的通知消息");
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "ROUND_START_NOTIFICATION是服务端发出的通知"
+        ));
+    }
+
+    /**
+     * 处理ROUND_COMPLETE_NOTIFICATION - v1.4协议轮次完成通知
+     */
+    private ProtocolAck onRoundCompleteNotification(ProtocolMessage msg) {
+        log.info("收到轮次完成通知，但这是服务端发出的通知消息");
+        return ackFor(msg, ProtocolType.MESSAGE_ERROR, mapOf(
+            "errorCode", "INVALID_DIRECTION",
+            "errorMessage", "ROUND_COMPLETE_NOTIFICATION是服务端发出的通知"
+        ));
+    }
+
+    // ====================== 数据集相关ACK消息处理方法 ======================
+
+    /**
+     * 处理DATASET_CREATE_ACK - v1.4协议数据集创建确认
+     */
+    private ProtocolAck onDatasetCreateAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到数据集创建确认: vmId={}, datasetId={}, status={}", vmId, datasetId, status);
+
+        if ("SUCCESS".equals(status)) {
+            // 更新数据集状态
+            log.debug("数据集创建成功: vmId={}, datasetId={}", vmId, datasetId);
+        } else {
+            String errorMessage = valueAsString(msg.getData(), "message");
+            log.error("数据集创建失败: vmId={}, datasetId={}, message={}", vmId, datasetId, errorMessage);
+        }
+
+        return null;
+    }
+
+    /**
+     * 处理DATASET_APPEND_ROWS_ACK - v1.4协议数据集追加行确认
+     */
+    private ProtocolAck onDatasetAppendRowsAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String status = valueAsString(msg.getData(), "status");
+        Integer appendedRows = valueAsInteger(msg.getData(), "appendedRows");
+
+        log.info("收到数据集追加行确认: vmId={}, datasetId={}, status={}, appendedRows={}",
+                vmId, datasetId, status, appendedRows);
+
+        return null;
+    }
+
+    /**
+     * 处理DATASET_COMPLETE_ACK - v1.4协议数据集完成确认
+     */
+    private ProtocolAck onDatasetCompleteAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到数据集完成确认: vmId={}, datasetId={}, status={}", vmId, datasetId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理DATASET_DELETE_ACK - v1.4协议数据集删除确认
+     */
+    private ProtocolAck onDatasetDeleteAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到数据集删除确认: vmId={}, datasetId={}, status={}", vmId, datasetId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理DATASET_STATUS_RESPONSE - v1.4协议数据集状态响应
+     */
+    private ProtocolAck onDatasetStatusResponse(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String status = valueAsString(msg.getData(), "status");
+        Integer totalRows = valueAsInteger(msg.getData(), "totalRows");
+
+        log.info("收到数据集状态响应: vmId={}, datasetId={}, status={}, totalRows={}",
+                vmId, datasetId, status, totalRows);
+
+        return null;
+    }
+
+    // ====================== 训练相关ACK消息处理方法 ======================
+
+    /**
+     * 处理TRAINING_START_ACK - v1.4协议训练开始确认
+     */
+    private ProtocolAck onTrainingStartAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到训练开始确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_STOP_ACK - v1.4协议训练停止确认
+     */
+    private ProtocolAck onTrainingStopAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到训练停止确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_PROGRESS_ACK - v1.4协议训练进度确认
+     */
+    private ProtocolAck onTrainingProgressAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到训练进度确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        return null;
+    }
+
+    // ====================== 模型相关ACK消息处理方法 ======================
+
+    /**
+     * 处理MODEL_UPLOAD_ACK - v1.4协议模型上传确认
+     */
+    private ProtocolAck onModelUploadAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String modelId = valueAsString(msg.getData(), "modelId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到模型上传确认: vmId={}, modelId={}, status={}", vmId, modelId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理MODEL_DOWNLOAD_ACK - v1.4协议模型下载确认
+     */
+    private ProtocolAck onModelDownloadAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String modelId = valueAsString(msg.getData(), "modelId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到模型下载确认: vmId={}, modelId={}, status={}", vmId, modelId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理GLOBAL_MODEL_UPDATE_ACK - v1.4协议全局模型更新确认
+     */
+    private ProtocolAck onGlobalModelUpdateAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(msg.getData(), "taskId");
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到全局模型更新确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
+
+        return null;
+    }
+
+    // ====================== 连接相关ACK消息处理方法 ======================
+
+    /**
+     * 处理CONNECT_ACK - v1.4协议连接确认
+     */
+    private ProtocolAck onConnectAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        String status = valueAsString(msg.getData(), "status");
+
+        log.info("收到连接确认: vmId={}, status={}", vmId, status);
+
+        return null;
+    }
+
+    /**
+     * 处理HEARTBEAT_ACK - v1.4协议心跳确认
+     */
+    private ProtocolAck onHeartbeatAck(ProtocolMessage msg) {
+        String vmId = msg.getVmId();
+        Long timestamp = valueAsLong(msg.getData(), "timestamp");
+
+        log.debug("收到心跳确认: vmId={}, timestamp={}", vmId, timestamp);
+
+        return null;
+    }
+
+    // ====================== v1.4协议业务通知消息处理方法 ======================
+
+    /**
+     * 处理DATASET_CREATE_NOTIFICATION - v1.4协议数据集创建通知
+     */
+    private ProtocolAck onDatasetCreateNotification(ProtocolMessage msg) {
+        log.info("收到数据集创建通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理DATASET_APPEND_ROWS_NOTIFICATION - v1.4协议数据集追加行通知
+     */
+    private ProtocolAck onDatasetAppendRowsNotification(ProtocolMessage msg) {
+        log.info("收到数据集追加行通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理DATASET_COMPLETE_NOTIFICATION - v1.4协议数据集完成通知
+     */
+    private ProtocolAck onDatasetCompleteNotification(ProtocolMessage msg) {
+        log.info("收到数据集完成通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_START_COMMAND_NOTIFICATION - v1.4协议训练开始命令通知
+     */
+    private ProtocolAck onTrainingStartCommandNotification(ProtocolMessage msg) {
+        log.info("收到训练开始命令通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_START_NOTIFICATION - v1.4协议训练开始通知
+     */
+    private ProtocolAck onTrainingStartNotification(ProtocolMessage msg) {
+        log.info("收到训练开始通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_START_FAILURE_NOTIFICATION - v1.4协议训练开始失败通知
+     */
+    private ProtocolAck onTrainingStartFailureNotification(ProtocolMessage msg) {
+        log.info("收到训练开始失败通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_STOP_COMMAND_NOTIFICATION - v1.4协议训练停止命令通知
+     */
+    private ProtocolAck onTrainingStopCommandNotification(ProtocolMessage msg) {
+        log.info("收到训练停止命令通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_PROGRESS_QUERY_NOTIFICATION - v1.4协议训练进度查询通知
+     */
+    private ProtocolAck onTrainingProgressQueryNotification(ProtocolMessage msg) {
+        log.info("收到训练进度查询通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理TRAINING_PROGRESS_UPDATE_NOTIFICATION - v1.4协议训练进度更新通知
+     */
+    private ProtocolAck onTrainingProgressUpdateNotification(ProtocolMessage msg) {
+        log.info("收到训练进度更新通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理MODEL_DOWNLOAD_NOTIFICATION - v1.4协议模型下载通知
+     */
+    private ProtocolAck onModelDownloadNotification(ProtocolMessage msg) {
+        log.info("收到模型下载通知，但这是服务端发出的通知消息");
+        return null;
+    }
+
+    /**
+     * 处理STATUS_UPDATE_NOTIFICATION - v1.4协议状态更新通知
+     */
+    private ProtocolAck onStatusUpdateNotification(ProtocolMessage msg) {
+        log.info("收到状态更新通知，但这是服务端发出的通知消息");
+        return null;
     }
 
     // TODO: 缓存功能将在后续版本中实现

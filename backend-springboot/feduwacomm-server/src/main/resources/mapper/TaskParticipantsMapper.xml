@@ -112,11 +112,16 @@
             COALESCE(current_epoch, 0) as current_epoch,
             COALESCE(status, 'UNKNOWN') as status,
             COALESCE(last_heartbeat, '1970-01-01 00:00:00') as last_heartbeat,
-            COALESCE(updated_at, '1970-01-01 00:00:00') as updated_at
+            COALESCE(updated_at, '1970-01-01 00:00:00') as updated_at,
+            COALESCE(id, 'UNKNOWN') as participant_id
         FROM task_participants
         WHERE task_id = #{taskId}
+          AND id IS NOT NULL           -- 确保主键存在
           AND vm_id IS NOT NULL
           AND status IS NOT NULL
+          AND current_epoch IS NOT NULL -- 确保轮次字段存在
+          AND LENGTH(TRIM(vm_id)) > 0   -- 确保vm_id不是空字符串
+          AND LENGTH(TRIM(status)) > 0  -- 确保status不是空字符串
         ORDER BY updated_at DESC
     </select>
 

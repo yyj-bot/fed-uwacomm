@@ -38,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * 联邦学习聚合服务
@@ -207,33 +208,62 @@ public class FederatedAggregationService {
             List<Map<String, Object>> participantDetails = null;
             try {
                 participantDetails = taskParticipantsMapper.getParticipantStatusDetails(taskId);
-                log.debug("参与者状态详情: 任务ID={}, 参与者数量={}", taskId,
+                log.debug("参与者状态详情查询: 任务ID={}, 原始结果数量={}", taskId,
                          participantDetails != null ? participantDetails.size() : "null");
+
+                // 🔧 强化null过滤：确保返回的列表不包含null元素
+                if (participantDetails != null) {
+                    int originalSize = participantDetails.size();
+                    participantDetails = participantDetails.stream()
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                    int filteredSize = participantDetails.size();
+
+                    if (originalSize != filteredSize) {
+                        log.warn("🔧 过滤null参与者元素: 任务ID={}, 原始数量={}, 过滤后数量={}",
+                                taskId, originalSize, filteredSize);
+                    }
+                } else {
+                    participantDetails = new ArrayList<>();
+                }
+
+                log.debug("参与者状态详情处理完成: 任务ID={}, 有效参与者数量={}", taskId, participantDetails.size());
             } catch (Exception e) {
                 log.error("获取参与者详情失败: 任务ID={}, 错误={}", taskId, e.getMessage());
                 participantDetails = new ArrayList<>(); // 使用空列表避免后续null检查
             }
+
+            // 🔧 增强轮次检测逻辑：智能适应轮次同步问题
+            log.debug("开始轮次检测: 任务ID={}, 期望轮次={}", taskId, roundNumber);
 
             // 首先检查传入的roundNumber是否有完成的参与者
             int completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
             log.debug("初始检查: 任务ID={}, 检查轮次={}, 已完成参与者={}",
                     taskId, roundNumber, completedParticipants);
 
-            // 如果传入轮次没有完成参与者，检查参与者实际完成的轮次
+            // 🔧 如果传入轮次没有完成参与者，智能查找实际轮次
             if (completedParticipants == 0) {
                 // 查询参与者实际完成的最新轮次
                 Integer actualCompletedRound = getLatestCompletedRound(taskId);
-                log.debug("实际完成轮次检查: 任务ID={}, 最新完成轮次={}", taskId, actualCompletedRound);
+                log.debug("查询到参与者实际完成轮次: 任务ID={}, 实际轮次={}", taskId, actualCompletedRound);
 
-                if (actualCompletedRound != null && !actualCompletedRound.equals(roundNumber)) {
-                    log.warn("❌ 轮次同步异常检测：期望轮次({}) != 当前轮次({})", roundNumber, actualCompletedRound);
+                if (actualCompletedRound != null) {
+                    // 🔧 智能轮次选择：选择合适的轮次进行聚合检查
+                    Integer targetRound = determineTargetRoundForAggregation(taskId, roundNumber, actualCompletedRound);
 
-                    // 使用参与者实际完成的轮次重新检查
-                    completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, actualCompletedRound);
-                    roundNumber = actualCompletedRound; // 更新为实际轮次
+                    if (!targetRound.equals(roundNumber)) {
+                        log.info("🔄 轮次修正检测: 任务ID={}, 期望轮次={}, 实际轮次={}, 目标轮次={}",
+                                taskId, roundNumber, actualCompletedRound, targetRound);
 
-                    log.info("🔄 轮次修正: 任务ID={}, 修正轮次={}, 重新统计已完成参与者={}",
-                            taskId, actualCompletedRound, completedParticipants);
+                        // 使用目标轮次重新统计
+                        completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, targetRound);
+                        roundNumber = targetRound; // 更新为目标轮次
+
+                        log.info("✅ 轮次修正完成: 任务ID={}, 使用轮次={}, 已完成参与者={}",
+                                taskId, targetRound, completedParticipants);
+                    }
+                } else {
+                    log.warn("⚠️ 未找到参与者完成轮次: 任务ID={}, 可能是新任务或数据同步问题", taskId);
                 }
             }
 
@@ -257,21 +287,18 @@ public class FederatedAggregationService {
                 log.warn("📊 聚合服务计数错误: 已完成参与者=0/{}, 等待时间={}秒, 满足最少参与者={}, 是否触发={}",
                         totalParticipants, waitTimeSeconds, hasMinParticipants, shouldTrigger);
 
-                // 🔧 修复：安全地输出每个参与者的状态
+                // 🔧 修复：输出每个参与者的状态（现已预先过滤null元素）
                 if (participantDetails != null && !participantDetails.isEmpty()) {
                     log.debug("参与者详情数量: {}", participantDetails.size());
                     for (int i = 0; i < participantDetails.size(); i++) {
                         Map<String, Object> participant = participantDetails.get(i);
-                        if (participant != null) {
-                            log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}",
-                                    i, participant.get("vm_id"), participant.get("current_epoch"),
-                                    participant.get("status"), participant.get("updated_at"));
-                        } else {
-                            log.warn("⚠️ 发现null参与者元素[{}]，跳过处理", i);
-                        }
+                        // 由于已经预先过滤，这里的participant不应该为null
+                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, 参与者ID={}",
+                                i, participant.get("vm_id"), participant.get("current_epoch"),
+                                participant.get("status"), participant.get("updated_at"), participant.get("participant_id"));
                     }
                 } else {
-                    log.warn("⚠️ 参与者详情列表为空或null: participantDetails={}", participantDetails);
+                    log.warn("⚠️ 参与者详情列表为空: 任务ID={}, 可能的原因: 1)任务无参与者 2)数据同步问题 3)查询条件过严", taskId);
                 }
             } else {
                 log.info("聚合条件检查: 任务ID={}, 轮次={}, 已完成参与者={}/{}, 等待时间={}秒, " +
@@ -597,6 +624,52 @@ public class FederatedAggregationService {
         } catch (Exception e) {
             log.error("获取最新完成轮次失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
             return null;
+        }
+    }
+
+    /**
+     * 🔧 智能确定聚合目标轮次
+     * 解决轮次同步问题中的竞态条件
+     *
+     * @param taskId 任务ID
+     * @param expectedRound 期望的轮次（通常来自事件）
+     * @param actualCompletedRound 参与者实际完成的轮次
+     * @return 应该用于聚合检查的目标轮次
+     */
+    private Integer determineTargetRoundForAggregation(String taskId, Integer expectedRound, Integer actualCompletedRound) {
+        try {
+            // 获取当前任务状态
+            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            if (task == null) {
+                log.warn("任务不存在，使用期望轮次: taskId={}, expectedRound={}", taskId, expectedRound);
+                return expectedRound;
+            }
+
+            Integer taskCurrentRound = task.getCurrentRound();
+            log.debug("轮次选择分析: 任务ID={}, 任务轮次={}, 期望轮次={}, 实际完成轮次={}",
+                    taskId, taskCurrentRound, expectedRound, actualCompletedRound);
+
+            // 🔧 智能选择策略：
+            // 1. 如果参与者实际完成轮次 > 任务当前轮次，说明存在轮次推进延迟
+            // 2. 如果参与者实际完成轮次 == 期望轮次，使用期望轮次
+            // 3. 如果存在同步问题，优先使用参与者实际完成的轮次进行聚合
+
+            if (actualCompletedRound.equals(expectedRound)) {
+                log.debug("轮次匹配，使用期望轮次: {}", expectedRound);
+                return expectedRound;
+            } else if (actualCompletedRound > (taskCurrentRound != null ? taskCurrentRound : 0)) {
+                log.info("🔄 检测到轮次推进延迟: 任务轮次={}, 参与者完成轮次={}, 使用参与者轮次",
+                        taskCurrentRound, actualCompletedRound);
+                return actualCompletedRound;
+            } else {
+                log.debug("使用期望轮次: {}", expectedRound);
+                return expectedRound;
+            }
+
+        } catch (Exception e) {
+            log.error("确定目标轮次失败: 任务ID={}, 错误={}, 使用期望轮次={}",
+                    taskId, e.getMessage(), expectedRound);
+            return expectedRound;
         }
     }
 

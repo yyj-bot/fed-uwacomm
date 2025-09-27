@@ -1233,16 +1233,35 @@ public class MockVirtualMachine {
      */
     private void handleTrainingCommand(Map<String, Object> messageData) {
         try {
-            // 从消息中提取训练参数
+            // 从消息中提取训练参数 - 适配协议v1.4标准
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             if (data == null) return;
 
+            // 解析新的标准字段
             String taskId = (String) data.get("taskId");
-            Object roundObj = data.get("round");
-            int round = roundObj instanceof Number ? ((Number) roundObj).intValue() : 1;
+            Object roundObj = data.get("roundNumber"); // 更新字段名：round → roundNumber
+            int roundNumber = roundObj instanceof Number ? ((Number) roundObj).intValue() : 1;
+            String mlAlgorithm = (String) data.get("mlAlgorithm"); // 新字段：mlAlgorithm
+            String messageText = (String) data.get("message"); // 新字段：message
 
-            System.out.println("🤖 " + vmData.getName() + " 开始自动训练响应: taskId=" + taskId + ", round=" + round);
+            // 解析超参数对象
+            @SuppressWarnings("unchecked")
+            Map<String, Object> hyperparameters = (Map<String, Object>) data.get("hyperparameters");
+
+            // 解析全局模型对象
+            @SuppressWarnings("unchecked")
+            Map<String, Object> globalModel = (Map<String, Object>) data.get("globalModel");
+
+            System.out.println("🤖 " + vmData.getName() + " 收到标准化训练指令:");
+            System.out.println("    taskId=" + taskId + ", roundNumber=" + roundNumber);
+            System.out.println("    mlAlgorithm=" + mlAlgorithm + ", message=" + messageText);
+            if (hyperparameters != null) {
+                System.out.println("    hyperparameters=" + hyperparameters);
+            }
+            if (globalModel != null) {
+                System.out.println("    globalModel=" + globalModel);
+            }
 
             // 使用线程池异步执行训练，避免阻塞消息处理
             if (messageExecutor == null) {
@@ -1251,13 +1270,51 @@ public class MockVirtualMachine {
 
             messageExecutor.submit(() -> {
                 try {
-                    simulateTrainingRound(taskId, round);
+                    // 构建标准响应消息
+                    sendTrainingStartResponse(taskId, roundNumber, "ACCEPTED", "已收到训练指令，准备开始训练");
+
+                    // 开始训练逻辑，使用新的roundNumber参数
+                    simulateTrainingRound(taskId, roundNumber);
                 } catch (Exception e) {
                     System.err.println("❌ " + vmData.getName() + " 自动训练响应失败: " + e.getMessage());
+                    // 发送错误响应
+                    try {
+                        sendTrainingStartResponse(taskId, roundNumber, "ERROR", "训练执行失败: " + e.getMessage());
+                    } catch (Exception ex) {
+                        System.err.println("❌ " + vmData.getName() + " 发送错误响应失败: " + ex.getMessage());
+                    }
                 }
             });
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 处理训练指令失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 发送标准TRAINING_START响应消息
+     * 符合协议v1.4标准
+     */
+    private void sendTrainingStartResponse(String taskId, int roundNumber, String status, String message) {
+        try {
+            // 使用MessageBuilder构建标准响应消息
+            // 注意：由于MessageBuilder在common模块中，我们手动构建消息以保持Mock VM的独立性
+            Map<String, Object> responseMessage = createProtocolMessage(ProtocolType.TRAINING_START_RESPONSE);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("taskId", taskId);
+            data.put("roundNumber", roundNumber);
+            data.put("status", status);
+            data.put("message", message);
+            data.put("timestamp", Instant.now().toString());
+
+            responseMessage.put("data", data);
+            responseMessage.put("id", "resp-" + System.currentTimeMillis() + "-" + vmData.getVmId().substring(0, 4));
+
+            System.out.println("📤 " + vmData.getName() + " 发送训练开始响应: " + status + " - " + message);
+            sendStompMessage(responseMessage);
+
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 发送训练开始响应失败: " + e.getMessage());
         }
     }
 

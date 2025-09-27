@@ -2,12 +2,14 @@ package com.feduwacomm.utils;
 
 import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
+import com.feduwacomm.entity.FederatedTask;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * WebSocket消息构建工具类
@@ -212,5 +214,246 @@ public class MessageBuilder {
 
         // 验证消息ID格式
         return messageIdGenerator.validateMessageId(message.getId());
+    }
+
+    // ==================== 协议标准化方法 v1.4 ====================
+
+    /**
+     * 生成符合协议的ID格式
+     * 格式: {prefix}-{timestamp}-{random}
+     *
+     * @param prefix ID前缀
+     * @return 标准格式的ID
+     */
+    public static String generateStandardId(String prefix) {
+        long timestamp = System.currentTimeMillis();
+        String random = UUID.randomUUID().toString().substring(0, 8);
+        return String.format("%s-%d-%s", prefix, timestamp, random);
+    }
+
+    /**
+     * 构建标准TRAINING_START消息
+     * 符合协议v1.4标准
+     *
+     * @param vmId 虚拟机ID
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param mlAlgorithm ML算法
+     * @param hyperparameters 超参数对象
+     * @param globalModel 全局模型对象
+     * @param message 消息内容
+     * @return 标准TRAINING_START消息
+     */
+    public static ProtocolMessage buildTrainingStartMessage(
+            String vmId,
+            String taskId,
+            int roundNumber,
+            String mlAlgorithm,
+            Map<String, Object> hyperparameters,
+            Map<String, Object> globalModel,
+            String message) {
+
+        String messageId = generateStandardId("cmd");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("mlAlgorithm", mlAlgorithm);
+        data.put("hyperparameters", hyperparameters);
+        data.put("globalModel", globalModel);
+        data.put("message", message);
+        data.put("timestamp", Instant.now().toString());
+
+        return ProtocolMessage.builder()
+                .type(ProtocolType.TRAINING_START)
+                .id(messageId)
+                .vmId(vmId)
+                .data(data)
+                .signature(addSignature(data))
+                .timestamp(Instant.now().toString())
+                .build();
+    }
+
+    /**
+     * 构建标准ROUND_START消息
+     * 符合协议v1.4标准
+     *
+     * @param vmId 虚拟机ID
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param trainingConfig 训练配置对象
+     * @param targetMetrics 目标指标对象
+     * @param expectedParticipants 预期参与者数量
+     * @return 标准ROUND_START消息
+     */
+    public static ProtocolMessage buildRoundStartMessage(
+            String vmId,
+            String taskId,
+            int roundNumber,
+            Map<String, Object> trainingConfig,
+            Map<String, Object> targetMetrics,
+            int expectedParticipants) {
+
+        String messageId = generateStandardId("server");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("trainingConfig", trainingConfig);
+        data.put("targetMetrics", targetMetrics);
+        data.put("expectedParticipants", expectedParticipants);
+        data.put("timestamp", Instant.now().toString());
+
+        return ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_START)
+                .id(messageId)
+                .vmId(vmId)
+                .data(data)
+                .signature(addSignature(data))
+                .timestamp(Instant.now().toString())
+                .build();
+    }
+
+    /**
+     * 构建超参数对象
+     *
+     * @param task 联邦学习任务
+     * @return 超参数Map
+     */
+    public static Map<String, Object> buildHyperparameters(FederatedTask task) {
+        Map<String, Object> hyperparameters = new HashMap<>();
+        hyperparameters.put("learningRate", task.getLearningRate() != null ? task.getLearningRate() : 0.01);
+        hyperparameters.put("batchSize", task.getBatchSize() != null ? task.getBatchSize() : 32);
+        hyperparameters.put("epochs", task.getEpochs() != null ? task.getEpochs() : 100);
+        hyperparameters.put("timeout", 300); // 5分钟超时
+        return hyperparameters;
+    }
+
+    /**
+     * 构建全局模型对象
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @return 全局模型Map
+     */
+    public static Map<String, Object> buildGlobalModel(String taskId, int roundNumber) {
+        Map<String, Object> globalModel = new HashMap<>();
+        globalModel.put("modelId", "global-model-" + taskId + "-round-" + roundNumber);
+        globalModel.put("version", "v" + roundNumber + ".0");
+        globalModel.put("downloadUrl", "/api/federated/models/" + taskId + "/global/round/" + roundNumber);
+        return globalModel;
+    }
+
+    /**
+     * 构建目标指标对象
+     *
+     * @param task 联邦学习任务
+     * @return 目标指标Map
+     */
+    public static Map<String, Object> buildTargetMetrics(FederatedTask task) {
+        Map<String, Object> targetMetrics = new HashMap<>();
+        targetMetrics.put("minAccuracy", 0.85);
+        targetMetrics.put("maxLoss", 0.15);
+        targetMetrics.put("convergenceThreshold", 0.001);
+        return targetMetrics;
+    }
+
+    /**
+     * 构建训练配置对象
+     *
+     * @param task 联邦学习任务
+     * @return 训练配置Map
+     */
+    public static Map<String, Object> buildTrainingConfig(FederatedTask task) {
+        Map<String, Object> trainingConfig = new HashMap<>();
+        trainingConfig.put("learningRate", task.getLearningRate() != null ? task.getLearningRate() : 0.01);
+        trainingConfig.put("batchSize", task.getBatchSize() != null ? task.getBatchSize() : 32);
+        trainingConfig.put("epochs", task.getEpochs() != null ? task.getEpochs() : 100);
+        trainingConfig.put("timeout", 300);
+        return trainingConfig;
+    }
+
+    /**
+     * 构建标准TRAINING_START响应消息
+     *
+     * @param vmId 虚拟机ID
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param status 状态
+     * @param message 消息内容
+     * @return TRAINING_START响应消息
+     */
+    public static ProtocolMessage buildTrainingStartResponse(
+            String vmId,
+            String taskId,
+            int roundNumber,
+            String status,
+            String message) {
+
+        String messageId = generateStandardId("resp");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("status", status);
+        data.put("message", message);
+        data.put("timestamp", Instant.now().toString());
+
+        return ProtocolMessage.builder()
+                .type(ProtocolType.TRAINING_START_RESPONSE)
+                .id(messageId)
+                .vmId(vmId)
+                .data(data)
+                .signature(addSignature(data))
+                .timestamp(Instant.now().toString())
+                .build();
+    }
+
+    /**
+     * 构建标准ROUND_START ACK消息
+     *
+     * @param vmId 虚拟机ID
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param status 状态
+     * @param message 消息内容
+     * @return ROUND_START ACK消息
+     */
+    public static ProtocolMessage buildRoundStartAck(
+            String vmId,
+            String taskId,
+            int roundNumber,
+            String status,
+            String message) {
+
+        String messageId = generateStandardId("ack");
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("status", status);
+        data.put("message", message);
+        data.put("timestamp", Instant.now().toString());
+
+        return ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_START_ACK)
+                .id(messageId)
+                .vmId(vmId)
+                .data(data)
+                .signature(addSignature(data))
+                .timestamp(Instant.now().toString())
+                .build();
+    }
+
+    /**
+     * 添加消息签名（当前实现为空签名）
+     * TODO: 实现真实的消息签名算法
+     *
+     * @param data 消息数据
+     * @return 签名字符串
+     */
+    public static String addSignature(Map<String, Object> data) {
+        // TODO: 实现真实的消息签名算法
+        return ""; // 暂时返回空签名
     }
 }

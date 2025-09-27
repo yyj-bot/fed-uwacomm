@@ -50,7 +50,7 @@
 
 ### 0.4 前置注册与认证流程
 - 第一步（HTTP）: 虚拟机向后端发起注册请求，注册成功后返回 `accessToken`、`secretId` 和建议的 WebSocket 连接信息
-- 第二步（WebSocket/STOMP）: 虚拟机使用 `accessToken` 建立 WebSocket 连接，并在 STOMP CONNECT 帧或 URL 查询参数中携带 Token
+- 第二步（WebSocket/STOMP）: 虚拟机使用 `accessToken` 建立 WebSocket 连接，并在 STOMP CONNECT 帧中携带 Token
 - 第三步（应用层）: 连接建立后发送应用层 `CONNECT` 消息，进行能力与环境上报
 
 > 说明：后端提供统一的原生 STOMP 端点（`/ws`）。推荐通过 STOMP CONNECT 头部携带 `Authorization: Bearer <token>`，避免在 URL 里暴露 Token。
@@ -416,8 +416,7 @@ function generateMessageId(prefix) {
         "neurons": [784, 256, 128, 10],
         "activation": "relu",
         "optimizer": "adam"
-      },
-      "downloadUrl": "/api/v1/model/download/model-123456"
+      }
     },
     "dataConfig": {
       "dataPath": "/data/training",
@@ -719,72 +718,6 @@ function generateMessageId(prefix) {
 
 > 补充：收到 VM 端 MODEL_UPLOAD 后，服务端根据任务配置的联邦学习算法进行聚合，将本地训练结果存入 `vm_round_models`，聚合后的全局模型存入 `model_versions`。
 
-#### 3.6.2 全局模型下发 (MODEL_DOWNLOAD) 🟢
-
-**消息作用**: 后端完成联邦聚合后向虚拟机推送最新的全局模型参数，用于下一轮本地训练。
-
-**虚拟机端实现**: 接收此消息后验证模型参数的完整性（通过checksum），解压并加载新的全局模型权重到本地模型中，准备开始下一轮本地训练。发送MODEL_UPDATE_ACK确认模型更新完成。
-
-**后端实现**: 当联邦聚合完成生成新的全局模型后，构建并向所有参与的虚拟机推送此消息，包含经过聚合的模型参数。跟踪每个虚拟机的模型更新状态，确保所有节点都成功接收到最新模型。
-
-```json
-{
-  "type": "MODEL_DOWNLOAD",
-  "id": "server-1704067200000-123471",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "a1b2c3d4e5f678901234567890123456",
-  "data": {
-    "taskId": "task-123456",
-    "round": 26,
-    "parameters": {
-      "model": {
-        "framework": "pytorch",
-        "format": "state_dict",
-        "weights": {
-          "shape": [784, 256, 128, 10],
-          "dtype": "float32",
-          "checksum": "sha256:def456..."
-        }
-      },
-      "training": {
-        "algorithm": "RandomForest",
-        "samples": 1000
-      }
-    },
-    "compression": "gzip"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-> 说明：v1.4版本优化：模型下发不再包含联邦学习算法信息，只下发经过聚合处理的模型参数和结构。虚拟机无需了解聚合过程，只需接收并使用新模型参数。
-
-#### 3.6.3 模型更新确认 (MODEL_UPDATE_ACK) 🔵
-
-**消息作用**: 虚拟机确认已成功接收并更新全局模型，通知后端可以继续后续的训练流程。
-
-**虚拟机端实现**: 在成功接收和应用全局模型后发送此确认消息，包含更新状态、模型版本、更新时间等信息。如果模型更新失败，应在status字段中标记为FAILED并提供错误详情。
-
-**后端实现**: 接收虚拟机的模型更新确认，更新数据库中对应虚拟机的模型同步状态。当所有参与节点都确认模型更新完成后，可以触发下一轮训练任务的开始。
-
-```json
-{
-  "type": "MODEL_UPDATE_ACK",
-  "id": "client-1704067200000-123472",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "a1b2c3d4e5f678901234567890123456",
-  "data": {
-    "vmId": "a1b2c3d4e5f678901234567890123456",
-    "modelVersion": "v1.0.1",
-    "updateTime": "2024-01-01T00:00:00.000Z",
-    "status": "SUCCESS",
-    "message": "全局模型更新已确认"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-> 说明：虚拟机收到全局模型更新后，发送此确认消息通知服务器已成功接收并应用新模型。
 
 ### 3.7 任务管理消息
 
@@ -2043,39 +1976,7 @@ function generateMessageId(prefix) {
 }
 ```
 
-### 3.12.10 模型下载通知 (MODEL_DOWNLOAD_NOTIFICATION) 🟢
-```json
-{
-  "type": "MODEL_DOWNLOAD_NOTIFICATION",
-  "id": "server-1704067200000-200019",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "vmId": "a1b2c3d4e5f678901234567890123456",
-  "data": {
-    "taskId": "task-123456",
-    "parameters": {
-      "model": {
-        "framework": "pytorch",
-        "format": "state_dict",
-        "weights": {
-          "shape": [784, 256, 128, 10],
-          "dtype": "float32",
-          "checksum": "sha256:global_model_1704067200000"
-        }
-      },
-      "training": {
-        "algorithm": "RandomForest",
-        "samples": 1000
-      }
-    },
-    "compression": "gzip",
-    "downloadTime": "2024-01-01T00:00:00.000Z",
-    "message": "全局模型下载数据"
-  },
-  "signature": "base64_encoded_signature"
-}
-```
-
-### 3.12.11 状态更新通知 (STATUS_UPDATE_NOTIFICATION) 🟢
+### 3.12.10 状态更新通知 (STATUS_UPDATE_NOTIFICATION) 🟢
 ```json
 {
   "type": "STATUS_UPDATE_NOTIFICATION",
@@ -2153,12 +2054,12 @@ function generateMessageId(prefix) {
 
 ### 4.4 训练流程
 1. **任务启动**: 服务器发送TRAINING_START命令
-2. **模型下载**: 客户端从服务器下载全局模型
+2. **模型接收**: 客户端通过GLOBAL_MODEL_BROADCAST接收全局模型
 3. **本地训练**: 客户端开始本地训练过程
 4. **进度报告**: 客户端定期发送TRAINING_PROGRESS
 5. **模型上传**: 训练完成后发送MODEL_UPLOAD
 6. **模型聚合**: 服务器聚合所有客户端模型
-7. **新模型分发**: 服务器向所有客户端发送新的全局模型
+7. **新模型广播**: 服务器通过GLOBAL_MODEL_BROADCAST向所有客户端广播新的全局模型
 
 ### 4.5 状态查询流程
 1. **查询请求**: 服务器发送STATUS_QUERY消息到目标虚拟机
