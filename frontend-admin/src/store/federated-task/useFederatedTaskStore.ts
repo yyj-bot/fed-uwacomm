@@ -488,5 +488,401 @@ export const useTask = () => {
   }
 }
 
+// ==================== v1.4 新增：联邦学习流程编排 Hook ====================
+
+export const useOrchestration = () => {
+  // 获取编排状态
+  const orchestrationList = useTaskStore((state) => state.orchestrationList)
+  const orchestrationListTotal = useTaskStore((state) => state.orchestrationListTotal)
+  const orchestrationListLoading = useTaskStore((state) => state.orchestrationListLoading)
+  const orchestrationListError = useTaskStore((state) => state.orchestrationListError)
+  
+  const currentOrchestration = useTaskStore((state) => state.currentOrchestration)
+  const currentOrchestrationLoading = useTaskStore((state) => state.currentOrchestrationLoading)
+  const currentOrchestrationError = useTaskStore((state) => state.currentOrchestrationError)
+  
+  const orchestrationTimelines = useTaskStore((state) => state.orchestrationTimelines)
+  const orchestrationTimelinesLoading = useTaskStore((state) => state.orchestrationTimelinesLoading)
+  const orchestrationTimelinesError = useTaskStore((state) => state.orchestrationTimelinesError)
+  
+  const orchestrationAnalytics = useTaskStore((state) => state.orchestrationAnalytics)
+  const orchestrationAnalyticsLoading = useTaskStore((state) => state.orchestrationAnalyticsLoading)
+  const orchestrationAnalyticsError = useTaskStore((state) => state.orchestrationAnalyticsError)
+  
+  const orchestrationOperationLoading = useTaskStore((state) => state.orchestrationOperationLoading)
+  const orchestrationOperationError = useTaskStore((state) => state.orchestrationOperationError)
+  
+  const createOrchestrationLoading = useTaskStore((state) => state.createOrchestrationLoading)
+  const createOrchestrationError = useTaskStore((state) => state.createOrchestrationError)
+  
+  const orchestrationQueryParams = useTaskStore((state) => state.orchestrationQueryParams)
+  const orchestrationPagination = useTaskStore((state) => state.orchestrationPagination)
+
+  // 获取编排操作方法
+  const fetchOrchestrationListAction = useTaskStore((state) => state.fetchOrchestrationList)
+  const refreshOrchestrationListAction = useTaskStore((state) => state.refreshOrchestrationList)
+  const fetchOrchestrationStatusAction = useTaskStore((state) => state.fetchOrchestrationStatus)
+  const setCurrentOrchestrationAction = useTaskStore((state) => state.setCurrentOrchestration)
+  const startOrchestrationAction = useTaskStore((state) => state.startOrchestration)
+  const pauseOrchestrationAction = useTaskStore((state) => state.pauseOrchestration)
+  const resumeOrchestrationAction = useTaskStore((state) => state.resumeOrchestration)
+  const terminateOrchestrationAction = useTaskStore((state) => state.terminateOrchestration)
+  const fetchOrchestrationTimelineAction = useTaskStore((state) => state.fetchOrchestrationTimeline)
+  const fetchOrchestrationAnalyticsAction = useTaskStore((state) => state.fetchOrchestrationAnalytics)
+  const setOrchestrationQueryParamsAction = useTaskStore((state) => state.setOrchestrationQueryParams)
+  const resetOrchestrationQueryParamsAction = useTaskStore((state) => state.resetOrchestrationQueryParams)
+  const setOrchestrationPaginationAction = useTaskStore((state) => state.setOrchestrationPagination)
+  const clearOrchestrationErrorAction = useTaskStore((state) => state.clearOrchestrationError)
+  const clearOrchestrationOperationErrorAction = useTaskStore((state) => state.clearOrchestrationOperationError)
+
+  // ==================== 封装编排操作方法 ====================
+
+  /**
+   * 获取编排列表
+   */
+  const fetchOrchestrationList = useCallback(async (params?: {
+    taskId?: string
+    status?: string
+    page?: number
+    size?: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }) => {
+    try {
+      await fetchOrchestrationListAction(params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取编排列表失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchOrchestrationListAction])
+
+  /**
+   * 刷新编排列表
+   */
+  const refreshOrchestrationList = useCallback(async () => {
+    try {
+      await refreshOrchestrationListAction()
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '刷新编排列表失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [refreshOrchestrationListAction])
+
+  /**
+   * 获取编排状态
+   */
+  const fetchOrchestrationStatus = useCallback(async (orchestrationId: string, params?: {
+    includeDetails?: boolean
+    includeMetrics?: boolean
+    refresh?: boolean
+  }) => {
+    try {
+      await fetchOrchestrationStatusAction(orchestrationId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取编排状态失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchOrchestrationStatusAction])
+
+  /**
+   * 设置当前编排
+   */
+  const setCurrentOrchestration = useCallback((orchestration: any) => {
+    setCurrentOrchestrationAction(orchestration)
+  }, [setCurrentOrchestrationAction])
+
+  /**
+   * 启动编排
+   */
+  const startOrchestration = useCallback(async (orchestrationData: {
+    taskId: string
+    workflowConfig: any
+    schedulingOptions?: any
+  }) => {
+    try {
+      const orchestrationId = await startOrchestrationAction(orchestrationData)
+      return { success: true, error: null, data: orchestrationId }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '启动编排失败'
+      return { success: false, error: errorMessage, data: null }
+    }
+  }, [startOrchestrationAction])
+
+  /**
+   * 暂停编排
+   */
+  const pauseOrchestration = useCallback(async (orchestrationId: string, pauseData?: {
+    reason?: string
+    pauseMode?: 'GRACEFUL' | 'IMMEDIATE'
+    waitForCurrentRound?: boolean
+    preserveState?: boolean
+    notifyParticipants?: boolean
+  }) => {
+    try {
+      await pauseOrchestrationAction(orchestrationId, pauseData)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '暂停编排失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [pauseOrchestrationAction])
+
+  /**
+   * 恢复编排
+   */
+  const resumeOrchestration = useCallback(async (orchestrationId: string, resumeData?: {
+    resumeFromSnapshot?: boolean
+    snapshotId?: string
+    validateState?: boolean
+    notifyParticipants?: boolean
+  }) => {
+    try {
+      await resumeOrchestrationAction(orchestrationId, resumeData)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '恢复编排失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [resumeOrchestrationAction])
+
+  /**
+   * 终止编排
+   */
+  const terminateOrchestration = useCallback(async (orchestrationId: string, params?: {
+    force?: boolean
+    cleanup?: boolean
+    saveResults?: boolean
+  }) => {
+    try {
+      await terminateOrchestrationAction(orchestrationId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '终止编排失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [terminateOrchestrationAction])
+
+  /**
+   * 获取编排时间线
+   */
+  const fetchOrchestrationTimeline = useCallback(async (orchestrationId: string, params?: {
+    includeEvents?: boolean
+    eventLevel?: 'ALL' | 'MAJOR' | 'ERROR'
+    timeRange?: string
+  }) => {
+    try {
+      await fetchOrchestrationTimelineAction(orchestrationId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取编排时间线失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchOrchestrationTimelineAction])
+
+  /**
+   * 获取编排性能分析
+   */
+  const fetchOrchestrationAnalytics = useCallback(async (orchestrationId: string, params?: {
+    includeRecommendations?: boolean
+    metricsLevel?: 'BASIC' | 'DETAILED' | 'FULL'
+  }) => {
+    try {
+      await fetchOrchestrationAnalyticsAction(orchestrationId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取编排性能分析失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchOrchestrationAnalyticsAction])
+
+  /**
+   * 设置编排查询参数
+   */
+  const setOrchestrationQueryParams = useCallback((params: {
+    taskId?: string
+    status?: string
+    page?: number
+    size?: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }) => {
+    setOrchestrationQueryParamsAction(params)
+  }, [setOrchestrationQueryParamsAction])
+
+  /**
+   * 重置编排查询参数
+   */
+  const resetOrchestrationQueryParams = useCallback(() => {
+    resetOrchestrationQueryParamsAction()
+  }, [resetOrchestrationQueryParamsAction])
+
+  /**
+   * 设置编排分页
+   */
+  const setOrchestrationPagination = useCallback((page: number, size?: number) => {
+    setOrchestrationPaginationAction(page, size)
+  }, [setOrchestrationPaginationAction])
+
+  /**
+   * 清除编排错误
+   */
+  const clearOrchestrationError = useCallback(() => {
+    clearOrchestrationErrorAction()
+  }, [clearOrchestrationErrorAction])
+
+  /**
+   * 清除编排操作错误
+   */
+  const clearOrchestrationOperationError = useCallback((orchestrationId: string) => {
+    clearOrchestrationOperationErrorAction(orchestrationId)
+  }, [clearOrchestrationOperationErrorAction])
+
+  // ==================== 编排计算属性 ====================
+
+  /**
+   * 获取编排时间线
+   */
+  const getOrchestrationTimeline = useCallback((orchestrationId: string) => {
+    return orchestrationTimelines[orchestrationId] || null
+  }, [orchestrationTimelines])
+
+  /**
+   * 检查编排时间线是否正在加载
+   */
+  const isOrchestrationTimelineLoading = useCallback((orchestrationId: string): boolean => {
+    return !!orchestrationTimelinesLoading[orchestrationId]
+  }, [orchestrationTimelinesLoading])
+
+  /**
+   * 获取编排性能分析
+   */
+  const getOrchestrationAnalytics = useCallback((orchestrationId: string) => {
+    return orchestrationAnalytics[orchestrationId] || null
+  }, [orchestrationAnalytics])
+
+  /**
+   * 检查编排性能分析是否正在加载
+   */
+  const isOrchestrationAnalyticsLoading = useCallback((orchestrationId: string): boolean => {
+    return !!orchestrationAnalyticsLoading[orchestrationId]
+  }, [orchestrationAnalyticsLoading])
+
+  /**
+   * 检查编排是否正在执行操作
+   */
+  const isOrchestrationOperating = useCallback((orchestrationId: string): boolean => {
+    return !!orchestrationOperationLoading[orchestrationId]
+  }, [orchestrationOperationLoading])
+
+  /**
+   * 获取编排操作错误
+   */
+  const getOrchestrationOperationError = useCallback((orchestrationId: string): string | null => {
+    return orchestrationOperationError[orchestrationId] || null
+  }, [orchestrationOperationError])
+
+  /**
+   * 检查编排是否可以暂停
+   */
+  const canPauseOrchestration = useCallback((orchestration: any): boolean => {
+    if (!orchestration) return false
+    return orchestration.status === 'RUNNING' && !isOrchestrationOperating(orchestration.orchestrationId)
+  }, [isOrchestrationOperating])
+
+  /**
+   * 检查编排是否可以恢复
+   */
+  const canResumeOrchestration = useCallback((orchestration: any): boolean => {
+    if (!orchestration) return false
+    return orchestration.status === 'PAUSED' && !isOrchestrationOperating(orchestration.orchestrationId)
+  }, [isOrchestrationOperating])
+
+  /**
+   * 检查编排是否可以终止
+   */
+  const canTerminateOrchestration = useCallback((orchestration: any): boolean => {
+    if (!orchestration) return false
+    return ['RUNNING', 'PAUSED'].includes(orchestration.status) && !isOrchestrationOperating(orchestration.orchestrationId)
+  }, [isOrchestrationOperating])
+
+  /**
+   * 获取运行中的编排数量
+   */
+  const runningOrchestrationCount = useCallback((): number => {
+    return orchestrationList.filter(orchestration => orchestration.status === 'RUNNING').length
+  }, [orchestrationList])
+
+  /**
+   * 获取已完成的编排数量
+   */
+  const completedOrchestrationCount = useCallback((): number => {
+    return orchestrationList.filter(orchestration => orchestration.status === 'COMPLETED').length
+  }, [orchestrationList])
+
+  /**
+   * 获取失败的编排数量
+   */
+  const failedOrchestrationCount = useCallback((): number => {
+    return orchestrationList.filter(orchestration => orchestration.status === 'FAILED').length
+  }, [orchestrationList])
+
+  return {
+    // 编排状态
+    orchestrationList,
+    orchestrationListTotal,
+    orchestrationListLoading,
+    orchestrationListError,
+    currentOrchestration,
+    currentOrchestrationLoading,
+    currentOrchestrationError,
+    orchestrationTimelines,
+    orchestrationTimelinesLoading,
+    orchestrationTimelinesError,
+    orchestrationAnalytics,
+    orchestrationAnalyticsLoading,
+    orchestrationAnalyticsError,
+    orchestrationOperationLoading,
+    orchestrationOperationError,
+    createOrchestrationLoading,
+    createOrchestrationError,
+    orchestrationQueryParams,
+    orchestrationPagination,
+    
+    // 编排操作方法
+    fetchOrchestrationList,
+    refreshOrchestrationList,
+    fetchOrchestrationStatus,
+    setCurrentOrchestration,
+    startOrchestration,
+    pauseOrchestration,
+    resumeOrchestration,
+    terminateOrchestration,
+    fetchOrchestrationTimeline,
+    fetchOrchestrationAnalytics,
+    setOrchestrationQueryParams,
+    resetOrchestrationQueryParams,
+    setOrchestrationPagination,
+    clearOrchestrationError,
+    clearOrchestrationOperationError,
+    
+    // 编排计算属性和工具方法
+    getOrchestrationTimeline,
+    isOrchestrationTimelineLoading,
+    getOrchestrationAnalytics,
+    isOrchestrationAnalyticsLoading,
+    isOrchestrationOperating,
+    getOrchestrationOperationError,
+    canPauseOrchestration,
+    canResumeOrchestration,
+    canTerminateOrchestration,
+    runningOrchestrationCount,
+    completedOrchestrationCount,
+    failedOrchestrationCount
+  }
+}
+
 // ==================== 导出默认 Hook ====================
 export default useTask
