@@ -24,8 +24,8 @@ public class UuidUtil {
     /**
      * 构造函数
      */
-    UuidUtil() {
-        // 包可见构造函数
+    public UuidUtil() {
+        // 公共构造函数，用于Spring注入和测试Mock
     }
 
     /**

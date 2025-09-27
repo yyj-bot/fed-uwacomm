@@ -71,7 +71,6 @@ public class FederatedTask {
     
     // 任务统计
     private Integer participantCount;
-    private Double progress;
     private Integer estimatedDuration;
     
     // 配置JSON存储
@@ -80,4 +79,18 @@ public class FederatedTask {
     // 任务结果
     private String finalResults;
     private String modelInfo;
+
+    /**
+     * 计算任务进度百分比
+     * @return 进度百分比 (0-100)
+     */
+    public double getProgress() {
+        if (totalRounds == null || totalRounds <= 0) {
+            return 0.0;
+        }
+        if (currentRound == null) {
+            return 0.0;
+        }
+        return Math.round((currentRound * 100.0) / totalRounds * 100.0) / 100.0;
+    }
 }

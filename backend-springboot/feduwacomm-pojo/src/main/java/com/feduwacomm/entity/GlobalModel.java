@@ -102,4 +102,20 @@ public class GlobalModel {
      * 聚合元数据(JSON格式)
      */
     private String metadata;
+
+    /**
+     * 分发状态 (PENDING, DISTRIBUTING, DISTRIBUTED, FAILED)
+     */
+    private String distributionStatus;
+
+    /**
+     * 已分发的虚拟机列表(JSON格式)
+     */
+    private String distributedVms;
+
+    /**
+     * 分发完成时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private LocalDateTime distributionCompletedAt;
 }

@@ -213,18 +213,18 @@ class InitialModelGenerationServiceTest {
     
     @Test
     @DisplayName("成功验证模型完整性")
-    void testValidateModelIntegrity_NoFile_ShouldReturnFalse() {
+    void testValidateModelIntegrity_NoModelData_ShouldReturnFalse() {
         // Given
         InitialModel mockModel = createMockInitialModel();
-        mockModel.setFilePath(null); // 没有文件路径
+        mockModel.setModelData(null); // 没有模型数据
         when(initialModelMapper.selectById(modelId)).thenReturn(mockModel);
-        
+
         // When
         boolean result = initialModelService.validateModelIntegrity(modelId);
-        
+
         // Then
         assertThat(result).isFalse();
-        
+
         verify(initialModelMapper).selectById(modelId);
     }
     
@@ -340,9 +340,8 @@ class InitialModelGenerationServiceTest {
                 .generationMethod(GenerationMethod.fromCode("RANDOM"))
                 .modelSize(1024L)
                 .status(InitialModelStatus.fromCode("READY"))
-                .filePath("/tmp/models/test-model.h5")
-                .checksum("test-checksum")
-                .architectureParams("{}")
+                .modelData("{\"r2\":-0.001,\"mse\":1.0,\"model_parameters\":{\"hidden_layers\":[128,64,32]}}")
+                .architectureParams("{\"layers\":3,\"units\":128}")
                 .createdAt(LocalDateTime.now())
                 .createdBy(userId)
                 .updatedAt(LocalDateTime.now())

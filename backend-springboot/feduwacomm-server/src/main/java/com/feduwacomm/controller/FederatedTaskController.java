@@ -273,7 +273,12 @@ public class FederatedTaskController {
         String clientIp = IpUtil.getClientIpAddress(request);
         String currentUserId = BaseContext.getCurrentId();
 
-        int participantCount = createDTO.getParticipantConfig().getParticipants().size();
+        // 安全获取参与者数量，避免NPE
+        int participantCount = 0;
+        if (createDTO.getParticipantConfig() != null &&
+            createDTO.getParticipantConfig().getParticipants() != null) {
+            participantCount = createDTO.getParticipantConfig().getParticipants().size();
+        }
 
         log.info("收到v1.3任务创建请求: taskName={}, algorithm={}, participantCount={}, userId={}, ip={}",
             createDTO.getTaskName(), createDTO.getAlgorithm(), participantCount, currentUserId, clientIp);

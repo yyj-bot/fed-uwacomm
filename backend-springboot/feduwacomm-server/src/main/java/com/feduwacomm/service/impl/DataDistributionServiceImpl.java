@@ -53,7 +53,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
 
-    private static final String DATA_STORAGE_PATH = "/opt/feduwacomm/data/distributed";
+    private static final String DATA_STORAGE_PATH = "./data/distributed";
 
     @Override
     @Transactional
@@ -504,7 +504,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
         
         try {
             // 创建报告目录
-            Path reportDir = Paths.get("/opt/feduwacomm/reports");
+            Path reportDir = Paths.get("./data/reports");
             Files.createDirectories(reportDir);
 
             String fileName = String.format("distribution_report_%s_%s.%s", 

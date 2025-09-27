@@ -102,11 +102,6 @@ public class NetworkProperties {
          */
         private String endpoint = WEBSOCKET_ENDPOINT;
 
-        /**
-         * 原生WebSocket端点路径
-         * 默认: /ws-native
-         */
-        private String nativeEndpoint = WEBSOCKET_NATIVE_ENDPOINT;
 
         /**
          * 心跳间隔（秒）
@@ -129,15 +124,13 @@ public class NetworkProperties {
         }
 
         /**
-         * 获取完整的WebSocket URL
+         * 获取完整的WebSocket URL (统一使用原生WebSocket端点)
          * @param server 服务器配置
-         * @param nativeWs 是否使用原生WebSocket
          * @return WebSocket URL
          */
-        public String getWebSocketUrl(Server server, boolean nativeWs) {
+        public String getWebSocketUrl(Server server) {
             String wsProtocol = getProtocol();
-            String path = nativeWs ? nativeEndpoint : endpoint;
-            return wsProtocol + server.getHost() + ":" + server.getPort() + path;
+            return wsProtocol + server.getHost() + ":" + server.getPort() + endpoint;
         }
     }
 
@@ -212,8 +205,10 @@ public class NetworkProperties {
      */
     public WebSocketInfo getWebSocketInfo() {
         WebSocketInfo info = new WebSocketInfo();
-        info.setSockjs(server.getBaseUrl() + websocket.getEndpoint());
-        info.setNativeWs(websocket.getWebSocketUrl(server, true));
+        // 统一使用原生WebSocket端点，移除SockJS支持
+        String websocketUrl = websocket.getWebSocketUrl(server);
+        info.setSockjs(websocketUrl); // 保持字段名但实际使用原生WebSocket
+        info.setNativeWs(websocketUrl);
         return info;
     }
 

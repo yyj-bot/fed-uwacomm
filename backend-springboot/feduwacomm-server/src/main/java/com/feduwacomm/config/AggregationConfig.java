@@ -18,20 +18,23 @@ public class AggregationConfig {
 
     /**
      * 最少参与者数量（触发聚合的最低客户端数）
+     * 轮次同步聚合模式下，建议设置为实际参与者数量
      */
     private int minParticipants = 2;
 
     /**
      * 最大等待时间（秒）
-     * 超过此时间将强制触发聚合
+     * 轮次同步模式下，允许更长的等待时间确保所有VM完成训练
+     * 生产环境建议根据训练复杂度调整（600-1800秒）
      */
-    private int maxWaitTimeSeconds = 300;
+    private int maxWaitTimeSeconds = 600;
 
     /**
      * 参与率阈值（0.0-1.0）
-     * 达到期望参与者的此比例时可触发聚合
+     * 轮次同步模式下，建议设置为1.0，要求所有参与者完成
+     * 仅在超时情况下才允许部分参与者聚合
      */
-    private double participationRate = 0.8;
+    private double participationRate = 1.0;
 
     /**
      * 是否启用超时聚合

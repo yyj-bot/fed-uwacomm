@@ -342,7 +342,7 @@ public class WebSocketProtocolRobustnessTest {
         // 测试无类型消息
         ProtocolMessage msg = ProtocolMessage.builder()
                 .id("test-msg")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId(TEST_VM_ID)
                 .build();
         ack = protocolService.handle(msg);
@@ -522,7 +522,7 @@ public class WebSocketProtocolRobustnessTest {
         return ProtocolMessage.builder()
                 .type(type)
                 .id(UUID.randomUUID().toString())
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId(vmId)
                 .data(data)
                 .signature("test-signature")

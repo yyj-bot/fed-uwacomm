@@ -18,25 +18,31 @@ public class WebSocketHandshakeAuthInterceptor implements HandshakeInterceptor {
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
             Map<String, Object> attributes) {
         URI uri = request.getURI();
-        MultiValueMap<String, String> queryParams = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
 
         System.out.println("WebSocket握手开始: " + uri);
-        System.out.println("查询参数: " + queryParams);
+        System.out.println("请求头部: " + request.getHeaders());
 
-        String token = first(queryParams.getFirst("token"), queryParams.getFirst("Token"));
+        // 从Authorization头部提取token
+        String authHeader = request.getHeaders().getFirst("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7); // 移除"Bearer "前缀
+        }
+
         if (token != null && !token.isBlank()) {
             attributes.put("token", token);
             System.out.println("Token提取成功: " + token.substring(0, Math.min(20, token.length())) + "...");
         } else {
-            System.out.println("Token提取失败: token参数为空");
+            System.out.println("Token提取失败: Authorization头部为空或格式不正确");
         }
 
-        String vmId = first(queryParams.getFirst("vmId"), queryParams.getFirst("VMID"));
+        // 从X-VM-ID头部提取vmId
+        String vmId = request.getHeaders().getFirst("X-VM-ID");
         if (vmId != null && !vmId.isBlank()) {
             attributes.put("vmId", vmId);
             System.out.println("VmId提取成功: " + vmId);
         } else {
-            System.out.println("VmId提取失败: vmId参数为空");
+            System.out.println("VmId提取失败: X-VM-ID头部为空");
         }
 
         System.out.println("握手前置检查通过");

@@ -13,7 +13,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -53,9 +54,12 @@ public class WebSocketEventListener {
         // 获取会话属性，添加null检查
         Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
         if (sessionAttributes == null) {
-            // 直接使用UuidUtil生成32位的会话ID用于日志记录
-            String sessionId = uuidUtil.generateUuid();
-            logger.warn("WebSocket连接事件中session attributes为null - SessionId: {}", sessionId);
+            // 会话属性还没有设置时这是正常情况，使用DEBUG级别日志
+            String sessionId = headerAccessor.getSessionId();
+            if (sessionId == null) {
+                sessionId = uuidUtil.generateUuid();
+            }
+            logger.debug("WebSocket连接事件中session attributes为null，可能是连接初期 - SessionId: {}", sessionId);
             return;
         }
 
@@ -74,11 +78,19 @@ public class WebSocketEventListener {
                 logger.info("VM连接状态已更新为CONNECTED - VmId: {}, SessionId: {}", vmId, sessionId);
 
                 // 发送VM连接成功消息
-                WebSocketMessage connectMessage = new WebSocketMessage();
-                connectMessage.setType("VM_CONNECT");
-                connectMessage.setContent("虚拟机 " + vmId + " 已连接");
-                connectMessage.setSender("System");
-                connectMessage.setTimestamp(LocalDateTime.now());
+                Map<String, Object> data = new HashMap<>();
+                data.put("message", "虚拟机 " + vmId + " 已连接");
+                data.put("vmId", vmId);
+                data.put("status", "CONNECTED");
+
+                WebSocketMessage connectMessage = WebSocketMessage.builder()
+                    .type("VM_CONNECT")
+                    .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
+                    .vmId(vmId)
+                    .data(data)
+                    .signature("temp-signature") // 临时签名，后续应使用真实签名
+                    .build();
+                connectMessage.setTimestampFromInstant(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", connectMessage);
 
             } catch (Exception e) {
@@ -103,9 +115,12 @@ public class WebSocketEventListener {
         // 获取会话属性，添加null检查
         Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
         if (sessionAttributes == null) {
-            // 直接使用UuidUtil生成32位的会话ID用于日志记录
-            String sessionId = uuidUtil.generateUuid();
-            logger.warn("WebSocket断开事件中session attributes为null - SessionId: {}", sessionId);
+            // 断开时session attributes为null也是可能的，使用DEBUG级别
+            String sessionId = headerAccessor.getSessionId();
+            if (sessionId == null) {
+                sessionId = uuidUtil.generateUuid();
+            }
+            logger.debug("WebSocket断开事件中session attributes为null - SessionId: {}", sessionId);
             return;
         }
 
@@ -123,11 +138,19 @@ public class WebSocketEventListener {
                 logger.info("VM连接状态已更新为DISCONNECTED - VmId: {}", vmId);
 
                 // 发送VM断开消息
-                WebSocketMessage disconnectMessage = new WebSocketMessage();
-                disconnectMessage.setType("VM_DISCONNECT");
-                disconnectMessage.setContent("虚拟机 " + vmId + " 已断开连接");
-                disconnectMessage.setSender("System");
-                disconnectMessage.setTimestamp(LocalDateTime.now());
+                Map<String, Object> data = new HashMap<>();
+                data.put("message", "虚拟机 " + vmId + " 已断开连接");
+                data.put("vmId", vmId);
+                data.put("status", "DISCONNECTED");
+
+                WebSocketMessage disconnectMessage = WebSocketMessage.builder()
+                    .type("VM_DISCONNECT")
+                    .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
+                    .vmId(vmId)
+                    .data(data)
+                    .signature("temp-signature") // 临时签名，后续应使用真实签名
+                    .build();
+                disconnectMessage.setTimestampFromInstant(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", disconnectMessage);
 
             } catch (Exception e) {
@@ -138,11 +161,19 @@ public class WebSocketEventListener {
             logger.info("用户断开连接 - Username: {}", username);
 
             // 发送用户离开消息
-            WebSocketMessage leaveMessage = new WebSocketMessage();
-            leaveMessage.setType("USER_LEAVE");
-            leaveMessage.setContent("用户 " + username + " 已离开");
-            leaveMessage.setSender(username);
-            leaveMessage.setTimestamp(LocalDateTime.now());
+            Map<String, Object> data = new HashMap<>();
+            data.put("message", "用户 " + username + " 已离开");
+            data.put("username", username);
+            data.put("action", "leave");
+
+            WebSocketMessage leaveMessage = WebSocketMessage.builder()
+                .type("USER_LEAVE")
+                .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
+                .vmId("system") // 系统消息使用固定vmId
+                .data(data)
+                .signature("temp-signature") // 临时签名，后续应使用真实签名
+                .build();
+            leaveMessage.setTimestampFromInstant(Instant.now());
             messagingTemplate.convertAndSend("/topic/public", leaveMessage);
         }
     }
