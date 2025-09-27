@@ -13,6 +13,20 @@ export const formatTime = (timestamp: string | number): string => {
   return date.toLocaleString('zh-CN')
 }
 
+// 格式化日期时间 (用于系统日志)
+export const formatDateTime = (timestamp: string | number): string => {
+  const date = new Date(timestamp)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+
 // 格式化持续时间
 export const formatDuration = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600)
@@ -79,4 +93,7 @@ export const getStatusColor = (status: string): string => {
     FAILED: '#ff4d4f',
   }
   return statusColors[status] || '#d9d9d9'
-} 
+}
+
+// 导出错误处理工具
+export * from './error-handler' 

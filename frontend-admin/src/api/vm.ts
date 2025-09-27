@@ -108,13 +108,13 @@ export const vmApi = {
       size: number
       pages: number
       list: VirtualMachine[]
-    }>>('/v1/vm/list', { params })
+    }>>('/vm/list', { params })
     return response.data.data
   },
 
   // ==================== 4.2 虚拟机详情查询接口 ====================
   async getVMDetail(vmId: string): Promise<VirtualMachine> {
-    const response = await vmApiInstance.get<ApiResponse<VirtualMachine>>(`/v1/vm/${vmId}`)
+    const response = await vmApiInstance.get<ApiResponse<VirtualMachine>>(`/vm/${vmId}`)
     return response.data.data
   },
 
@@ -164,7 +164,7 @@ export const vmApi = {
       vmId: string
       name: string
       updatedAt: string
-    }>>(`/v1/vm/${vmId}`, vmData)
+    }>>(`/vm/${vmId}`, vmData)
     return response.data.data
   },
 
@@ -177,7 +177,7 @@ export const vmApi = {
     const response = await vmApiInstance.delete<ApiResponse<{
       vmId: string
       deletedAt: string
-    }>>(`/v1/vm/${vmId}`, { params })
+    }>>(`/vm/${vmId}`, { params })
     return response.data.data
   },
 
@@ -204,7 +204,7 @@ export const vmApi = {
       status: string
       commandId: string
       estimatedTime: number
-    }>>(`/v1/vm/${vmId}/start`, startData)
+    }>>(`/vm/${vmId}/start`, startData)
     return response.data.data
   },
 
@@ -224,7 +224,7 @@ export const vmApi = {
       status: string
       commandId: string
       estimatedTime: number
-    }>>(`/v1/vm/${vmId}/stop`, stopData)
+    }>>(`/vm/${vmId}/stop`, stopData)
     return response.data.data
   },
 
@@ -247,13 +247,13 @@ export const vmApi = {
       status: string
       commandId: string
       estimatedTime: number
-    }>>(`/v1/vm/${vmId}/restart`, restartData)
+    }>>(`/vm/${vmId}/restart`, restartData)
     return response.data.data
   },
 
   // ==================== 6.1 虚拟机状态查询接口 ====================
   async getVMStatus(vmId: string): Promise<VMStatus> {
-    const response = await vmApiInstance.get<ApiResponse<VMStatus>>(`/v1/vm/${vmId}/status`)
+    const response = await vmApiInstance.get<ApiResponse<VMStatus>>(`/vm/${vmId}/status`)
     return response.data.data
   },
 } as const

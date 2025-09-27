@@ -52,20 +52,43 @@ export class UserService {
    */
   async login(loginData: LoginRequest): Promise<LoginResponse> {
     try {
+      console.log('🔑 userService.login开始:', loginData.loginIdentifier)
       this.validateLoginRequest(loginData)
       
+      console.log('📡 调用userApi.login')
       const response = await userApi.login(loginData)
+      console.log('✅ userApi.login成功，响应:', {
+        hasToken: !!response.token,
+        hasRefreshToken: !!response.refreshToken,
+        hasUser: !!response.user,
+        tokenPreview: response.token ? '***' + response.token.slice(-10) : 'null'
+      })
       
       // 保存认证信息到本地存储
+      console.log('💾 保存token到localStorage')
       this.saveAuthTokens(response.token, response.refreshToken)
       
-      return {
+      // 验证保存是否成功
+      const savedToken = localStorage.getItem('access_token')
+      const savedRefresh = localStorage.getItem('refresh_token')
+      console.log('🔍 验证localStorage保存状态:', {
+        accessTokenSaved: !!savedToken,
+        refreshTokenSaved: !!savedRefresh,
+        tokenMatches: savedToken === response.token,
+        tokenPreview: savedToken ? '***' + savedToken.slice(-10) : 'null'
+      })
+      
+      const result = {
         token: response.token,
         refreshToken: response.refreshToken,
         expiresIn: response.expiresIn,
         user: this.transformUser(response.user)
       }
+      
+      console.log('🎯 userService.login完成，返回结果')
+      return result
     } catch (error) {
+      console.error('❌ userService.login失败:', error)
       throw this.handleServiceError(error, '用户登录失败')
     }
   }
@@ -163,7 +186,18 @@ export class UserService {
    */
   isAuthenticated(): boolean {
     const token = localStorage.getItem('access_token')
-    return !!token && !this.isTokenExpired(token)
+    if (!token) {
+      return false
+    }
+    
+    // 检查token格式和过期状态
+    if (this.isTokenExpired(token)) {
+      // token过期或格式错误，清除认证信息
+      this.clearAuthTokens()
+      return false
+    }
+    
+    return true
   }
 
   /**
