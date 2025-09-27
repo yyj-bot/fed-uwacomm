@@ -11,7 +11,7 @@ import { Card as AntdCard, CardProps as AntdCardProps } from 'antd'
 import classNames from 'classnames'
 import './Card.module.css'
 
-export interface CardProps extends AntdCardProps {
+export interface CardProps extends Omit<AntdCardProps, 'variant'> {
   /** 卡片变体 */
   variant?: 'default' | 'outlined' | 'filled' | 'elevated'
   /** 是否显示阴影 */

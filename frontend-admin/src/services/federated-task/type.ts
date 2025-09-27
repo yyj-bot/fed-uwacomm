@@ -11,7 +11,7 @@ import type { PaginationParams, FederatedTask, FederatedTaskDetails, TaskResults
 // ==================== 创建任务相关类型 ====================
 
 /**
- * 创建任务请求
+ * 创建任务请求 - v1.3 增强版
  */
 export interface CreateTaskRequest {
   /** 任务名称 */
@@ -22,12 +22,45 @@ export interface CreateTaskRequest {
   readonly description?: string
   /** 算法名称 */
   readonly algorithm: string
-  /** 参与者列表 */
-  readonly participants: Array<{
+  
+  // 🆕 v1.3 新增：智能数据集配置
+  readonly datasetConfig?: {
+    readonly datasetId: string
+    readonly distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+    readonly distributionRatios: Record<string, number>
+    readonly validationSplit: number
+    readonly testSplit: number
+  }
+  
+  // 🆕 v1.3 新增：智能参与者配置
+  readonly participantConfig?: {
+    readonly selectionMode: 'MANUAL' | 'AUTOMATIC'
+    readonly requirements?: {
+      readonly minParticipants: number
+      readonly maxParticipants: number
+      readonly minCpuCores: number
+      readonly minMemoryMb: number
+    }
+    readonly participants: Array<{
+      readonly vmId: string
+      readonly role: 'PARTICIPANT'
+      readonly dataRatio: number
+      readonly capabilities?: string[]
+      readonly constraints?: {
+        readonly maxCpuUsage?: number
+        readonly maxMemoryUsage?: number
+      }
+    }>
+  }
+  
+  // 兼容旧格式 - 将在 v2.0 中删除
+  /** @deprecated 使用 participantConfig 代替 */
+  readonly participants?: Array<{
     readonly vmId: string
-    readonly role: string
+    readonly role: 'PARTICIPANT'
     readonly dataSource: string
   }>
+  
   /** 超参数配置 */
   readonly hyperparameters: {
     readonly learningRate: number
@@ -53,7 +86,7 @@ export interface CreateTaskRequest {
 }
 
 /**
- * 创建任务响应
+ * 创建任务响应 - v1.3 增强版
  */
 export interface CreateTaskResponse {
   /** 任务ID */
@@ -70,6 +103,28 @@ export interface CreateTaskResponse {
   readonly participantCount: number
   /** 预估执行时间（秒） */
   readonly estimatedDuration: number
+  
+  // 🆕 v1.3 新增：配置摘要
+  readonly configSummary?: {
+    readonly dataset?: {
+      readonly datasetId: string
+      readonly totalRows: number
+      readonly distributionStrategy: string
+    }
+    readonly participants: Array<{
+      readonly vmId: string
+      readonly vmName: string
+      readonly role: string
+      readonly dataRatio: number
+    }>
+  }
+  
+  // 🆕 v1.3 新增：预计性能指标
+  readonly performanceEstimation?: {
+    readonly expectedAccuracy: number
+    readonly convergenceRounds: number
+    readonly networkTraffic: string
+  }
 }
 
 // ==================== 配置任务相关类型 ====================
@@ -472,7 +527,7 @@ export interface TaskStatistics {
 // ==================== 错误类型 ====================
 
 /**
- * 联邦学习任务服务错误类型
+ * 联邦学习任务服务错误类型 - v1.3 增强版
  */
 export interface FederatedTaskServiceError {
   /** 错误码 */
@@ -483,10 +538,17 @@ export interface FederatedTaskServiceError {
   readonly details?: unknown
   /** 原始错误 */
   readonly originalError?: Error
+  
+  // 🆕 v1.3 新增：废弃警告信息
+  readonly deprecationWarning?: {
+    readonly deprecationVersion: string
+    readonly removalVersion: string
+    readonly migrationGuide: string
+  }
 }
 
 /**
- * 任务操作错误类型
+ * 任务操作错误类型 - v1.3 增强版
  */
 export interface TaskOperationError extends FederatedTaskServiceError {
   /** 任务ID */
@@ -500,6 +562,7 @@ export interface TaskOperationError extends FederatedTaskServiceError {
     | 'TASK_ALREADY_EXISTS'
     | 'TASK_INVALID_STATUS'
     | 'TASK_CONFIG_ERROR'
+    | 'DATASET_CONFIG_ERROR'  // 🆕 v1.3 新增
     | 'INSUFFICIENT_PARTICIPANTS'
     | 'PARTICIPANT_OFFLINE'
     | 'MODEL_ERROR'
@@ -579,6 +642,329 @@ export type TaskStatus = FederatedTask['status']
  * 联邦学习任务类型联合类型
  */
 export type TaskType = FederatedTask['taskType']
+
+// ==================== v1.4 新增：联邦学习流程编排类型 ====================
+
+/**
+ * 启动编排请求
+ */
+export interface StartOrchestrationRequest {
+  /** 关联的任务ID */
+  readonly taskId: string
+  /** 工作流配置 */
+  readonly workflowConfig: {
+    readonly autoStart: boolean
+    readonly stages: {
+      readonly initialModelGeneration: {
+        readonly enabled: boolean
+        readonly strategy: 'RANDOM_GENERATION' | 'PRETRAINED_MODEL' | 'CUSTOM'
+        readonly parameters: {
+          readonly modelType: string
+          readonly architecture: {
+            readonly inputSize: number
+            readonly hiddenLayers: number[]
+            readonly outputSize: number
+          }
+        }
+      }
+      readonly dataDistribution: {
+        readonly enabled: boolean
+        readonly strategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
+        readonly verificationLevel: 'NONE' | 'BASIC' | 'FULL'
+      }
+      readonly modelDistribution: {
+        readonly enabled: boolean
+        readonly timeout: number
+        readonly retryAttempts: number
+      }
+      readonly federatedTraining: {
+        readonly maxRounds: number
+        readonly convergenceThreshold: number
+        readonly participantThreshold: number
+        readonly earlyStoppingPatience?: number
+        readonly dynamicParticipantSelection?: boolean
+      }
+      readonly modelAggregation: {
+        readonly method: 'FEDAVG' | 'FEDPROX' | 'CUSTOM'
+        readonly weightingStrategy: 'EQUAL' | 'DATA_SIZE' | 'ACCURACY'
+        readonly qualityGating: {
+          readonly enabled: boolean
+          readonly minAccuracy?: number
+          readonly maxLoss?: number
+        }
+      }
+      readonly evaluation: {
+        readonly enabled: boolean
+        readonly metrics: string[]
+        readonly testDataRatio: number
+      }
+    }
+    readonly errorHandling: {
+      readonly maxRetries: number
+      readonly retryDelay: number
+      readonly failureThreshold: number
+    }
+    readonly monitoring: {
+      readonly enableRealTimeMetrics: boolean
+      readonly metricsCollectionInterval: number
+      readonly performanceAlerts: boolean
+    }
+  }
+  /** 调度选项 */
+  readonly schedulingOptions?: {
+    readonly priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+    readonly maxExecutionTime: number
+    readonly resourceLimits: {
+      readonly maxCpuCores: number
+      readonly maxMemoryMb: number
+      readonly maxNetworkBandwidth: number
+    }
+    readonly scheduling: {
+      readonly startTime?: string
+      readonly timezone?: string
+      readonly dependencies?: string[]
+    }
+  }
+}
+
+/**
+ * 启动编排响应
+ */
+export interface StartOrchestrationResponse {
+  /** 编排任务ID */
+  readonly orchestrationId: string
+  /** 关联的任务ID */
+  readonly taskId: string
+  /** 当前状态 */
+  readonly status: string
+  /** 启动时间 */
+  readonly startedAt: string
+  /** 预计完成时间 */
+  readonly estimatedCompletion: string
+  /** 当前阶段 */
+  readonly currentStage: string
+  /** 工作流计划 */
+  readonly workflowPlan: {
+    readonly totalStages: number
+    readonly estimatedDuration: string
+    readonly stages: Array<{
+      readonly name: string
+      readonly status: string
+      readonly estimatedDuration: string
+    }>
+  }
+  /** 资源分配 */
+  readonly resourceAllocation: {
+    readonly allocatedMemory: string
+    readonly allocatedCpuCores: number
+    readonly allocatedBandwidth: string
+    readonly participatingVms: string[]
+  }
+}
+
+/**
+ * 编排状态查询请求参数
+ */
+export interface OrchestrationStatusParams {
+  /** 是否包含详细信息 */
+  readonly includeDetails?: boolean
+  /** 是否包含指标数据 */
+  readonly includeMetrics?: boolean
+  /** 是否强制刷新 */
+  readonly refresh?: boolean
+}
+
+/**
+ * 暂停编排请求
+ */
+export interface PauseOrchestrationRequest {
+  /** 暂停原因 */
+  readonly reason?: string
+  /** 暂停模式 */
+  readonly pauseMode?: 'GRACEFUL' | 'IMMEDIATE'
+  /** 是否等待当前轮次完成 */
+  readonly waitForCurrentRound?: boolean
+  /** 是否保留状态 */
+  readonly preserveState?: boolean
+  /** 是否通知参与者 */
+  readonly notifyParticipants?: boolean
+}
+
+/**
+ * 暂停编排响应
+ */
+export interface PauseOrchestrationResponse {
+  /** 编排任务ID */
+  readonly orchestrationId: string
+  /** 当前状态 */
+  readonly status: string
+  /** 暂停时间 */
+  readonly pausedAt: string
+  /** 暂停阶段 */
+  readonly pausedStage: string
+  /** 暂停轮次 */
+  readonly pausedRound?: number
+  /** 暂停原因 */
+  readonly reason?: string
+  /** 是否可以恢复 */
+  readonly canResume: boolean
+  /** 状态快照 */
+  readonly stateSnapshot: {
+    readonly snapshotId: string
+    readonly createdAt: string
+    readonly modelVersions: Record<string, string>
+    readonly trainingProgress: number
+    readonly participantStates: Record<string, any>
+  }
+}
+
+/**
+ * 恢复编排请求
+ */
+export interface ResumeOrchestrationRequest {
+  /** 是否从快照恢复 */
+  readonly resumeFromSnapshot?: boolean
+  /** 快照ID */
+  readonly snapshotId?: string
+  /** 是否验证状态 */
+  readonly validateState?: boolean
+  /** 是否通知参与者 */
+  readonly notifyParticipants?: boolean
+}
+
+/**
+ * 恢复编排响应
+ */
+export interface ResumeOrchestrationResponse {
+  /** 编排任务ID */
+  readonly orchestrationId: string
+  /** 当前状态 */
+  readonly status: string
+  /** 恢复时间 */
+  readonly resumedAt: string
+  /** 恢复阶段 */
+  readonly resumedStage: string
+  /** 恢复轮次 */
+  readonly resumedRound?: number
+  /** 状态验证结果 */
+  readonly stateValidation: {
+    readonly passed: boolean
+    readonly modelsVerified: number
+    readonly stateConsistent: boolean
+  }
+  /** 预计剩余时间 */
+  readonly estimatedRemainingTime: string
+}
+
+/**
+ * 终止编排请求参数
+ */
+export interface TerminateOrchestrationParams {
+  /** 是否强制终止 */
+  readonly force?: boolean
+  /** 是否清理资源 */
+  readonly cleanup?: boolean
+  /** 是否保存结果 */
+  readonly saveResults?: boolean
+}
+
+/**
+ * 终止编排响应
+ */
+export interface TerminateOrchestrationResponse {
+  /** 编排任务ID */
+  readonly orchestrationId: string
+  /** 当前状态 */
+  readonly status: string
+  /** 终止时间 */
+  readonly terminatedAt: string
+  /** 终止阶段 */
+  readonly terminatedStage: string
+  /** 终止轮次 */
+  readonly terminatedRound?: number
+  /** 已完成轮次 */
+  readonly completedRounds: number
+  /** 部分结果 */
+  readonly partialResults: {
+    readonly bestModel: {
+      readonly roundNumber: number
+      readonly accuracy: number
+      readonly modelId: string
+    }
+    readonly savedModels: number
+    readonly trainingMetrics: string
+  }
+  /** 清理状态 */
+  readonly cleanup: {
+    readonly resourcesReleased: boolean
+    readonly temporaryDataCleared: boolean
+    readonly participantsNotified: boolean
+  }
+}
+
+/**
+ * 编排时间线查询参数
+ */
+export interface OrchestrationTimelineParams {
+  /** 是否包含事件 */
+  readonly includeEvents?: boolean
+  /** 事件级别 */
+  readonly eventLevel?: 'ALL' | 'MAJOR' | 'ERROR'
+  /** 时间范围 */
+  readonly timeRange?: string
+}
+
+/**
+ * 编排列表查询参数
+ */
+export interface OrchestrationListParams extends PaginationParams {
+  /** 关联的任务ID */
+  readonly taskId?: string
+  /** 编排状态 */
+  readonly status?: string
+  /** 排序字段 */
+  readonly sortBy?: string
+  /** 排序方向 */
+  readonly sortOrder?: 'asc' | 'desc'
+}
+
+/**
+ * 编排列表响应
+ */
+export interface OrchestrationListResponse {
+  /** 总数 */
+  readonly total: number
+  /** 当前页 */
+  readonly page: number
+  /** 每页大小 */
+  readonly size: number
+  /** 编排列表 */
+  readonly items: Array<{
+    readonly orchestrationId: string
+    readonly taskId: string
+    readonly status: string
+    readonly startedAt: string
+    readonly completedAt?: string
+    readonly currentStage: string
+    readonly progress: number
+    readonly duration: string
+    readonly participatingVms: number
+    readonly completedRounds: number
+    readonly totalRounds: number
+    readonly finalAccuracy?: number
+    readonly success?: boolean
+  }>
+}
+
+/**
+ * 编排性能分析查询参数
+ */
+export interface OrchestrationAnalyticsParams {
+  /** 是否包含建议 */
+  readonly includeRecommendations?: boolean
+  /** 指标级别 */
+  readonly metricsLevel?: 'BASIC' | 'DETAILED' | 'FULL'
+}
 
 // ==================== 重新导出基础类型 ====================
 // 注：工具类型已从 @/types 统一导入，不再重复定义

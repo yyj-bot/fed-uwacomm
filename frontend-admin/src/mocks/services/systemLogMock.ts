@@ -172,7 +172,6 @@ const mockCleanupTasks: CleanupTask[] = [
     status: 'COMPLETED',
     estimatedRecords: 5000,
     estimatedSize: 104857600,
-    dryRun: false,
     progress: 100,
     deletedRecords: 5000,
     freedSpace: 104857600,
@@ -185,7 +184,6 @@ const mockCleanupTasks: CleanupTask[] = [
     status: 'PROCESSING',
     estimatedRecords: 3000,
     estimatedSize: 62914560,
-    dryRun: false,
     progress: 75,
     deletedRecords: 2250,
     freedSpace: 47185920,
@@ -326,53 +324,44 @@ export const systemLogMock = {
 
   // ==================== 日志导出接口 ====================
 
-  exportLogs: (exportData: any): ApiResponse<LogExportResponse> => {
-    const exportId = `export_${Date.now()}`
-    return {
-      code: 200,
-      message: '导出任务已创建',
-      data: {
-        exportId: exportId,
-        status: 'PROCESSING',
-        estimatedTime: 30,
-        downloadUrl: `http://localhost:8080/api/log/export/download/${exportId}`
-      }
-    }
-  },
-
-  getExportStatus: (exportId: string): ApiResponse<ExportTask> => {
-    const task = mockExportTasks.find(t => t.exportId === exportId)
-    if (!task) {
-      // 如果找不到预定义的任务，返回一个动态生成的任务状态
-      return {
-        code: 200,
-        message: '查询成功',
-        data: {
-          exportId: exportId,
-          status: 'COMPLETED',
-          estimatedTime: 30,
-          downloadUrl: `http://localhost:8080/api/log/export/download/${exportId}`,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          progress: 100,
-          totalRecords: 1000,
-          processedRecords: 1000,
-          fileSize: 204800,
-          createdAt: new Date(Date.now() - 60000).toISOString(),
-          completedAt: new Date().toISOString(),
-          format: 'CSV'
+  downloadLogs: (exportData: any): Blob => {
+    // 模拟生成日志文件内容
+    const format = exportData.format?.toLowerCase() || 'csv'
+    let content = ''
+    let contentType = 'text/csv'
+    
+    if (format === 'json') {
+      content = JSON.stringify([
+        {
+          logId: 'log_001',
+          timestamp: '2024-01-01T10:00:00',
+          level: 'INFO',
+          category: 'SYSTEM',
+          message: '系统启动成功',
+          vmId: null,
+          taskId: null
+        },
+        {
+          logId: 'log_002',
+          timestamp: '2024-01-01T10:01:00',
+          level: 'WARN',
+          category: 'USER',
+          message: '用户登录失败',
+          vmId: null,
+          taskId: null
         }
-      }
+      ], null, 2)
+      contentType = 'application/json'
+    } else {
+      // CSV format
+      content = `时间,级别,类别,消息,虚拟机ID,任务ID
+2024-01-01T10:00:00,INFO,SYSTEM,系统启动成功,,
+2024-01-01T10:01:00,WARN,USER,用户登录失败,,
+2024-01-01T10:02:00,ERROR,VM,虚拟机连接失败,vm_001,
+2024-01-01T10:03:00,INFO,TASK,任务执行完成,,task_001`
     }
-    return {
-      code: 200,
-      message: '查询成功',
-      data: task
-    }
-  },
-
-  downloadExportFile: (exportId: string): Blob => {
-    // 模拟文件下载
-    return new Blob(['mock export file content'], { type: 'text/csv' })
+    
+    return new Blob([content], { type: contentType + '; charset=utf-8' })
   },
 
   getExportHistory: (params: any = {}): ApiResponse<PaginatedResponse<ExportTask>> => {
@@ -412,8 +401,7 @@ export const systemLogMock = {
         cleanupId: cleanupId,
         status: 'PROCESSING',
         estimatedRecords: 5000,
-        estimatedSize: 104857600,
-        dryRun: cleanupData.dryRun || false
+        estimatedSize: 104857600
       }
     }
   },
@@ -430,7 +418,6 @@ export const systemLogMock = {
           status: 'COMPLETED',
           estimatedRecords: 2000,
           estimatedSize: 52428800,
-          dryRun: false,
           progress: 100,
           deletedRecords: 2000,
           freedSpace: 52428800,

@@ -15,7 +15,7 @@ interface DataStatistics {
   totalSize: number
   dataTypeDistribution: Record<string, number>
   statusDistribution: Record<string, number>
-  vmDistribution: Record<string, {
+  userDistribution: Record<string, {
     count: number
     size: number
   }>
@@ -120,7 +120,6 @@ export const trainingData = {
     datasetId: string
     datasetDescription: string
     datasetType: string
-    vmId: string
     status: string
     uploadTime: string
     uploadedBy: string
@@ -130,7 +129,6 @@ export const trainingData = {
       datasetId: string
       datasetDescription: string
       datasetType: string
-      vmId: string
       status: string
       uploadTime: string
       uploadedBy: string
@@ -143,18 +141,16 @@ export const trainingData = {
 
   // ==================== 3.2 文本信息上传接口 ====================
   async uploadText(textData: {
-    vmId: string
     dataType: string
     title: string
     content: string
-    description?: string
+    datasetDescription?: string
     tags?: string[]
     metadata?: Record<string, unknown>
   }): Promise<{
     datasetId: string
     datasetDescription: string
     datasetType: string
-    vmId: string
     status: string
     uploadTime: string
     uploadedBy: string
@@ -163,7 +159,6 @@ export const trainingData = {
       datasetId: string
       datasetDescription: string
       datasetType: string
-      vmId: string
       status: string
       uploadTime: string
       uploadedBy: string
@@ -173,7 +168,6 @@ export const trainingData = {
 
   // ==================== 3.3 数据列表查询接口 ====================
   async getDataList(params: PaginationParams & {
-    vmId?: string
     dataType?: string
     status?: string
     keyword?: string
@@ -188,7 +182,6 @@ export const trainingData = {
       datasetId: string
       datasetDescription: string
       datasetType: string
-      vmId: string
       status: string
       tags?: string[]
     }>
@@ -201,7 +194,6 @@ export const trainingData = {
         datasetId: string
         datasetDescription: string
         datasetType: string
-        vmId: string
         status: string
         tags?: string[]
       }>
@@ -302,7 +294,6 @@ export const trainingData = {
 
   // ==================== 3.11 数据统计接口 ====================
   async getDataStatistics(params: {
-    vmId?: string
     dataType?: string
     startDate?: string
     endDate?: string
@@ -316,7 +307,6 @@ export const trainingData = {
     exportType: 'CSV' | 'JSON' | 'EXCEL'
     filters?: {
       dataType?: string
-      vmId?: string
       status?: string
       startTime?: string
       endTime?: string

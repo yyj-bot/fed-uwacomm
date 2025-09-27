@@ -14,6 +14,34 @@ export default defineConfig({
     // 修复 'global is not defined' 错误
     global: 'globalThis',
   },
+  server: {
+    port: 5173,
+    proxy: {
+      // 代理所有 /api 请求到后端服务器
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('proxy error', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Sending Request to the Target:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+      // 代理WebSocket连接（如果有的话）
+      '/ws': {
+        target: 'ws://localhost:8080',
+        ws: true,
+        changeOrigin: true,
+      }
+    }
+  },
   build: {
     rollupOptions: {
       output: {

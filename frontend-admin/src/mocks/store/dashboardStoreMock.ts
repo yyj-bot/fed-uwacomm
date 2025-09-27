@@ -48,6 +48,12 @@ export const mockDashboardOverview: DashboardOverview = {
     averageAccuracy: 87.6,
     modelsToday: 6
   },
+  participantStats: {
+    totalParticipants: 0,
+    onlineParticipants: 0,
+    activeParticipants: 0,
+    newParticipantsToday: 0
+  },
   systemStats: {
     systemUptime: 15.6,
     totalLogs: 125467,

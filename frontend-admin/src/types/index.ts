@@ -196,7 +196,6 @@ export interface TrainingDataset {
   readonly datasetId: string
   readonly datasetDescription: string
   readonly datasetType: 'ACOUSTIC' | 'ENVIRONMENT' | 'MODEL' | 'FEATURE' | 'OTHER'
-  readonly vmId: string
   readonly status: 'UPLOADING' | 'PROCESSING' | 'VALIDATING' | 'READY' | 'ERROR' | 'DELETED'
   readonly uploadTime: string
   readonly uploadedBy: string

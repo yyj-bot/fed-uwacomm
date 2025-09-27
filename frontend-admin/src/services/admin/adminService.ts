@@ -19,10 +19,9 @@ import type {
   UserListParams,
   LockUserRequest,
   ResetPasswordRequest,
-  GrantPermissionRequest,
-  Permission,
   LockUserResponse,
-  UnlockUserResponse
+  UnlockUserResponse,
+  UserStatistics
 } from './type'
 
 /**
@@ -88,13 +87,15 @@ export class AdminUserService {
     try {
       this.validateCreateUserRequest(userData)
       
-      const user = await admin.createUser({
+      const createRequest = {
         username: userData.username,
         email: userData.email,
         password: userData.password,
         role: userData.role,
         status: userData.status || 'ACTIVE'
-      })
+      }
+      
+      const user = await admin.createUser(createRequest)
       
       return this.transformUser(user)
     } catch (error) {
@@ -193,54 +194,18 @@ export class AdminUserService {
   }
 
   /**
-   * 获取用户权限列表
-   * @param userId 用户ID
-   * @returns 权限列表
+   * 获取用户统计信息
+   * @returns 用户统计数据
    */
-  async getUserPermissions(userId: string): Promise<Permission[]> {
+  async getUserStatistics(): Promise<UserStatistics> {
     try {
-      this.validateUserId(userId)
-      
-      const permissions = await admin.getUserPermissions(userId)
-      return permissions.map(permission => this.transformPermission(permission))
+      const statistics = await admin.getUserStatistics()
+      return this.transformUserStatistics(statistics)
     } catch (error) {
-      throw this.handleServiceError(error, `获取用户权限失败 (ID: ${userId})`)
+      throw this.handleServiceError(error, '获取用户统计信息失败')
     }
   }
 
-  /**
-   * 授予用户权限
-   * @param userId 用户ID
-   * @param request 授权请求
-   * @returns 授予的权限信息
-   */
-  async grantUserPermission(userId: string, request: GrantPermissionRequest): Promise<Permission> {
-    try {
-      this.validateUserId(userId)
-      this.validateGrantPermissionRequest(request)
-      
-      const permission = await admin.grantUserPermission(userId, request.permissionName)
-      return this.transformPermission(permission)
-    } catch (error) {
-      throw this.handleServiceError(error, `授予用户权限失败 (ID: ${userId})`)
-    }
-  }
-
-  /**
-   * 撤销用户权限
-   * @param userId 用户ID
-   * @param permissionId 权限ID
-   */
-  async revokeUserPermission(userId: string, permissionId: string): Promise<void> {
-    try {
-      this.validateUserId(userId)
-      this.validatePermissionId(permissionId)
-      
-      await admin.revokeUserPermission(userId, permissionId)
-    } catch (error) {
-      throw this.handleServiceError(error, `撤销用户权限失败 (ID: ${userId})`)
-    }
-  }
 
   // ==================== 私有方法 ====================
 
@@ -253,14 +218,6 @@ export class AdminUserService {
     }
   }
 
-  /**
-   * 验证权限ID
-   */
-  private validatePermissionId(permissionId: string): void {
-    if (!permissionId || typeof permissionId !== 'string' || permissionId.trim().length === 0) {
-      throw new Error('权限ID不能为空')
-    }
-  }
 
   /**
    * 验证创建用户请求
@@ -313,14 +270,6 @@ export class AdminUserService {
     }
   }
 
-  /**
-   * 验证授权请求
-   */
-  private validateGrantPermissionRequest(request: GrantPermissionRequest): void {
-    if (!request.permissionName || request.permissionName.trim().length === 0) {
-      throw new Error('权限名称不能为空')
-    }
-  }
 
   /**
    * 验证分页响应数据
@@ -355,16 +304,20 @@ export class AdminUserService {
   }
 
   /**
-   * 转换权限数据
+   * 转换用户统计数据
    */
-  private transformPermission(permission: any): Permission {
+  private transformUserStatistics(statistics: any): UserStatistics {
     return {
-      permissionId: permission.permissionId,
-      permissionName: permission.permissionName,
-      description: permission.description,
-      grantedAt: permission.grantedAt
+      totalUsers: statistics.totalUsers,
+      activeUsers: statistics.activeUsers,
+      lockedUsers: statistics.lockedUsers,
+      roleDistribution: statistics.roleDistribution,
+      statusDistribution: statistics.statusDistribution,
+      newUsersThisMonth: statistics.newUsersThisMonth,
+      activeUsersThisMonth: statistics.activeUsersThisMonth
     }
   }
+
 
   /**
    * 统一错误处理

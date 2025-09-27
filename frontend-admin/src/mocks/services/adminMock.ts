@@ -11,7 +11,7 @@ import type {
   PaginatedResponse, 
   ApiResponse 
 } from '@/types'
-import type { Permission } from '@/services/admin/type'
+import type { UserStatistics } from '@/services/admin/type'
 
 // ==================== Mock数据生成工具 ====================
 
@@ -105,43 +105,6 @@ export const mockUsers: User[] = [
   }
 ]
 
-// ==================== Mock权限数据 ====================
-
-/**
- * Mock权限列表
- */
-export const mockPermissions: Permission[] = [
-  {
-    permissionId: 'p1b2c3d4e5f678901234567890123456',
-    permissionName: 'READ_DATA',
-    description: '读取数据权限',
-    grantedAt: '2024-01-01T10:00:00Z'
-  },
-  {
-    permissionId: 'p2c3d4e5f6789012345678901234567a',
-    permissionName: 'WRITE_DATA',
-    description: '写入数据权限',
-    grantedAt: '2024-01-01T10:05:00Z'
-  },
-  {
-    permissionId: 'p3d4e5f67890123456789012345678ab',
-    permissionName: 'MANAGE_USERS',
-    description: '用户管理权限',
-    grantedAt: '2024-01-01T10:10:00Z'
-  },
-  {
-    permissionId: 'p4e5f678901234567890123456789abc',
-    permissionName: 'MANAGE_TASKS',
-    description: '任务管理权限',
-    grantedAt: '2024-01-01T10:15:00Z'
-  },
-  {
-    permissionId: 'p5f678901234567890123456789abcd',
-    permissionName: 'SYSTEM_ADMIN',
-    description: '系统管理权限',
-    grantedAt: '2024-01-01T10:20:00Z'
-  }
-]
 
 // ==================== Mock API响应 ====================
 
@@ -378,78 +341,36 @@ export const mockAdminApi = {
   },
 
   /**
-   * Mock获取用户权限
+   * Mock获取用户统计信息
    */
-  getUserPermissions: (userId: string): ApiResponse<Permission[]> => {
-    const user = mockUsers.find(u => u.userId === userId)
-    if (!user) {
-      return createErrorResponse<Permission[]>(404, '用户不存在')
+  getUserStatistics: (): ApiResponse<UserStatistics> => {
+    const totalUsers = mockUsers.length
+    const activeUsers = mockUsers.filter(u => u.status === 'ACTIVE').length
+    const lockedUsers = mockUsers.filter(u => u.status === 'LOCKED').length
+    
+    const roleDistribution = {
+      ADMIN: mockUsers.filter(u => u.role === 'ADMIN').length,
+      RESEARCHER: mockUsers.filter(u => u.role === 'RESEARCHER').length,
+      OPERATOR: mockUsers.filter(u => u.role === 'OPERATOR').length,
+      VIEWER: mockUsers.filter(u => u.role === 'VIEWER').length
     }
     
-    // 根据用户角色返回不同权限
-    let userPermissions: Permission[] = []
-    
-    switch (user.role) {
-      case 'ADMIN':
-        userPermissions = [...mockPermissions]
-        break
-      case 'RESEARCHER':
-        userPermissions = mockPermissions.filter(p => 
-          ['READ_DATA', 'WRITE_DATA', 'MANAGE_TASKS'].includes(p.permissionName)
-        )
-        break
-      case 'OPERATOR':
-        userPermissions = mockPermissions.filter(p => 
-          ['READ_DATA', 'MANAGE_TASKS'].includes(p.permissionName)
-        )
-        break
-      case 'VIEWER':
-        userPermissions = mockPermissions.filter(p => 
-          p.permissionName === 'READ_DATA'
-        )
-        break
+    const statusDistribution = {
+      ACTIVE: mockUsers.filter(u => u.status === 'ACTIVE').length,
+      INACTIVE: mockUsers.filter(u => u.status === 'INACTIVE').length,
+      LOCKED: mockUsers.filter(u => u.status === 'LOCKED').length,
+      DELETED: mockUsers.filter(u => u.status === 'DELETED').length
     }
     
-    return createSuccessResponse(userPermissions, '获取成功')
-  },
-
-  /**
-   * Mock授予用户权限
-   */
-  grantUserPermission: (userId: string, permissionName: string): ApiResponse<Permission> => {
-    const user = mockUsers.find(u => u.userId === userId)
-    if (!user) {
-      return createErrorResponse<Permission>(404, '用户不存在')
-    }
-    
-    const permission = mockPermissions.find(p => p.permissionName === permissionName)
-    if (!permission) {
-      return createErrorResponse<Permission>(404, '权限不存在')
-    }
-    
-    const newPermission: Permission = {
-      ...permission,
-      grantedAt: generateTimestamp()
-    }
-    
-    return createSuccessResponse(newPermission, '权限授予成功')
-  },
-
-  /**
-   * Mock撤销用户权限
-   */
-  revokeUserPermission: (userId: string, permissionId: string): ApiResponse<null> => {
-    const user = mockUsers.find(u => u.userId === userId)
-    if (!user) {
-      return createErrorResponse<null>(404, '用户不存在')
-    }
-    
-    const permission = mockPermissions.find(p => p.permissionId === permissionId)
-    if (!permission) {
-      return createErrorResponse<null>(404, '权限不存在')
-    }
-    
-    return createSuccessResponse(null, '权限撤销成功')
+    return createSuccessResponse({
+      totalUsers,
+      activeUsers,
+      lockedUsers,
+      roleDistribution,
+      statusDistribution,
+      newUsersThisMonth: Math.floor(totalUsers * 0.2), // 假设20%是本月新增
+      activeUsersThisMonth: Math.floor(activeUsers * 0.9) // 假设90%的活跃用户本月活跃
+    }, '获取用户统计成功')
   }
 }
 
