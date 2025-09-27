@@ -11,35 +11,29 @@ from dataclasses import asdict
 import pandas as pd
 import numpy as np
 
-from .config import FederatedConfig, TrainingState, FederatedAlgorithm
+from .config import MLConfig, TrainingState, MLAlgorithm
 from .model_wrapper import ModelWrapper
 
-# 可选依赖：PyTorch（如果可用）
-try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
+# Scikit-learn是必需依赖
+from sklearn.base import BaseEstimator
+from sklearn.metrics import mean_squared_error, accuracy_score
 
 
 class FederatedLearningClient:
     """联邦学习客户端"""
     
-    def __init__(self, client_id: str, model, 
-                 model_type: str = "pytorch", config: FederatedConfig = None):
+    def __init__(self, client_id: str, model: BaseEstimator, 
+                 config: MLConfig = None):
         """初始化联邦学习客户端
         
         Args:
             client_id: 客户端唯一标识
-            model: 机器学习模型对象
-            model_type: 模型类型，"pytorch" 或 "sklearn"
+            model: Scikit-learn模型对象
             config: 联邦学习配置
         """
         self.client_id = client_id
-        self.model_wrapper = ModelWrapper(model, model_type)
-        self.config = config or FederatedConfig()
+        self.model_wrapper = ModelWrapper(model)
+        self.config = config or MLConfig()
         self.training_state = TrainingState()
         self.local_data = None
         self.local_labels = None
@@ -99,12 +93,8 @@ class FederatedLearningClient:
                 self.model_wrapper.set_parameters(global_params)
             
             # 执行本地训练
-            if self.model_wrapper.model_type == "pytorch":
-                training_result = self._train_pytorch_model(validation_data)
-            elif self.model_wrapper.model_type == "sklearn":
-                training_result = self._train_sklearn_model(validation_data)
-            else:
-                raise ValueError(f"不支持的模型类型: {self.model_wrapper.model_type}")
+            # 训练sklearn模型
+            training_result = self._train_sklearn_model(validation_data)
             
             # 更新训练状态
             self.training_state.round_num += 1
@@ -138,88 +128,6 @@ class FederatedLearningClient:
             raise
         finally:
             self.training_state.is_training = False
-    
-    def _train_pytorch_model(self, validation_data: Tuple = None) -> Dict[str, Any]:
-        """训练PyTorch模型
-        
-        Args:
-            validation_data: 验证数据
-            
-        Returns:
-            dict: 训练结果
-        """
-        if not TORCH_AVAILABLE:
-            raise ImportError("PyTorch不可用")
-            
-        model = self.model_wrapper.model
-        model.train()
-        
-        # 确定设备（GPU或CPU）
-        device = next(model.parameters()).device
-        
-        # 准备数据并移到相同设备
-        X_tensor = torch.FloatTensor(self.local_data.values).to(device)
-        y_tensor = torch.FloatTensor(self.local_labels.values).to(device)
-        
-        # 创建数据加载器
-        dataset = torch.utils.data.TensorDataset(X_tensor, y_tensor)
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=self.config.local_batch_size, shuffle=True
-        )
-        
-        # 优化器
-        optimizer = optim.SGD(model.parameters(), lr=self.config.learning_rate)
-        criterion = nn.MSELoss()  # 根据任务类型调整
-        
-        epoch_losses = []
-        
-        # 本地训练循环
-        for epoch in range(self.config.local_epochs):
-            epoch_loss = 0.0
-            batch_count = 0
-            
-            for batch_X, batch_y in dataloader:
-                optimizer.zero_grad()
-                
-                outputs = model(batch_X)
-                loss = criterion(outputs.squeeze(), batch_y)
-                
-                # FedProx正则化项
-                if self.config.algorithm == FederatedAlgorithm.FEDPROX:
-                    prox_term = 0.0
-                    for param in model.parameters():
-                        prox_term += torch.norm(param) ** 2
-                    loss += (self.config.mu / 2) * prox_term
-                
-                loss.backward()
-                optimizer.step()
-                
-                epoch_loss += loss.item()
-                batch_count += 1
-            
-            avg_epoch_loss = epoch_loss / batch_count if batch_count > 0 else 0
-            epoch_losses.append(avg_epoch_loss)
-            
-            self.logger.debug(f"Epoch {epoch + 1}/{self.config.local_epochs}, 损失: {avg_epoch_loss:.4f}")
-        
-        # 计算最终准确率（对于回归任务，这里用R²代替）
-        with torch.no_grad():
-            model.eval()
-            all_outputs = model(X_tensor)
-            final_loss = criterion(all_outputs.squeeze(), y_tensor).item()
-            
-            # 简单的R²计算
-            y_mean = torch.mean(y_tensor)
-            ss_tot = torch.sum((y_tensor - y_mean) ** 2)
-            ss_res = torch.sum((y_tensor - all_outputs.squeeze()) ** 2)
-            r2_score = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-            final_accuracy = r2_score.item()
-        
-        return {
-            'epoch_losses': epoch_losses,
-            'final_loss': final_loss,
-            'final_accuracy': final_accuracy
-        }
     
     def _train_sklearn_model(self, validation_data: Tuple = None) -> Dict[str, Any]:
         """训练Scikit-learn模型

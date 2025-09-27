@@ -2,17 +2,17 @@
 
 ## 📋 概述
 
-本模块实现了完整的联邦学习框架，支持FedAvg和FedProx算法，兼容PyTorch和Scikit-learn模型。
+本模块实现了完整的联邦学习框架，支持FedAvg和FedProx算法，专为Scikit-learn模型设计，简化协作和部署。
 
 ## 🚀 主要功能
 
 ### ✅ 已实现功能
 - **联邦学习算法**：FedAvg、FedProx
-- **模型支持**：PyTorch神经网络、Scikit-learn模型
+- **模型支持**：Scikit-learn全系列模型（RandomForest、SVM、LinearRegression等）
 - **参数聚合**：加权平均、正则化聚合
 - **训练状态管理**：进度跟踪、错误处理
 - **检查点机制**：模型保存/恢复
-- **早停机制**：自动收敛检测
+- **简化部署**：无需GPU，纯CPU计算
 
 ### 🔧 核心组件
 
@@ -43,19 +43,17 @@ config = FederatedConfig(
     max_rounds=100
 )
 
-# 2. 创建客户端（以PyTorch模型为例）
-import torch.nn as nn
+# 2. 创建客户端（以Scikit-learn模型为例）
+from sklearn.ensemble import RandomForestRegressor
 
-model = nn.Sequential(
-    nn.Linear(20, 64),
-    nn.ReLU(),
-    nn.Linear(64, 1)
+model = RandomForestRegressor(
+    n_estimators=100,
+    random_state=42
 )
 
 client = FederatedLearningClient(
     client_id="client_001",
     model=model,
-    model_type="pytorch",
     config=config
 )
 
@@ -70,18 +68,25 @@ coordinator.register_client(client)
 result = coordinator.run_federated_training()
 ```
 
-### Scikit-learn模型示例
+### 其他Scikit-learn模型示例
 
 ```python
 from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
 
-# 创建sklearn模型
-model = LinearRegression()
+# 线性回归模型
+linear_model = LinearRegression()
+linear_client = FederatedLearningClient(
+    client_id="linear_client",
+    model=linear_model,
+    config=config
+)
 
-client = FederatedLearningClient(
-    client_id="sklearn_client",
-    model=model,
-    model_type="sklearn",
+# SVM回归模型
+svm_model = SVR(kernel='rbf', C=1.0)
+svm_client = FederatedLearningClient(
+    client_id="svm_client",
+    model=svm_model,
     config=config
 )
 ```

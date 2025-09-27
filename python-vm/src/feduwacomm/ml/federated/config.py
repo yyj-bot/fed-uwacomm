@@ -7,28 +7,23 @@ from typing import List, Dict, Optional, Any
 from enum import Enum
 
 
-# ===================== 联邦学习相关配置 =====================
+# ===================== 本地机器学习相关配置 =====================
 
-class FederatedAlgorithm(Enum):
-    """联邦学习算法类型"""
-    FEDAVG = "FedAvg"
-    FEDPROX = "FedProx"
-    FEDNOVA = "FedNova"
-    SCAFFOLD = "SCAFFOLD"
+class MLAlgorithm(Enum):
+    """本地机器学习算法类型"""
+    RANDOM_FOREST = "RandomForest"
+    SVM = "SVM"
+    LINEAR_REGRESSION = "LinearRegression"
+    LOGISTIC_REGRESSION = "LogisticRegression"
+    XGBOOST = "XGBoost"
 
 
 @dataclass
-class FederatedConfig:
-    """联邦学习配置"""
-    algorithm: FederatedAlgorithm = FederatedAlgorithm.FEDAVG
-    local_epochs: int = 5
-    local_batch_size: int = 32
-    learning_rate: float = 0.01
-    mu: float = 0.01  # FedProx 正则化参数
-    client_fraction: float = 1.0  # 每轮参与的客户端比例
-    max_rounds: int = 100
-    patience: int = 10  # 早停耐心值
-    min_delta: float = 0.001  # 最小改进阈值
+class MLConfig:
+    """本地机器学习配置"""
+    algorithm: MLAlgorithm = MLAlgorithm.RANDOM_FOREST
+    epochs: int = 5  # 对于sklearn，表示重复训练次数
+    hyperparameters: Dict[str, Any] = field(default_factory=dict)  # 算法特定超参数
 
 
 @dataclass
@@ -52,19 +47,17 @@ class SystemInfo:
     os: str       # 操作系统
     kernel: str   # 内核
     python: str   # python版本
-    gpu: str      # GPU型号
-    cuda: str     # CUDA版本
-    cudnn: str    # cuDNN版本
+    cpu: str      # CPU型号
+    memory: str   # 内存大小
 
 
 @dataclass
 class Capabilities:
     """能力"""
-    supportedAlgorithms: List[str]  # 支持的联邦学习算法
-    maxBatchSize: int               # 最大批量大小
-    maxMemoryUsage: int             # 最大内存使用量
-    gpuMemory: int                  # GPU内存
-    networkSpeed: int               # 网络速度
+    supportedAlgorithms: List[str]  # 支持的机器学习算法（Scikit-learn算法）
+    maxMemoryUsage: int             # 最大内存使用量（MB）
+    cpuCores: int                   # CPU核心数
+    networkSpeed: int               # 网络速度（Mbps）
 
 
 @dataclass

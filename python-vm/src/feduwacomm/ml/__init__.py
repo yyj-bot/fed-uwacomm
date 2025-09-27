@@ -25,8 +25,8 @@ from .federated import (
     FederatedLearningCoordinator,
     FederatedAggregator,
     ModelWrapper,
-    FederatedConfig,
-    FederatedAlgorithm,
+    MLConfig,
+    MLAlgorithm,
     VMRegisterRequest
 )
 from .storage import VMStorage
@@ -51,8 +51,8 @@ __all__ = [
     'FederatedLearningCoordinator', 
     'FederatedAggregator',
     'ModelWrapper',
-    'FederatedConfig',
-    'FederatedAlgorithm',
+    'MLConfig',
+    'MLAlgorithm',
     'VMRegisterRequest',
     'VMStorage',
     'SystemMonitor',
