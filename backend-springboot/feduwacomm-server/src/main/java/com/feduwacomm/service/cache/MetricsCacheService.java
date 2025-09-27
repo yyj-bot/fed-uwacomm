@@ -1,4 +1,8 @@
-package com.feduwacomm.cache;
+package com.feduwacomm.service.cache;
+
+import com.feduwacomm.service.cache.exception.CacheValidationException;
+import com.feduwacomm.service.cache.model.GlobalMetrics;
+import com.feduwacomm.service.cache.model.ParticipantMetrics;
 
 import java.util.Map;
 import java.util.Optional;

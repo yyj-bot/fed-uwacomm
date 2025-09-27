@@ -680,6 +680,34 @@ CREATE TABLE IF NOT EXISTS task_participants (
 -- =====================================================
 -- 初始化完成
 -- =====================================================
+-- =====================================================
+-- 轮次同步性重构：性能优化索引
+-- =====================================================
+
+-- 全局模型表轮次同步索引
+CREATE INDEX IF NOT EXISTS idx_global_models_task_round_sync
+ON global_models(task_id, round_number, distribution_status);
+
+-- 模型分发记录状态索引
+CREATE INDEX IF NOT EXISTS idx_model_distributions_status_sync
+ON model_distributions(model_id, vm_id, distribution_status);
+
+-- 模型分发记录验证时间索引（用于超时检测）
+CREATE INDEX IF NOT EXISTS idx_model_distributions_verified_at
+ON model_distributions(verified_at);
+
+-- 任务参与者状态索引（用于轮次推进检查）
+CREATE INDEX IF NOT EXISTS idx_task_participants_status_round
+ON task_participants(task_id, status, current_epoch);
+
+-- 联邦任务更新时间索引（用于乐观锁）
+CREATE INDEX IF NOT EXISTS idx_federated_tasks_updated_at
+ON federated_tasks(id, updated_at);
+
+-- =====================================================
+-- 索引创建完成
+-- =====================================================
+
 -- 数据库初始化脚本执行完成
 -- 共创建了 20 个表:
 -- 1. users - 用户表

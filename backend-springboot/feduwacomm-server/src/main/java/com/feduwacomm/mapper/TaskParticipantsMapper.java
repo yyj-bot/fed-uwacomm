@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 联邦学习任务参与者数据访问层
@@ -89,4 +90,9 @@ public interface TaskParticipantsMapper {
      * 获取指定任务中参与者实际完成的最新轮次
      */
     Integer getLatestCompletedRound(@Param("taskId") String taskId);
+
+    /**
+     * 调试方法：获取参与者状态详情用于诊断
+     */
+    List<Map<String, Object>> getParticipantStatusDetails(@Param("taskId") String taskId);
 }

@@ -1,5 +1,9 @@
-package com.feduwacomm.cache;
+package com.feduwacomm.service.cache.impl;
 
+import com.feduwacomm.service.cache.MetricsCacheService;
+import com.feduwacomm.service.cache.exception.CacheValidationException;
+import com.feduwacomm.service.cache.model.GlobalMetrics;
+import com.feduwacomm.service.cache.model.ParticipantMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

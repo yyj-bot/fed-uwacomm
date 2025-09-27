@@ -1,7 +1,7 @@
 package com.feduwacomm.service;
 
 import com.feduwacomm.enums.FederatedTaskStatus;
-import com.feduwacomm.cache.MetricsCacheService;
+import com.feduwacomm.service.cache.MetricsCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

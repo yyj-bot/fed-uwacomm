@@ -1,4 +1,4 @@
-package com.feduwacomm.cache;
+package com.feduwacomm.service.cache.exception;
 
 /**
  * 缓存验证异常

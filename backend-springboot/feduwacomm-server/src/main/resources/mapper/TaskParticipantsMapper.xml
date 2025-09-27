@@ -105,6 +105,21 @@
           AND status = 'COMPLETED'
     </select>
 
+    <!-- 调试查询：获取参与者状态详情用于诊断 -->
+    <select id="getParticipantStatusDetails" resultType="java.util.Map">
+        SELECT
+            COALESCE(vm_id, 'UNKNOWN') as vm_id,
+            COALESCE(current_epoch, 0) as current_epoch,
+            COALESCE(status, 'UNKNOWN') as status,
+            COALESCE(last_heartbeat, '1970-01-01 00:00:00') as last_heartbeat,
+            COALESCE(updated_at, '1970-01-01 00:00:00') as updated_at
+        FROM task_participants
+        WHERE task_id = #{taskId}
+          AND vm_id IS NOT NULL
+          AND status IS NOT NULL
+        ORDER BY updated_at DESC
+    </select>
+
     <!-- 统计任务总参与者数量 -->
     <select id="countTotalParticipants" resultType="int">
         SELECT COUNT(*)

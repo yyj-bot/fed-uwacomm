@@ -7,6 +7,7 @@ import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
 import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.GlobalModelStatus;
+import com.feduwacomm.enums.RoundState;
 import com.feduwacomm.event.AggregationCompletedEvent;
 import com.feduwacomm.event.AggregationTriggeredEvent;
 import com.feduwacomm.event.ModelUploadEvent;
@@ -61,6 +62,11 @@ public class FederatedAggregationService {
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
 
+    // 🔧 轮次同步组件
+    private final RoundStateManager roundStateManager;
+    private final RoundLockManager roundLockManager;
+    private final VmAckTracker vmAckTracker;
+
     // 聚合状态管理
     private final Map<String, LocalDateTime> roundStartTimes = new ConcurrentHashMap<>();
     private final Map<String, ReentrantLock> aggregationLocks = new ConcurrentHashMap<>();
@@ -78,15 +84,13 @@ public class FederatedAggregationService {
         Integer roundNumber = event.getRoundNumber();
         String aggregationKey = buildAggregationKey(taskId, roundNumber);
 
-        log.info("处理模型上传事件: 任务ID={}, 轮次={}, 虚拟机ID={}", 
+        log.info("处理模型上传事件: 任务ID={}, 轮次={}, 虚拟机ID={}",
                 taskId, roundNumber, event.getVmId());
 
         try {
-            // 获取聚合锁，避免并发触发
-            ReentrantLock lock = aggregationLocks.computeIfAbsent(aggregationKey, k -> new ReentrantLock());
-            
-            if (!lock.tryLock()) {
-                log.debug("聚合已在进行中，跳过: {}", aggregationKey);
+            // 🔧 使用轮次锁管理器获取分布式锁，防止竞态条件
+            if (!roundLockManager.acquireRoundLock(taskId)) {
+                log.warn("获取轮次锁失败，跳过聚合检查: 任务ID={}, 轮次={}", taskId, roundNumber);
                 return;
             }
 
@@ -94,18 +98,29 @@ public class FederatedAggregationService {
                 // 记录轮次开始时间（如果还没记录）
                 roundStartTimes.putIfAbsent(aggregationKey, LocalDateTime.now());
 
+                // 🔧 增强轮次状态检查，确保轮次同步
+                RoundState currentState = roundStateManager.getCurrentRoundState(taskId);
+                log.debug("当前轮次状态: 任务ID={}, 状态={}", taskId, currentState);
+
                 // 检查聚合条件
                 if (shouldTriggerAggregation(taskId, roundNumber)) {
                     triggerAggregation(taskId, roundNumber, "MODEL_UPLOAD_COMPLETE");
                 }
-                
+
             } finally {
-                lock.unlock();
+                // 🔧 确保轮次锁被正确释放
+                roundLockManager.releaseRoundLock(taskId);
             }
 
         } catch (Exception e) {
-            log.error("处理模型上传事件失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("处理模型上传事件失败: 任务ID={}, 轮次={}, 错误={}",
                     taskId, roundNumber, e.getMessage(), e);
+            // 异常情况下也要释放锁
+            try {
+                roundLockManager.releaseRoundLock(taskId);
+            } catch (Exception lockEx) {
+                log.error("释放轮次锁失败: 任务ID={}", taskId, lockEx);
+            }
         }
     }
 
@@ -188,28 +203,39 @@ public class FederatedAggregationService {
                 return false;
             }
 
-            // 🔧 修复：动态检测参与者实际完成的轮次
+            // 🔧 增强调试：安全地获取参与者详细状态信息
+            List<Map<String, Object>> participantDetails = null;
+            try {
+                participantDetails = taskParticipantsMapper.getParticipantStatusDetails(taskId);
+                log.debug("参与者状态详情: 任务ID={}, 参与者数量={}", taskId,
+                         participantDetails != null ? participantDetails.size() : "null");
+            } catch (Exception e) {
+                log.error("获取参与者详情失败: 任务ID={}, 错误={}", taskId, e.getMessage());
+                participantDetails = new ArrayList<>(); // 使用空列表避免后续null检查
+            }
+
             // 首先检查传入的roundNumber是否有完成的参与者
             int completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
+            log.debug("初始检查: 任务ID={}, 检查轮次={}, 已完成参与者={}",
+                    taskId, roundNumber, completedParticipants);
 
             // 如果传入轮次没有完成参与者，检查参与者实际完成的轮次
             if (completedParticipants == 0) {
                 // 查询参与者实际完成的最新轮次
                 Integer actualCompletedRound = getLatestCompletedRound(taskId);
+                log.debug("实际完成轮次检查: 任务ID={}, 最新完成轮次={}", taskId, actualCompletedRound);
+
                 if (actualCompletedRound != null && !actualCompletedRound.equals(roundNumber)) {
-                    log.warn("轮次不匹配检测: 任务ID={}, 期望轮次={}, 参与者实际完成轮次={}",
-                            taskId, roundNumber, actualCompletedRound);
+                    log.warn("❌ 轮次同步异常检测：期望轮次({}) != 当前轮次({})", roundNumber, actualCompletedRound);
+
                     // 使用参与者实际完成的轮次重新检查
                     completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, actualCompletedRound);
                     roundNumber = actualCompletedRound; // 更新为实际轮次
-                    log.info("使用实际轮次重新检查聚合条件: 任务ID={}, 实际轮次={}, 已完成参与者={}",
+
+                    log.info("🔄 轮次修正: 任务ID={}, 修正轮次={}, 重新统计已完成参与者={}",
                             taskId, actualCompletedRound, completedParticipants);
                 }
             }
-
-            // 添加详细调试信息
-            log.debug("聚合条件详细信息: 任务ID={}, 检查轮次={}, 总参与者={}, 已完成参与者={}",
-                    taskId, roundNumber, totalParticipants, completedParticipants);
 
             // 计算等待时间
             String aggregationKey = buildAggregationKey(taskId, roundNumber);
@@ -226,10 +252,33 @@ public class FederatedAggregationService {
 
             boolean shouldTrigger = allParticipantsCompleted || (isTimeout && hasMinParticipants);
 
-            log.info("聚合条件检查: 任务ID={}, 轮次={}, 已完成参与者={}/{}, 等待时间={}秒, " +
-                      "所有完成={}, 超时={}, 满足最少参与者={}, 是否触发={}",
-                    taskId, roundNumber, completedParticipants, totalParticipants, waitTimeSeconds,
-                    allParticipantsCompleted, isTimeout, hasMinParticipants, shouldTrigger);
+            // 🔧 增强日志：提供更详细的聚合决策信息
+            if (completedParticipants == 0 && totalParticipants > 0) {
+                log.warn("📊 聚合服务计数错误: 已完成参与者=0/{}, 等待时间={}秒, 满足最少参与者={}, 是否触发={}",
+                        totalParticipants, waitTimeSeconds, hasMinParticipants, shouldTrigger);
+
+                // 🔧 修复：安全地输出每个参与者的状态
+                if (participantDetails != null && !participantDetails.isEmpty()) {
+                    log.debug("参与者详情数量: {}", participantDetails.size());
+                    for (int i = 0; i < participantDetails.size(); i++) {
+                        Map<String, Object> participant = participantDetails.get(i);
+                        if (participant != null) {
+                            log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}",
+                                    i, participant.get("vm_id"), participant.get("current_epoch"),
+                                    participant.get("status"), participant.get("updated_at"));
+                        } else {
+                            log.warn("⚠️ 发现null参与者元素[{}]，跳过处理", i);
+                        }
+                    }
+                } else {
+                    log.warn("⚠️ 参与者详情列表为空或null: participantDetails={}", participantDetails);
+                }
+            } else {
+                log.info("聚合条件检查: 任务ID={}, 轮次={}, 已完成参与者={}/{}, 等待时间={}秒, " +
+                          "所有完成={}, 超时={}, 满足最少参与者={}, 是否触发={}",
+                        taskId, roundNumber, completedParticipants, totalParticipants, waitTimeSeconds,
+                        allParticipantsCompleted, isTimeout, hasMinParticipants, shouldTrigger);
+            }
 
             return shouldTrigger;
 
@@ -458,19 +507,70 @@ public class FederatedAggregationService {
 
     /**
      * 更新任务进度并重置参与者状态准备新轮次
+     * 🔧 使用RoundStateManager确保轮次推进的原子性和一致性
      */
+    @Transactional(rollbackFor = Exception.class)
     private void updateTaskProgress(String taskId, Integer nextRound) {
         try {
-            // 更新任务轮次
-            federatedTasksMapper.updateTaskProgress(taskId, nextRound, "RUNNING");
+            log.info("🔄 开始原子性轮次推进: 任务ID={}, 目标轮次={}", taskId, nextRound);
 
-            // 重置所有参与者状态准备新轮次训练
+            // 🔧 使用RoundStateManager安全推进轮次
+            boolean roundAdvanced = roundStateManager.advanceRound(taskId);
+            if (!roundAdvanced) {
+                throw new RuntimeException("轮次推进失败: 任务ID=" + taskId);
+            }
+
+            // 🔧 验证轮次推进成功
+            FederatedTask afterUpdate = federatedTasksMapper.selectTaskById(taskId);
+            if (afterUpdate == null) {
+                throw new RuntimeException("任务不存在: " + taskId);
+            }
+
+            Integer currentRound = afterUpdate.getCurrentRound();
+            if (!nextRound.equals(currentRound)) {
+                throw new RuntimeException(String.format(
+                    "轮次推进验证失败: 任务ID=%s, 期望轮次=%d, 实际轮次=%s",
+                    taskId, nextRound, currentRound));
+            }
+
+            // 🔧 创建新轮次的全局模型记录
+            boolean modelCreated = roundStateManager.createRoundModel(taskId, nextRound);
+            if (!modelCreated) {
+                log.warn("新轮次模型创建失败，但继续处理: 任务ID={}, 轮次={}", taskId, nextRound);
+            }
+
+            // 🔧 统一参与者状态同步：确保所有参与者为新轮次做好准备
             int resetCount = taskParticipantsMapper.resetParticipantsForNewRound(taskId, nextRound);
 
-            log.info("任务进度已更新: 任务ID={}, 下一轮次={}, 重置参与者状态数量={}",
-                     taskId, nextRound, resetCount);
+            // 🔧 增强验证：确保参与者状态与任务轮次同步
+            if (resetCount > 0) {
+                // 验证参与者状态确实重置
+                List<Map<String, Object>> participantStatus = taskParticipantsMapper.getParticipantStatusDetails(taskId);
+                long trainingCount = participantStatus.stream()
+                    .filter(p -> "TRAINING".equals(p.get("status")))
+                    .count();
+
+                log.info("✅ 轮次推进完成: 任务ID={}, 当前轮次={}, 重置参与者数量={}, 训练中参与者={}",
+                         taskId, currentRound, resetCount, trainingCount);
+
+                if (trainingCount != resetCount) {
+                    log.warn("⚠️ 参与者状态不一致: 重置数量={}, 实际训练中数量={}", resetCount, trainingCount);
+                }
+
+                // 🔧 轮次状态验证：确保轮次状态同步
+                RoundState newRoundState = roundStateManager.getCurrentRoundState(taskId);
+                log.info("轮次状态同步完成: 任务ID={}, 轮次={}, 状态={}",
+                        taskId, currentRound, newRoundState);
+
+            } else {
+                log.warn("⚠️ 没有参与者状态被重置: 任务ID={}, 轮次={}", taskId, nextRound);
+            }
+
         } catch (Exception e) {
-            log.error("更新任务进度失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
+            log.error("❌ 更新任务进度失败: 任务ID={}, 目标轮次={}, 错误={}",
+                     taskId, nextRound, e.getMessage(), e);
+            // 重新抛出异常以触发事务回滚
+            throw new RuntimeException("更新任务进度失败", e);
         }
     }
 

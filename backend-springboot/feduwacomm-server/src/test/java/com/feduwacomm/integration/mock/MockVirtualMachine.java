@@ -1119,6 +1119,10 @@ public class MockVirtualMachine {
                     System.out.println("📨 " + vmData.getName() + " 收到全局模型更新");
                     // 处理全局模型更新
                     handleGlobalModelUpdate(messageData);
+                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
+                    System.out.println("📨 " + vmData.getName() + " 收到全局模型广播");
+                    // 处理全局模型广播 - 新增轮次同步支持
+                    handleGlobalModelBroadcast(messageData);
                 } else if (isProtocolType(type, ProtocolType.TASK_START)) {
                     System.out.println("📨 " + vmData.getName() + " 收到任务启动指令");
                     // 处理任务启动
@@ -1284,6 +1288,106 @@ public class MockVirtualMachine {
         } catch (Exception e) {
             System.err.println("❌ " + vmData.getName() + " 处理全局模型更新失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 处理全局模型广播 - 新增轮次同步支持
+     * 根据轮次同步重构需求，VM收到GLOBAL_MODEL_BROADCAST后需要发送GLOBAL_MODEL_BROADCAST_ACK确认
+     */
+    private void handleGlobalModelBroadcast(Map<String, Object> messageData) {
+        try {
+            System.out.println("📥 " + vmData.getName() + " 处理全局模型广播");
+
+            // 解析广播消息数据
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            if (data != null) {
+                Object taskId = data.get("taskId");
+                Object roundNumber = data.get("round");
+                Object globalModel = data.get("globalModel");
+                Object modelChecksum = data.get("checksum");
+
+                System.out.println("📦 " + vmData.getName() + " 收到全局模型广播:");
+                System.out.println("    任务ID: " + taskId);
+                System.out.println("    轮次: " + roundNumber);
+                System.out.println("    模型校验和: " + modelChecksum);
+
+                // 模拟模型接收验证（校验和检查）
+                boolean modelValid = validateReceivedModel(globalModel, modelChecksum);
+
+                if (modelValid) {
+                    System.out.println("✅ " + vmData.getName() + " 全局模型接收验证成功");
+
+                    // 发送GLOBAL_MODEL_BROADCAST_ACK确认 - 关键的轮次同步支持
+                    Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GLOBAL_MODEL_BROADCAST_ACK);
+                    Map<String, Object> ackData = new HashMap<>();
+                    ackData.put("vmId", vmData.getVmId());
+                    ackData.put("taskId", taskId);
+                    ackData.put("round", roundNumber);
+                    ackData.put("acknowledged", true);
+                    ackData.put("ackTime", Instant.now().toString());
+                    ackData.put("status", "MODEL_RECEIVED");
+                    ackMessage.put("data", ackData);
+
+                    // 模拟一些ACK延迟，增加真实性
+                    Thread.sleep(50 + (int) (Math.random() * 100)); // 50-150ms随机延迟
+
+                    sendStompMessage(ackMessage);
+                    System.out.println("📤 " + vmData.getName() + " 已发送GLOBAL_MODEL_BROADCAST_ACK确认");
+                } else {
+                    System.err.println("❌ " + vmData.getName() + " 全局模型接收验证失败");
+
+                    // 发送带错误状态的ACK
+                    Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GLOBAL_MODEL_BROADCAST_ACK);
+                    Map<String, Object> ackData = new HashMap<>();
+                    ackData.put("vmId", vmData.getVmId());
+                    ackData.put("taskId", taskId);
+                    ackData.put("round", roundNumber);
+                    ackData.put("acknowledged", false);
+                    ackData.put("ackTime", Instant.now().toString());
+                    ackData.put("status", "MODEL_VALIDATION_FAILED");
+                    ackData.put("error", "模型校验和不匹配");
+                    ackMessage.put("data", ackData);
+
+                    sendStompMessage(ackMessage);
+                    System.out.println("📤 " + vmData.getName() + " 已发送GLOBAL_MODEL_BROADCAST_ACK错误确认");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ " + vmData.getName() + " 处理全局模型广播失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 验证接收到的模型（校验和检查）
+     */
+    private boolean validateReceivedModel(Object globalModel, Object expectedChecksum) {
+        try {
+            // 简化的模型验证逻辑
+            if (globalModel == null) {
+                return false;
+            }
+
+            // 模拟校验和计算和验证
+            if (expectedChecksum != null) {
+                String actualChecksum = calculateModelChecksum(globalModel);
+                return expectedChecksum.toString().equals(actualChecksum);
+            }
+
+            // 如果没有提供校验和，假设模型有效
+            return true;
+        } catch (Exception e) {
+            System.err.println("⚠️ " + vmData.getName() + " 模型验证过程出错: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 计算模型校验和（简化实现）
+     */
+    private String calculateModelChecksum(Object model) {
+        // 简化的校验和计算 - 在实际应用中可能使用MD5或SHA-256
+        return "checksum_" + model.toString().hashCode();
     }
 
     /**
@@ -1802,7 +1906,9 @@ public class MockVirtualMachine {
             case "MODEL_UPDATE":
                 return data.containsKey("taskId") && data.containsKey("parameters");
             case "GLOBAL_MODEL_BROADCAST":
-                return data.containsKey("taskId") && data.containsKey("round");
+                // 增强验证：支持轮次同步重构的新字段
+                return data.containsKey("taskId") && data.containsKey("round") &&
+                       (data.containsKey("globalModel") || data.containsKey("modelData"));
             default:
                 return true; // 对于未知消息类型，假设格式正确
         }

@@ -19,10 +19,11 @@ import com.feduwacomm.event.ModelUploadEvent;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.MessageIdGenerator;
-import com.feduwacomm.cache.MetricsCacheService;
-import com.feduwacomm.cache.ParticipantMetrics;
-import com.feduwacomm.cache.GlobalMetrics;
-import com.feduwacomm.cache.CacheValidationException;
+import com.feduwacomm.service.cache.MetricsCacheService;
+import com.feduwacomm.service.cache.model.ParticipantMetrics;
+import com.feduwacomm.service.cache.model.GlobalMetrics;
+import com.feduwacomm.service.cache.exception.CacheValidationException;
+import com.feduwacomm.enums.RoundState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,9 @@ public class WebSocketProtocolService {
     private final MessageBuilder messageBuilder;
     private final MessageIdGenerator messageIdGenerator;
     private final MetricsCacheService metricsCacheService;
+    private final RoundStateManager roundStateManager;
+    private final VmAckTracker vmAckTracker;
+    private final RoundLockManager roundLockManager;
 
     // in-memory VM 最新状态缓存：vmId -> STATUS_RESPONSE.data（用于快速读，不作为数据源）
     private final ConcurrentHashMap<String, Map<String, Object>> statusCache = new ConcurrentHashMap<>();
@@ -79,7 +83,10 @@ public class WebSocketProtocolService {
                                     UuidUtil uuidUtil,
                                     MessageBuilder messageBuilder,
                                     MessageIdGenerator messageIdGenerator,
-                                    MetricsCacheService metricsCacheService) {
+                                    MetricsCacheService metricsCacheService,
+                                    RoundStateManager roundStateManager,
+                                    VmAckTracker vmAckTracker,
+                                    RoundLockManager roundLockManager) {
         this.messagingTemplate = messagingTemplate;
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
@@ -94,6 +101,9 @@ public class WebSocketProtocolService {
         this.messageBuilder = messageBuilder;
         this.messageIdGenerator = messageIdGenerator;
         this.metricsCacheService = metricsCacheService;
+        this.roundStateManager = roundStateManager;
+        this.vmAckTracker = vmAckTracker;
+        this.roundLockManager = roundLockManager;
     }
 
     public ProtocolAck handle(ProtocolMessage msg) {
@@ -683,8 +693,9 @@ public class WebSocketProtocolService {
                     log.info("参与者记录创建成功: 任务ID={}, VM ID={}, 轮次={}, 状态=COMPLETED",
                             taskId, vmId, round);
 
+                    // TODO: 缓存功能将在后续版本中实现
                     // 更新参与者度量指标缓存
-                    updateParticipantMetricsCache(taskId, vmId, round, acc, loss, "COMPLETED");
+                    // updateParticipantMetricsCache(taskId, vmId, round, acc, loss, "COMPLETED");
                 } else {
                     log.error("参与者记录创建失败: 任务ID={}, VM ID={}, 轮次={}", taskId, vmId, round);
                 }
@@ -696,8 +707,9 @@ public class WebSocketProtocolService {
                     log.info("VM轮次状态和度量指标更新成功: 任务ID={}, VM ID={}, 轮次={}, 状态=COMPLETED, 精度={}, 损失={}",
                             taskId, vmId, round, acc, loss);
 
+                    // TODO: 缓存功能将在后续版本中实现
                     // 更新参与者度量指标缓存
-                    updateParticipantMetricsCache(taskId, vmId, round, acc, loss, "COMPLETED");
+                    // updateParticipantMetricsCache(taskId, vmId, round, acc, loss, "COMPLETED");
                 } else {
                     log.warn("VM轮次状态和度量指标更新结果为0: 任务ID={}, VM ID={}, 轮次={}", taskId, vmId, round);
                 }
@@ -1027,10 +1039,39 @@ public class WebSocketProtocolService {
     }
 
     /**
-     * 检查并推进任务轮次
-     * 当所有参与者都完成当前轮次的训练时，推进任务到下一轮次
+     * 安全的轮次推进检查（重构版）
+     * 使用轮次锁管理器防止并发问题，通过状态管理器确保严格的状态控制
+     *
+     * @param taskId 任务ID
+     * @param currentRound 当前轮次
      */
     private void checkAndAdvanceTaskRound(String taskId, Integer currentRound) {
+        if (taskId == null || currentRound == null) {
+            log.error("轮次推进参数无效: taskId={}, currentRound={}", taskId, currentRound);
+            return;
+        }
+
+        // 获取轮次锁，防止并发推进
+        boolean lockAcquired = roundLockManager.acquireRoundLock(taskId);
+        if (!lockAcquired) {
+            log.warn("无法获取轮次锁，跳过推进检查: taskId={}", taskId);
+            return;
+        }
+
+        try {
+            // 安全的轮次推进逻辑
+            performSafeRoundAdvancement(taskId, currentRound);
+
+        } finally {
+            // 确保释放锁
+            roundLockManager.releaseRoundLock(taskId);
+        }
+    }
+
+    /**
+     * 执行安全的轮次推进逻辑
+     */
+    private void performSafeRoundAdvancement(String taskId, Integer currentRound) {
         // 获取当前任务信息
         FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
         if (task == null) {
@@ -1045,29 +1086,46 @@ public class WebSocketProtocolService {
             return;
         }
 
+        // 检查轮次状态
+        RoundState currentState = roundStateManager.getCurrentRoundState(taskId);
+        if (currentState != RoundState.TRAINING) {
+            log.debug("当前轮次状态不允许推进: taskId={}, currentRound={}, state={}",
+                     taskId, currentRound, currentState);
+            return;
+        }
+
         // 统计已完成当前轮次训练的参与者数量
         int completedCount = taskParticipantsMapper.countCompletedParticipants(taskId, currentRound);
         int totalCount = taskParticipantsMapper.countTotalParticipants(taskId);
 
-        log.info("轮次推进检查: 任务ID={}, 当前轮次={}, 已完成={}, 总数={}",
-                taskId, currentRound, completedCount, totalCount);
+        log.info("轮次推进检查: 任务ID={}, 当前轮次={}, 已完成={}, 总数={}, 状态={}",
+                taskId, currentRound, completedCount, totalCount, currentState);
 
         // 如果所有参与者都完成了当前轮次，推进到下一轮次
         if (completedCount > 0 && completedCount == totalCount) {
-            Integer newRound = currentRound + 1;
-            double progress = task.getTotalRounds() != null ?
-                (double) newRound / task.getTotalRounds() * 100.0 : 0.0;
+            // 使用状态管理器的安全推进方法
+            boolean advanced = roundStateManager.advanceRound(taskId);
+            if (advanced) {
+                Integer newRound = currentRound + 1;
+                double progress = task.getTotalRounds() != null ?
+                    (double) newRound / task.getTotalRounds() * 100.0 : 0.0;
 
-            // 更新任务的当前轮次和进度
-            federatedTasksMapper.updateTaskProgress(taskId, newRound, "RUNNING");
+                log.info("任务轮次推进成功: 任务ID={}, 从轮次{}推进到轮次{}, 进度={:.1f}%",
+                        taskId, currentRound, newRound, progress);
 
-            log.info("任务轮次推进成功: 任务ID={}, 从轮次{}推进到轮次{}, 进度={:.1f}%",
-                    taskId, currentRound, newRound, progress);
+                // 重置所有参与者状态为TRAINING，准备下一轮训练
+                if (newRound <= task.getTotalRounds()) {
+                    taskParticipantsMapper.resetParticipantsForNewRound(taskId, newRound);
+                    log.info("参与者状态已重置为下一轮训练: 任务ID={}, 新轮次={}", taskId, newRound);
 
-            // 重置所有参与者状态为TRAINING，准备下一轮训练
-            if (newRound <= task.getTotalRounds()) {
-                taskParticipantsMapper.resetParticipantsForNewRound(taskId, newRound);
-                log.info("参与者状态已重置为下一轮训练: 任务ID={}, 新轮次={}", taskId, newRound);
+                    // 创建新轮次的全局模型记录
+                    roundStateManager.createRoundModel(taskId, newRound);
+
+                    // 初始化新轮次的分发记录
+                    vmAckTracker.initializeRoundDistributions(taskId, newRound);
+                }
+            } else {
+                log.error("轮次推进失败: taskId={}, currentRound={}", taskId, currentRound);
             }
         } else if (totalCount == 0) {
             log.warn("任务没有参与者，无法推进轮次: 任务ID={}", taskId);
@@ -2188,8 +2246,8 @@ public class WebSocketProtocolService {
     }
 
     /**
-     * 处理全局模型广播确认消息
-     * 虚拟机确认已收到全局模型广播
+     * 处理全局模型广播确认消息（重构版）
+     * 虚拟机确认已收到全局模型广播，集成VM确认跟踪器进行同步控制
      */
     private ProtocolAck onGlobalModelBroadcastAck(ProtocolMessage msg) {
         Map<String, Object> data = msg.getData();
@@ -2201,17 +2259,61 @@ public class WebSocketProtocolService {
         log.info("收到全局模型广播确认: vmId={}, taskId={}, round={}, status={}",
                 vmId, taskId, round, status);
 
+        if (taskId == null || round == null || vmId == null) {
+            log.error("ACK消息参数不完整: vmId={}, taskId={}, round={}", vmId, taskId, round);
+            return ackFor(msg, ProtocolType.STATUS_RESPONSE, mapOf(
+                "status", "ERROR",
+                "errorMessage", "消息参数不完整"
+            ));
+        }
+
         try {
-            // 记录确认状态
+            // 记录VM确认状态
             if ("SUCCESS".equals(status)) {
-                log.info("虚拟机{}成功接收全局模型: taskId={}, round={}", vmId, taskId, round);
-                // 这里可以记录到数据库或更新分发状态
-                // TODO: 如果需要跟踪模型分发状态，可以在这里更新数据库
+                // 使用VmAckTracker记录确认
+                boolean recorded = vmAckTracker.recordAck(taskId, vmId, round);
+                if (recorded) {
+                    log.info("虚拟机{}成功接收全局模型并记录ACK: taskId={}, round={}", vmId, taskId, round);
+
+                    // 检查是否所有VM都已确认
+                    if (vmAckTracker.allVmsAcked(taskId, round)) {
+                        log.info("所有VM都已确认收到全局模型: taskId={}, round={}", taskId, round);
+
+                        // 状态转换：WAITING_ACK → READY
+                        RoundState currentState = roundStateManager.getCurrentRoundState(taskId);
+                        if (currentState == RoundState.WAITING_ACK) {
+                            boolean transitioned = roundStateManager.transitionRoundState(
+                                taskId, RoundState.WAITING_ACK, RoundState.READY);
+
+                            if (transitioned) {
+                                log.info("轮次状态转换成功: taskId={}, round={}, {} → {}",
+                                        taskId, round, RoundState.WAITING_ACK, RoundState.READY);
+
+                                // 这里可以触发下一阶段：发送ROUND_START消息
+                                // 或者等待外部触发训练开始
+                            } else {
+                                log.error("轮次状态转换失败: taskId={}, round={}", taskId, round);
+                            }
+                        } else {
+                            log.debug("当前状态不是WAITING_ACK，跳过状态转换: taskId={}, round={}, state={}",
+                                     taskId, round, currentState);
+                        }
+                    } else {
+                        // 记录进度信息
+                        var progress = vmAckTracker.getAckProgress(taskId, round);
+                        log.debug("等待更多VM确认: taskId={}, round={}, 进度={}", taskId, round, progress);
+                    }
+                } else {
+                    log.error("记录VM ACK失败: vmId={}, taskId={}, round={}", vmId, taskId, round);
+                }
+
             } else if ("ERROR".equals(status)) {
                 String errorMessage = valueAsString(data, "errorMessage");
                 log.warn("虚拟机{}接收全局模型失败: taskId={}, round={}, error={}",
                         vmId, taskId, round, errorMessage);
-                // TODO: 处理接收失败的情况，可能需要重新发送
+
+                // 这里可以记录失败状态，并可能触发重新发送机制
+                // 对于失败的VM，可以考虑从参与者中排除或重试
             }
 
             return ackFor(msg, ProtocolType.STATUS_RESPONSE, mapOf(
@@ -2219,7 +2321,8 @@ public class WebSocketProtocolService {
                 "vmId", vmId,
                 "taskId", taskId,
                 "round", round,
-                "timestamp", Instant.now().toString()
+                "timestamp", Instant.now().toString(),
+                "message", "ACK已处理"
             ));
 
         } catch (Exception e) {
@@ -2828,6 +2931,8 @@ public class WebSocketProtocolService {
                 .build();
     }
 
+    // TODO: 缓存功能将在后续版本中实现
+    /*
     /**
      * 更新参与者度量指标缓存
      *
@@ -2838,6 +2943,7 @@ public class WebSocketProtocolService {
      * @param loss 损失值
      * @param status 状态
      */
+    /*
     private void updateParticipantMetricsCache(String taskId, String vmId, Integer round,
                                              Double accuracy, Double loss, String status) {
         try {
@@ -2874,6 +2980,7 @@ public class WebSocketProtocolService {
      *
      * @param taskId 任务ID
      */
+    /*
     private void updateGlobalMetricsCache(String taskId) {
         try {
             // 获取任务信息，用于计算预估时间
@@ -2893,5 +3000,6 @@ public class WebSocketProtocolService {
             log.error("更新全局度量指标缓存时发生意外错误: taskId={}, 错误={}", taskId, e.getMessage(), e);
         }
     }
+    */
 
 } 

@@ -13,9 +13,9 @@ import com.feduwacomm.service.LogService;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.controller.FederatedTaskController;
-import com.feduwacomm.cache.MetricsCacheService;
-import com.feduwacomm.cache.GlobalMetrics;
-import com.feduwacomm.cache.CacheValidationException;
+import com.feduwacomm.service.cache.MetricsCacheService;
+import com.feduwacomm.service.cache.model.GlobalMetrics;
+import com.feduwacomm.service.cache.exception.CacheValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -767,35 +767,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private TaskDetailVO.MetricsVO buildTaskMetrics(FederatedTask task, List<TaskParticipant> participants) {
         String taskId = task.getId();
 
-        try {
-            // 第一优先级：从全局指标缓存获取
-            log.debug("尝试从全局指标缓存获取数据: taskId={}", taskId);
-            GlobalMetrics cachedGlobalMetrics = metricsCacheService.validateAndGetGlobalMetrics(taskId);
-
-            log.info("从全局指标缓存获取成功: taskId={}, globalAccuracy={}, globalLoss={}, rounds={}",
-                    taskId, cachedGlobalMetrics.getGlobalAccuracy(), cachedGlobalMetrics.getGlobalLoss(),
-                    cachedGlobalMetrics.getCommunicationRounds());
-
-            return convertGlobalMetricsToVO(cachedGlobalMetrics);
-
-        } catch (CacheValidationException e) {
-            log.debug("全局指标缓存无效，尝试从参与者缓存计算: taskId={}, 原因={}", taskId, e.getMessage());
-
-            try {
-                // 第二优先级：从参与者缓存计算全局指标
-                GlobalMetrics computedMetrics = metricsCacheService.computeAndUpdateGlobalMetrics(
-                        taskId, task.getTotalRounds());
-
-                log.info("从参与者缓存计算全局指标成功: taskId={}, globalAccuracy={}, globalLoss={}",
-                        taskId, computedMetrics.getGlobalAccuracy(), computedMetrics.getGlobalLoss());
-
-                return convertGlobalMetricsToVO(computedMetrics);
-
-            } catch (Exception cacheException) {
-                log.warn("从缓存计算全局指标失败，降级到数据库查询: taskId={}, 错误={}",
-                        taskId, cacheException.getMessage());
-            }
-        }
+        // TODO: 缓存功能将在后续版本中实现，直接使用数据库查询
+        log.debug("使用数据库查询获取全局指标: taskId={}", taskId);
 
         // 第三优先级：降级到数据库查询（原有逻辑）
         log.info("使用数据库降级查询构建度量指标: taskId={}", taskId);
@@ -805,6 +778,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     /**
      * 将全局指标缓存对象转换为VO
      */
+    // TODO: 缓存功能将在后续版本中实现
+    /*
     private TaskDetailVO.MetricsVO convertGlobalMetricsToVO(GlobalMetrics globalMetrics) {
         if (globalMetrics == null) {
             throw new CacheValidationException("GlobalMetrics", "unknown", "缓存对象为null");
@@ -818,6 +793,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .estimatedTimeRemaining(globalMetrics.getEstimatedTimeRemaining())
                 .build();
     }
+    */
 
     /**
      * 从数据库构建度量指标（原有逻辑，作为降级方案）

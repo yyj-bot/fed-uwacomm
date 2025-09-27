@@ -1,4 +1,4 @@
-package com.feduwacomm.cache;
+package com.feduwacomm.service.cache.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
