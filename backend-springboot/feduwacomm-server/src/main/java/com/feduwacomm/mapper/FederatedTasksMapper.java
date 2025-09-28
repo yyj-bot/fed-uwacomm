@@ -25,7 +25,6 @@ public interface FederatedTasksMapper {
     
     int updateTaskProgress(@Param("id") String id,
                           @Param("currentRound") Integer currentRound,
-                          @Param("progress") Double progress,
                           @Param("status") String status);
     
     int deleteTask(@Param("id") String id);

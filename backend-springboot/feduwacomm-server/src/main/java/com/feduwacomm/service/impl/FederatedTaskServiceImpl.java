@@ -10,9 +10,13 @@ import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
+import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import com.feduwacomm.controller.FederatedTaskController;
+import com.feduwacomm.service.cache.MetricsCacheService;
+import com.feduwacomm.service.cache.model.GlobalMetrics;
+import com.feduwacomm.service.cache.exception.CacheValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -52,6 +56,22 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     @Autowired
     private UuidUtil uuidUtil;
+
+    @Autowired
+    private MetricsCacheService metricsCacheService;
+
+    @Autowired
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
+    // v1.4协议新增组件
+    @Autowired
+    private com.feduwacomm.service.RoundStateManager roundStateManager;
+
+    @Autowired
+    private com.feduwacomm.service.VmAckTracker vmAckTracker;
+
+    @Autowired
+    private com.feduwacomm.service.RoundLockManager roundLockManager;
 
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
@@ -200,6 +220,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .dataSource(p.getDataSource())
                 .build())
             .collect(Collectors.toList());
+
+        // 发送训练启动指令给所有参与者
+        sendTrainingStartCommand(taskId, participants);
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
@@ -650,6 +673,55 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     // 私有辅助方法
 
+    /**
+     * 向参与者发送训练启动指令
+     */
+    private void sendTrainingStartCommand(String taskId, List<TaskParticipant> participants) {
+        if (participants == null || participants.isEmpty()) {
+            log.warn("任务{}没有参与者，跳过发送训练启动指令", taskId);
+            return;
+        }
+
+        // 获取任务信息以获取算法配置
+        FederatedTask task = getTaskById(taskId);
+        if (task == null) {
+            log.error("任务{}不存在，无法发送训练启动指令", taskId);
+            return;
+        }
+
+        String algorithmCode = task.getAlgorithm() != null ? task.getAlgorithm().getCode() : "FEDERATED_AVERAGING";
+        log.info("开始向{}个参与者发送训练启动指令: taskId={}, algorithm={}", participants.size(), taskId, algorithmCode);
+
+        for (TaskParticipant participant : participants) {
+            try {
+                // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.4标准
+                ProtocolMessage startMessage = MessageBuilder.buildTrainingStartMessage(
+                    participant.getVmId(),
+                    taskId,
+                    1, // roundNumber
+                    algorithmCode, // mlAlgorithm
+                    MessageBuilder.buildHyperparameters(task), // hyperparameters对象
+                    MessageBuilder.buildGlobalModel(taskId, 1), // globalModel对象
+                    "请开始本地ML训练任务" // message
+                );
+
+                // 发送到VM专用topic
+                String vmTopic = "/topic/vm/" + participant.getVmId();
+                messagingTemplate.convertAndSend(vmTopic, startMessage);
+
+                log.info("训练启动指令已发送: vmId={}, taskId={}, algorithm={}, topic={}",
+                    participant.getVmId(), taskId, algorithmCode, vmTopic);
+
+            } catch (Exception e) {
+                log.error("发送训练启动指令失败: vmId={}, taskId={}, 错误={}",
+                    participant.getVmId(), taskId, e.getMessage(), e);
+            }
+        }
+
+        log.info("训练启动指令发送完成: taskId={}, algorithm={}, 成功发送给{}个参与者",
+                taskId, algorithmCode, participants.size());
+    }
+
     private FederatedTask buildTaskFromCreateDTO(TaskCreateDTO createDTO, String taskId, String createdBy, LocalDateTime now) {
         FederatedTask task = new FederatedTask();
         task.setId(taskId);
@@ -694,7 +766,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
         
         task.setCurrentRound(0);
-        task.setProgress(0.0);
+        // progress现在通过getProgress()方法自动计算，无需设置
         task.setParticipantCount(createDTO.getParticipants().size());
         task.setEstimatedDuration(estimateTaskDuration(createDTO));
         task.setCreatedAt(now);
@@ -759,6 +831,40 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     private TaskDetailVO.MetricsVO buildTaskMetrics(FederatedTask task, List<TaskParticipant> participants) {
+        String taskId = task.getId();
+
+        // TODO: 缓存功能将在后续版本中实现，直接使用数据库查询
+        log.debug("使用数据库查询获取全局指标: taskId={}", taskId);
+
+        // 第三优先级：降级到数据库查询（原有逻辑）
+        log.info("使用数据库降级查询构建度量指标: taskId={}", taskId);
+        return buildTaskMetricsFromDatabase(task, participants);
+    }
+
+    /**
+     * 将全局指标缓存对象转换为VO
+     */
+    // TODO: 缓存功能将在后续版本中实现
+    /*
+    private TaskDetailVO.MetricsVO convertGlobalMetricsToVO(GlobalMetrics globalMetrics) {
+        if (globalMetrics == null) {
+            throw new CacheValidationException("GlobalMetrics", "unknown", "缓存对象为null");
+        }
+
+        return TaskDetailVO.MetricsVO.builder()
+                .globalLoss(globalMetrics.getGlobalLoss())
+                .globalAccuracy(globalMetrics.getGlobalAccuracy())
+                .communicationRounds(globalMetrics.getCommunicationRounds())
+                .dataProcessed(globalMetrics.getDataProcessed())
+                .estimatedTimeRemaining(globalMetrics.getEstimatedTimeRemaining())
+                .build();
+    }
+    */
+
+    /**
+     * 从数据库构建度量指标（原有逻辑，作为降级方案）
+     */
+    private TaskDetailVO.MetricsVO buildTaskMetricsFromDatabase(FederatedTask task, List<TaskParticipant> participants) {
         // 计算全局指标
         double globalLoss = participants.stream()
             .filter(p -> p.getLoss() != null)
@@ -778,7 +884,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             estimatedTimeRemaining = remainingRounds * 180; // 假设每轮3分钟
         }
 
-        return TaskDetailVO.MetricsVO.builder()
+        TaskDetailVO.MetricsVO metricsVO = TaskDetailVO.MetricsVO.builder()
             .globalLoss(globalLoss)
             .globalAccuracy(globalAccuracy)
             .communicationRounds(task.getCurrentRound())
@@ -788,6 +894,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .sum())
             .estimatedTimeRemaining(estimatedTimeRemaining)
             .build();
+
+        log.debug("数据库降级查询构建度量指标完成: taskId={}, globalAccuracy={}, globalLoss={}",
+                task.getId(), globalAccuracy, globalLoss);
+
+        return metricsVO;
     }
 
     private TaskVO convertToTaskVO(FederatedTask task) {
@@ -1377,7 +1488,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         task.setParticipantCount(createDTO.getParticipantConfig().getParticipants().size());
         task.setCurrentRound(0);
         task.setTotalRounds(createDTO.getHyperparameters() != null ? createDTO.getHyperparameters().getRounds() : 10);
-        task.setProgress(0.0);
+        // progress现在通过getProgress()方法自动计算，无需设置
 
         // 设置v1.3特有字段
         task.setDatasetId(createDTO.getDatasetConfig().getDatasetId());
@@ -1505,4 +1616,398 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
     }
 
+    // ====================== v1.4协议任务生命周期管理方法 ======================
+
+    /**
+     * v1.4启动联邦学习任务
+     * 实现"后端大脑"集中控制，VM被动响应
+     */
+    @Override
+    @Transactional
+    public TaskOperationVO startFederatedTask(String taskId) {
+        log.info("v1.4启动联邦学习任务: taskId={}", taskId);
+
+        // 获取轮次锁
+        if (!roundLockManager.acquireRoundLock(taskId)) {
+            throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
+        }
+
+        try {
+            // 验证任务状态
+            FederatedTask task = getTaskById(taskId);
+            if (task == null) {
+                throw new UserException("任务不存在");
+            }
+
+            if (!STATUS_CONFIGURED.equals(task.getStatus()) && !STATUS_STOPPED.equals(task.getStatus())) {
+                throw new UserException("任务状态不允许启动操作，当前状态: " + task.getStatus());
+            }
+
+            // 初始化轮次状态管理器
+            roundStateManager.initializeTask(taskId, task.getTotalRounds());
+
+            // 设置任务为运行状态
+            LocalDateTime now = LocalDateTime.now();
+            task.setStatus(STATUS_RUNNING);
+            task.setStartedAt(now);
+            task.setUpdatedAt(now);
+
+            // 设置v1.4协议字段
+            task.setProtocolVersion("1.4");
+            task.setLifecycleStatus("ACTIVE");
+
+            // 更新任务状态
+            int result = tasksMapper.updateTask(task);
+            if (result <= 0) {
+                throw new UserException("任务启动失败");
+            }
+
+            // 初始化VM确认跟踪器
+            List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+            List<String> vmIds = participants.stream()
+                .map(TaskParticipant::getVmId)
+                .collect(Collectors.toList());
+            vmAckTracker.initializeTask(taskId, vmIds);
+
+            // 启动第一轮训练
+            startFirstRound(taskId);
+
+            // 记录操作日志
+            logTask(taskId, "INFO", "v1.4任务启动成功", "TASK_LIFECYCLE", null,
+                Map.of("protocolVersion", "1.4", "participantCount", participants.size()));
+
+            TaskOperationVO response = TaskOperationVO.builder()
+                .taskId(taskId)
+                .startedAt(now)
+                .build();
+
+            log.info("v1.4任务启动完成: taskId={}", taskId);
+            return response;
+
+        } finally {
+            roundLockManager.releaseRoundLock(taskId);
+        }
+    }
+
+    /**
+     * v1.4停止联邦学习任务
+     */
+    @Override
+    @Transactional
+    public TaskOperationVO stopFederatedTask(String taskId) {
+        log.info("v1.4停止联邦学习任务: taskId={}", taskId);
+
+        if (!roundLockManager.acquireRoundLock(taskId)) {
+            throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
+        }
+
+        try {
+            FederatedTask task = getTaskById(taskId);
+            if (task == null) {
+                throw new UserException("任务不存在");
+            }
+
+            if (!STATUS_RUNNING.equals(task.getStatus()) && !STATUS_PAUSED.equals(task.getStatus())) {
+                throw new UserException("任务状态不允许停止操作，当前状态: " + task.getStatus());
+            }
+
+            // 发送停止指令到所有VM
+            sendStopCommandToAllVMs(taskId);
+
+            // 等待VM确认
+            boolean allAcknowledged = vmAckTracker.waitForAllAcknowledgments(taskId, "TASK_STOP", 30000);
+            if (!allAcknowledged) {
+                log.warn("部分VM未及时确认停止指令: taskId={}", taskId);
+            }
+
+            // 更新任务状态
+            LocalDateTime now = LocalDateTime.now();
+            task.setStatus(STATUS_STOPPED);
+            task.setStoppedAt(now);
+            task.setUpdatedAt(now);
+            task.setLifecycleStatus("STOPPED");
+
+            int result = tasksMapper.updateTask(task);
+            if (result <= 0) {
+                throw new UserException("任务停止失败");
+            }
+
+            // 保存轮次状态快照用于恢复
+            saveRoundStateSnapshot(taskId);
+
+            // 记录操作日志
+            logTask(taskId, "INFO", "v1.4任务停止成功", "TASK_LIFECYCLE", null,
+                Map.of("currentRound", task.getCurrentRound(), "acknowledged", allAcknowledged));
+
+            TaskOperationVO response = TaskOperationVO.builder()
+                .taskId(taskId)
+                .stoppedAt(now)
+                .build();
+
+            log.info("v1.4任务停止完成: taskId={}", taskId);
+            return response;
+
+        } finally {
+            roundLockManager.releaseRoundLock(taskId);
+        }
+    }
+
+    /**
+     * v1.4恢复联邦学习任务
+     */
+    @Override
+    @Transactional
+    public TaskOperationVO resumeFederatedTask(String taskId) {
+        log.info("v1.4恢复联邦学习任务: taskId={}", taskId);
+
+        if (!roundLockManager.acquireRoundLock(taskId)) {
+            throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
+        }
+
+        try {
+            FederatedTask task = getTaskById(taskId);
+            if (task == null) {
+                throw new UserException("任务不存在");
+            }
+
+            if (!STATUS_PAUSED.equals(task.getStatus()) && !STATUS_STOPPED.equals(task.getStatus())) {
+                throw new UserException("任务状态不允许恢复操作，当前状态: " + task.getStatus());
+            }
+
+            // 恢复轮次状态
+            restoreRoundStateSnapshot(taskId);
+
+            // 重新初始化VM确认跟踪器
+            List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+            List<String> vmIds = participants.stream()
+                .map(TaskParticipant::getVmId)
+                .collect(Collectors.toList());
+            vmAckTracker.reinitializeTask(taskId, vmIds);
+
+            // 更新任务状态
+            LocalDateTime now = LocalDateTime.now();
+            task.setStatus(STATUS_RUNNING);
+            task.setResumedAt(now);
+            task.setUpdatedAt(now);
+            task.setLifecycleStatus("ACTIVE");
+
+            int result = tasksMapper.updateTask(task);
+            if (result <= 0) {
+                throw new UserException("任务恢复失败");
+            }
+
+            // 发送恢复指令到所有VM
+            sendResumeCommandToAllVMs(taskId);
+
+            // 记录操作日志
+            logTask(taskId, "INFO", "v1.4任务恢复成功", "TASK_LIFECYCLE", null,
+                Map.of("resumedRound", task.getCurrentRound()));
+
+            TaskOperationVO response = TaskOperationVO.builder()
+                .taskId(taskId)
+                .resumedAt(now)
+                .build();
+
+            log.info("v1.4任务恢复完成: taskId={}", taskId);
+            return response;
+
+        } finally {
+            roundLockManager.releaseRoundLock(taskId);
+        }
+    }
+
+    /**
+     * v1.4删除联邦学习任务
+     */
+    @Override
+    @Transactional
+    public TaskOperationVO deleteFederatedTask(String taskId, boolean preserveData) {
+        log.info("v1.4删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
+
+        if (!roundLockManager.acquireRoundLock(taskId)) {
+            throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
+        }
+
+        try {
+            FederatedTask task = getTaskById(taskId);
+            if (task == null) {
+                throw new UserException("任务不存在");
+            }
+
+            // 如果任务正在运行，先停止
+            if (STATUS_RUNNING.equals(task.getStatus())) {
+                log.info("任务正在运行，先执行停止操作: taskId={}", taskId);
+                stopFederatedTask(taskId);
+            }
+
+            // 清理v1.4协议相关状态
+            roundStateManager.cleanupTask(taskId);
+            vmAckTracker.cleanupTask(taskId);
+
+            // 删除任务数据
+            LocalDateTime now = LocalDateTime.now();
+            if (!preserveData) {
+                // 删除参与者数据
+                tasksMapper.deleteParticipantsByTaskId(taskId);
+
+                // 删除轮次状态记录
+                tasksMapper.deleteRoundStatesByTaskId(taskId);
+
+                // 删除VM确认跟踪记录
+                tasksMapper.deleteVmAckTrackingByTaskId(taskId);
+            }
+
+            // 标记任务为已删除
+            task.setStatus(STATUS_CANCELLED);
+            task.setCancelledAt(now);
+            task.setUpdatedAt(now);
+            task.setLifecycleStatus("DELETED");
+
+            int result = tasksMapper.updateTask(task);
+            if (result <= 0) {
+                throw new UserException("任务删除失败");
+            }
+
+            // 记录操作日志
+            logTask(taskId, "INFO", "v1.4任务删除成功", "TASK_LIFECYCLE", null,
+                Map.of("preserveData", preserveData));
+
+            TaskOperationVO response = TaskOperationVO.builder()
+                .taskId(taskId)
+                .deletedAt(now)
+                .dataDeleted(!preserveData)
+                .build();
+
+            log.info("v1.4任务删除完成: taskId={}", taskId);
+            return response;
+
+        } finally {
+            roundLockManager.releaseRoundLock(taskId);
+        }
+    }
+
+    // ====================== v1.4协议辅助方法 ======================
+
+    /**
+     * 启动第一轮训练
+     */
+    private void startFirstRound(String taskId) {
+        log.info("启动第一轮训练: taskId={}", taskId);
+
+        // 设置轮次状态为初始化
+        roundStateManager.setRoundState(taskId, 1, com.feduwacomm.enums.RoundState.INITIALIZING);
+
+        // 发送ROUND_START消息到所有VM
+        sendRoundStartToAllVMs(taskId, 1);
+
+        // 转换到训练状态
+        roundStateManager.setRoundState(taskId, 1, com.feduwacomm.enums.RoundState.TRAINING);
+
+        log.info("第一轮训练启动完成: taskId={}", taskId);
+    }
+
+    /**
+     * 发送停止指令到所有VM
+     */
+    private void sendStopCommandToAllVMs(String taskId) {
+        log.info("发送停止指令到所有VM: taskId={}", taskId);
+
+        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        for (TaskParticipant participant : participants) {
+            Map<String, Object> message = MessageBuilder.buildMessage()
+                .messageType("TASK_STOP")
+                .taskId(taskId)
+                .vmId(participant.getVmId())
+                .protocol("1.4")
+                .addData("reason", "USER_REQUESTED")
+                .addData("timestamp", LocalDateTime.now())
+                .build();
+
+            messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
+            vmAckTracker.trackMessage(taskId, participant.getVmId(), "TASK_STOP");
+        }
+    }
+
+    /**
+     * 发送恢复指令到所有VM
+     */
+    private void sendResumeCommandToAllVMs(String taskId) {
+        log.info("发送恢复指令到所有VM: taskId={}", taskId);
+
+        FederatedTask task = getTaskById(taskId);
+        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+
+        for (TaskParticipant participant : participants) {
+            Map<String, Object> message = MessageBuilder.buildMessage()
+                .messageType("TASK_RESUME")
+                .taskId(taskId)
+                .vmId(participant.getVmId())
+                .protocol("1.4")
+                .addData("currentRound", task.getCurrentRound())
+                .addData("timestamp", LocalDateTime.now())
+                .build();
+
+            messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
+        }
+    }
+
+    /**
+     * 发送轮次开始消息到所有VM
+     */
+    private void sendRoundStartToAllVMs(String taskId, int round) {
+        log.info("发送轮次开始消息: taskId={}, round={}", taskId, round);
+
+        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        for (TaskParticipant participant : participants) {
+            Map<String, Object> message = MessageBuilder.buildMessage()
+                .messageType("ROUND_START")
+                .taskId(taskId)
+                .vmId(participant.getVmId())
+                .protocol("1.4")
+                .addData("round", round)
+                .addData("timestamp", LocalDateTime.now())
+                .build();
+
+            messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
+            vmAckTracker.trackMessage(taskId, participant.getVmId(), "ROUND_START");
+        }
+    }
+
+    /**
+     * 保存轮次状态快照
+     */
+    private void saveRoundStateSnapshot(String taskId) {
+        try {
+            Map<String, Object> snapshot = roundStateManager.createSnapshot(taskId);
+
+            FederatedTask task = getTaskById(taskId);
+            task.setResumeInfo(objectMapper.writeValueAsString(snapshot));
+            task.setUpdatedAt(LocalDateTime.now());
+
+            tasksMapper.updateTask(task);
+            log.info("轮次状态快照保存成功: taskId={}", taskId);
+        } catch (Exception e) {
+            log.error("保存轮次状态快照失败: taskId={}", taskId, e);
+        }
+    }
+
+    /**
+     * 恢复轮次状态快照
+     */
+    private void restoreRoundStateSnapshot(String taskId) {
+        try {
+            FederatedTask task = getTaskById(taskId);
+            if (task.getResumeInfo() != null && !task.getResumeInfo().isEmpty()) {
+                Map<String, Object> snapshot = objectMapper.readValue(task.getResumeInfo(), Map.class);
+                roundStateManager.restoreSnapshot(taskId, snapshot);
+                log.info("轮次状态快照恢复成功: taskId={}", taskId);
+            } else {
+                log.warn("未找到轮次状态快照，重新初始化: taskId={}", taskId);
+                roundStateManager.initializeTask(taskId, task.getTotalRounds());
+            }
+        } catch (Exception e) {
+            log.error("恢复轮次状态快照失败: taskId={}", taskId, e);
+            throw new UserException("任务状态恢复失败");
+        }
+    }
 }

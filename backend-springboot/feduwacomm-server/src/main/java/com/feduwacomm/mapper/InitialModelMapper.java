@@ -18,10 +18,10 @@ public interface InitialModelMapper {
      * 插入初始模型记录
      */
     @Insert("INSERT INTO initial_models (id, task_id, model_type, generation_method, " +
-            "model_size, architecture_params, file_path, checksum, status, " +
+            "model_size, architecture_params, model_data, status, " +
             "created_at, created_by, updated_at) " +
             "VALUES (#{id}, #{taskId}, #{modelType}, #{generationMethod}, " +
-            "#{modelSize}, #{architectureParams}, #{filePath}, #{checksum}, #{status}, " +
+            "#{modelSize}, #{architectureParams}, #{modelData}, #{status}, " +
             "#{createdAt}, #{createdBy}, #{updatedAt})")
     int insertInitialModel(InitialModel initialModel);
     
@@ -52,14 +52,14 @@ public interface InitialModelMapper {
     int updateStatus(@Param("id") String id, @Param("status") String status);
     
     /**
-     * 更新模型文件信息
+     * 更新模型JSON数据
      */
-    @Update("UPDATE initial_models SET file_path = #{filePath}, checksum = #{checksum}, " +
-            "model_size = #{modelSize}, status = #{status}, updated_at = NOW() " +
+    @Update("UPDATE initial_models SET model_data = #{modelData}, " +
+            "status = #{status}, updated_at = NOW() " +
             "WHERE id = #{id}")
-    int updateFileInfo(@Param("id") String id, @Param("filePath") String filePath, 
-                      @Param("checksum") String checksum, @Param("modelSize") Long modelSize,
-                      @Param("status") String status);
+    int updateModelData(@Param("id") String id, @Param("modelData") String modelData,
+                       @Param("status") String status);
+
     
     /**
      * 根据状态查询初始模型列表

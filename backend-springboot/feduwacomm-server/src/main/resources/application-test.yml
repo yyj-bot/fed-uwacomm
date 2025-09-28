@@ -18,3 +18,19 @@ logging:
     com.zaxxer.hikari: WARN
   db:
     enabled: true # 测试环境启用数据库日志
+
+# FedUWAComm测试环境配置覆盖
+feduwacomm:
+  network:
+    websocket:
+      # 测试环境WebSocket传输配置 - 最大限制支持完整的联邦学习测试
+      transport:
+        message-size-limit: 1073741824 # 1GB = 1024*1024*1024
+        send-buffer-size-limit: 1073741824 # 1GB
+        send-time-limit: 600000 # 10分钟 (毫秒)
+        time-to-first-message: 120000 # 2分钟 (毫秒)
+
+      # 测试环境心跳配置 - 较长心跳间隔避免测试干扰
+      heartbeat:
+        value: 60000 # 60秒心跳间隔
+        scheduler-pool-size: 10 # 足够的线程池支持多VM测试

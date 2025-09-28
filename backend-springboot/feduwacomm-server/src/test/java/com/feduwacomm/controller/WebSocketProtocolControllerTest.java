@@ -70,7 +70,7 @@ public class WebSocketProtocolControllerTest {
         sampleMessage = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-001")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId("vm-001")
                 .data(messageData)
                 .signature("test-signature")
@@ -181,7 +181,7 @@ public class WebSocketProtocolControllerTest {
         ProtocolMessage messageWithoutVmId = ProtocolMessage.builder()
                 .type(ProtocolType.HEARTBEAT)
                 .id("msg-002")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId(null)  // 没有vmId
                 .data(new HashMap<>())
                 .build();
@@ -228,7 +228,7 @@ public class WebSocketProtocolControllerTest {
             ProtocolMessage message = ProtocolMessage.builder()
                     .type(type)
                     .id("msg-" + type.name())
-                    .timestamp(Instant.now())
+                    .timestamp(Instant.now().toString())
                     .vmId("vm-test")
                     .data(new HashMap<>())
                     .build();
@@ -306,7 +306,7 @@ public class WebSocketProtocolControllerTest {
         ProtocolMessage complexMessage = ProtocolMessage.builder()
                 .type(ProtocolType.TRAINING_PROGRESS)
                 .id("training-msg-001")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId("vm-complex")
                 .data(complexData)
                 .signature("complex-signature")
@@ -376,7 +376,7 @@ public class WebSocketProtocolControllerTest {
         ProtocolMessage messageWithSpecialVmId = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-special")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .vmId("vm-001_test.special-chars")
                 .data(new HashMap<>())
                 .build();

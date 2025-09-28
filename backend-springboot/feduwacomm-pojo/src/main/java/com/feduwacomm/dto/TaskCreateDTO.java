@@ -58,6 +58,10 @@ public class TaskCreateDTO {
     @NotNull(message = "参与者配置不能为空")
     private ParticipantConfigDTO participantConfig;
 
+    // v2.0 新增：联邦学习聚合配置
+    @Valid
+    private AggregationConfigDTO aggregationConfig;
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -254,5 +258,48 @@ public class TaskCreateDTO {
                 private Integer maxMemoryUsage = 75;
             }
         }
+    }
+
+    // v2.0 新增：联邦学习聚合配置DTO
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AggregationConfigDTO {
+        @NotBlank(message = "聚合策略不能为空")
+        private String strategy; // FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA, FEDERATED_SCAFFOLD
+
+        private String engineType; // UNIVERSAL, SPECIALIZED
+        private List<String> supportedModelTypes; // RANDOM_FOREST, NEURAL_NETWORK, SVM
+        private List<String> supportedAlgorithms; // FEDERATED_AVERAGING, FEDERATED_PROXIMAL, etc.
+        private Boolean performanceOptimization = true;
+        private Boolean memoryEfficient = true;
+
+        @DecimalMin(value = "0.001", message = "收敛阈值不能小于0.001")
+        @DecimalMax(value = "1.0", message = "收敛阈值不能大于1.0")
+        private Double convergenceThreshold = 0.01;
+
+        @Min(value = 1, message = "最少聚合模型数量不能小于1")
+        private Integer minModelsForAggregation = 2;
+
+        @Min(value = 1, message = "最大等待时间不能小于1秒")
+        @Max(value = 3600, message = "最大等待时间不能大于3600秒")
+        private Integer maxWaitTimeSeconds = 300;
+
+        private Boolean supportMixedModels = false;
+        private String aggregationMethod = "UNIVERSAL";
+
+        // FedProx专用参数
+        @DecimalMin(value = "0.0", message = "近端项系数不能小于0.0")
+        @DecimalMax(value = "1.0", message = "近端项系数不能大于1.0")
+        private Double proximalTerm = 0.1;
+
+        // FedNova专用参数
+        @DecimalMin(value = "0.1", message = "动量因子不能小于0.1")
+        @DecimalMax(value = "0.9", message = "动量因子不能大于0.9")
+        private Double momentumFactor = 0.9;
+
+        // Scaffold专用参数
+        private Boolean enableControlVariates = true;
     }
 }
