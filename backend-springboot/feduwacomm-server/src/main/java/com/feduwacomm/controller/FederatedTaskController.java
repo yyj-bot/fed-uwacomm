@@ -513,7 +513,6 @@ public class FederatedTaskController {
                 .type(type)
                 .keyword(keyword)
                 .algorithm(algorithm)
-                .createdBy(currentUserId) // 只查询当前用户创建的任务
                 .build();
             
             // 解析日期参数

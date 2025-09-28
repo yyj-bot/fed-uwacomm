@@ -383,11 +383,11 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
             if (total == 0) {
                 return PageResult.<VmListVO>builder()
-                    .current(queryDTO.getPage().longValue())
+                    .page(queryDTO.getPage().longValue())
                     .size(queryDTO.getSize().longValue())
                     .total(0L)
                     .pages(0L)
-                    .records(Collections.emptyList())
+                    .list(Collections.emptyList())
                     .build();
             }
 
@@ -412,11 +412,11 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             long pages = (long) Math.ceil((double) total / queryDTO.getSize());
 
             return PageResult.<VmListVO>builder()
-                .current(queryDTO.getPage().longValue())
+                .page(queryDTO.getPage().longValue())
                 .size(queryDTO.getSize().longValue())
                 .total((long) total)
                 .pages(pages)
-                .records(voList)
+                .list(voList)
                 .build();
 
         } catch (Exception e) {
