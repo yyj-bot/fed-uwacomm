@@ -9,7 +9,7 @@ import com.feduwacomm.service.VmRoundModelService;
 import com.feduwacomm.vo.VmRoundModelBestVO;
 import com.feduwacomm.vo.VmRoundModelTrendVO;
 import com.feduwacomm.vo.VmRoundModelVO;
-import com.feduwacomm.config.TestSecurityConfig;
+import com.feduwacomm.config.TestJwtInterceptorConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@ContextConfiguration(classes = TestSecurityConfig.class)
+@ContextConfiguration(classes = TestJwtInterceptorConfig.class)
 public class VmRoundModelControllerTest {
 
     @Autowired
@@ -89,10 +89,10 @@ public class VmRoundModelControllerTest {
         // 准备分页结果
         List<VmRoundModelVO> records = Arrays.asList(sampleVmRoundModelVO);
         samplePageResult = PageResult.<VmRoundModelVO>builder()
-                .records(records)
+                .list(records)
                 .total(1L)
                 .pages(1L)
-                .current(1L)
+                .page(1L)
                 .size(10L)
                 .build();
 

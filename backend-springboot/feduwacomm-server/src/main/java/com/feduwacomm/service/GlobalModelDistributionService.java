@@ -109,7 +109,7 @@ public class GlobalModelDistributionService {
                             .page(1)
                             .size(5)
                             .build();
-                        List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getRecords();
+                        List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getList();
                         participantVmIds = availableVms.stream()
                             .map(VmListVO::getVmId)
                             .toList();

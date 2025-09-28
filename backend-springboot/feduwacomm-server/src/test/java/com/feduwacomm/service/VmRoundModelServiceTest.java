@@ -122,11 +122,11 @@ public class VmRoundModelServiceTest {
         assertNotNull(result);
         assertEquals(1L, result.getTotal());
         assertEquals(1L, result.getPages());
-        assertEquals(1L, result.getCurrent());
+        assertEquals(1L, result.getPage());
         assertEquals(10L, result.getSize());
-        assertEquals(1, result.getRecords().size());
+        assertEquals(1, result.getList().size());
 
-        VmRoundModelVO resultVO = result.getRecords().get(0);
+        VmRoundModelVO resultVO = result.getList().get(0);
         assertEquals(vmRoundModel.getId(), resultVO.getVmRoundModelId());
         assertEquals(vmRoundModel.getTaskId(), resultVO.getTaskId());
         assertEquals(vmRoundModel.getVmId(), resultVO.getVmId());
@@ -152,9 +152,9 @@ public class VmRoundModelServiceTest {
         assertNotNull(result);
         assertEquals(0L, result.getTotal());
         assertEquals(0L, result.getPages());
-        assertEquals(1L, result.getCurrent());
+        assertEquals(1L, result.getPage());
         assertEquals(10L, result.getSize());
-        assertTrue(result.getRecords().isEmpty());
+        assertTrue(result.getList().isEmpty());
 
         // 验证mock调用
         verify(vmRoundModelMapper).selectByPage(anyString(), any(), anyString(), any(), any());

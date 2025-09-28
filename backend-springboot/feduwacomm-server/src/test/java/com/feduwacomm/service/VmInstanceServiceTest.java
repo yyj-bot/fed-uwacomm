@@ -399,12 +399,12 @@ public class VmInstanceServiceTest {
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.getTotal());
-        assertEquals(1, result.getCurrent());
+        assertEquals(1, result.getPage());
         assertEquals(10, result.getSize());
         assertEquals(1, result.getPages());
-        assertEquals(1, result.getRecords().size());
+        assertEquals(1, result.getList().size());
 
-        VmListVO vmListVO = result.getRecords().get(0);
+        VmListVO vmListVO = result.getList().get(0);
         assertEquals(vmInstance.getId(), vmListVO.getVmId());
         assertEquals(vmInstance.getName(), vmListVO.getName());
         assertEquals(vmInstance.getStatus(), vmListVO.getStatus());
@@ -430,10 +430,10 @@ public class VmInstanceServiceTest {
         // 验证结果
         assertNotNull(result);
         assertEquals(0, result.getTotal());
-        assertEquals(1, result.getCurrent());
+        assertEquals(1, result.getPage());
         assertEquals(10, result.getSize());
         assertEquals(0, result.getPages());
-        assertTrue(result.getRecords().isEmpty());
+        assertTrue(result.getList().isEmpty());
 
         // 验证mock调用 - 当总数为0时，不应查询列表数据
         verify(vmInstancesMapper).countVmInstances(anyString(), anyString(), anyString(), anyString());

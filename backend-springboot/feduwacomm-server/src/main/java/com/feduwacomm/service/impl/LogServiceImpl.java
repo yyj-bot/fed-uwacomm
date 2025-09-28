@@ -182,9 +182,9 @@ public class LogServiceImpl implements LogService {
             List<LogListVO> logVOs = logs.stream().map(this::convertToLogListVO).collect(Collectors.toList());
 
             PageResult<LogListVO> result = PageResult.<LogListVO>builder()
-                    .records(logVOs)
+                    .list(logVOs)
                     .total(total)
-                    .current((long)queryDTO.getPage())
+                    .page((long)queryDTO.getPage())
                     .size((long)queryDTO.getSize())
                     .pages((total + queryDTO.getSize() - 1) / queryDTO.getSize())
                     .build();
@@ -383,7 +383,7 @@ public class LogServiceImpl implements LogService {
             PageResult<LogListVO> logs = queryLogs(queryDTO);
 
             // 根据格式生成文件内容
-            String content = generateExportContent(logs.getRecords(), exportDTO);
+            String content = generateExportContent(logs.getList(), exportDTO);
             return content.getBytes(SystemConstants.DEFAULT_CHARSET);
 
         } catch (Exception e) {
@@ -531,9 +531,9 @@ public class LogServiceImpl implements LogService {
                 .collect(Collectors.toList());
         
         return PageResult.<LogCleanupTaskVO>builder()
-                .records(taskVOs)
+                .list(taskVOs)
                 .total(total)
-                .current((long)page)
+                .page((long)page)
                 .size((long)size)
                 .pages((total + size - 1) / size)
                 .build();
