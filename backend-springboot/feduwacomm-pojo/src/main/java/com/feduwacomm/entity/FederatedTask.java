@@ -83,6 +83,9 @@ public class FederatedTask {
     // v1.4 新增字段 - 任务恢复信息
     private String resumeInfo;
 
+    // 乐观锁版本号
+    private Long version;
+
     /**
      * 计算任务进度百分比
      * @return 进度百分比 (0-100)

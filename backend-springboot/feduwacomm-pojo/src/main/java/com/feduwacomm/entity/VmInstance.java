@@ -115,6 +115,26 @@ public class VmInstance {
     private String metadata;
 
     /**
+     * 虚拟机所有者ID
+     */
+    private String ownerId;
+
+    /**
+     * 所属项目ID
+     */
+    private String projectId;
+
+    /**
+     * 是否共享
+     */
+    private Boolean isShared;
+
+    /**
+     * 是否公开共享
+     */
+    private Boolean isPublicShared;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

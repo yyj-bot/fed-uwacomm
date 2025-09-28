@@ -33,4 +33,20 @@ public class TrainingDataTextDTO {
     private List<String> tags;
 
     private Map<String, Object> metadata;
+
+    /**
+     * 获取文本数据内容
+     * 兼容性方法，映射到content字段
+     */
+    public String getTextData() {
+        return this.content;
+    }
+
+    /**
+     * 设置文本数据内容
+     * 兼容性方法，映射到content字段
+     */
+    public void setTextData(String textData) {
+        this.content = textData;
+    }
 }

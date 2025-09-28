@@ -513,7 +513,6 @@ public class FederatedTaskController {
                 .type(type)
                 .keyword(keyword)
                 .algorithm(algorithm)
-                .createdBy(currentUserId) // 只查询当前用户创建的任务
                 .build();
             
             // 解析日期参数
@@ -684,10 +683,10 @@ public class FederatedTaskController {
         log.info("收到任务统计查询请求: userId={}, ip={}", currentUserId, clientIp);
 
         try {
-            // 这里可以实现任务统计功能
-            Object stats = new Object(); // 占位符
-            
-            log.info("任务统计查询成功: userId={}", currentUserId);
+            // 调用Service获取真实的任务统计信息
+            TaskStatisticsVO stats = federatedTaskService.getTaskStatistics();
+
+            log.info("任务统计查询成功: userId={}, totalTasks={}", currentUserId, stats.getTotalTasks());
             return Result.success("查询成功", stats);
             
         } catch (Exception e) {
@@ -701,22 +700,26 @@ public class FederatedTaskController {
      * POST /api/federated/tasks/batch
      */
     @PostMapping("/tasks/batch")
-    public Result<Object> batchOperation(@RequestBody Object batchDTO,
-                                       HttpServletRequest request) {
+    public Result<TaskBatchOperationResultVO> batchOperation(@RequestBody TaskBatchOperationDTO batchDTO,
+                                                            HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String currentUserId = BaseContext.getCurrentId();
-        
-        log.info("收到任务批量操作请求: userId={}, ip={}", currentUserId, clientIp);
+
+        log.info("收到任务批量操作请求: userId={}, ip={}, operation={}, taskCount={}",
+            currentUserId, clientIp, batchDTO.getOperation(),
+            batchDTO.getTaskIds() != null ? batchDTO.getTaskIds().size() : 0);
 
         try {
-            // 这里可以实现批量操作功能
-            Object result = new Object(); // 占位符
-            
-            log.info("任务批量操作成功: userId={}", currentUserId);
+            // 调用Service执行批量操作
+            TaskBatchOperationResultVO result = federatedTaskService.batchOperateTask(batchDTO, currentUserId);
+
+            log.info("任务批量操作成功: userId={}, operation={}, success={}, failure={}",
+                currentUserId, batchDTO.getOperation(), result.getSuccessCount(), result.getFailureCount());
             return Result.success("操作成功", result);
-            
+
         } catch (Exception e) {
-            log.error("任务批量操作失败: userId={}, error={}", currentUserId, e.getMessage());
+            log.error("任务批量操作失败: userId={}, operation={}, error={}",
+                currentUserId, batchDTO.getOperation(), e.getMessage());
             return Result.error("操作失败: " + e.getMessage());
         }
     }

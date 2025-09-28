@@ -8,6 +8,7 @@ import com.feduwacomm.mapper.WorkflowStageExecutionMapper;
 import com.feduwacomm.orchestration.*;
 import com.feduwacomm.orchestration.handler.*;
 import com.feduwacomm.service.FederatedOrchestrationService;
+import com.feduwacomm.service.RetryService;
 import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,9 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private RetryService retryService;
 
     // 阶段处理器映射
     private Map<WorkflowStage, StageHandler> stageHandlers;
@@ -202,9 +206,39 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
                 
             } else if (result.isShouldRetry()) {
                 // 需要重试
-                log.warn("阶段执行失败，将重试: stage={}, orchestrationId={}, error={}", 
+                log.warn("阶段执行失败，将重试: stage={}, orchestrationId={}, error={}",
                     currentStage, orchestrationId, result.getError());
-                // TODO: 实现重试逻辑
+
+                // 检查重试策略
+                int currentAttempt = retryService.getRetryCount("workflow", orchestrationId);
+                RetryService.RetryResult retryResult = retryService.shouldRetryWorkflowStage(
+                    orchestrationId, currentStage, currentAttempt, result.getError());
+
+                if (retryResult.shouldRetry()) {
+                    // 安排重试
+                    Map<String, Object> retryContext = new HashMap<>();
+                    retryContext.put("orchestrationId", orchestrationId);
+                    retryContext.put("stage", currentStage.name());
+                    retryContext.put("originalContext", context.getStageData());
+
+                    retryService.scheduleRetry("workflow", orchestrationId,
+                        retryResult.getDelayMillis(), retryResult.getNextAttempt(), retryContext);
+
+                    // 更新阶段状态为等待重试
+                    updateStageExecution(stageExecution.getId(),
+                        WorkflowStageExecution.StageExecutionStatus.PENDING,
+                        null, null, "等待重试: " + retryResult.getReason());
+                } else {
+                    // 不可重试，标记为永久失败
+                    log.error("阶段执行重试失败，永久失败: stage={}, orchestrationId={}, reason={}",
+                        currentStage, orchestrationId, retryResult.getReason());
+
+                    updateStageExecution(stageExecution.getId(),
+                        WorkflowStageExecution.StageExecutionStatus.FAILED,
+                        LocalDateTime.now(), null, "重试失败: " + retryResult.getReason());
+
+                    failWorkflow(context, "重试失败: " + retryResult.getReason());
+                }
                 
             } else {
                 // 永久失败
@@ -370,6 +404,82 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
         } catch (Exception e) {
             log.warn("序列化输出数据失败，将返回空值: {}", e.getMessage());
             return null;
+        }
+    }
+
+    @Override
+    public void rollbackToStage(String taskId, String targetStage, String reason) {
+        log.info("回滚到指定阶段: taskId={}, targetStage={}, reason={}", taskId, targetStage, reason);
+        // TODO: 实现回滚逻辑
+    }
+
+    @Override
+    public boolean updateStageStatus(String orchestrationId, String stageName, String status) {
+        log.info("更新阶段状态: orchestrationId={}, stageName={}, status={}", orchestrationId, stageName, status);
+        // TODO: 实现阶段状态更新逻辑
+        return true;
+    }
+
+    @Override
+    public boolean updateOrchestrationStatus(String orchestrationId, String status) {
+        log.info("更新工作流编排状态: orchestrationId={}, status={}", orchestrationId, status);
+        try {
+            OrchestrationWorkflow workflow = orchestrationMapper.selectById(orchestrationId);
+            if (workflow != null) {
+                workflow.setStatus(OrchestrationWorkflow.WorkflowStatus.valueOf(status));
+                workflow.setUpdatedAt(LocalDateTime.now());
+                return orchestrationMapper.update(workflow) > 0;
+            }
+        } catch (Exception e) {
+            log.error("更新工作流编排状态失败: orchestrationId={}, status={}", orchestrationId, status, e);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean triggerStage(String orchestrationId, String stageName, java.util.Map<String, Object> input) {
+        log.info("触发指定阶段: orchestrationId={}, stageName={}", orchestrationId, stageName);
+        // TODO: 实现阶段触发逻辑
+        return true;
+    }
+
+    @Override
+    public void terminateOrchestration(String orchestrationId, String reason) {
+        log.info("终止工作流编排: orchestrationId={}, reason={}", orchestrationId, reason);
+        try {
+            OrchestrationWorkflow workflow = orchestrationMapper.selectById(orchestrationId);
+            if (workflow != null) {
+                workflow.setStatus(OrchestrationWorkflow.WorkflowStatus.TERMINATED);
+                workflow.setCompletedAt(LocalDateTime.now());
+                orchestrationMapper.update(workflow);
+                log.info("工作流编排已终止: orchestrationId={}", orchestrationId);
+            }
+        } catch (Exception e) {
+            log.error("终止工作流编排失败: orchestrationId={}, reason={}", orchestrationId, reason, e);
+        }
+    }
+
+    @Override
+    public void triggerNextStage(String orchestrationId, String triggeredBy,
+                                java.util.Map<String, Object> context) {
+        try {
+            log.info("触发下一阶段: orchestrationId={}, triggeredBy={}", orchestrationId, triggeredBy);
+
+            OrchestrationWorkflow workflow = orchestrationMapper.selectById(orchestrationId);
+            if (workflow == null) {
+                log.warn("工作流不存在: orchestrationId={}", orchestrationId);
+                return;
+            }
+
+            // TODO: 实现触发下一阶段的逻辑
+            // 1. 获取当前阶段
+            // 2. 确定下一阶段
+            // 3. 更新工作流状态
+            // 4. 启动下一阶段执行
+
+            log.info("下一阶段触发完成: orchestrationId={}", orchestrationId);
+        } catch (Exception e) {
+            log.error("触发下一阶段失败: orchestrationId={}, triggeredBy={}", orchestrationId, triggeredBy, e);
         }
     }
 }

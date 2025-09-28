@@ -1,9 +1,11 @@
 package com.feduwacomm.service;
 
 import com.feduwacomm.entity.ModelDistribution;
+import com.feduwacomm.entity.VmAckTracking;
 import com.feduwacomm.mapper.GlobalModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.mapper.VmAckTrackingMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -37,6 +39,9 @@ public class VmAckTracker {
 
     @Autowired
     private TaskParticipantsMapper taskParticipantsMapper;
+
+    @Autowired
+    private VmAckTrackingMapper vmAckTrackingMapper;
 
     /**
      * 记录VM发送的GLOBAL_MODEL_BROADCAST_ACK
@@ -402,8 +407,31 @@ public class VmAckTracker {
         }
 
         log.info("记录任务启动确认: taskId={}, vmId={}, status={}", taskId, vmId, status);
-        // TODO: 实现任务级别的ACK跟踪逻辑，可以使用task_participants表
-        return "SUCCESS".equals(status);
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_START)
+                .status("SUCCESS".equals(status) ? VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            boolean success = result > 0 && "SUCCESS".equals(status);
+
+            if (success) {
+                log.info("任务启动确认记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+            } else {
+                log.warn("任务启动确认记录失败或状态非成功: taskId={}, vmId={}, status={}", taskId, vmId, status);
+            }
+
+            return success;
+        } catch (Exception e) {
+            log.error("记录任务启动确认失败: taskId={}, vmId={}, status={}", taskId, vmId, status, e);
+            return false;
+        }
     }
 
     /**
@@ -422,8 +450,30 @@ public class VmAckTracker {
         }
 
         log.warn("记录任务启动失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
-        // TODO: 实现任务启动失败的处理逻辑
-        return true;
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_START)
+                .status(VmAckTracking.AckStatus.FAILED)
+                .errorMessage(reason)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("任务启动失败记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("任务启动失败记录失败: taskId={}, vmId={}", taskId, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录任务启动失败异常: taskId={}, vmId={}, reason={}", taskId, vmId, reason, e);
+            return false;
+        }
     }
 
     /**
@@ -440,8 +490,29 @@ public class VmAckTracker {
         }
 
         log.info("记录任务停止确认: taskId={}, vmId={}", taskId, vmId);
-        // TODO: 实现任务停止ACK跟踪逻辑
-        return true;
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_STOP)
+                .status(VmAckTracking.AckStatus.SUCCESS)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("任务停止确认记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("任务停止确认记录失败: taskId={}, vmId={}", taskId, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录任务停止确认异常: taskId={}, vmId={}", taskId, vmId, e);
+            return false;
+        }
     }
 
     /**
@@ -460,8 +531,26 @@ public class VmAckTracker {
         }
 
         log.warn("记录任务停止失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
-        // TODO: 实现任务停止失败的处理逻辑
-        return true;
+
+        try {
+            // 创建确认跟踪记录
+            VmAckTracking tracking = new VmAckTracking();
+            tracking.setTaskId(taskId);
+            tracking.setVmId(vmId);
+            tracking.setMessageType("FEDERATED_TASK_STOP_FAILURE");
+            tracking.setStatus(VmAckTracking.AckStatus.FAILED);
+            tracking.setErrorMessage(reason);
+            tracking.setCreatedAt(LocalDateTime.now());
+            tracking.setUpdatedAt(LocalDateTime.now());
+
+            vmAckTrackingMapper.insert(tracking);
+
+            log.info("已记录任务停止失败: taskId={}, vmId={}, reason={}", taskId, vmId, reason);
+            return true;
+        } catch (Exception e) {
+            log.error("记录任务停止失败时出错: taskId={}, vmId={}, error={}", taskId, vmId, e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
@@ -478,8 +567,26 @@ public class VmAckTracker {
         }
 
         log.info("记录任务恢复确认: taskId={}, vmId={}", taskId, vmId);
-        // TODO: 实现任务恢复ACK跟踪逻辑
-        return true;
+
+        try {
+            // 创建任务恢复确认跟踪记录
+            VmAckTracking tracking = new VmAckTracking();
+            tracking.setTaskId(taskId);
+            tracking.setVmId(vmId);
+            tracking.setMessageType("FEDERATED_TASK_RESUME_ACK");
+            tracking.setStatus(VmAckTracking.AckStatus.SUCCESS);
+            tracking.setAckTime(LocalDateTime.now());
+            tracking.setCreatedAt(LocalDateTime.now());
+            tracking.setUpdatedAt(LocalDateTime.now());
+
+            vmAckTrackingMapper.insert(tracking);
+
+            log.info("任务恢复确认已记录: taskId={}, vmId={}", taskId, vmId);
+            return true;
+        } catch (Exception e) {
+            log.error("记录任务恢复确认时出错: taskId={}, vmId={}, error={}", taskId, vmId, e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
@@ -498,8 +605,30 @@ public class VmAckTracker {
         }
 
         log.warn("记录任务恢复失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
-        // TODO: 实现任务恢复失败的处理逻辑
-        return true;
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_RESUME)
+                .status(VmAckTracking.AckStatus.FAILED)
+                .errorMessage(reason)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("任务恢复失败记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("任务恢复失败记录失败: taskId={}, vmId={}", taskId, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录任务恢复失败异常: taskId={}, vmId={}, reason={}", taskId, vmId, reason, e);
+            return false;
+        }
     }
 
     /**
@@ -516,8 +645,29 @@ public class VmAckTracker {
         }
 
         log.info("记录任务删除确认: taskId={}, vmId={}", taskId, vmId);
-        // TODO: 实现任务删除ACK跟踪逻辑
-        return true;
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_DELETE)
+                .status(VmAckTracking.AckStatus.SUCCESS)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("任务删除确认记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("任务删除确认记录失败: taskId={}, vmId={}", taskId, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录任务删除确认异常: taskId={}, vmId={}", taskId, vmId, e);
+            return false;
+        }
     }
 
     /**
@@ -536,8 +686,30 @@ public class VmAckTracker {
         }
 
         log.warn("记录任务删除失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
-        // TODO: 实现任务删除失败的处理逻辑
-        return true;
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(null) // 任务级别确认
+                .ackType(VmAckTracking.AckType.TASK_DELETE)
+                .status(VmAckTracking.AckStatus.FAILED)
+                .errorMessage(reason)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("任务删除失败记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("任务删除失败记录失败: taskId={}, vmId={}", taskId, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录任务删除失败异常: taskId={}, vmId={}, reason={}", taskId, vmId, reason, e);
+            return false;
+        }
     }
 
     /**
@@ -555,8 +727,26 @@ public class VmAckTracker {
         }
 
         log.debug("开始跟踪消息: messageId={}, vmId={}, messageType={}", messageId, vmId, messageType);
-        // TODO: 实现消息跟踪逻辑，可以存储到临时表或缓存中
-        return true;
+
+        try {
+            // 创建消息跟踪记录
+            VmAckTracking tracking = new VmAckTracking();
+            tracking.setTaskId("MESSAGE_TRACKING"); // 用于区分消息跟踪
+            tracking.setVmId(vmId);
+            tracking.setMessageType(messageType);
+            tracking.setMessageId(messageId);
+            tracking.setStatus(VmAckTracking.AckStatus.PENDING);
+            tracking.setCreatedAt(LocalDateTime.now());
+            tracking.setUpdatedAt(LocalDateTime.now());
+
+            vmAckTrackingMapper.insert(tracking);
+
+            log.debug("消息跟踪已创建: messageId={}, vmId={}, messageType={}", messageId, vmId, messageType);
+            return true;
+        } catch (Exception e) {
+            log.error("创建消息跟踪时出错: messageId={}, vmId={}, error={}", messageId, vmId, e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
@@ -573,8 +763,29 @@ public class VmAckTracker {
         }
 
         log.info("初始化任务跟踪: taskId={}, vmCount={}", taskId, vmIds.size());
-        // TODO: 实现任务初始化跟踪逻辑
-        return true;
+
+        try {
+            // 为每个VM创建初始跟踪记录
+            for (String vmId : vmIds) {
+                VmAckTracking ackTracking = VmAckTracking.builder()
+                    .taskId(taskId)
+                    .vmId(vmId)
+                    .roundNumber(null) // 任务级别初始化
+                    .ackType(VmAckTracking.AckType.TASK_INIT)
+                    .status(VmAckTracking.AckStatus.PENDING)
+                    .acknowledgedAt(LocalDateTime.now())
+                    .build();
+
+                vmAckTrackingMapper.insertAckTracking(ackTracking);
+                log.debug("任务跟踪初始化: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+            }
+
+            log.info("任务跟踪初始化成功: taskId={}, 初始化VM数={}", taskId, vmIds.size());
+            return true;
+        } catch (Exception e) {
+            log.error("初始化任务跟踪失败: taskId={}, vmCount={}", taskId, vmIds.size(), e);
+            return false;
+        }
     }
 
     /**
@@ -591,8 +802,33 @@ public class VmAckTracker {
         }
 
         log.info("重新初始化任务跟踪: taskId={}, vmCount={}", taskId, vmIds.size());
-        // TODO: 实现任务重新初始化跟踪逻辑
-        return true;
+
+        try {
+            // 首先清理旧的跟踪记录
+            vmAckTrackingMapper.deleteByTaskId(taskId);
+            log.debug("已清理旧的跟踪记录: taskId={}", taskId);
+
+            // 重新创建跟踪记录
+            for (String vmId : vmIds) {
+                VmAckTracking ackTracking = VmAckTracking.builder()
+                    .taskId(taskId)
+                    .vmId(vmId)
+                    .roundNumber(null) // 任务级别初始化
+                    .ackType(VmAckTracking.AckType.TASK_REINIT)
+                    .status(VmAckTracking.AckStatus.PENDING)
+                    .acknowledgedAt(LocalDateTime.now())
+                    .build();
+
+                vmAckTrackingMapper.insertAckTracking(ackTracking);
+                log.debug("任务重新初始化跟踪: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+            }
+
+            log.info("任务重新初始化成功: taskId={}, 初始化VM数={}", taskId, vmIds.size());
+            return true;
+        } catch (Exception e) {
+            log.error("重新初始化任务跟踪失败: taskId={}, vmCount={}", taskId, vmIds.size(), e);
+            return false;
+        }
     }
 
     /**
@@ -610,8 +846,42 @@ public class VmAckTracker {
         }
 
         log.info("等待所有确认: taskId={}, messageType={}, timeout={}s", taskId, messageType, timeoutSeconds);
-        // TODO: 实现等待确认逻辑，需要检查所有VM的ACK状态
-        return true;
+
+        try {
+            long startTime = System.currentTimeMillis();
+            long timeoutMillis = timeoutSeconds * 1000L;
+
+            while (System.currentTimeMillis() - startTime < timeoutMillis) {
+                // 查询当前任务的确认状态
+                List<VmAckTracking> trackings = vmAckTrackingMapper.findByTaskIdAndMessageType(taskId, messageType);
+
+                if (trackings.isEmpty()) {
+                    log.debug("尚无确认记录，继续等待: taskId={}, messageType={}", taskId, messageType);
+                } else {
+                    // 检查是否所有VM都已确认
+                    long successCount = trackings.stream()
+                        .filter(t -> "SUCCESS".equals(t.getStatus()))
+                        .count();
+
+                    long totalCount = trackings.size();
+                    log.debug("确认进度: {}/{} taskId={}, messageType={}", successCount, totalCount, taskId, messageType);
+
+                    if (successCount == totalCount && totalCount > 0) {
+                        log.info("所有VM确认完成: taskId={}, messageType={}, count={}", taskId, messageType, totalCount);
+                        return true;
+                    }
+                }
+
+                // 短暂等待后重试
+                Thread.sleep(1000); // 每秒检查一次
+            }
+
+            log.warn("等待确认超时: taskId={}, messageType={}, timeout={}s", taskId, messageType, timeoutSeconds);
+            return false;
+        } catch (Exception e) {
+            log.error("等待确认时出错: taskId={}, messageType={}, error={}", taskId, messageType, e.getMessage(), e);
+            return false;
+        }
     }
 
     /**
@@ -627,8 +897,22 @@ public class VmAckTracker {
         }
 
         log.info("清理任务跟踪数据: taskId={}", taskId);
-        // TODO: 实现任务跟踪数据清理逻辑
-        return true;
+
+        try {
+            // 删除该任务的所有跟踪记录
+            int deletedCount = vmAckTrackingMapper.deleteByTaskId(taskId);
+
+            if (deletedCount > 0) {
+                log.info("任务跟踪数据清理成功: taskId={}, 删除记录数={}", taskId, deletedCount);
+            } else {
+                log.debug("任务没有跟踪数据需要清理: taskId={}", taskId);
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.error("清理任务跟踪数据失败: taskId={}", taskId, e);
+            return false;
+        }
     }
 
     // ==================== v1.4协议新增轮次ACK跟踪方法 ====================
@@ -653,10 +937,29 @@ public class VmAckTracker {
         log.info("记录ROUND_START_ACK: taskId={}, round={}, vmId={}, status={}",
                 taskId, roundNumber, vmId, status);
 
-        // TODO: 实现轮次开始确认的持久化逻辑
-        // 可以考虑在数据库中添加round_acknowledgments表来跟踪轮次确认状态
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(roundNumber)
+                .ackType(VmAckTracking.AckType.ROUND_START)
+                .status("SUCCESS".equals(status) ? VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
 
-        return true;
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("轮次开始确认记录成功: taskId={}, roundNumber={}, vmId={}, ackId={}",
+                        taskId, roundNumber, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("轮次开始确认记录失败: taskId={}, roundNumber={}, vmId={}", taskId, roundNumber, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录轮次开始确认异常: taskId={}, roundNumber={}, vmId={}", taskId, roundNumber, vmId, e);
+            return false;
+        }
     }
 
     /**
@@ -679,10 +982,29 @@ public class VmAckTracker {
         log.info("记录ROUND_COMPLETE_ACK: taskId={}, round={}, vmId={}, status={}",
                 taskId, roundNumber, vmId, status);
 
-        // TODO: 实现轮次完成确认的持久化逻辑
-        // 可以考虑在数据库中添加round_acknowledgments表来跟踪轮次确认状态
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(roundNumber)
+                .ackType(VmAckTracking.AckType.ROUND_COMPLETE)
+                .status("SUCCESS".equals(status) ? VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
 
-        return true;
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("轮次完成确认记录成功: taskId={}, roundNumber={}, vmId={}, ackId={}",
+                        taskId, roundNumber, vmId, ackTracking.getId());
+                return true;
+            } else {
+                log.error("轮次完成确认记录失败: taskId={}, roundNumber={}, vmId={}", taskId, roundNumber, vmId);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录轮次完成确认异常: taskId={}, roundNumber={}, vmId={}", taskId, roundNumber, vmId, e);
+            return false;
+        }
     }
 
     /**
@@ -701,10 +1023,27 @@ public class VmAckTracker {
 
         log.debug("检查轮次就绪状态: taskId={}, round={}", taskId, roundNumber);
 
-        // TODO: 实现轮次就绪状态检查逻辑
-        // 查询所有参与该任务的VM，并检查它们是否都已发送ROUND_START_ACK
+        try {
+            // 查询参与该任务的VM总数（基于task_participants表）
+            int totalVms = taskParticipantsMapper.countActiveParticipants(taskId);
+            if (totalVms == 0) {
+                log.warn("任务没有活跃的参与VM: taskId={}", taskId);
+                return false;
+            }
 
-        return true; // 临时返回true，实际需要查询数据库
+            // 查询已发送ROUND_START_ACK的VM数量
+            int ackedVms = vmAckTrackingMapper.countVmsByAckStatus(
+                taskId, VmAckTracking.AckType.ROUND_START, VmAckTracking.AckStatus.SUCCESS, roundNumber);
+
+            boolean allReady = (ackedVms >= totalVms);
+            log.info("轮次就绪状态检查完成: taskId={}, round={}, totalVms={}, ackedVms={}, allReady={}",
+                    taskId, roundNumber, totalVms, ackedVms, allReady);
+
+            return allReady;
+        } catch (Exception e) {
+            log.error("检查轮次就绪状态失败: taskId={}, round={}", taskId, roundNumber, e);
+            return false;
+        }
     }
 
     /**
@@ -723,9 +1062,159 @@ public class VmAckTracker {
 
         log.debug("检查轮次完成状态: taskId={}, round={}", taskId, roundNumber);
 
-        // TODO: 实现轮次完成状态检查逻辑
-        // 查询所有参与该任务的VM，并检查它们是否都已发送ROUND_COMPLETE_ACK
+        try {
+            // 查询参与该任务的VM总数
+            int totalVms = taskParticipantsMapper.countActiveParticipants(taskId);
+            if (totalVms == 0) {
+                log.warn("任务没有活跃的参与VM: taskId={}", taskId);
+                return false;
+            }
 
-        return true; // 临时返回true，实际需要查询数据库
+            // 查询已发送ROUND_COMPLETE_ACK的VM数量
+            int completedVms = vmAckTrackingMapper.countVmsByAckStatus(
+                taskId, VmAckTracking.AckType.ROUND_COMPLETE, VmAckTracking.AckStatus.SUCCESS, roundNumber);
+
+            boolean allCompleted = (completedVms >= totalVms);
+            log.info("轮次完成状态检查完成: taskId={}, round={}, totalVms={}, completedVms={}, allCompleted={}",
+                    taskId, roundNumber, totalVms, completedVms, allCompleted);
+
+            return allCompleted;
+        } catch (Exception e) {
+            log.error("检查轮次完成状态失败: taskId={}, round={}", taskId, roundNumber, e);
+            return false;
+        }
+    }
+
+    // ==================== v1.4协议梯度上传相关ACK跟踪方法 ====================
+
+    /**
+     * 记录VM梯度上传成功确认
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param roundNumber 轮次号
+     * @return 是否记录成功
+     */
+    @Transactional
+    public boolean recordGradientUploadSuccess(String taskId, String vmId, Integer roundNumber) {
+        if (taskId == null || vmId == null || roundNumber == null) {
+            log.error("记录梯度上传成功参数无效: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+            return false;
+        }
+
+        log.info("记录梯度上传成功: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(roundNumber)
+                .ackType(VmAckTracking.AckType.GRADIENT_UPLOAD)
+                .status(VmAckTracking.AckStatus.SUCCESS)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("梯度上传成功记录完成: taskId={}, vmId={}, roundNumber={}, ackId={}",
+                        taskId, vmId, roundNumber, ackTracking.getId());
+                return true;
+            } else {
+                log.error("梯度上传成功记录失败: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录梯度上传成功异常: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber, e);
+            return false;
+        }
+    }
+
+    /**
+     * 记录VM梯度上传失败确认
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param roundNumber 轮次号
+     * @param errorMessage 错误信息
+     * @return 是否记录成功
+     */
+    @Transactional
+    public boolean recordGradientUploadFailure(String taskId, String vmId, Integer roundNumber, String errorMessage) {
+        if (taskId == null || vmId == null || roundNumber == null) {
+            log.error("记录梯度上传失败参数无效: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+            return false;
+        }
+
+        log.warn("记录梯度上传失败: taskId={}, vmId={}, roundNumber={}, error={}", taskId, vmId, roundNumber, errorMessage);
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(roundNumber)
+                .ackType(VmAckTracking.AckType.GRADIENT_UPLOAD)
+                .status(VmAckTracking.AckStatus.FAILED)
+                .errorMessage(errorMessage)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("梯度上传失败记录完成: taskId={}, vmId={}, roundNumber={}, ackId={}",
+                        taskId, vmId, roundNumber, ackTracking.getId());
+                return true;
+            } else {
+                log.error("梯度上传失败记录失败: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录梯度上传失败异常: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber, e);
+            return false;
+        }
+    }
+
+    /**
+     * 记录VM准备就绪可以开始梯度上传
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param roundNumber 轮次号
+     * @return 是否记录成功
+     */
+    @Transactional
+    public boolean recordVmReadyForGradientUpload(String taskId, String vmId, Integer roundNumber) {
+        if (taskId == null || vmId == null || roundNumber == null) {
+            log.error("记录VM梯度上传就绪参数无效: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+            return false;
+        }
+
+        log.info("记录VM准备就绪开始梯度上传: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+
+        try {
+            VmAckTracking ackTracking = VmAckTracking.builder()
+                .taskId(taskId)
+                .vmId(vmId)
+                .roundNumber(roundNumber)
+                .ackType(VmAckTracking.AckType.GRADIENT_READY)
+                .status(VmAckTracking.AckStatus.SUCCESS)
+                .acknowledgedAt(LocalDateTime.now())
+                .build();
+
+            int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
+            if (result > 0) {
+                log.info("VM梯度上传就绪记录完成: taskId={}, vmId={}, roundNumber={}, ackId={}",
+                        taskId, vmId, roundNumber, ackTracking.getId());
+                return true;
+            } else {
+                log.error("VM梯度上传就绪记录失败: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("记录VM梯度上传就绪异常: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber, e);
+            return false;
+        }
     }
 }

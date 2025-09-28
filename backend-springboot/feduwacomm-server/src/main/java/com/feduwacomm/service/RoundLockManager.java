@@ -208,23 +208,37 @@ public class RoundLockManager {
      * @return 影响的行数
      */
     private int updateTaskForLock(String taskId, java.time.LocalDateTime lastUpdatedAt) {
-        // 这里需要在FederatedTasksMapper中添加一个带版本控制的更新方法
-        // 由于当前代码中没有这个方法，我们先使用简单的方式
-        // 在实际实现中，应该添加类似以下的方法：
-        // updateTaskWithVersion(taskId, lastUpdatedAt, newUpdatedAt)
-
-        // 临时实现：通过更新updated_at字段来实现乐观锁
         try {
             var task = federatedTasksMapper.selectTaskById(taskId);
-            if (task != null && task.getUpdatedAt().equals(lastUpdatedAt)) {
-                // 更新时间戳，如果成功说明没有并发冲突
-                return federatedTasksMapper.updateTaskStatus(taskId, task.getStatus().name(),
-                                                           java.time.LocalDateTime.now());
-            } else {
-                return 0; // 版本冲突
+            if (task == null) {
+                log.warn("任务不存在: taskId={}", taskId);
+                return 0;
             }
+
+            // 检查时间戳是否匹配（兼容旧的时间戳检查）
+            if (!task.getUpdatedAt().equals(lastUpdatedAt)) {
+                log.debug("时间戳不匹配，可能存在并发更新: taskId={}, expected={}, actual={}",
+                         taskId, lastUpdatedAt, task.getUpdatedAt());
+                return 0;
+            }
+
+            // 使用乐观锁进行更新，version字段会自动递增
+            int result = federatedTasksMapper.updateTaskStatusWithVersion(
+                taskId,
+                task.getStatus().name(),
+                java.time.LocalDateTime.now(),
+                task.getVersion()
+            );
+
+            if (result > 0) {
+                log.debug("乐观锁更新成功: taskId={}, version={}", taskId, task.getVersion());
+            } else {
+                log.warn("乐观锁更新失败，版本冲突: taskId={}, expectedVersion={}", taskId, task.getVersion());
+            }
+
+            return result;
         } catch (Exception e) {
-            log.error("乐观锁更新失败: taskId={}", taskId, e);
+            log.error("乐观锁更新异常: taskId={}", taskId, e);
             return 0;
         }
     }

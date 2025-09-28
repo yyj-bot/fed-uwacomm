@@ -119,7 +119,8 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
                                                protocol_version VARCHAR(10) DEFAULT 'v1.4' COMMENT '协议版本',
                                                lifecycle_status ENUM('CREATED', 'RUNNING', 'STOPPED', 'RESUMED', 'DELETED') DEFAULT 'CREATED' COMMENT 'v1.4任务生命周期状态',
                                                supports_multi_task BOOLEAN DEFAULT TRUE COMMENT '是否支持多任务并发',
-                                               resume_info JSON NULL COMMENT '恢复信息'
+                                               resume_info JSON NULL COMMENT '恢复信息',
+                                               version BIGINT DEFAULT 1 COMMENT '乐观锁版本号'
 );
 
 -- 4. 训练数据集元信息表 (training_dataset，原training_data)

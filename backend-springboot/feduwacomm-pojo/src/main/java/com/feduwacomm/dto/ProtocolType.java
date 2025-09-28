@@ -3,7 +3,7 @@ package com.feduwacomm.dto;
 /**
  * WebSocket协议类型枚举 - v1.4简化版
  *
- * 本枚举定义了WebSocket协议v1.4的34个核心消息类型，
+ * 本枚举定义了WebSocket协议v1.4的37个核心消息类型，
  * 采用中心化架构设计，移除了冗余和复杂的协商机制。
  *
  * 协议分层：
@@ -12,7 +12,7 @@ package com.feduwacomm.dto;
  * - 轮次管理层: ROUND_*, GRADIENT_*, GLOBAL_MODEL_* (9个协议)
  * - 状态监控层: VM_STATUS_*, ERROR (3个协议)
  * - 虚拟机控制层: VM_START, VM_STOP (4个协议)
- * - 数据集管理层: DATASET_* (4个协议)
+ * - 数据集管理层: DATASET_* (10个协议，包含3个补充的ACK消息)
  */
 public enum ProtocolType {
 
@@ -86,7 +86,7 @@ public enum ProtocolType {
     /** 虚拟机停止确认 */
     VM_STOP_ACK,
 
-    // ==================== 数据集管理层 (4个协议) ====================
+    // ==================== 数据集管理层 (10个协议) ====================
     /** 数据集创建 */
     DATASET_CREATE,
     /** 数据集创建确认 */

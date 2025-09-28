@@ -19,6 +19,7 @@ import com.feduwacomm.event.ModelUploadEvent;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.MessageIdGenerator;
+import com.feduwacomm.service.DigitalSignatureService;
 import com.feduwacomm.service.cache.MetricsCacheService;
 import com.feduwacomm.service.cache.model.ParticipantMetrics;
 import com.feduwacomm.service.cache.model.GlobalMetrics;
@@ -62,6 +63,7 @@ public class WebSocketProtocolService {
     private final UuidUtil uuidUtil;
     private final MessageBuilder messageBuilder;
     private final MessageIdGenerator messageIdGenerator;
+    private final DigitalSignatureService digitalSignatureService;
     private final MetricsCacheService metricsCacheService;
     private final RoundStateManager roundStateManager;
     private final VmAckTracker vmAckTracker;
@@ -84,6 +86,7 @@ public class WebSocketProtocolService {
                                     UuidUtil uuidUtil,
                                     MessageBuilder messageBuilder,
                                     MessageIdGenerator messageIdGenerator,
+                                    DigitalSignatureService digitalSignatureService,
                                     MetricsCacheService metricsCacheService,
                                     RoundStateManager roundStateManager,
                                     VmAckTracker vmAckTracker,
@@ -102,6 +105,7 @@ public class WebSocketProtocolService {
         this.uuidUtil = uuidUtil;
         this.messageBuilder = messageBuilder;
         this.messageIdGenerator = messageIdGenerator;
+        this.digitalSignatureService = digitalSignatureService;
         this.metricsCacheService = metricsCacheService;
         this.roundStateManager = roundStateManager;
         this.vmAckTracker = vmAckTracker;
@@ -257,8 +261,33 @@ public class WebSocketProtocolService {
                 .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data != null ? data : new HashMap<>())
-                .signature(null) // TODO: 实现签名生成
+                .signature(generateAckSignature(ackType, vmId, data))
                 .build();
+    }
+
+    /**
+     * 生成ACK消息签名
+     * 为确认消息生成数字签名
+     */
+    private String generateAckSignature(ProtocolType ackType, String vmId, Map<String, Object> data) {
+        try {
+            // 构建待签名内容
+            StringBuilder content = new StringBuilder();
+            content.append("ackType:").append(ackType != null ? ackType.name() : "");
+            content.append("|vmId:").append(vmId != null ? vmId : "");
+
+            if (data != null && !data.isEmpty()) {
+                content.append("|data:");
+                data.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> content.append(entry.getKey()).append("=").append(entry.getValue()).append(";"));
+            }
+
+            return digitalSignatureService.signMessage(content.toString(), DigitalSignatureService.SignatureAlgorithm.RSA_SHA256);
+        } catch (Exception e) {
+            log.warn("ACK消息签名生成失败: ackType={}, vmId={}, error={}", ackType, vmId, e.getMessage());
+            return "";
+        }
     }
 
     private Map<String, Object> mapOf(Object... kv) {
@@ -267,6 +296,18 @@ public class WebSocketProtocolService {
             map.put(String.valueOf(kv[i]), kv[i + 1]);
         }
         return map;
+    }
+
+    /**
+     * 判断是否应该重试上传
+     * 根据错误信息判断是否为可重试的临时性错误
+     */
+    private boolean shouldRetryUpload(String errorMessage) {
+        if (errorMessage == null) return false;
+
+        String error = errorMessage.toLowerCase();
+        return error.contains("网络") || error.contains("超时") ||
+               error.contains("连接") || error.contains("临时");
     }
 
     private String valueAsString(Map<String, Object> m, String key) {
@@ -474,12 +515,20 @@ public class WebSocketProtocolService {
         try {
             if ("SUCCESS".equals(status)) {
                 log.info("虚拟机{}确认梯度上传成功: taskId={}, round={}", vmId, taskId, round);
-                // TODO: 可以在这里更新梯度上传状态跟踪
+                // 更新梯度上传状态跟踪
+                vmAckTracker.recordGradientUploadSuccess(taskId, vmId, round);
             } else {
                 String errorMessage = valueAsString(data, "errorMessage");
                 log.warn("虚拟机{}梯度上传确认异常: taskId={}, round={}, error={}",
                         vmId, taskId, round, errorMessage);
-                // TODO: 处理上传失败的情况，可能需要重新上传
+                // 处理上传失败的情况，记录失败状态并考虑重新上传
+                vmAckTracker.recordGradientUploadFailure(taskId, vmId, round, errorMessage);
+
+                // 可以根据错误类型决定是否触发重新上传
+                if (shouldRetryUpload(errorMessage)) {
+                    log.info("计划为VM {}重新上传梯度: taskId={}, round={}", vmId, taskId, round);
+                    // 这里可以添加重新上传逻辑
+                }
             }
 
             return ackFor(msg, ProtocolType.VM_STATUS_RESPONSE, mapOf(
@@ -950,7 +999,8 @@ public class WebSocketProtocolService {
             switch (status) {
                 case "READY":
                     log.info("虚拟机{}已准备就绪，可以开始梯度上传: taskId={}, round={}", vmId, taskId, round);
-                    // TODO: 记录VM准备状态，可以开始接收梯度
+                    // 记录VM准备状态，可以开始接收梯度
+                    vmAckTracker.recordVmReadyForGradientUpload(taskId, vmId, round);
                     // 可以在这里更新数据库状态或设置定时器等待上传
 
                     // 确认收到准备状态，告知VM可以开始上传
@@ -2296,6 +2346,21 @@ public class WebSocketProtocolService {
                     Object trainingTime = metrics.get("trainingTime");
                     log.info("任务性能指标: taskId={}, vmId={}, accuracy={}, loss={}, trainingTime={}",
                             taskId, vmId, accuracy, loss, trainingTime);
+
+                    // 更新参与者度量指标缓存
+                    Integer currentRound = progress != null ?
+                        parseIntegerSafely(progress.get("currentRound")) : null;
+                    String participantStatus = taskStatus != null ?
+                        (String) taskStatus.get("status") : "UNKNOWN";
+
+                    updateParticipantMetricsCache(
+                        taskId,
+                        vmId,
+                        currentRound,
+                        parseDoubleSafely(accuracy),
+                        parseDoubleSafely(loss),
+                        participantStatus
+                    );
                 }
 
                 if (modelInfo != null) {
@@ -2802,8 +2867,6 @@ public class WebSocketProtocolService {
     // 已在v1.4协议中移除，状态更新通过心跳和标准ACK消息处理
     // 参考v1.4协议文档：状态更新通知已合并到心跳和确认消息中
 
-    // TODO: 缓存功能将在后续版本中实现
-    /*
     /**
      * 更新参与者度量指标缓存
      *
@@ -2814,12 +2877,12 @@ public class WebSocketProtocolService {
      * @param loss 损失值
      * @param status 状态
      */
-    /*
     private void updateParticipantMetricsCache(String taskId, String vmId, Integer round,
                                              Double accuracy, Double loss, String status) {
         try {
             // 创建参与者度量指标
-            ParticipantMetrics metrics = ParticipantMetrics.builder()
+            com.feduwacomm.service.cache.model.ParticipantMetrics metrics =
+                com.feduwacomm.service.cache.model.ParticipantMetrics.builder()
                     .vmId(vmId)
                     .taskId(taskId)
                     .currentRound(round)
@@ -2838,7 +2901,7 @@ public class WebSocketProtocolService {
             // 重新计算并更新全局指标缓存
             updateGlobalMetricsCache(taskId);
 
-        } catch (CacheValidationException e) {
+        } catch (com.feduwacomm.service.cache.exception.CacheValidationException e) {
             log.error("更新参与者度量指标缓存失败: {}", e.getMessage(), e);
         } catch (Exception e) {
             log.error("更新参与者度量指标缓存时发生意外错误: taskId={}, vmId={}, 错误={}",
@@ -2851,27 +2914,56 @@ public class WebSocketProtocolService {
      *
      * @param taskId 任务ID
      */
-    /*
     private void updateGlobalMetricsCache(String taskId) {
         try {
             // 获取任务信息，用于计算预估时间
-            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            com.feduwacomm.entity.FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
             Integer totalRounds = task != null ? task.getTotalRounds() : null;
 
             // 重新计算并更新全局指标
-            GlobalMetrics globalMetrics = metricsCacheService.computeAndUpdateGlobalMetrics(taskId, totalRounds);
+            com.feduwacomm.service.cache.model.GlobalMetrics globalMetrics =
+                metricsCacheService.computeAndUpdateGlobalMetrics(taskId, totalRounds);
 
             log.debug("全局度量指标缓存更新成功: taskId={}, globalAccuracy={}, globalLoss={}, rounds={}",
                     taskId, globalMetrics.getGlobalAccuracy(), globalMetrics.getGlobalLoss(),
                     globalMetrics.getCommunicationRounds());
 
-        } catch (CacheValidationException e) {
+        } catch (com.feduwacomm.service.cache.exception.CacheValidationException e) {
             log.error("更新全局度量指标缓存失败: {}", e.getMessage(), e);
         } catch (Exception e) {
             log.error("更新全局度量指标缓存时发生意外错误: taskId={}, 错误={}", taskId, e.getMessage(), e);
         }
     }
-    */
+
+    /**
+     * 安全解析Double值
+     */
+    private Double parseDoubleSafely(Object value) {
+        if (value == null) return null;
+        if (value instanceof Double) return (Double) value;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            log.warn("无法解析Double值: {}", value);
+            return null;
+        }
+    }
+
+    /**
+     * 安全解析Integer值
+     */
+    private Integer parseIntegerSafely(Object value) {
+        if (value == null) return null;
+        if (value instanceof Integer) return (Integer) value;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            log.warn("无法解析Integer值: {}", value);
+            return null;
+        }
+    }
 
     /**
      * 创建错误响应ACK
