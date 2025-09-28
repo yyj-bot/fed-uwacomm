@@ -37,10 +37,10 @@ public class ProtocolMessage {
 
     /**
      * 消息时间戳（必需）
-     * 格式: ISO字符串 (如: "2024-01-01T00:00:00.000Z")
+     * Jackson自动序列化为ISO字符串格式 (如: "2024-01-01T00:00:00.000Z")
      */
     @JsonProperty("timestamp")
-    private String timestamp;
+    private Instant timestamp;
 
     /**
      * 虚拟机ID（必需）
@@ -61,24 +61,4 @@ public class ProtocolMessage {
     @JsonProperty("signature")
     private String signature;
 
-    // 便利方法：从Instant设置时间戳
-    public void setTimestampFromInstant(Instant instant) {
-        this.timestamp = instant != null ? instant.toString() : null;
-    }
-
-    // 便利方法：获取时间戳为Instant
-    public Instant getTimestampAsInstant() {
-        return this.timestamp != null ? Instant.parse(this.timestamp) : null;
-    }
-
-    // 向后兼容方法（标记为deprecated）
-    @Deprecated
-    public void setTimestamp(Instant instant) {
-        setTimestampFromInstant(instant);
-    }
-
-    @Deprecated
-    public Instant getTimestamp() {
-        return getTimestampAsInstant();
-    }
 } 

@@ -70,7 +70,7 @@ public class WebSocketProtocolControllerTest {
         sampleMessage = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(messageData)
                 .signature("test-signature")
@@ -181,7 +181,7 @@ public class WebSocketProtocolControllerTest {
         ProtocolMessage messageWithoutVmId = ProtocolMessage.builder()
                 .type(ProtocolType.HEARTBEAT)
                 .id("msg-002")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(null)  // 没有vmId
                 .data(new HashMap<>())
                 .build();
@@ -217,9 +217,9 @@ public class WebSocketProtocolControllerTest {
         ProtocolType[] protocolTypes = {
                 ProtocolType.CONNECT,
                 ProtocolType.HEARTBEAT,
-                ProtocolType.TRAINING_START,
-                ProtocolType.MODEL_UPLOAD,
-                ProtocolType.STATUS_QUERY,
+                ProtocolType.FEDERATED_TASK_START,
+                ProtocolType.GRADIENT_UPLOAD,
+                ProtocolType.VM_STATUS_QUERY,
                 ProtocolType.DATASET_CREATE
         };
 
@@ -228,7 +228,7 @@ public class WebSocketProtocolControllerTest {
             ProtocolMessage message = ProtocolMessage.builder()
                     .type(type)
                     .id("msg-" + type.name())
-                    .timestamp(Instant.now().toString())
+                    .timestamp(Instant.now())
                     .vmId("vm-test")
                     .data(new HashMap<>())
                     .build();
@@ -304,9 +304,9 @@ public class WebSocketProtocolControllerTest {
         complexData.put("metadata", Map.of("batchSize", 32, "epochs", 10));
 
         ProtocolMessage complexMessage = ProtocolMessage.builder()
-                .type(ProtocolType.TRAINING_PROGRESS)
+                .type(ProtocolType.ROUND_START)
                 .id("training-msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-complex")
                 .data(complexData)
                 .signature("complex-signature")
@@ -314,7 +314,7 @@ public class WebSocketProtocolControllerTest {
 
         // Mock服务层返回对应的ACK
         ProtocolAck complexAck = ProtocolAck.builder()
-                .type(ProtocolType.TRAINING_PROGRESS)
+                .type(ProtocolType.ROUND_START)
                 .id("training-ack-001")
                 .timestamp(Instant.now())
                 .vmId("vm-complex")
@@ -331,7 +331,7 @@ public class WebSocketProtocolControllerTest {
         verify(protocolService).handle(messageCaptor.capture());
 
         ProtocolMessage capturedMessage = messageCaptor.getValue();
-        assertEquals(ProtocolType.TRAINING_PROGRESS, capturedMessage.getType());
+        assertEquals(ProtocolType.ROUND_START, capturedMessage.getType());
         assertEquals("training-msg-001", capturedMessage.getId());
         assertEquals("vm-complex", capturedMessage.getVmId());
         assertEquals(complexData, capturedMessage.getData());
@@ -341,7 +341,7 @@ public class WebSocketProtocolControllerTest {
         verify(messagingTemplate).convertAndSendToUser(anyString(), anyString(), ackCaptor.capture());
         
         ProtocolAck capturedAck = ackCaptor.getValue();
-        assertEquals(ProtocolType.TRAINING_PROGRESS, capturedAck.getType());
+        assertEquals(ProtocolType.ROUND_START, capturedAck.getType());
         assertEquals("vm-complex", capturedAck.getVmId());
         assertNotNull(capturedAck.getData());
     }
@@ -376,7 +376,7 @@ public class WebSocketProtocolControllerTest {
         ProtocolMessage messageWithSpecialVmId = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-special")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001_test.special-chars")
                 .data(new HashMap<>())
                 .build();

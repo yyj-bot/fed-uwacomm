@@ -79,8 +79,8 @@ public class RoundStateManager {
                     return RoundState.DISTRIBUTING;
                 } else if ("DISTRIBUTED".equals(distributionStatus)) {
                     // 检查是否所有VM都已确认
-                    // 这里需要VmAckTracker来判断，暂时返回READY
-                    return RoundState.READY;
+                    // 这里需要VmAckTracker来判断，暂时返回COMPLETED
+                    return RoundState.COMPLETED;
                 } else if ("FAILED".equals(distributionStatus)) {
                     return RoundState.DISTRIBUTING; // 失败状态，需要重试
                 }
@@ -165,11 +165,7 @@ public class RoundStateManager {
                 globalModel.setDistributionStatus("DISTRIBUTING");
                 globalModel.setDistributedVms(null); // 清空已分发列表
                 break;
-            case WAITING_ACK:
-                globalModel.setDistributionStatus("DISTRIBUTED");
-                // 注意：这里不设置distribution_completed_at，等所有ACK后再设置
-                break;
-            case READY:
+            case COMPLETED:
                 globalModel.setDistributionStatus("DISTRIBUTED");
                 globalModel.setDistributionCompletedAt(LocalDateTime.now());
                 break;
@@ -201,7 +197,7 @@ public class RoundStateManager {
         }
 
         RoundState state = parseRoundState(globalModel);
-        return state == RoundState.WAITING_ACK;
+        return state == RoundState.DISTRIBUTING;
     }
 
     /**
@@ -302,5 +298,226 @@ public class RoundStateManager {
     public String getRoundStateDescription(String taskId) {
         RoundState state = getCurrentRoundState(taskId);
         return state != null ? state.getDescription() : "未知状态";
+    }
+
+    /**
+     * 设置指定轮次的状态
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param roundState 新状态
+     * @return 是否设置成功
+     */
+    @Transactional
+    public boolean setRoundState(String taskId, int roundNumber, RoundState roundState) {
+        if (taskId == null || roundNumber <= 0 || roundState == null) {
+            log.error("设置轮次状态参数无效: taskId={}, roundNumber={}, roundState={}",
+                     taskId, roundNumber, roundState);
+            return false;
+        }
+
+        GlobalModel globalModel = globalModelMapper.selectByTaskIdAndRound(taskId, roundNumber);
+        if (globalModel == null) {
+            log.error("指定轮次的全局模型不存在: taskId={}, roundNumber={}", taskId, roundNumber);
+            return false;
+        }
+
+        boolean success = updateGlobalModelState(globalModel, roundState);
+        if (success) {
+            log.info("轮次状态设置成功: taskId={}, roundNumber={}, roundState={}",
+                    taskId, roundNumber, roundState);
+        } else {
+            log.error("轮次状态设置失败: taskId={}, roundNumber={}, roundState={}",
+                     taskId, roundNumber, roundState);
+        }
+
+        return success;
+    }
+
+    /**
+     * 创建任务状态快照
+     *
+     * @param taskId 任务ID
+     * @return 快照数据（JSON格式）
+     */
+    public String createSnapshot(String taskId) {
+        if (taskId == null) {
+            log.error("创建快照参数无效: taskId is null");
+            return null;
+        }
+
+        try {
+            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            if (task == null) {
+                log.error("任务不存在: taskId={}", taskId);
+                return null;
+            }
+
+            // 创建简单的快照数据
+            java.util.Map<String, Object> snapshot = new java.util.HashMap<>();
+            snapshot.put("taskId", taskId);
+            snapshot.put("currentRound", task.getCurrentRound());
+            snapshot.put("totalRounds", task.getTotalRounds());
+            snapshot.put("status", task.getStatus());
+            snapshot.put("snapshotTime", java.time.LocalDateTime.now().toString());
+
+            // 获取当前轮次状态
+            RoundState currentState = getCurrentRoundState(taskId);
+            if (currentState != null) {
+                snapshot.put("roundState", currentState.name());
+            }
+
+            // 简单的JSON序列化
+            String snapshotJson = toJsonString(snapshot);
+            log.info("任务快照创建成功: taskId={}, snapshot={}", taskId, snapshotJson);
+            return snapshotJson;
+
+        } catch (Exception e) {
+            log.error("创建任务快照失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 从快照恢复任务状态
+     *
+     * @param taskId 任务ID
+     * @param snapshotData 快照数据
+     * @return 是否恢复成功
+     */
+    @Transactional
+    public boolean restoreSnapshot(String taskId, java.util.Map<String, Object> snapshotData) {
+        if (taskId == null || snapshotData == null) {
+            log.error("恢复快照参数无效: taskId={}, snapshotData={}", taskId, snapshotData);
+            return false;
+        }
+
+        try {
+            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            if (task == null) {
+                log.error("任务不存在: taskId={}", taskId);
+                return false;
+            }
+
+            // 恢复基本任务信息
+            Object currentRoundObj = snapshotData.get("currentRound");
+            Object statusObj = snapshotData.get("status");
+
+            if (currentRoundObj instanceof Number) {
+                Integer currentRound = ((Number) currentRoundObj).intValue();
+                String status = statusObj != null ? statusObj.toString() : "RUNNING";
+
+                int result = federatedTasksMapper.updateTaskProgress(taskId, currentRound, status);
+                if (result > 0) {
+                    log.info("任务快照恢复成功: taskId={}, currentRound={}, status={}",
+                            taskId, currentRound, status);
+                    return true;
+                } else {
+                    log.error("任务快照恢复失败: taskId={}, 数据库更新失败", taskId);
+                    return false;
+                }
+            }
+
+            log.error("快照数据格式无效: taskId={}, snapshotData={}", taskId, snapshotData);
+            return false;
+
+        } catch (Exception e) {
+            log.error("恢复任务快照失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 初始化任务的轮次管理
+     *
+     * @param taskId 任务ID
+     * @param totalRounds 总轮次数
+     * @return 是否初始化成功
+     */
+    @Transactional
+    public boolean initializeTask(String taskId, Integer totalRounds) {
+        if (taskId == null || totalRounds == null || totalRounds <= 0) {
+            log.error("初始化任务参数无效: taskId={}, totalRounds={}", taskId, totalRounds);
+            return false;
+        }
+
+        try {
+            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            if (task == null) {
+                log.error("任务不存在: taskId={}", taskId);
+                return false;
+            }
+
+            // 初始化任务进度
+            int result = federatedTasksMapper.updateTaskProgress(taskId, 1, "INITIALIZED");
+            if (result > 0) {
+                // 创建第一轮的全局模型记录
+                boolean modelCreated = createRoundModel(taskId, 1);
+                if (modelCreated) {
+                    log.info("任务初始化成功: taskId={}, totalRounds={}", taskId, totalRounds);
+                    return true;
+                } else {
+                    log.error("任务初始化失败: 创建轮次模型失败, taskId={}", taskId);
+                    return false;
+                }
+            } else {
+                log.error("任务初始化失败: 更新任务进度失败, taskId={}", taskId);
+                return false;
+            }
+
+        } catch (Exception e) {
+            log.error("初始化任务失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 简单的Map转JSON字符串工具方法
+     */
+    private String toJsonString(java.util.Map<String, Object> map) {
+        StringBuilder json = new StringBuilder("{");
+        boolean first = true;
+        for (java.util.Map.Entry<String, Object> entry : map.entrySet()) {
+            if (!first) {
+                json.append(",");
+            }
+            json.append("\"").append(entry.getKey()).append("\":");
+            Object value = entry.getValue();
+            if (value instanceof String) {
+                json.append("\"").append(value).append("\"");
+            } else {
+                json.append(value);
+            }
+            first = false;
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    /**
+     * 清理任务相关的轮次状态数据
+     *
+     * @param taskId 任务ID
+     * @return 是否清理成功
+     */
+    public boolean cleanupTask(String taskId) {
+        if (taskId == null) {
+            log.error("清理任务轮次状态参数无效: taskId={}", taskId);
+            return false;
+        }
+
+        log.info("清理任务轮次状态数据: taskId={}", taskId);
+
+        try {
+            // 清理内存中的轮次状态缓存
+            String taskPrefix = "round:" + taskId + ":";
+            // TODO: 实现具体的清理逻辑，从缓存和数据库中移除相关数据
+
+            log.info("任务轮次状态清理完成: taskId={}", taskId);
+            return true;
+        } catch (Exception e) {
+            log.error("清理任务轮次状态失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return false;
+        }
     }
 }

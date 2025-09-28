@@ -219,7 +219,7 @@ class FederatedAggregationPerformanceTest {
             FederatedAlgorithm.FEDERATED_AVERAGING,
             FederatedAlgorithm.FEDERATED_PROXIMAL,
             FederatedAlgorithm.FEDERATED_NOVA,
-            FederatedAlgorithm.FEDERATED_SCAFFOLD
+            FederatedAlgorithm.SCAFFOLD
         };
 
         Map<String, AlgorithmPerformance> performanceResults = new HashMap<>();

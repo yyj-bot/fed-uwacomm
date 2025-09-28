@@ -80,6 +80,9 @@ public class FederatedTask {
     private String finalResults;
     private String modelInfo;
 
+    // v1.4 新增字段 - 任务恢复信息
+    private String resumeInfo;
+
     /**
      * 计算任务进度百分比
      * @return 进度百分比 (0-100)
@@ -92,5 +95,57 @@ public class FederatedTask {
             return 0.0;
         }
         return Math.round((currentRound * 100.0) / totalRounds * 100.0) / 100.0;
+    }
+
+    /**
+     * 获取任务恢复信息
+     * @return 恢复信息（JSON格式）
+     */
+    public String getResumeInfo() {
+        return resumeInfo;
+    }
+
+    /**
+     * 设置任务恢复信息
+     * @param resumeInfo 恢复信息（JSON格式）
+     */
+    public void setResumeInfo(String resumeInfo) {
+        this.resumeInfo = resumeInfo;
+    }
+
+    // v1.4新增方法 - 协议版本和生命周期管理
+    private String protocolVersion = "1.4";
+    private String lifecycleStatus = "CREATED";
+
+    /**
+     * 获取协议版本
+     * @return 协议版本
+     */
+    public String getProtocolVersion() {
+        return protocolVersion;
+    }
+
+    /**
+     * 设置协议版本
+     * @param protocolVersion 协议版本
+     */
+    public void setProtocolVersion(String protocolVersion) {
+        this.protocolVersion = protocolVersion;
+    }
+
+    /**
+     * 获取生命周期状态
+     * @return 生命周期状态
+     */
+    public String getLifecycleStatus() {
+        return lifecycleStatus;
+    }
+
+    /**
+     * 设置生命周期状态
+     * @param lifecycleStatus 生命周期状态
+     */
+    public void setLifecycleStatus(String lifecycleStatus) {
+        this.lifecycleStatus = lifecycleStatus;
     }
 }

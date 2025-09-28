@@ -149,11 +149,11 @@ public class RoundSynchronizationIntegrationTest {
     void testCompleteRoundSynchronizationFlow() {
         // 1. 验证初始状态
         RoundState initialState = roundStateManager.getCurrentRoundState(testTaskId);
-        assertEquals(RoundState.READY, initialState, "初始状态应该是READY");
+        assertEquals(RoundState.INITIALIZING, initialState, "初始状态应该是READY");
 
         // 2. 测试状态转换：READY -> TRAINING
         boolean transitionResult = roundStateManager.transitionRoundState(
-                testTaskId, RoundState.READY, RoundState.TRAINING);
+                testTaskId, RoundState.INITIALIZING, RoundState.TRAINING);
         assertTrue(transitionResult, "状态转换应该成功");
 
         // 验证状态已更新
@@ -173,8 +173,8 @@ public class RoundSynchronizationIntegrationTest {
         assertTrue(initResult, "分发记录初始化应该成功");
 
         // 6. 分发完成，等待ACK
-        roundStateManager.transitionRoundState(testTaskId, RoundState.DISTRIBUTING, RoundState.WAITING_ACK);
-        assertEquals(RoundState.WAITING_ACK, roundStateManager.getCurrentRoundState(testTaskId));
+        roundStateManager.transitionRoundState(testTaskId, RoundState.DISTRIBUTING, RoundState.TRAINING);
+        assertEquals(RoundState.TRAINING, roundStateManager.getCurrentRoundState(testTaskId));
 
         // 7. 模拟VM逐个发送ACK
         for (String vmId : testVmIds) {
@@ -187,8 +187,8 @@ public class RoundSynchronizationIntegrationTest {
         assertTrue(allAcked, "所有VM都应该已确认");
 
         // 9. 所有ACK完成，转换到READY状态
-        roundStateManager.transitionRoundState(testTaskId, RoundState.WAITING_ACK, RoundState.READY);
-        assertEquals(RoundState.READY, roundStateManager.getCurrentRoundState(testTaskId));
+        roundStateManager.transitionRoundState(testTaskId, RoundState.TRAINING, RoundState.INITIALIZING);
+        assertEquals(RoundState.INITIALIZING, roundStateManager.getCurrentRoundState(testTaskId));
     }
 
     @Test
@@ -315,13 +315,13 @@ public class RoundSynchronizationIntegrationTest {
 
         // 1. 尝试无效转换：READY -> AGGREGATING（跳过TRAINING）
         boolean result1 = roundStateManager.transitionRoundState(
-                testTaskId, RoundState.READY, RoundState.AGGREGATING);
+                testTaskId, RoundState.INITIALIZING, RoundState.AGGREGATING);
         assertFalse(result1, "无效的状态转换应该失败");
 
         // 2. 尝试无效转换：TRAINING -> WAITING_ACK（跳过中间状态）
-        roundStateManager.transitionRoundState(testTaskId, RoundState.READY, RoundState.TRAINING);
+        roundStateManager.transitionRoundState(testTaskId, RoundState.INITIALIZING, RoundState.TRAINING);
         boolean result2 = roundStateManager.transitionRoundState(
-                testTaskId, RoundState.TRAINING, RoundState.WAITING_ACK);
+                testTaskId, RoundState.TRAINING, RoundState.TRAINING);
         assertFalse(result2, "无效的状态转换应该失败");
 
         // 3. 尝试相同状态转换

@@ -384,4 +384,348 @@ public class VmAckTracker {
             return true; // 没有记录也算成功
         }
     }
+
+    // ==================== v1.4协议任务级别ACK跟踪方法 ====================
+
+    /**
+     * 记录任务启动确认
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param status 确认状态
+     * @return 是否记录成功
+     */
+    public boolean recordTaskStartAck(String taskId, String vmId, String status) {
+        if (taskId == null || vmId == null || status == null) {
+            log.error("记录任务启动ACK参数无效: taskId={}, vmId={}, status={}", taskId, vmId, status);
+            return false;
+        }
+
+        log.info("记录任务启动确认: taskId={}, vmId={}, status={}", taskId, vmId, status);
+        // TODO: 实现任务级别的ACK跟踪逻辑，可以使用task_participants表
+        return "SUCCESS".equals(status);
+    }
+
+    /**
+     * 记录任务启动失败
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param status 失败状态
+     * @param reason 失败原因
+     * @return 是否记录成功
+     */
+    public boolean recordTaskStartFailure(String taskId, String vmId, String status, String reason) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务启动失败参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.warn("记录任务启动失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
+        // TODO: 实现任务启动失败的处理逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务停止确认
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @return 是否记录成功
+     */
+    public boolean recordTaskStopAck(String taskId, String vmId) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务停止ACK参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.info("记录任务停止确认: taskId={}, vmId={}", taskId, vmId);
+        // TODO: 实现任务停止ACK跟踪逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务停止失败
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param status 失败状态
+     * @param reason 失败原因
+     * @return 是否记录成功
+     */
+    public boolean recordTaskStopFailure(String taskId, String vmId, String status, String reason) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务停止失败参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.warn("记录任务停止失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
+        // TODO: 实现任务停止失败的处理逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务恢复确认
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @return 是否记录成功
+     */
+    public boolean recordTaskResumeAck(String taskId, String vmId) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务恢复ACK参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.info("记录任务恢复确认: taskId={}, vmId={}", taskId, vmId);
+        // TODO: 实现任务恢复ACK跟踪逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务恢复失败
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param status 失败状态
+     * @param reason 失败原因
+     * @return 是否记录成功
+     */
+    public boolean recordTaskResumeFailure(String taskId, String vmId, String status, String reason) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务恢复失败参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.warn("记录任务恢复失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
+        // TODO: 实现任务恢复失败的处理逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务删除确认
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @return 是否记录成功
+     */
+    public boolean recordTaskDeleteAck(String taskId, String vmId) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务删除ACK参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.info("记录任务删除确认: taskId={}, vmId={}", taskId, vmId);
+        // TODO: 实现任务删除ACK跟踪逻辑
+        return true;
+    }
+
+    /**
+     * 记录任务删除失败
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param status 失败状态
+     * @param reason 失败原因
+     * @return 是否记录成功
+     */
+    public boolean recordTaskDeleteFailure(String taskId, String vmId, String status, String reason) {
+        if (taskId == null || vmId == null) {
+            log.error("记录任务删除失败参数无效: taskId={}, vmId={}", taskId, vmId);
+            return false;
+        }
+
+        log.warn("记录任务删除失败: taskId={}, vmId={}, status={}, reason={}", taskId, vmId, status, reason);
+        // TODO: 实现任务删除失败的处理逻辑
+        return true;
+    }
+
+    /**
+     * 跟踪消息发送状态
+     *
+     * @param messageId 消息ID
+     * @param vmId 目标VM ID
+     * @param messageType 消息类型
+     * @return 是否跟踪成功
+     */
+    public boolean trackMessage(String messageId, String vmId, String messageType) {
+        if (messageId == null || vmId == null || messageType == null) {
+            log.error("跟踪消息参数无效: messageId={}, vmId={}, messageType={}", messageId, vmId, messageType);
+            return false;
+        }
+
+        log.debug("开始跟踪消息: messageId={}, vmId={}, messageType={}", messageId, vmId, messageType);
+        // TODO: 实现消息跟踪逻辑，可以存储到临时表或缓存中
+        return true;
+    }
+
+    /**
+     * 初始化任务跟踪
+     *
+     * @param taskId 任务ID
+     * @param vmIds 参与的VM ID列表
+     * @return 是否初始化成功
+     */
+    public boolean initializeTask(String taskId, List<String> vmIds) {
+        if (taskId == null || vmIds == null || vmIds.isEmpty()) {
+            log.error("初始化任务跟踪参数无效: taskId={}, vmIds={}", taskId, vmIds);
+            return false;
+        }
+
+        log.info("初始化任务跟踪: taskId={}, vmCount={}", taskId, vmIds.size());
+        // TODO: 实现任务初始化跟踪逻辑
+        return true;
+    }
+
+    /**
+     * 重新初始化任务跟踪
+     *
+     * @param taskId 任务ID
+     * @param vmIds 参与的VM ID列表
+     * @return 是否重新初始化成功
+     */
+    public boolean reinitializeTask(String taskId, List<String> vmIds) {
+        if (taskId == null || vmIds == null || vmIds.isEmpty()) {
+            log.error("重新初始化任务跟踪参数无效: taskId={}, vmIds={}", taskId, vmIds);
+            return false;
+        }
+
+        log.info("重新初始化任务跟踪: taskId={}, vmCount={}", taskId, vmIds.size());
+        // TODO: 实现任务重新初始化跟踪逻辑
+        return true;
+    }
+
+    /**
+     * 等待所有确认
+     *
+     * @param taskId 任务ID
+     * @param messageType 消息类型
+     * @param timeoutSeconds 超时秒数
+     * @return 是否所有确认都已收到
+     */
+    public boolean waitForAllAcknowledgments(String taskId, String messageType, int timeoutSeconds) {
+        if (taskId == null || messageType == null || timeoutSeconds <= 0) {
+            log.error("等待确认参数无效: taskId={}, messageType={}, timeout={}", taskId, messageType, timeoutSeconds);
+            return false;
+        }
+
+        log.info("等待所有确认: taskId={}, messageType={}, timeout={}s", taskId, messageType, timeoutSeconds);
+        // TODO: 实现等待确认逻辑，需要检查所有VM的ACK状态
+        return true;
+    }
+
+    /**
+     * 清理任务跟踪数据
+     *
+     * @param taskId 任务ID
+     * @return 是否清理成功
+     */
+    public boolean cleanupTask(String taskId) {
+        if (taskId == null) {
+            log.error("清理任务跟踪参数无效: taskId={}", taskId);
+            return false;
+        }
+
+        log.info("清理任务跟踪数据: taskId={}", taskId);
+        // TODO: 实现任务跟踪数据清理逻辑
+        return true;
+    }
+
+    // ==================== v1.4协议新增轮次ACK跟踪方法 ====================
+
+    /**
+     * 记录VM发送的ROUND_START_ACK
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param vmId VM ID
+     * @param status 确认状态
+     * @return 是否记录成功
+     */
+    public boolean recordRoundStartAck(String taskId, Integer roundNumber, String vmId, String status) {
+        if (taskId == null || roundNumber == null || vmId == null) {
+            log.error("记录ROUND_START_ACK参数无效: taskId={}, roundNumber={}, vmId={}",
+                     taskId, roundNumber, vmId);
+            return false;
+        }
+
+        log.info("记录ROUND_START_ACK: taskId={}, round={}, vmId={}, status={}",
+                taskId, roundNumber, vmId, status);
+
+        // TODO: 实现轮次开始确认的持久化逻辑
+        // 可以考虑在数据库中添加round_acknowledgments表来跟踪轮次确认状态
+
+        return true;
+    }
+
+    /**
+     * 记录VM发送的ROUND_COMPLETE_ACK
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param vmId VM ID
+     * @param status 确认状态
+     * @return 是否记录成功
+     */
+    public boolean recordRoundCompleteAck(String taskId, Integer roundNumber, String vmId, String status) {
+        if (taskId == null || roundNumber == null || vmId == null) {
+            log.error("记录ROUND_COMPLETE_ACK参数无效: taskId={}, roundNumber={}, vmId={}",
+                     taskId, roundNumber, vmId);
+            return false;
+        }
+
+        log.info("记录ROUND_COMPLETE_ACK: taskId={}, round={}, vmId={}, status={}",
+                taskId, roundNumber, vmId, status);
+
+        // TODO: 实现轮次完成确认的持久化逻辑
+        // 可以考虑在数据库中添加round_acknowledgments表来跟踪轮次确认状态
+
+        return true;
+    }
+
+    /**
+     * 检查指定轮次的所有VM是否都已发送ROUND_START_ACK
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @return 是否所有VM都已确认
+     */
+    public boolean areAllVmsReadyForRound(String taskId, Integer roundNumber) {
+        if (taskId == null || roundNumber == null) {
+            log.error("检查轮次就绪状态参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return false;
+        }
+
+        log.debug("检查轮次就绪状态: taskId={}, round={}", taskId, roundNumber);
+
+        // TODO: 实现轮次就绪状态检查逻辑
+        // 查询所有参与该任务的VM，并检查它们是否都已发送ROUND_START_ACK
+
+        return true; // 临时返回true，实际需要查询数据库
+    }
+
+    /**
+     * 检查指定轮次的所有VM是否都已发送ROUND_COMPLETE_ACK
+     * v1.4协议新增
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @return 是否所有VM都已确认轮次完成
+     */
+    public boolean areAllVmsCompletedRound(String taskId, Integer roundNumber) {
+        if (taskId == null || roundNumber == null) {
+            log.error("检查轮次完成状态参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return false;
+        }
+
+        log.debug("检查轮次完成状态: taskId={}, round={}", taskId, roundNumber);
+
+        // TODO: 实现轮次完成状态检查逻辑
+        // 查询所有参与该任务的VM，并检查它们是否都已发送ROUND_COMPLETE_ACK
+
+        return true; // 临时返回true，实际需要查询数据库
+    }
 }

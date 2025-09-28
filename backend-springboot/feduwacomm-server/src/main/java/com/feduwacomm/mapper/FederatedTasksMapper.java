@@ -59,6 +59,11 @@ public interface FederatedTasksMapper {
 
     // v1.3 新增：检查VM占用情况
     int countTasksByVmIdAndStatuses(@Param("vmId") String vmId, @Param("statuses") List<String> statuses);
+
+    // v1.4 新增：轮次状态和VM确认跟踪清理
+    int deleteRoundStatesByTaskId(@Param("taskId") String taskId);
+
+    int deleteVmAckTrackingByTaskId(@Param("taskId") String taskId);
     
     // 兼容旧方法
     @Deprecated

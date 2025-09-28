@@ -1622,7 +1622,6 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
      * v1.4启动联邦学习任务
      * 实现"后端大脑"集中控制，VM被动响应
      */
-    @Override
     @Transactional
     public TaskOperationVO startFederatedTask(String taskId) {
         log.info("v1.4启动联邦学习任务: taskId={}", taskId);
@@ -1692,7 +1691,6 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     /**
      * v1.4停止联邦学习任务
      */
-    @Override
     @Transactional
     public TaskOperationVO stopFederatedTask(String taskId) {
         log.info("v1.4停止联邦学习任务: taskId={}", taskId);
@@ -1755,7 +1753,6 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     /**
      * v1.4恢复联邦学习任务
      */
-    @Override
     @Transactional
     public TaskOperationVO resumeFederatedTask(String taskId) {
         log.info("v1.4恢复联邦学习任务: taskId={}", taskId);
@@ -1819,7 +1816,6 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     /**
      * v1.4删除联邦学习任务
      */
-    @Override
     @Transactional
     public TaskOperationVO deleteFederatedTask(String taskId, boolean preserveData) {
         log.info("v1.4删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
@@ -1914,14 +1910,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
         for (TaskParticipant participant : participants) {
-            Map<String, Object> message = MessageBuilder.buildMessage()
-                .messageType("TASK_STOP")
-                .taskId(taskId)
-                .vmId(participant.getVmId())
-                .protocol("1.4")
-                .addData("reason", "USER_REQUESTED")
-                .addData("timestamp", LocalDateTime.now())
-                .build();
+            Map<String, Object> message = new HashMap<>();
+            message.put("type", "TASK_STOP");
+            message.put("taskId", taskId);
+            message.put("vmId", participant.getVmId());
+            message.put("protocol", "1.4");
+            message.put("reason", "USER_REQUESTED");
+            message.put("timestamp", LocalDateTime.now());
 
             messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
             vmAckTracker.trackMessage(taskId, participant.getVmId(), "TASK_STOP");
@@ -1938,14 +1933,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
 
         for (TaskParticipant participant : participants) {
-            Map<String, Object> message = MessageBuilder.buildMessage()
-                .messageType("TASK_RESUME")
-                .taskId(taskId)
-                .vmId(participant.getVmId())
-                .protocol("1.4")
-                .addData("currentRound", task.getCurrentRound())
-                .addData("timestamp", LocalDateTime.now())
-                .build();
+            Map<String, Object> message = new HashMap<>();
+            message.put("type", "TASK_RESUME");
+            message.put("taskId", taskId);
+            message.put("vmId", participant.getVmId());
+            message.put("protocol", "1.4");
+            message.put("currentRound", task.getCurrentRound());
+            message.put("timestamp", LocalDateTime.now());
 
             messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
         }
@@ -1959,14 +1953,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
         for (TaskParticipant participant : participants) {
-            Map<String, Object> message = MessageBuilder.buildMessage()
-                .messageType("ROUND_START")
-                .taskId(taskId)
-                .vmId(participant.getVmId())
-                .protocol("1.4")
-                .addData("round", round)
-                .addData("timestamp", LocalDateTime.now())
-                .build();
+            Map<String, Object> message = new HashMap<>();
+            message.put("type", "ROUND_START");
+            message.put("taskId", taskId);
+            message.put("vmId", participant.getVmId());
+            message.put("protocol", "1.4");
+            message.put("round", round);
+            message.put("timestamp", LocalDateTime.now());
 
             messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
             vmAckTracker.trackMessage(taskId, participant.getVmId(), "ROUND_START");
@@ -1978,10 +1971,10 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
      */
     private void saveRoundStateSnapshot(String taskId) {
         try {
-            Map<String, Object> snapshot = roundStateManager.createSnapshot(taskId);
+            String snapshot = roundStateManager.createSnapshot(taskId);
 
             FederatedTask task = getTaskById(taskId);
-            task.setResumeInfo(objectMapper.writeValueAsString(snapshot));
+            task.setResumeInfo(snapshot);
             task.setUpdatedAt(LocalDateTime.now());
 
             tasksMapper.updateTask(task);

@@ -38,7 +38,7 @@ public class MessageBuilder {
         return ProtocolMessage.builder()
                 .type(type)
                 .id(messageIdGenerator.generateServerMessageId())
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data != null ? data : new HashMap<>())
                 .signature(generateSignature(type, vmId, data)) // TODO: 实现签名生成
@@ -58,7 +58,7 @@ public class MessageBuilder {
         return ProtocolMessage.builder()
                 .type(type)
                 .id(messageIdGenerator.generateCommandMessageId())
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data != null ? data : new HashMap<>())
                 .signature(generateSignature(type, vmId, data))
@@ -118,61 +118,65 @@ public class MessageBuilder {
      * @param originalType 原始消息类型
      * @return 对应的ACK消息类型
      */
+    /**
+     * 获取对应的ACK类型 - v1.4协议版本
+     * 只包含v1.4标准支持的34个核心协议类型
+     */
     private ProtocolType getAckType(ProtocolType originalType) {
         switch (originalType) {
+            // 连接管理层
             case CONNECT:
                 return ProtocolType.CONNECT_ACK;
             case HEARTBEAT:
                 return ProtocolType.HEARTBEAT_ACK;
-            case TRAINING_START:
-                return ProtocolType.TRAINING_START_ACK;
-            case TRAINING_START_RESPONSE:
-                return ProtocolType.TRAINING_START_RESPONSE_ACK;
-            case TRAINING_STOP:
-                return ProtocolType.TRAINING_STOP_ACK;
-            case TRAINING_PROGRESS:
-                return ProtocolType.TRAINING_PROGRESS_ACK;
-            case TRAINING_PROGRESS_RESPONSE:
-                return ProtocolType.TRAINING_PROGRESS_RESPONSE_ACK;
-            case MODEL_UPLOAD:
-            case MODEL_DOWNLOAD:
-            case GLOBAL_MODEL_UPDATE:
-                return ProtocolType.MODEL_UPDATE_ACK;
-            case GRADIENT_UPLOAD:
-                return ProtocolType.GRADIENT_UPLOAD_ACK;
-            case AGGREGATION_START:
-                return ProtocolType.AGGREGATION_START_ACK;
-            case AGGREGATION_COMPLETE:
-                return ProtocolType.AGGREGATION_COMPLETE_ACK;
-            case GLOBAL_MODEL_BROADCAST:
-                return ProtocolType.GLOBAL_MODEL_BROADCAST_ACK;
-            case ROUND_START:
-                return ProtocolType.ROUND_START_ACK;
-            case ROUND_COMPLETE:
-                return ProtocolType.ROUND_COMPLETE_ACK;
-            case MODEL_TYPE_NEGOTIATION:
-                return ProtocolType.MODEL_TYPE_NEGOTIATION_ACK;
-            case ALGORITHM_CONFIG:
-                return ProtocolType.ALGORITHM_CONFIG_ACK;
-            case GRADIENT_UPLOAD_PREPARE:
-                return ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK;
-            case STRATEGY_SWITCH_NOTIFICATION:
-                return ProtocolType.STRATEGY_SWITCH_ACK;
-            case TASK_START:
-                return ProtocolType.TASK_START_ACK;
+
+            // 任务管理层
             case FEDERATED_TASK_START:
                 return ProtocolType.FEDERATED_TASK_START_ACK;
+            case FEDERATED_TASK_STOP:
+                return ProtocolType.FEDERATED_TASK_STOP_ACK;
+            case FEDERATED_TASK_RESUME:
+                return ProtocolType.FEDERATED_TASK_RESUME_ACK;
+            case FEDERATED_TASK_DELETE:
+                return ProtocolType.FEDERATED_TASK_DELETE_ACK;
+            case FEDERATED_TASK_STATUS_QUERY:
+                return ProtocolType.FEDERATED_TASK_STATUS_RESPONSE;
+
+            // 轮次管理层
+            case ROUND_START:
+                return ProtocolType.ROUND_START_ACK;
+            case GRADIENT_UPLOAD:
+                return ProtocolType.GRADIENT_UPLOAD_ACK;
+            case GLOBAL_MODEL_BROADCAST:
+                return ProtocolType.GLOBAL_MODEL_BROADCAST_ACK;
+            case ROUND_COMPLETE:
+                return ProtocolType.ROUND_COMPLETE_ACK;
+
+            // 虚拟机控制层
+            case VM_START:
+                return ProtocolType.VM_START_ACK;
+            case VM_STOP:
+                return ProtocolType.VM_STOP_ACK;
+
+            // 状态监控层
+            case VM_STATUS_QUERY:
+                return ProtocolType.VM_STATUS_RESPONSE;
+
+            // 数据集管理层
             case DATASET_CREATE:
                 return ProtocolType.DATASET_CREATE_ACK;
             case DATASET_APPEND_ROWS:
                 return ProtocolType.DATASET_APPEND_ROWS_ACK;
             case DATASET_COMPLETE:
                 return ProtocolType.DATASET_COMPLETE_ACK;
+            case DATASET_STATUS_QUERY:
+                return ProtocolType.DATASET_STATUS_RESPONSE;
             case DATASET_DELETE:
                 return ProtocolType.DATASET_DELETE_ACK;
+
             default:
-                // 如果没有对应的ACK类型，返回通用的响应类型
-                return ProtocolType.STATUS_RESPONSE;
+                // v1.4协议不支持的类型，返回ERROR
+                return ProtocolType.ERROR;
         }
     }
 
@@ -232,7 +236,7 @@ public class MessageBuilder {
     }
 
     /**
-     * 构建标准TRAINING_START消息
+     * 构建标准FEDERATED_TASK_START消息
      * 符合协议v1.4标准
      *
      * @param vmId 虚拟机ID
@@ -242,9 +246,49 @@ public class MessageBuilder {
      * @param hyperparameters 超参数对象
      * @param globalModel 全局模型对象
      * @param message 消息内容
-     * @return 标准TRAINING_START消息
+     * @return 标准FEDERATED_TASK_START消息
      */
     public static ProtocolMessage buildTrainingStartMessage(
+            String vmId,
+            String taskId,
+            int roundNumber,
+            String mlAlgorithm,
+            Map<String, Object> hyperparameters,
+            Map<String, Object> globalModel,
+            String message) {
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("mlAlgorithm", mlAlgorithm);
+        data.put("hyperparameters", hyperparameters);
+        data.put("globalModel", globalModel);
+        data.put("message", message);
+
+        return ProtocolMessage.builder()
+                .type(ProtocolType.FEDERATED_TASK_START)
+                .id(generateStandardId("federated-task-start"))
+                .timestamp(Instant.now())
+                .vmId(vmId)
+                .data(data)
+                .signature("")
+                .build();
+    }
+
+    /**
+     * 构建标准FEDERATED_TASK_START消息 (别名方法)
+     * 符合协议v1.4标准
+     *
+     * @param vmId 虚拟机ID
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     * @param mlAlgorithm ML算法
+     * @param hyperparameters 超参数对象
+     * @param globalModel 全局模型对象
+     * @param message 消息内容
+     * @return 标准FEDERATED_TASK_START消息
+     */
+    public static ProtocolMessage buildFederatedTaskStartMessage(
             String vmId,
             String taskId,
             int roundNumber,
@@ -265,54 +309,15 @@ public class MessageBuilder {
         data.put("timestamp", Instant.now().toString());
 
         return ProtocolMessage.builder()
-                .type(ProtocolType.TRAINING_START)
+                .type(ProtocolType.FEDERATED_TASK_START)
                 .id(messageId)
                 .vmId(vmId)
                 .data(data)
                 .signature(addSignature(data))
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build();
     }
 
-    /**
-     * 构建标准ROUND_START消息
-     * 符合协议v1.4标准
-     *
-     * @param vmId 虚拟机ID
-     * @param taskId 任务ID
-     * @param roundNumber 轮次号
-     * @param trainingConfig 训练配置对象
-     * @param targetMetrics 目标指标对象
-     * @param expectedParticipants 预期参与者数量
-     * @return 标准ROUND_START消息
-     */
-    public static ProtocolMessage buildRoundStartMessage(
-            String vmId,
-            String taskId,
-            int roundNumber,
-            Map<String, Object> trainingConfig,
-            Map<String, Object> targetMetrics,
-            int expectedParticipants) {
-
-        String messageId = generateStandardId("server");
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("taskId", taskId);
-        data.put("roundNumber", roundNumber);
-        data.put("trainingConfig", trainingConfig);
-        data.put("targetMetrics", targetMetrics);
-        data.put("expectedParticipants", expectedParticipants);
-        data.put("timestamp", Instant.now().toString());
-
-        return ProtocolMessage.builder()
-                .type(ProtocolType.ROUND_START)
-                .id(messageId)
-                .vmId(vmId)
-                .data(data)
-                .signature(addSignature(data))
-                .timestamp(Instant.now().toString())
-                .build();
-    }
 
     /**
      * 构建超参数对象
@@ -374,16 +379,17 @@ public class MessageBuilder {
     }
 
     /**
-     * 构建标准TRAINING_START响应消息
+     * 构建标准FEDERATED_TASK_STATUS_RESPONSE消息
+     * 符合协议v1.4标准
      *
      * @param vmId 虚拟机ID
      * @param taskId 任务ID
      * @param roundNumber 轮次号
      * @param status 状态
      * @param message 消息内容
-     * @return TRAINING_START响应消息
+     * @return FEDERATED_TASK_STATUS_RESPONSE消息
      */
-    public static ProtocolMessage buildTrainingStartResponse(
+    public static ProtocolMessage buildFederatedTaskStatusResponse(
             String vmId,
             String taskId,
             int roundNumber,
@@ -400,12 +406,12 @@ public class MessageBuilder {
         data.put("timestamp", Instant.now().toString());
 
         return ProtocolMessage.builder()
-                .type(ProtocolType.TRAINING_START_RESPONSE)
+                .type(ProtocolType.FEDERATED_TASK_STATUS_RESPONSE)
                 .id(messageId)
                 .vmId(vmId)
                 .data(data)
                 .signature(addSignature(data))
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build();
     }
 
@@ -441,7 +447,7 @@ public class MessageBuilder {
                 .vmId(vmId)
                 .data(data)
                 .signature(addSignature(data))
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .build();
     }
 
@@ -455,5 +461,240 @@ public class MessageBuilder {
     public static String addSignature(Map<String, Object> data) {
         // TODO: 实现真实的消息签名算法
         return ""; // 暂时返回空签名
+    }
+
+    /**
+     * 构建标准消息（实例方法）
+     * 为FederatedTaskServiceImpl提供的兼容性方法
+     *
+     * @return ProtocolMessage构建器
+     */
+    public ProtocolMessage.ProtocolMessageBuilder buildMessage() {
+        return ProtocolMessage.builder()
+                .id(messageIdGenerator.generateServerMessageId())
+                .timestamp(Instant.now())
+                .data(new HashMap<>())
+                .signature(""); // 空签名，待实现
+    }
+
+    /**
+     * 构建标准消息（静态方法）
+     * 为静态上下文提供的兼容性方法
+     *
+     * @return ProtocolMessage构建器
+     */
+    public static ProtocolMessage.ProtocolMessageBuilder buildStaticMessage() {
+        return ProtocolMessage.builder()
+                .id(generateStandardId("msg"))
+                .timestamp(Instant.now())
+                .data(new HashMap<>())
+                .signature(""); // 空签名，待实现
+    }
+
+    // ==================== v1.4协议专用消息构建方法 ====================
+
+    /**
+     * 构建ROUND_START消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildRoundStartMessage(String vmId, String taskId, int roundNumber,
+                                                  Map<String, Object> roundSpecificConfig,
+                                                  Map<String, Object> targetMetrics,
+                                                  int expectedParticipants) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("roundSpecificConfig", roundSpecificConfig);
+        data.put("targetMetrics", targetMetrics);
+        data.put("expectedParticipants", expectedParticipants);
+
+        return buildServerMessage(ProtocolType.ROUND_START, vmId, data);
+    }
+
+    /**
+     * 构建ROUND_COMPLETE消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildRoundCompleteMessage(String vmId, String taskId, int roundNumber,
+                                                     Map<String, Object> roundResults,
+                                                     Map<String, Object> nextRound,
+                                                     String taskStatus) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("roundResults", roundResults);
+        data.put("nextRound", nextRound);
+        data.put("taskStatus", taskStatus);
+
+        return buildServerMessage(ProtocolType.ROUND_COMPLETE, vmId, data);
+    }
+
+    /**
+     * 构建GLOBAL_MODEL_BROADCAST消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildGlobalModelBroadcastMessage(String vmId, String taskId, int roundNumber,
+                                                            Map<String, Object> globalModel,
+                                                            Map<String, Object> aggregationInfo,
+                                                            Map<String, Object> nextRoundConfig) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("globalModel", globalModel);
+        data.put("aggregationInfo", aggregationInfo);
+        data.put("nextRoundConfig", nextRoundConfig);
+
+        return buildServerMessage(ProtocolType.GLOBAL_MODEL_BROADCAST, vmId, data);
+    }
+
+    /**
+     * 构建DATASET_STATUS_QUERY消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildDatasetStatusQueryMessage(String vmId, String taskId, String datasetId,
+                                                          String queryType, boolean includeStatistics,
+                                                          boolean includeMetadata, boolean includeSampleData) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("datasetId", datasetId);
+        data.put("queryType", queryType);
+        data.put("includeStatistics", includeStatistics);
+        data.put("includeMetadata", includeMetadata);
+        data.put("includeSampleData", includeSampleData);
+
+        return buildServerMessage(ProtocolType.DATASET_STATUS_QUERY, vmId, data);
+    }
+
+    /**
+     * 构建DATASET_DELETE消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildDatasetDeleteMessage(String vmId, String taskId, String datasetId,
+                                                     String reason, boolean backup, boolean force) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("datasetId", datasetId);
+        data.put("reason", reason);
+        data.put("backup", backup);
+        data.put("force", force);
+
+        return buildServerMessage(ProtocolType.DATASET_DELETE, vmId, data);
+    }
+
+    /**
+     * 构建CONNECT_ACK消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildConnectAckMessage(String vmId, String sessionId,
+                                                  int heartbeatInterval, long maxMessageSize) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("sessionId", sessionId);
+        data.put("serverTime", Instant.now().toString());
+        data.put("heartbeatInterval", heartbeatInterval);
+        data.put("maxMessageSize", maxMessageSize);
+
+        return buildServerMessage(ProtocolType.CONNECT_ACK, vmId, data);
+    }
+
+    /**
+     * 构建HEARTBEAT_ACK消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildHeartbeatAckMessage(String vmId, int nextHeartbeat, String systemStatus) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("serverTime", Instant.now().toString());
+        data.put("nextHeartbeat", nextHeartbeat);
+        data.put("systemStatus", systemStatus);
+
+        return buildServerMessage(ProtocolType.HEARTBEAT_ACK, vmId, data);
+    }
+
+    /**
+     * 构建VM_STATUS_QUERY消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildVmStatusQueryMessage(String vmId, String queryType,
+                                                     boolean includeResources, boolean includeProcesses,
+                                                     boolean includeNetwork, boolean includeTasks,
+                                                     int timeout) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("queryType", queryType);
+        data.put("includeResources", includeResources);
+        data.put("includeProcesses", includeProcesses);
+        data.put("includeNetwork", includeNetwork);
+        data.put("includeTasks", includeTasks);
+        data.put("timeout", timeout);
+
+        return buildServerMessage(ProtocolType.VM_STATUS_QUERY, vmId, data);
+    }
+
+    /**
+     * 构建ROUND_START_ACK消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildRoundStartAckMessage(String vmId, String taskId, int roundNumber,
+                                                     String status, int estimatedTrainingTime) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("status", status);
+        data.put("estimatedTrainingTime", estimatedTrainingTime);
+
+        return buildServerMessage(ProtocolType.ROUND_START_ACK, vmId, data);
+    }
+
+    /**
+     * 构建ROUND_COMPLETE_ACK消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildRoundCompleteAckMessage(String vmId, String taskId, int roundNumber,
+                                                        String status, boolean readyForNextRound) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("roundNumber", roundNumber);
+        data.put("status", status);
+        data.put("readyForNextRound", readyForNextRound);
+
+        return buildServerMessage(ProtocolType.ROUND_COMPLETE_ACK, vmId, data);
+    }
+
+    /**
+     * 构建DATASET_STATUS_RESPONSE消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildDatasetStatusResponseMessage(String vmId, String taskId, String datasetId,
+                                                             String status, int rowCount, long sizeBytes,
+                                                             Map<String, Object> usage, Map<String, Object> integrity,
+                                                             Map<String, Object> statistics) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("datasetId", datasetId);
+        data.put("status", status);
+        data.put("rowCount", rowCount);
+        data.put("sizeBytes", sizeBytes);
+        data.put("createdAt", Instant.now().toString());
+        data.put("lastModified", Instant.now().toString());
+        data.put("usage", usage != null ? usage : new HashMap<>());
+        data.put("integrity", integrity != null ? integrity : new HashMap<>());
+        data.put("statistics", statistics != null ? statistics : new HashMap<>());
+
+        return buildServerMessage(ProtocolType.DATASET_STATUS_RESPONSE, vmId, data);
+    }
+
+    /**
+     * 构建DATASET_DELETE_ACK消息
+     * 符合协议v1.4标准
+     */
+    public ProtocolMessage buildDatasetDeleteAckMessage(String vmId, String taskId, String datasetId,
+                                                        String status, Map<String, Object> cleanupProgress,
+                                                        String estimatedCleanupTime) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", taskId);
+        data.put("datasetId", datasetId);
+        data.put("status", status);
+        data.put("cleanupProgress", cleanupProgress != null ? cleanupProgress : new HashMap<>());
+        data.put("estimatedCleanupTime", estimatedCleanupTime != null ? estimatedCleanupTime : Instant.now().toString());
+
+        return buildServerMessage(ProtocolType.DATASET_DELETE_ACK, vmId, data);
     }
 }
