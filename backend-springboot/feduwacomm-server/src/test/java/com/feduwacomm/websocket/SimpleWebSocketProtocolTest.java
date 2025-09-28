@@ -37,7 +37,7 @@ class SimpleWebSocketProtocolTest {
             .type(ProtocolType.GRADIENT_UPLOAD)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
 
         // Then
@@ -77,10 +77,10 @@ class SimpleWebSocketProtocolTest {
         // 验证第一阶段：核心协议
         assertThat(ProtocolType.GRADIENT_UPLOAD).isNotNull();
         assertThat(ProtocolType.GRADIENT_UPLOAD_ACK).isNotNull();
-        assertThat(ProtocolType.AGGREGATION_START).isNotNull();
-        assertThat(ProtocolType.AGGREGATION_START_ACK).isNotNull();
-        assertThat(ProtocolType.AGGREGATION_COMPLETE).isNotNull();
-        assertThat(ProtocolType.AGGREGATION_COMPLETE_ACK).isNotNull();
+        assertThat(ProtocolType.ROUND_START).isNotNull();
+        assertThat(ProtocolType.ROUND_START_ACK).isNotNull();
+        assertThat(ProtocolType.ROUND_COMPLETE).isNotNull();
+        assertThat(ProtocolType.ROUND_COMPLETE_ACK).isNotNull();
         assertThat(ProtocolType.GLOBAL_MODEL_BROADCAST).isNotNull();
         assertThat(ProtocolType.GLOBAL_MODEL_BROADCAST_ACK).isNotNull();
 
@@ -89,17 +89,17 @@ class SimpleWebSocketProtocolTest {
         assertThat(ProtocolType.ROUND_START_ACK).isNotNull();
         assertThat(ProtocolType.ROUND_COMPLETE).isNotNull();
         assertThat(ProtocolType.ROUND_COMPLETE_ACK).isNotNull();
-        assertThat(ProtocolType.MODEL_TYPE_NEGOTIATION).isNotNull();
-        assertThat(ProtocolType.MODEL_TYPE_NEGOTIATION_ACK).isNotNull();
+        assertThat(ProtocolType.VM_STATUS_QUERY).isNotNull();
+        assertThat(ProtocolType.VM_STATUS_RESPONSE).isNotNull();
 
         // 验证第三阶段：增强功能协议
-        assertThat(ProtocolType.ALGORITHM_CONFIG).isNotNull();
-        assertThat(ProtocolType.ALGORITHM_CONFIG_ACK).isNotNull();
-        assertThat(ProtocolType.GRADIENT_UPLOAD_PREPARE).isNotNull();
-        assertThat(ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK).isNotNull();
-        assertThat(ProtocolType.AGGREGATION_NOTIFICATION).isNotNull();
-        assertThat(ProtocolType.STRATEGY_SWITCH_NOTIFICATION).isNotNull();
-        assertThat(ProtocolType.STRATEGY_SWITCH_ACK).isNotNull();
+        assertThat(ProtocolType.VM_START).isNotNull();
+        assertThat(ProtocolType.VM_START_ACK).isNotNull();
+        assertThat(ProtocolType.GRADIENT_UPLOAD).isNotNull();
+        assertThat(ProtocolType.GRADIENT_UPLOAD_ACK).isNotNull();
+        assertThat(ProtocolType.GLOBAL_MODEL_BROADCAST).isNotNull();
+        assertThat(ProtocolType.VM_STOP).isNotNull();
+        assertThat(ProtocolType.VM_STOP_ACK).isNotNull();
     }
 
     @Test
@@ -115,7 +115,7 @@ class SimpleWebSocketProtocolTest {
 
         // 测试ALGORITHM_CONFIG消息结构
         Map<String, Object> algorithmConfigData = createAlgorithmConfigData();
-        ProtocolMessage algorithmMsg = createProtocolMessage(ProtocolType.ALGORITHM_CONFIG, algorithmConfigData);
+        ProtocolMessage algorithmMsg = createProtocolMessage(ProtocolType.VM_START, algorithmConfigData);
 
         assertThat(algorithmMsg.getData()).containsKey("algorithm");
         assertThat(algorithmMsg.getData()).containsKey("parameters");
@@ -165,7 +165,7 @@ class SimpleWebSocketProtocolTest {
             "queryType", "AGGREGATION_STATUS"
         );
 
-        ProtocolMessage queryMsg = createProtocolMessage(ProtocolType.STATUS_QUERY, queryData);
+        ProtocolMessage queryMsg = createProtocolMessage(ProtocolType.VM_STATUS_QUERY, queryData);
         assertThat(queryMsg.getData()).containsEntry("queryType", "AGGREGATION_STATUS");
 
         // 测试状态响应
@@ -175,7 +175,7 @@ class SimpleWebSocketProtocolTest {
             "progress", 0.75
         );
 
-        ProtocolMessage responseMsg = createProtocolMessage(ProtocolType.STATUS_RESPONSE, responseData);
+        ProtocolMessage responseMsg = createProtocolMessage(ProtocolType.VM_STATUS_RESPONSE, responseData);
         assertThat(responseMsg.getData()).containsEntry("status", "IN_PROGRESS");
         assertThat(responseMsg.getData()).containsEntry("progress", 0.75);
     }
@@ -213,7 +213,7 @@ class SimpleWebSocketProtocolTest {
             .type(type)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
     }
 

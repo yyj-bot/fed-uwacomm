@@ -95,7 +95,7 @@ class EnhancedWebSocketProtocolServiceTest {
             ProtocolMessage.builder()
                 .type(ProtocolType.GRADIENT_UPLOAD_ACK)
                 .id("server-1706281200000-123456")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("test-vm")
                 .data(Map.of("status", "SUCCESS"))
                 .signature("test-signature")
@@ -181,7 +181,7 @@ class EnhancedWebSocketProtocolServiceTest {
                 "round", 5,
                 "training_result", "invalid json string" // 无效JSON
             ))
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
 
         when(uuidUtil.generateUuid()).thenReturn("model-uuid-123");
@@ -211,7 +211,7 @@ class EnhancedWebSocketProtocolServiceTest {
                 "taskId", "task-001"
                 // 缺少 "round" 字段
             ))
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
 
         // When
@@ -399,7 +399,7 @@ class EnhancedWebSocketProtocolServiceTest {
                         .type(message.getType())
                         .vmId("vm-" + String.format("%03d", threadIndex))
                         .data(message.getData())
-                        .timestamp(message.getTimestamp().toString()) // 转换为String
+                        .timestamp(message.getTimestamp()) // 使用Instant类型
                         .id(message.getId())
                         .signature(message.getSignature())
                         .build();
@@ -426,9 +426,9 @@ class EnhancedWebSocketProtocolServiceTest {
     void testMessageRoutingCorrectness() {
         // Given - 测试不同类型的消息是否被正确路由
         ProtocolMessage[] messages = {
-            createMessage(ProtocolType.STATUS_QUERY, Map.of("vmId", "vm-001")),
+            createMessage(ProtocolType.VM_STATUS_QUERY, Map.of("vmId", "vm-001")),
             createMessage(ProtocolType.HEARTBEAT, Map.of("vmId", "vm-002")),
-            createMessage(ProtocolType.TRAINING_START, Map.of("taskId", "task-001"))
+            createMessage(ProtocolType.FEDERATED_TASK_START, Map.of("taskId", "task-001"))
         };
 
         // When & Then
@@ -485,7 +485,7 @@ class EnhancedWebSocketProtocolServiceTest {
             .type(ProtocolType.GRADIENT_UPLOAD)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
     }
 
@@ -494,7 +494,7 @@ class EnhancedWebSocketProtocolServiceTest {
             .type(type)
             .vmId("vm-001")
             .data(data)
-            .timestamp(Instant.now().toString())
+            .timestamp(Instant.now())
             .build();
     }
 }

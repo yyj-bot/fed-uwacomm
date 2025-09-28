@@ -22,19 +22,20 @@ import java.net.URI;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * 模拟虚拟机类 v2.0
- * 支持UniversalAggregationEngine和多策略联邦学习架构
+ * 模拟虚拟机类 v1.4
+ * 基于WebSocket协议v1.4的被动响应模式设计
  *
- * v2.0新增特性：
- * - 多模型类型支持：RandomForest + Neural Network
- * - 多聚合策略：FedAvg, FedProx, FedNova, Scaffold
- * - 增强WebSocket协议：梯度上传、模型分发、聚合通知
- * - 性能优化：大规模并发处理
+ * v1.4核心特性：
+ * - 被动响应模式：只响应后端指令，不做主动决策
+ * - 多任务并发：通过TaskId实现精确的任务隔离
+ * - 简化协议：专注于核心的34个协议消息
+ * - 中心化控制：后端作为"大脑"，VM作为"手脚"
  */
 public class MockVirtualMachine {
 
@@ -52,10 +53,13 @@ public class MockVirtualMachine {
     private ScheduledExecutorService messageExecutor;
     private final Object sessionLock = new Object(); // 会话同步锁
 
-    // v2.0新增字段
-    private String currentModelType = "RANDOM_FOREST"; // 当前支持的模型类型
-    private String currentAlgorithm = "FEDERATED_AVERAGING"; // 当前聚合算法
-    private boolean gradientUploadReady = false; // 梯度上传通道状态
+    // v1.4新增字段：多任务状态管理
+    private final Map<String, TaskExecutionContext> activeTaskContexts = new ConcurrentHashMap<>();
+    private final Map<String, LocalModel> taskLocalModels = new ConcurrentHashMap<>();
+
+    // v1.4新增字段：被动响应模式状态
+    private volatile boolean isPassiveMode = true;
+    private final ScheduledExecutorService passiveScheduler = Executors.newScheduledThreadPool(2);
 
     // 协议违规和失败模拟相关字段
     private int protocolViolationCount = 0; // 协议违规计数
@@ -69,14 +73,25 @@ public class MockVirtualMachine {
     private int genericErrorCount = 0; // 通用ERROR消息计数
     private final Map<String, Integer> errorCodeCounts = new HashMap<>(); // 错误码统计
 
+    // 模型和算法状态字段
+    private String currentModelType = "RANDOM_FOREST"; // 当前模型类型
+    private String currentAlgorithm = "FEDERATED_AVERAGING"; // 当前算法
+    private boolean gradientUploadReady = false; // 梯度上传准备状态
+    private List<Map<String, Object>> receivedMessages = new ArrayList<>(); // 接收到的消息列表
+
+    // 日志字段 - 使用Lombok的@Slf4j注解提供
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MockVirtualMachine.class);
+
     public MockVirtualMachine(VmTestData vmData) {
         this.vmData = vmData;
         this.heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
         this.messageExecutor = Executors.newSingleThreadScheduledExecutor();
 
-        // 为测试环境初始化连接状态，确保Mock VM可以立即工作
+        // v1.4被动响应模式初始化
         this.connected = true;
-        System.out.println("🤖 [" + vmData.getName() + "] Mock虚拟机初始化完成，连接状态: " + connected);
+        this.isPassiveMode = true;
+
+        System.out.println("🤖 [" + vmData.getName() + "] Mock虚拟机初始化完成(被动响应模式v1.4)，连接状态: " + connected);
     }
 
     /**
@@ -328,7 +343,7 @@ public class MockVirtualMachine {
             Thread.sleep(500);
 
             // 然后上传模型参数
-            Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.MODEL_UPLOAD);
+            Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
 
             Map<String, Object> data = new HashMap<>();
             data.put("taskId", taskId);
@@ -606,8 +621,8 @@ public class MockVirtualMachine {
             int messageSize = jsonMessage.getBytes("UTF-8").length;
             System.out.println("📊 [" + vmData.getName() + "] 消息大小: " + messageSize + " bytes (" + String.format("%.2f", messageSize / 1024.0) + " KB)");
 
-            // 如果是MODEL_UPLOAD消息，额外打印模型参数信息
-            if ("MODEL_UPLOAD".equals(messageType)) {
+            // 如果是GRADIENT_UPLOAD消息，额外打印模型参数信息
+            if ("GRADIENT_UPLOAD".equals(messageType)) {
                 Map<String, Object> data = (Map<String, Object>) message.get("data");
                 if (data != null && data.containsKey("parameters")) {
                     Map<String, Object> parameters = (Map<String, Object>) data.get("parameters");
@@ -731,8 +746,8 @@ public class MockVirtualMachine {
                     System.out.println("💓 [" + vmData.getName() + "] 心跳消息已模拟发送");
                     return true;
 
-                case "MODEL_UPLOAD":
-                    // 模拟MODEL_UPLOAD消息成功发送
+                case "GRADIENT_UPLOAD":
+                    // 模拟GRADIENT_UPLOAD消息成功发送
                     Map<String, Object> data = (Map<String, Object>) message.get("data");
                     String taskId = (String) data.get("taskId");
                     Integer round = (Integer) data.get("round");
@@ -742,16 +757,6 @@ public class MockVirtualMachine {
                     Thread.sleep(50 + (int)(Math.random() * 100));
                     return true;
 
-                case "GRADIENT_UPLOAD":
-                    // 模拟GRADIENT_UPLOAD消息成功发送
-                    Map<String, Object> gradData = (Map<String, Object>) message.get("data");
-                    String gradTaskId = (String) gradData.get("taskId");
-                    Integer gradRound = (Integer) gradData.get("round");
-                    System.out.println("🔢 [" + vmData.getName() + "] 梯度上传消息已发送 - 任务ID: " + gradTaskId + ", 轮次: " + gradRound);
-
-                    // 模拟网络延迟
-                    Thread.sleep(30 + (int)(Math.random() * 70));
-                    return true;
 
                 case "CONNECT":
                     // 连接消息总是成功
@@ -863,25 +868,23 @@ public class MockVirtualMachine {
     // ==================== v2.0新增方法 ====================
 
     /**
-     * 发送模型类型协商消息
+     * 设置模型类型配置（v1.4中心化架构）
      * 支持RANDOM_FOREST和NEURAL_NETWORK
+     * 注意：v1.4协议中不再需要MODEL_TYPE_NEGOTIATION，服务器直接在FEDERATED_TASK_START中指定模型类型
      */
-    public void sendModelTypeNegotiation(String modelType) throws Exception {
-        // 修复协议违规：根据WebSocket协议文档，MODEL_TYPE_NEGOTIATION应该由服务器发送给虚拟机
-        // 虚拟机不应该主动发送此消息，而是等待服务器发送并响应ACK
+    public void setModelType(String modelType) throws Exception {
         this.currentModelType = modelType;
-        System.out.println("🤝 [" + vmData.getName() + "] 模型类型准备就绪: " + modelType + "（等待服务器发送MODEL_TYPE_NEGOTIATION）");
+        System.out.println("🤝 [" + vmData.getName() + "] 模型类型设置: " + modelType + "（v1.4中心化架构，无需协商）");
     }
 
     /**
-     * 发送算法配置消息
-     * 支持FedAvg, FedProx, FedNova, Scaffold
+     * 设置算法配置（v1.4中心化架构）
+     * 支持FedAvg, FedProx, FedNova
+     * 注意：v1.4协议中不再需要ALGORITHM_CONFIG，服务器直接在FEDERATED_TASK_START中指定算法
      */
-    public void sendAlgorithmConfig(String algorithm) throws Exception {
-        // 修复协议违规：根据WebSocket协议文档，ALGORITHM_CONFIG应该由服务器发送给虚拟机
-        // 虚拟机不应该主动发送此消息，而是等待服务器发送并响应ACK
+    public void setAlgorithm(String algorithm) throws Exception {
         this.currentAlgorithm = algorithm;
-        System.out.println("⚙️ [" + vmData.getName() + "] 算法配置准备就绪: " + algorithm + "（等待服务器发送ALGORITHM_CONFIG）");
+        System.out.println("⚙️ [" + vmData.getName() + "] 算法配置设置: " + algorithm + "（v1.4中心化架构，无需协商）");
     }
 
     /**
@@ -1004,6 +1007,7 @@ public class MockVirtualMachine {
     public String getCurrentModelType() { return currentModelType; }
     public String getCurrentAlgorithm() { return currentAlgorithm; }
     public boolean isGradientUploadReady() { return gradientUploadReady; }
+    public List<Map<String, Object>> getReceivedMessages() { return new ArrayList<>(receivedMessages); }
 
     /**
      * Mock STOMP Session Handler
@@ -1110,77 +1114,76 @@ public class MockVirtualMachine {
                 // 处理不同类型的消息 - 使用ProtocolType枚举比较 (v2.0增强版本)
                 if (isProtocolType(type, ProtocolType.CONNECT_ACK)) {
                     System.out.println("✅ " + vmData.getName() + " 连接确认");
-                } else if (isProtocolType(type, ProtocolType.TRAINING_START_COMMAND_NOTIFICATION) ||
-                           isProtocolType(type, ProtocolType.TRAINING_START)) {
+                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_START)) {
                     System.out.println("📨 " + vmData.getName() + " 收到训练开始指令");
                     // 自动响应训练指令
                     handleTrainingCommand(messageData);
-                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_UPDATE)) {
-                    System.out.println("📨 " + vmData.getName() + " 收到全局模型更新");
-                    // 处理全局模型更新
-                    handleGlobalModelUpdate(messageData);
                 } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
-                    System.out.println("📨 " + vmData.getName() + " 收到全局模型广播");
-                    // 处理全局模型广播 - 新增轮次同步支持
-                    handleGlobalModelBroadcast(messageData);
-                } else if (isProtocolType(type, ProtocolType.TASK_START)) {
-                    System.out.println("📨 " + vmData.getName() + " 收到任务启动指令");
-                    // 处理任务启动
-                    handleTaskStart(messageData);
+                    System.out.println("📨 [v1.4] " + vmData.getName() + " 收到全局模型广播");
+                    // v1.4协议：使用新的被动响应处理方法
+                    handleGlobalModelBroadcastV14(messageData);
+                } else if (isProtocolType(type, ProtocolType.ROUND_START)) {
+                    System.out.println("🏁 [v1.4] " + vmData.getName() + " 收到轮次开始指令");
+                    // v1.4协议：处理轮次开始
+                    handleRoundStart(messageData);
+                } else if (isProtocolType(type, ProtocolType.ROUND_COMPLETE)) {
+                    System.out.println("🏆 [v1.4] " + vmData.getName() + " 收到轮次完成通知");
+                    // v1.4协议：处理轮次完成
+                    handleRoundComplete(messageData);
                 } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_START)) {
-                    System.out.println("📨 " + vmData.getName() + " 收到联邦学习任务启动指令");
-                    // 处理联邦学习任务启动
+                    System.out.println("📨 [v1.4] " + vmData.getName() + " 收到联邦任务启动指令");
+                    // v1.4协议：处理联邦任务启动（被动模式）
                     handleFederatedTaskStart(messageData);
-                // ========== v2.0新增消息类型处理 ==========
-                } else if (isProtocolType(type, ProtocolType.MODEL_TYPE_NEGOTIATION)) {
-                    System.out.println("🤝 " + vmData.getName() + " 收到模型类型协商请求");
-                    handleModelTypeNegotiation(messageData);
-                } else if (isProtocolType(type, ProtocolType.MODEL_TYPE_NEGOTIATION_ACK)) {
-                    System.out.println("🤝 " + vmData.getName() + " 收到模型类型协商确认");
-                    handleModelTypeNegotiationAck(messageData);
-                } else if (isProtocolType(type, ProtocolType.ALGORITHM_CONFIG)) {
-                    System.out.println("⚙️ " + vmData.getName() + " 收到算法配置请求");
-                    handleAlgorithmConfig(messageData);
-                } else if (isProtocolType(type, ProtocolType.ALGORITHM_CONFIG_ACK)) {
-                    System.out.println("⚙️ " + vmData.getName() + " 收到算法配置确认");
-                    handleAlgorithmConfigAck(messageData);
-                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_PREPARE)) {
-                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传准备请求");
+                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_STOP)) {
+                    System.out.println("⏹️ [v1.4] " + vmData.getName() + " 收到联邦任务停止指令");
+                    // v1.4协议：处理任务停止
+                    handleFederatedTaskStop(messageData);
+                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_RESUME)) {
+                    System.out.println("▶️ [v1.4] " + vmData.getName() + " 收到联邦任务恢复指令");
+                    // v1.4协议：处理任务恢复
+                    handleFederatedTaskResume(messageData);
+                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_DELETE)) {
+                    System.out.println("🗑️ [v1.4] " + vmData.getName() + " 收到联邦任务删除指令");
+                    // v1.4协议：处理任务删除
+                    handleFederatedTaskDelete(messageData);
+                // ========== v1.4协议消息类型处理 ==========
+                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
+                    System.out.println("📊 " + vmData.getName() + " 收到全局模型广播");
+                    handleGlobalModelBroadcast(messageData);
+                } else if (isProtocolType(type, ProtocolType.ROUND_START)) {
+                    System.out.println("🚀 " + vmData.getName() + " 收到轮次开始通知");
+                    handleRoundStart(messageData);
+                } else if (isProtocolType(type, ProtocolType.ROUND_COMPLETE)) {
+                    System.out.println("✅ " + vmData.getName() + " 收到轮次完成通知");
+                    handleRoundComplete(messageData);
+                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD)) {
+                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传请求");
                     handleGradientUploadPrepare(messageData);
-                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK)) {
-                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传准备确认");
+                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
+                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传确认");
                     handleGradientUploadPrepareAck(messageData);
                 } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
                     System.out.println("📊 " + vmData.getName() + " 收到梯度上传确认");
                     handleGradientUploadAck(messageData);
-                } else if (isProtocolType(type, ProtocolType.AGGREGATION_NOTIFICATION)) {
-                    System.out.println("🔄 " + vmData.getName() + " 收到聚合完成通知");
+                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
+                    System.out.println("🔄 " + vmData.getName() + " 收到全局模型广播");
                     handleAggregationNotification(messageData);
-                } else if (isProtocolType(type, ProtocolType.STRATEGY_SWITCH_NOTIFICATION)) {
-                    System.out.println("🔀 " + vmData.getName() + " 收到策略切换通知");
+                } else if (isProtocolType(type, ProtocolType.VM_STATUS_QUERY)) {
+                    System.out.println("🔀 " + vmData.getName() + " 收到状态查询");
                     handleStrategySwitchNotification(messageData);
                 // ========== 原有消息类型继续处理 ==========
                 } else if (isProtocolType(type, ProtocolType.ERROR) ||
                            isProtocolType(type, ProtocolType.CONNECTION_ERROR) ||
-                           isProtocolType(type, ProtocolType.MESSAGE_ERROR) ||
-                           isProtocolType(type, ProtocolType.STATUS_QUERY_ERROR)) {
+                           isProtocolType(type, ProtocolType.MESSAGE_ERROR)) {
                     System.err.println("❌ " + vmData.getName() + " 收到错误消息: " + type);
                     handleErrorMessage(messageData);
-                } else if (isProtocolType(type, ProtocolType.MODEL_UPDATE_ACK) ||
-                           isProtocolType(type, ProtocolType.MODEL_UPLOAD_ACK) ||
+                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST_ACK) ||
+                           isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK) ||
                            isProtocolType(type, ProtocolType.HEARTBEAT_ACK)) {
                     System.out.println("✅ " + vmData.getName() + " 收到确认消息: " + type);
                     // 对于ACK消息，只需要记录，不需要特殊处理
-                } else if ("MODEL_UPLOAD".equals(type)) {
-                    // 检查是否为ACK消息 - ACK消息通常包含status字段且数据结构不同
-                    if (isLikelyAckMessage(messageData)) {
-                        System.out.println("✅ " + vmData.getName() + " 收到疑似MODEL_UPLOAD_ACK确认消息");
-                    } else {
-                        // 根据协议文档，MODEL_UPLOAD(🔵)应该由虚拟机向服务端发送，服务端不应该发送此消息
-                        handleProtocolViolation(type, "MODEL_UPLOAD消息只能由虚拟机发送到服务端，服务端不应发送此消息");
-                    }
                 } else if ("GRADIENT_UPLOAD".equals(type)) {
-                    // 检查是否为ACK消息
+                    // 检查是否为ACK消息 - ACK消息通常包含status字段且数据结构不同
                     if (isLikelyAckMessage(messageData)) {
                         System.out.println("✅ " + vmData.getName() + " 收到疑似GRADIENT_UPLOAD_ACK确认消息");
                     } else {
@@ -1298,7 +1301,7 @@ public class MockVirtualMachine {
         try {
             // 使用MessageBuilder构建标准响应消息
             // 注意：由于MessageBuilder在common模块中，我们手动构建消息以保持Mock VM的独立性
-            Map<String, Object> responseMessage = createProtocolMessage(ProtocolType.TRAINING_START_RESPONSE);
+            Map<String, Object> responseMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
 
             Map<String, Object> data = new HashMap<>();
             data.put("taskId", taskId);
@@ -1333,7 +1336,7 @@ public class MockVirtualMachine {
                 System.out.println("✅ " + vmData.getName() + " 全局模型更新完成，版本: " + modelVersion);
 
                 // 发送模型更新确认
-                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.MODEL_UPDATE_ACK);
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GLOBAL_MODEL_BROADCAST_ACK);
                 Map<String, Object> ackData = new HashMap<>();
                 ackData.put("vmId", vmData.getVmId());
                 ackData.put("modelVersion", modelVersion);
@@ -1461,7 +1464,7 @@ public class MockVirtualMachine {
                 System.out.println("✅ " + vmData.getName() + " 任务启动确认: " + taskId);
 
                 // 发送任务启动确认
-                Map<String, Object> startAck = createProtocolMessage(ProtocolType.TASK_START_ACK);
+                Map<String, Object> startAck = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
                 Map<String, Object> startData = new HashMap<>();
                 startData.put("vmId", vmData.getVmId());
                 startData.put("taskId", taskId);
@@ -1477,65 +1480,507 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 处理联邦学习任务启动指令
+     * 处理联邦任务启动指令 - v1.4协议被动响应模式
      */
     private void handleFederatedTaskStart(Map<String, Object> messageData) {
         try {
-            System.out.println("🚀 " + vmData.getName() + " 处理联邦学习任务启动指令");
+            System.out.println("🚀 [v1.4] " + vmData.getName() + " 处理联邦任务启动指令(被动模式)");
 
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             if (data != null) {
                 String taskId = (String) data.get("taskId");
-                System.out.println("✅ " + vmData.getName() + " 联邦学习任务启动确认: " + taskId);
+                String federatedAlgorithm = (String) data.get("federatedAlgorithm");
+                Integer totalRounds = (Integer) data.get("totalRounds");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> initialGlobalModel = (Map<String, Object>) data.get("initialGlobalModel");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> localTrainingConfig = (Map<String, Object>) data.get("localTrainingConfig");
 
-                // 发送任务准备就绪确认
-                Map<String, Object> readyAck = createProtocolMessage(ProtocolType.TRAINING_START_ACK);
-                Map<String, Object> readyData = new HashMap<>();
-                readyData.put("vmId", vmData.getVmId());
-                readyData.put("taskId", taskId);
-                readyData.put("status", "READY_FOR_TRAINING");
-                readyData.put("capabilities", vmData.getCapabilities());
-                readyData.put("readyTime", Instant.now().toString());
-                readyAck.put("data", readyData);
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 任务信息: taskId=" + taskId + ", algorithm=" + federatedAlgorithm + ", rounds=" + totalRounds);
 
-                sendStompMessage(readyAck);
+                // 1. 创建任务执行上下文
+                TaskExecutionContext taskContext = TaskExecutionContext.builder()
+                    .taskId(taskId)
+                    .federatedAlgorithm(federatedAlgorithm)
+                    .totalRounds(totalRounds)
+                    .currentRound(0)
+                    .status(TaskStatus.READY)
+                    .localTrainingConfig(localTrainingConfig)
+                    .build();
 
-                // 启动主动训练监控
-                startActiveTrainingMonitoring(taskId);
+                activeTaskContexts.put(taskId, taskContext);
+
+                // 2. 初始化本地模型
+                LocalModel localModel = initializeLocalModel(initialGlobalModel, federatedAlgorithm);
+                taskLocalModels.put(taskId, localModel);
+
+                // 3. 发送任务启动确认 - v1.4协议要求
+                sendFederatedTaskStartAck(taskId, "SUCCESS", "任务启动成功", vmData.getCapabilities());
+
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 任务启动完成: taskId=" + taskId + ", 进入被动等待模式");
             }
         } catch (Exception e) {
-            System.err.println("❌ " + vmData.getName() + " 处理联邦学习任务启动指令失败: " + e.getMessage());
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理联邦任务启动指令失败: " + e.getMessage());
+            // v1.4协议：失败时发送错误报告
+            sendErrorReport("TASK_START_FAILED", e.getMessage());
         }
     }
 
     /**
-     * 启动主动训练监控 - 定期检查是否需要执行训练
+     * 初始化本地模型 - v1.4协议
      */
-    private void startActiveTrainingMonitoring(String taskId) {
-        System.out.println("🔍 " + vmData.getName() + " 启动主动训练监控: " + taskId);
+    private LocalModel initializeLocalModel(Map<String, Object> initialGlobalModel, String federatedAlgorithm) {
+        return LocalModel.builder()
+            .modelParameters(initialGlobalModel != null ? initialGlobalModel : new HashMap<>())
+            .algorithmType(federatedAlgorithm)
+            .lastUpdated(Instant.now())
+            .build();
+    }
 
-        // 使用现有的消息执行器来定期检查训练状态
-        if (messageExecutor == null) {
-            messageExecutor = Executors.newSingleThreadScheduledExecutor();
+    /**
+     * 发送联邦任务启动确认 - v1.4协议
+     */
+    private void sendFederatedTaskStartAck(String taskId, String status, String message, Map<String, Object> capabilities) {
+        try {
+            Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
+            Map<String, Object> ackData = new HashMap<>();
+            ackData.put("vmId", vmData.getVmId());
+            ackData.put("taskId", taskId);
+            ackData.put("status", status);
+            ackData.put("message", message);
+            ackData.put("vmCapabilities", capabilities);
+            ackData.put("timestamp", Instant.now().toString());
+            ackMessage.put("data", ackData);
+
+            sendStompMessage(ackMessage);
+            System.out.println("📤 [v1.4] " + vmData.getName() + " 发送FEDERATED_TASK_START_ACK: " + status);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送任务启动确认失败: " + e.getMessage());
         }
+    }
 
-        // 定期执行模拟训练轮次
-        for (int round = 1; round <= 8; round++) { // 最多8轮训练
-            final int currentRound = round;
+    /**
+     * 发送错误报告 - v1.4协议
+     */
+    private void sendErrorReport(String errorType, String errorMessage) {
+        try {
+            Map<String, Object> errorMsg = createProtocolMessage(ProtocolType.ERROR);
+            Map<String, Object> errorData = new HashMap<>();
+            errorData.put("vmId", vmData.getVmId());
+            errorData.put("errorType", errorType);
+            errorData.put("errorMessage", errorMessage);
+            errorData.put("timestamp", Instant.now().toString());
+            errorMsg.put("data", errorData);
 
-            messageExecutor.submit(() -> {
+            sendStompMessage(errorMsg);
+            System.err.println("🚨 [v1.4] " + vmData.getName() + " 发送错误报告: " + errorType);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送错误报告失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 被动等待模式 - v1.4协议核心设计
+     * VM不再主动监控，只响应后端指令
+     */
+    /**
+     * 处理轮次开始指令 - v1.4协议
+     */
+    private void handleRoundStart(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+            Integer roundNumber = (Integer) data.get("roundNumber");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> roundSpecificConfig = (Map<String, Object>) data.get("roundSpecificConfig");
+
+            System.out.println("🏁 [v1.4] " + vmData.getName() + " 处理轮次开始: taskId=" + taskId + ", round=" + roundNumber);
+
+            TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+            if (taskContext == null) {
+                throw new IllegalStateException("任务上下文不存在: " + taskId);
+            }
+
+            // 更新任务状态
+            taskContext.setCurrentRound(roundNumber);
+            taskContext.setStatus(TaskStatus.TRAINING);
+            taskContext.setLastUpdated(Instant.now());
+
+            // 发送轮次开始确认
+            sendRoundStartAck(taskId, roundNumber, "SUCCESS");
+
+            // 开始本地训练（异步执行）
+            CompletableFuture.runAsync(() -> {
                 try {
-                    // 等待一段时间模拟训练间隔
-                    Thread.sleep(5000 * currentRound); // 每轮间隔递增
-
-                    System.out.println("🎯 " + vmData.getName() + " 主动执行第" + currentRound + "轮训练");
-                    simulateTrainingRound(taskId, currentRound);
-
+                    executeTraining(taskId, roundNumber);
                 } catch (Exception e) {
-                    System.err.println("❌ " + vmData.getName() + " 主动训练第" + currentRound + "轮失败: " + e.getMessage());
+                    System.err.println("❌ [v1.4] " + vmData.getName() + " 训练执行失败: " + e.getMessage());
+                    sendErrorReport("TRAINING_FAILED", e.getMessage());
                 }
             });
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理轮次开始失败: " + e.getMessage());
+            sendErrorReport("ROUND_START_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 发送轮次开始确认 - v1.4协议
+     */
+    private void sendRoundStartAck(String taskId, int roundNumber, String status) {
+        try {
+            Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ROUND_START_ACK);
+            Map<String, Object> ackData = new HashMap<>();
+            ackData.put("vmId", vmData.getVmId());
+            ackData.put("taskId", taskId);
+            ackData.put("roundNumber", roundNumber);
+            ackData.put("status", status);
+            ackData.put("timestamp", Instant.now().toString());
+            ackMessage.put("data", ackData);
+
+            sendStompMessage(ackMessage);
+            System.out.println("📤 [v1.4] " + vmData.getName() + " 发送ROUND_START_ACK: taskId=" + taskId + ", round=" + roundNumber);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送轮次开始确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 执行训练 - v1.4协议被动模式下的本地训练
+     */
+    private void executeTraining(String taskId, int roundNumber) throws Exception {
+        System.out.println("💪 [v1.4] " + vmData.getName() + " 开始训练: taskId=" + taskId + ", round=" + roundNumber);
+
+        TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+        LocalModel localModel = taskLocalModels.get(taskId);
+
+        if (taskContext == null || localModel == null) {
+            throw new IllegalStateException("任务上下文或本地模型不存在: " + taskId);
+        }
+
+        // 模拟训练过程
+        simulateTrainingProcess(taskContext, localModel, roundNumber);
+
+        // 训练完成后上传梯度
+        uploadGradients(taskId, roundNumber);
+
+        System.out.println("✅ [v1.4] " + vmData.getName() + " 训练完成: taskId=" + taskId + ", round=" + roundNumber);
+    }
+
+    /**
+     * 模拟训练过程 - v1.4协议
+     */
+    private void simulateTrainingProcess(TaskExecutionContext taskContext, LocalModel localModel, int roundNumber) throws InterruptedException {
+        // 模拟训练时间（根据轮次变化）
+        int trainingTime = 2000 + (roundNumber * 500); // 2-6秒
+        Thread.sleep(trainingTime);
+
+        // 更新本地模型指标模拟结果
+        double accuracy = 0.7 + (roundNumber * 0.02); // 精度逐渐提高
+        double loss = 1.0 - (roundNumber * 0.1); // 损失逐渐减少
+
+        localModel.setAccuracy(Math.min(accuracy, 0.95));
+        localModel.setLoss(Math.max(loss, 0.1));
+        localModel.setTrainingEpochs(localModel.getTrainingEpochs() + 1);
+        localModel.setLastUpdated(Instant.now());
+
+        System.out.println("📈 [v1.4] " + vmData.getName() + " 训练结果: accuracy=" + String.format("%.3f", localModel.getAccuracy()) + ", loss=" + String.format("%.3f", localModel.getLoss()));
+    }
+
+
+    /**
+     * 生成模拟梯度数据
+     */
+    private double[] generateMockGradients() {
+        Random random = new Random();
+        double[] gradients = new double[10]; // 模拟10个参数的梯度
+        for (int i = 0; i < gradients.length; i++) {
+            gradients[i] = random.nextGaussian() * 0.1; // 随机梯度值
+        }
+        return gradients;
+    }
+
+    /**
+     * 生成模拟偏置数据
+     */
+    private double[] generateMockBias() {
+        Random random = new Random();
+        double[] bias = new double[3]; // 模拟3个偏置参数
+        for (int i = 0; i < bias.length; i++) {
+            bias[i] = random.nextGaussian() * 0.05;
+        }
+        return bias;
+    }
+    /**
+     * 处理全局模型广播 - v1.4协议重构
+     */
+    private void handleGlobalModelBroadcastV14(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+            Integer roundNumber = (Integer) data.get("roundNumber");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> globalModel = (Map<String, Object>) data.get("globalModel");
+
+            System.out.println("🌐 [v1.4] " + vmData.getName() + " 处理全局模型广播: taskId=" + taskId + ", round=" + roundNumber);
+
+            TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+            LocalModel localModel = taskLocalModels.get(taskId);
+
+            if (taskContext != null && localModel != null) {
+                // 更新本地模型
+                if (globalModel != null) {
+                    localModel.setModelParameters(globalModel);
+                    localModel.setLastUpdated(Instant.now());
+                }
+
+                taskContext.setStatus(TaskStatus.WAITING_FOR_INSTRUCTIONS);
+                taskContext.setLastUpdated(Instant.now());
+
+                // 发送全局模型接收确认
+                sendGlobalModelBroadcastAck(taskId, roundNumber, "SUCCESS");
+
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 全局模型更新完成: taskId=" + taskId);
+            } else {
+                System.err.println("❌ [v1.4] " + vmData.getName() + " 任务上下文或本地模型不存在: " + taskId);
+                sendGlobalModelBroadcastAck(taskId, roundNumber, "ERROR");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理全局模型广播失败: " + e.getMessage());
+            sendErrorReport("GLOBAL_MODEL_BROADCAST_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 发送全局模型广播确认 - v1.4协议
+     */
+    private void sendGlobalModelBroadcastAck(String taskId, int roundNumber, String status) {
+        try {
+            Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GLOBAL_MODEL_BROADCAST_ACK);
+            Map<String, Object> ackData = new HashMap<>();
+            ackData.put("vmId", vmData.getVmId());
+            ackData.put("taskId", taskId);
+            ackData.put("roundNumber", roundNumber);
+            ackData.put("status", status);
+            ackData.put("timestamp", Instant.now().toString());
+            ackMessage.put("data", ackData);
+
+            sendStompMessage(ackMessage);
+            System.out.println("📤 [v1.4] " + vmData.getName() + " 发送GLOBAL_MODEL_BROADCAST_ACK: taskId=" + taskId + ", round=" + roundNumber);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送全局模型广播确认失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理轮次完成通知 - v1.4协议
+     */
+    private void handleRoundComplete(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+            Integer roundNumber = (Integer) data.get("roundNumber");
+
+            System.out.println("🏁 [v1.4] " + vmData.getName() + " 处理轮次完成通知: taskId=" + taskId + ", round=" + roundNumber);
+
+            TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+            if (taskContext != null) {
+                taskContext.setLastUpdated(Instant.now());
+
+                // 检查是否是最后一轮
+                boolean isLastRound = roundNumber.equals(taskContext.getTotalRounds());
+                if (isLastRound) {
+                    taskContext.setStatus(TaskStatus.COMPLETED);
+                    System.out.println("🏆 [v1.4] " + vmData.getName() + " 任务完成: taskId=" + taskId);
+                } else {
+                    taskContext.setStatus(TaskStatus.WAITING_FOR_INSTRUCTIONS);
+                    System.out.println("⏸️ [v1.4] " + vmData.getName() + " 等待下一轮次指令: taskId=" + taskId);
+                }
+
+                // 发送轮次完成确认
+                sendRoundCompleteAck(taskId, roundNumber, "ACKNOWLEDGED");
+            } else {
+                System.err.println("❌ [v1.4] " + vmData.getName() + " 任务上下文不存在: " + taskId);
+                sendRoundCompleteAck(taskId, roundNumber, "ERROR");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理轮次完成通知失败: " + e.getMessage());
+            sendErrorReport("ROUND_COMPLETE_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 发送轮次完成确认 - v1.4协议
+     */
+    private void sendRoundCompleteAck(String taskId, int roundNumber, String status) {
+        try {
+            Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ROUND_COMPLETE_ACK);
+            Map<String, Object> ackData = new HashMap<>();
+            ackData.put("vmId", vmData.getVmId());
+            ackData.put("taskId", taskId);
+            ackData.put("roundNumber", roundNumber);
+            ackData.put("status", status);
+            ackData.put("timestamp", Instant.now().toString());
+            ackMessage.put("data", ackData);
+
+            sendStompMessage(ackMessage);
+            System.out.println("📤 [v1.4] " + vmData.getName() + " 发送ROUND_COMPLETE_ACK: taskId=" + taskId + ", round=" + roundNumber);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送轮次完成确认失败: " + e.getMessage());
+        }
+    }
+
+    // ==================== v1.4协议任务生命周期管理 ====================
+
+    /**
+     * 处理联邦任务停止指令 - v1.4协议
+     */
+    private void handleFederatedTaskStop(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+            String reason = (String) data.get("reason");
+
+            System.out.println("⏹️ [v1.4] " + vmData.getName() + " 处理任务停止: taskId=" + taskId + ", reason=" + reason);
+
+            TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+            if (taskContext != null) {
+                taskContext.setStatus(TaskStatus.STOPPED);
+                taskContext.setLastUpdated(Instant.now());
+
+                // 发送任务停止确认
+                sendFederatedTaskStopAck(taskId, "SUCCESS", "任务已停止");
+
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 任务停止完成: taskId=" + taskId);
+            } else {
+                System.err.println("❌ [v1.4] " + vmData.getName() + " 任务上下文不存在: " + taskId);
+                sendFederatedTaskStopAck(taskId, "ERROR", "任务上下文不存在");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理任务停止失败: " + e.getMessage());
+            sendErrorReport("TASK_STOP_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 处理联邦任务恢复指令 - v1.4协议
+     */
+    private void handleFederatedTaskResume(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resumeFrom = (Map<String, Object>) data.get("resumeFrom");
+
+            System.out.println("▶️ [v1.4] " + vmData.getName() + " 处理任务恢复: taskId=" + taskId);
+
+            TaskExecutionContext taskContext = activeTaskContexts.get(taskId);
+            if (taskContext != null && taskContext.getStatus() == TaskStatus.STOPPED) {
+                // 从指定轮次恢复
+                if (resumeFrom != null) {
+                    Integer resumeRound = (Integer) resumeFrom.get("roundNumber");
+                    if (resumeRound != null) {
+                        taskContext.setCurrentRound(resumeRound);
+                    }
+                }
+
+                taskContext.setStatus(TaskStatus.WAITING_FOR_INSTRUCTIONS);
+                taskContext.setLastUpdated(Instant.now());
+
+                // 发送任务恢复确认
+                sendFederatedTaskResumeAck(taskId, "SUCCESS", "任务已恢复");
+
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 任务恢复完成: taskId=" + taskId);
+            } else {
+                System.err.println("❌ [v1.4] " + vmData.getName() + " 任务不能恢复（不存在或状态错误）: " + taskId);
+                sendFederatedTaskResumeAck(taskId, "ERROR", "任务不能恢复");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理任务恢复失败: " + e.getMessage());
+            sendErrorReport("TASK_RESUME_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 处理联邦任务删除指令 - v1.4协议
+     */
+    private void handleFederatedTaskDelete(Map<String, Object> messageData) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+
+            System.out.println("🗑️ [v1.4] " + vmData.getName() + " 处理任务删除: taskId=" + taskId);
+
+            // 清理任务上下文和本地模型
+            TaskExecutionContext removedContext = activeTaskContexts.remove(taskId);
+            LocalModel removedModel = taskLocalModels.remove(taskId);
+
+            if (removedContext != null || removedModel != null) {
+                // 发送任务删除确认
+                sendFederatedTaskDeleteAck(taskId, "SUCCESS", "任务已删除");
+                System.out.println("✅ [v1.4] " + vmData.getName() + " 任务删除完成: taskId=" + taskId);
+            } else {
+                System.err.println("❌ [v1.4] " + vmData.getName() + " 任务不存在: " + taskId);
+                sendFederatedTaskDeleteAck(taskId, "ERROR", "任务不存在");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 处理任务删除失败: " + e.getMessage());
+            sendErrorReport("TASK_DELETE_FAILED", e.getMessage());
+        }
+    }
+
+    /**
+     * 发送联邦任务停止确认 - v1.4协议
+     */
+    private void sendFederatedTaskStopAck(String taskId, String status, String message) {
+        sendTaskLifecycleAck(ProtocolType.FEDERATED_TASK_STOP_ACK, taskId, status, message);
+    }
+
+    /**
+     * 发送联邦任务恢复确认 - v1.4协议
+     */
+    private void sendFederatedTaskResumeAck(String taskId, String status, String message) {
+        sendTaskLifecycleAck(ProtocolType.FEDERATED_TASK_RESUME_ACK, taskId, status, message);
+    }
+
+    /**
+     * 发送联邦任务删除确认 - v1.4协议
+     */
+    private void sendFederatedTaskDeleteAck(String taskId, String status, String message) {
+        sendTaskLifecycleAck(ProtocolType.FEDERATED_TASK_DELETE_ACK, taskId, status, message);
+    }
+
+    /**
+     * 通用任务生命周期确认发送方法 - v1.4协议
+     */
+    private void sendTaskLifecycleAck(ProtocolType ackType, String taskId, String status, String message) {
+        try {
+            Map<String, Object> ackMessage = createProtocolMessage(ackType);
+            Map<String, Object> ackData = new HashMap<>();
+            ackData.put("vmId", vmData.getVmId());
+            ackData.put("taskId", taskId);
+            ackData.put("status", status);
+            ackData.put("message", message);
+            ackData.put("timestamp", Instant.now().toString());
+            ackMessage.put("data", ackData);
+
+            sendStompMessage(ackMessage);
+            System.out.println("📤 [v1.4] " + vmData.getName() + " 发送" + ackType + ": taskId=" + taskId + ", status=" + status);
+        } catch (Exception e) {
+            System.err.println("❌ [v1.4] " + vmData.getName() + " 发送任务生命周期确认失败: " + e.getMessage());
         }
     }
 
@@ -1559,7 +2004,7 @@ public class MockVirtualMachine {
                 this.currentModelType = modelType;
 
                 // 发送模型类型协商确认（ACK）
-                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.MODEL_TYPE_NEGOTIATION_ACK);
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.VM_STATUS_RESPONSE);
                 Map<String, Object> ackData = new HashMap<>();
                 ackData.put("vmId", vmData.getVmId());
                 ackData.put("finalModelType", modelType);
@@ -1624,7 +2069,7 @@ public class MockVirtualMachine {
                 this.currentAlgorithm = algorithm;
 
                 // 发送算法配置确认（ACK）
-                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ALGORITHM_CONFIG_ACK);
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.VM_STATUS_RESPONSE);
                 Map<String, Object> ackData = new HashMap<>();
                 ackData.put("vmId", vmData.getVmId());
                 ackData.put("algorithm", algorithm);
@@ -1690,7 +2135,7 @@ public class MockVirtualMachine {
                 this.gradientUploadReady = true;
 
                 // 发送梯度上传准备确认（ACK）
-                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD_PREPARE_ACK);
+                Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD_ACK);
                 Map<String, Object> ackData = new HashMap<>();
                 ackData.put("vmId", vmData.getVmId());
                 ackData.put("taskId", taskId);
@@ -1808,7 +2253,7 @@ public class MockVirtualMachine {
                 System.out.println("    旧算法: " + oldAlgorithm + " → 新算法: " + newAlgorithm);
 
                 // 发送策略切换确认
-                Map<String, Object> switchAck = createProtocolMessage(ProtocolType.STRATEGY_SWITCH_ACK);
+                Map<String, Object> switchAck = createProtocolMessage(ProtocolType.VM_STATUS_RESPONSE);
                 Map<String, Object> switchData = new HashMap<>();
                 switchData.put("vmId", vmData.getVmId());
                 switchData.put("taskId", taskId);
@@ -1925,13 +2370,12 @@ public class MockVirtualMachine {
      */
     private boolean isVmOnlyMessage(String messageType) {
         // 根据协议文档，这些消息类型标记为🔵，只能由虚拟机发送
-        return "MODEL_UPLOAD".equals(messageType) ||
-               "GRADIENT_UPLOAD".equals(messageType) ||
+        return "GRADIENT_UPLOAD".equals(messageType) ||
                "CONNECT".equals(messageType) ||
                "HEARTBEAT".equals(messageType) ||
                "TRAINING_PROGRESS_RESPONSE".equals(messageType) ||
-               "MODEL_UPDATE_ACK".equals(messageType) ||
-               "TRAINING_START_RESPONSE".equals(messageType);
+               "GLOBAL_MODEL_BROADCAST_ACK".equals(messageType) ||
+               "FEDERATED_TASK_START_ACK".equals(messageType);
     }
 
     /**
@@ -1958,7 +2402,7 @@ public class MockVirtualMachine {
         }
 
         switch (messageType) {
-            case "TRAINING_START":
+            case "FEDERATED_TASK_START":
                 return data.containsKey("taskId") && data.containsKey("epochs");
             case "MODEL_UPDATE":
                 return data.containsKey("taskId") && data.containsKey("parameters");
@@ -1977,7 +2421,7 @@ public class MockVirtualMachine {
     private boolean validateMessageSequence(String messageType) {
         // 简化的顺序检查：某些消息只能在特定状态下发送
         switch (messageType) {
-            case "TRAINING_START":
+            case "FEDERATED_TASK_START":
                 return connected; // 训练开始消息只能在连接建立后发送
             case "MODEL_UPDATE":
                 // 模型更新只能在有正在进行的训练任务时发送
@@ -2015,7 +2459,7 @@ public class MockVirtualMachine {
         }
 
         // 只对上传类消息进行失败模拟
-        if (!"MODEL_UPLOAD".equals(messageType) && !"GRADIENT_UPLOAD".equals(messageType)) {
+        if (!"GRADIENT_UPLOAD".equals(messageType)) {
             return false;
         }
 
@@ -2332,5 +2776,371 @@ public class MockVirtualMachine {
      */
     public int getTotalErrorCount() {
         return messageErrorCount + connectionErrorCount + statusQueryErrorCount + genericErrorCount;
+    }
+
+    // ==================== v1.4协议内部类定义 ====================
+
+    /**
+     * 任务执行上下文 - v1.4协议多任务支持
+     */
+    @Data
+    @Builder
+    public static class TaskExecutionContext {
+        private String taskId;
+        private String federatedAlgorithm;
+        private Integer totalRounds;
+        private Integer currentRound;
+        private TaskStatus status;
+        private Map<String, Object> localTrainingConfig;
+        private Instant createdAt;
+        private Instant lastUpdated;
+
+        public static class TaskExecutionContextBuilder {
+            public TaskExecutionContext build() {
+                if (this.createdAt == null) {
+                    this.createdAt = Instant.now();
+                }
+                if (this.lastUpdated == null) {
+                    this.lastUpdated = Instant.now();
+                }
+                return new TaskExecutionContext(taskId, federatedAlgorithm, totalRounds,
+                    currentRound, status, localTrainingConfig, createdAt, lastUpdated);
+            }
+        }
+    }
+
+    /**
+     * 本地模型 - v1.4协议任务隔离支持
+     */
+    @Data
+    @Builder
+    public static class LocalModel {
+        private Map<String, Object> modelParameters;
+        private String algorithmType;
+        private Instant lastUpdated;
+        private double accuracy;
+        private double loss;
+        private int trainingEpochs;
+    }
+
+    /**
+     * 任务状态枚举 - v1.4协议状态管理
+     */
+    public enum TaskStatus {
+        READY,                      // 准备就绪
+        WAITING_FOR_INSTRUCTIONS,  // 等待指令
+        TRAINING,                   // 训练中
+        UPLOADING_GRADIENTS,       // 上传梯度中
+        WAITING_FOR_MODEL,         // 等待新模型
+        COMPLETED,                  // 已完成
+        FAILED,                     // 失败
+        STOPPED                     // 已停止
+    }
+
+    // ==================== v1.4集成测试支持方法 ====================
+
+    /**
+     * 检查是否处于被动模式
+     * v1.4协议：虚拟机应始终处于被动响应模式
+     */
+    public boolean isInPassiveMode() {
+        return true; // v1.4虚拟机始终处于被动模式
+    }
+
+    /**
+     * 检查是否有活跃的任务
+     */
+    public boolean hasActiveTask(String taskId) {
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        return context != null &&
+               context.getStatus() != TaskStatus.COMPLETED &&
+               context.getStatus() != TaskStatus.FAILED &&
+               context.getStatus() != TaskStatus.STOPPED;
+    }
+
+    /**
+     * 检查任务是否处于活跃状态
+     */
+    public boolean isTaskActive(String taskId) {
+        return hasActiveTask(taskId);
+    }
+
+    /**
+     * 检查是否包含指定任务（无论状态）
+     */
+    public boolean hasTask(String taskId) {
+        return activeTaskContexts.containsKey(taskId);
+    }
+
+    /**
+     * 处理WebSocket消息 - v1.4协议专用
+     * 用于集成测试的消息处理入口
+     */
+    public void handleMessage(String message) {
+        try {
+            Map<String, Object> messageMap = objectMapper.readValue(message, Map.class);
+            String messageType = (String) messageMap.get("type");
+
+            log.debug("Mock VM处理消息: vmId={}, messageType={}", vmData.getVmId(), messageType);
+
+            // v1.4协议消息处理
+            switch (messageType) {
+                case "CONNECT":
+                    handleConnectV14(messageMap);
+                    break;
+                case "FEDERATED_TASK_START":
+                    handleFederatedTaskStartV14(messageMap);
+                    break;
+                case "FEDERATED_TASK_STOP":
+                    handleFederatedTaskStopV14(messageMap);
+                    break;
+                case "FEDERATED_TASK_RESUME":
+                    handleFederatedTaskResumeV14(messageMap);
+                    break;
+                case "FEDERATED_TASK_DELETE":
+                    handleFederatedTaskDeleteV14(messageMap);
+                    break;
+                case "ROUND_START":
+                    handleRoundStartV14(messageMap);
+                    break;
+                case "GLOBAL_MODEL_BROADCAST":
+                    handleGlobalModelBroadcastV14(messageMap);
+                    break;
+                case "ROUND_COMPLETE":
+                    handleRoundCompleteV14(messageMap);
+                    break;
+                case "ERROR":
+                    handleErrorV14(messageMap);
+                    break;
+                default:
+                    log.warn("Mock VM收到未知消息类型: vmId={}, messageType={}",
+                            vmData.getVmId(), messageType);
+            }
+        } catch (Exception e) {
+            log.error("Mock VM处理消息失败: vmId={}, error={}",
+                     vmData.getVmId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模拟离线状态
+     */
+    public void simulateOffline() {
+        this.connected = false;
+        log.info("Mock VM模拟离线: vmId={}", vmData.getVmId());
+    }
+
+    /**
+     * 模拟在线状态
+     */
+    public void simulateOnline() {
+        this.connected = true;
+        log.info("Mock VM模拟上线: vmId={}", vmData.getVmId());
+    }
+
+    /**
+     * 模拟训练错误
+     */
+    public void simulateTrainingError(String taskId) {
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setStatus(TaskStatus.FAILED);
+            log.info("Mock VM模拟训练错误: vmId={}, taskId={}", vmData.getVmId(), taskId);
+        }
+    }
+
+    // ==================== v1.4协议消息处理器 ====================
+
+    private void handleConnectV14(Map<String, Object> message) {
+        log.info("Mock VM处理CONNECT消息: vmId={}", vmData.getVmId());
+        this.connected = true;
+        // 发送CONNECT_ACK响应
+        sendConnectAckV14();
+    }
+
+    private void handleFederatedTaskStartV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+        String algorithm = (String) data.get("federatedAlgorithm");
+        Integer totalRounds = (Integer) data.get("totalRounds");
+
+        log.info("Mock VM处理任务启动: vmId={}, taskId={}, algorithm={}",
+                vmData.getVmId(), taskId, algorithm);
+
+        // 创建任务执行上下文
+        TaskExecutionContext context = TaskExecutionContext.builder()
+            .taskId(taskId)
+            .federatedAlgorithm(algorithm)
+            .totalRounds(totalRounds)
+            .currentRound(0)
+            .status(TaskStatus.READY)
+            .createdAt(Instant.now())
+            .lastUpdated(Instant.now())
+            .build();
+
+        activeTaskContexts.put(taskId, context);
+
+        // 发送任务启动确认
+        sendFederatedTaskStartAckV14(taskId, "SUCCESS");
+    }
+
+    private void handleFederatedTaskStopV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+
+        log.info("Mock VM处理任务停止: vmId={}, taskId={}", vmData.getVmId(), taskId);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setStatus(TaskStatus.STOPPED);
+            context.setLastUpdated(Instant.now());
+        }
+
+        sendFederatedTaskStopAckV14(taskId, "SUCCESS");
+    }
+
+    private void handleFederatedTaskResumeV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+
+        log.info("Mock VM处理任务恢复: vmId={}, taskId={}", vmData.getVmId(), taskId);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setStatus(TaskStatus.READY);
+            context.setLastUpdated(Instant.now());
+        }
+
+        sendFederatedTaskResumeAckV14(taskId, "SUCCESS");
+    }
+
+    private void handleFederatedTaskDeleteV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+
+        log.info("Mock VM处理任务删除: vmId={}, taskId={}", vmData.getVmId(), taskId);
+
+        // 移除任务上下文
+        activeTaskContexts.remove(taskId);
+        taskLocalModels.remove(taskId);
+
+        sendFederatedTaskDeleteAckV14(taskId, "SUCCESS");
+    }
+
+    private void handleRoundStartV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+        Integer roundNumber = (Integer) data.get("roundNumber");
+
+        log.info("Mock VM处理轮次开始: vmId={}, taskId={}, roundNumber={}",
+                vmData.getVmId(), taskId, roundNumber);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setCurrentRound(roundNumber);
+            context.setStatus(TaskStatus.TRAINING);
+            context.setLastUpdated(Instant.now());
+        }
+
+        sendRoundStartAckV14(taskId, roundNumber, "SUCCESS");
+
+        // 异步执行训练
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(1000); // 模拟训练时间
+                executeTrainingV14(taskId, roundNumber);
+            } catch (Exception e) {
+                log.error("Mock VM训练失败: vmId={}, taskId={}, error={}",
+                         vmData.getVmId(), taskId, e.getMessage());
+            }
+        });
+    }
+
+
+    private void handleRoundCompleteV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+        Integer roundNumber = (Integer) data.get("roundNumber");
+
+        log.info("Mock VM处理轮次完成: vmId={}, taskId={}, roundNumber={}",
+                vmData.getVmId(), taskId, roundNumber);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setStatus(TaskStatus.WAITING_FOR_INSTRUCTIONS);
+            context.setLastUpdated(Instant.now());
+        }
+
+        sendRoundCompleteAckV14(taskId, roundNumber, "SUCCESS");
+    }
+
+    private void handleErrorV14(Map<String, Object> message) {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String errorCode = (String) data.get("errorCode");
+        String errorMessage = (String) data.get("errorMessage");
+
+        log.info("Mock VM处理错误消息: vmId={}, errorCode={}, errorMessage={}",
+                vmData.getVmId(), errorCode, errorMessage);
+    }
+
+    private void executeTrainingV14(String taskId, int roundNumber) {
+        log.info("Mock VM执行训练: vmId={}, taskId={}, roundNumber={}",
+                vmData.getVmId(), taskId, roundNumber);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null && context.getStatus() != TaskStatus.FAILED) {
+            context.setStatus(TaskStatus.UPLOADING_GRADIENTS);
+            context.setLastUpdated(Instant.now());
+
+            // 模拟梯度上传
+            sendGradientUploadV14(taskId, roundNumber);
+        }
+    }
+
+    // ==================== v1.4协议消息发送器 ====================
+
+    private void sendConnectAckV14() {
+        // 模拟发送CONNECT_ACK消息
+        log.debug("Mock VM发送CONNECT_ACK: vmId={}", vmData.getVmId());
+    }
+
+    private void sendFederatedTaskStartAckV14(String taskId, String status) {
+        log.debug("Mock VM发送FEDERATED_TASK_START_ACK: vmId={}, taskId={}, status={}",
+                 vmData.getVmId(), taskId, status);
+    }
+
+    private void sendFederatedTaskStopAckV14(String taskId, String status) {
+        log.debug("Mock VM发送FEDERATED_TASK_STOP_ACK: vmId={}, taskId={}, status={}",
+                 vmData.getVmId(), taskId, status);
+    }
+
+    private void sendFederatedTaskResumeAckV14(String taskId, String status) {
+        log.debug("Mock VM发送FEDERATED_TASK_RESUME_ACK: vmId={}, taskId={}, status={}",
+                 vmData.getVmId(), taskId, status);
+    }
+
+    private void sendFederatedTaskDeleteAckV14(String taskId, String status) {
+        log.debug("Mock VM发送FEDERATED_TASK_DELETE_ACK: vmId={}, taskId={}, status={}",
+                 vmData.getVmId(), taskId, status);
+    }
+
+    private void sendRoundStartAckV14(String taskId, int roundNumber, String status) {
+        log.debug("Mock VM发送ROUND_START_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
+                 vmData.getVmId(), taskId, roundNumber, status);
+    }
+
+    private void sendGradientUploadV14(String taskId, int roundNumber) {
+        log.debug("Mock VM发送GRADIENT_UPLOAD: vmId={}, taskId={}, roundNumber={}",
+                 vmData.getVmId(), taskId, roundNumber);
+    }
+
+    private void sendGlobalModelBroadcastAckV14(String taskId, int roundNumber, String status) {
+        log.debug("Mock VM发送GLOBAL_MODEL_BROADCAST_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
+                 vmData.getVmId(), taskId, roundNumber, status);
+    }
+
+    private void sendRoundCompleteAckV14(String taskId, int roundNumber, String status) {
+        log.debug("Mock VM发送ROUND_COMPLETE_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
+                 vmData.getVmId(), taskId, roundNumber, status);
     }
 }

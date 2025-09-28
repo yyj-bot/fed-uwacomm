@@ -45,8 +45,8 @@ public class AggregationStrategyFactory {
         // FedNova策略 - 对应 FEDERATED_NOVA
         strategyMap.put(FederatedAlgorithm.FEDERATED_NOVA, new FedNovaStrategy());
 
-        // Scaffold策略 - 对应 FEDERATED_SCAFFOLD
-        strategyMap.put(FederatedAlgorithm.FEDERATED_SCAFFOLD, new ScaffoldStrategy());
+        // Scaffold策略 - 对应 SCAFFOLD
+        strategyMap.put(FederatedAlgorithm.SCAFFOLD, new ScaffoldStrategy());
 
         log.info("聚合策略工厂初始化完成，支持的算法: {}", strategyMap.keySet());
     }

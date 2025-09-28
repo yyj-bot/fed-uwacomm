@@ -611,12 +611,12 @@ public class FederatedTaskServiceTest {
             TaskParticipant.builder()
                 .vmId("vm-001")
                 .dataSource("/data/vm001")
-                .role(ParticipantRole.TRAINER)
+                .role(ParticipantRole.PARTICIPANT)
                 .build(),
             TaskParticipant.builder()
                 .vmId("vm-002")
                 .dataSource("/data/vm002")
-                .role(ParticipantRole.TRAINER)
+                .role(ParticipantRole.PARTICIPANT)
                 .build()
         );
 
@@ -674,7 +674,7 @@ public class FederatedTaskServiceTest {
             assertEquals("/topic/vm/" + participant.getVmId(), topic, "Topic格式不正确");
 
             // 验证消息类型
-            assertEquals(ProtocolType.TRAINING_START, message.getType(), "消息类型应该是TRAINING_START");
+            assertEquals(ProtocolType.FEDERATED_TASK_START, message.getType(), "消息类型应该是TRAINING_START");
 
             // 验证ID格式符合协议标准：cmd-{timestamp}-{random}
             assertNotNull(message.getId(), "消息ID不能为null");
@@ -733,7 +733,7 @@ public class FederatedTaskServiceTest {
         }
 
         // 验证没有发送任何消息
-        verify(messagingTemplate, never()).convertAndSend(anyString(), any());
+        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
     }
 
     /**
@@ -764,7 +764,7 @@ public class FederatedTaskServiceTest {
         }
 
         // 验证没有发送任何消息
-        verify(messagingTemplate, never()).convertAndSend(anyString(), any());
+        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
     }
 
     /**

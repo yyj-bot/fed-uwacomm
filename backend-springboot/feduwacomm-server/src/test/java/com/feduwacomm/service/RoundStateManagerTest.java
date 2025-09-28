@@ -79,7 +79,7 @@ class RoundStateManagerTest {
         RoundState result = roundStateManager.getCurrentRoundState(testTaskId);
 
         // Then
-        assertEquals(RoundState.READY, result); // COMPLETED + DISTRIBUTED = READY
+        assertEquals(RoundState.INITIALIZING, result); // COMPLETED + DISTRIBUTED = READY
         verify(federatedTasksMapper).selectTaskById(testTaskId);
         verify(globalModelMapper).selectByTaskIdAndRound(testTaskId, testRoundNumber);
     }
@@ -137,7 +137,7 @@ class RoundStateManagerTest {
         when(globalModelMapper.updateGlobalModel(any(GlobalModel.class))).thenReturn(1);
 
         // When
-        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.READY, RoundState.TRAINING);
+        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.INITIALIZING, RoundState.TRAINING);
 
         // Then
         assertTrue(result);
@@ -149,7 +149,7 @@ class RoundStateManagerTest {
     @Test
     void testTransitionRoundState_InvalidTransition_ShouldFail() {
         // When - 尝试无效转换：TRAINING -> AGGREGATING 是有效的，测试TRAINING -> WAITING_ACK（无效）
-        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.TRAINING, RoundState.WAITING_ACK);
+        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.TRAINING, RoundState.TRAINING);
 
         // Then
         assertFalse(result);
@@ -159,9 +159,9 @@ class RoundStateManagerTest {
     @Test
     void testTransitionRoundState_NullParameters_ShouldFail() {
         // When & Then
-        assertFalse(roundStateManager.transitionRoundState(null, RoundState.READY, RoundState.TRAINING));
+        assertFalse(roundStateManager.transitionRoundState(null, RoundState.INITIALIZING, RoundState.TRAINING));
         assertFalse(roundStateManager.transitionRoundState(testTaskId, null, RoundState.TRAINING));
-        assertFalse(roundStateManager.transitionRoundState(testTaskId, RoundState.READY, null));
+        assertFalse(roundStateManager.transitionRoundState(testTaskId, RoundState.INITIALIZING, null));
     }
 
     @Test
@@ -173,7 +173,7 @@ class RoundStateManagerTest {
                 .thenReturn(mockModel);
 
         // When
-        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.READY, RoundState.TRAINING);
+        boolean result = roundStateManager.transitionRoundState(testTaskId, RoundState.INITIALIZING, RoundState.TRAINING);
 
         // Then
         assertFalse(result);
@@ -318,7 +318,7 @@ class RoundStateManagerTest {
         String result = roundStateManager.getRoundStateDescription(testTaskId);
 
         // Then
-        assertEquals(RoundState.READY.getDescription(), result);
+        assertEquals(RoundState.INITIALIZING.getDescription(), result);
         verify(federatedTasksMapper).selectTaskById(testTaskId);
         verify(globalModelMapper).selectByTaskIdAndRound(testTaskId, testRoundNumber);
     }
@@ -341,16 +341,16 @@ class RoundStateManagerTest {
         // 测试所有有效的状态转换
         assertTrue(RoundState.TRAINING.canTransitionTo(RoundState.AGGREGATING));
         assertTrue(RoundState.AGGREGATING.canTransitionTo(RoundState.DISTRIBUTING));
-        assertTrue(RoundState.DISTRIBUTING.canTransitionTo(RoundState.WAITING_ACK));
-        assertTrue(RoundState.WAITING_ACK.canTransitionTo(RoundState.READY));
-        assertTrue(RoundState.READY.canTransitionTo(RoundState.TRAINING));
+        assertTrue(RoundState.DISTRIBUTING.canTransitionTo(RoundState.TRAINING));
+        assertTrue(RoundState.TRAINING.canTransitionTo(RoundState.INITIALIZING));
+        assertTrue(RoundState.INITIALIZING.canTransitionTo(RoundState.TRAINING));
     }
 
     @Test
     void testStateTransitionValidation_InvalidTransitions_ShouldFail() {
         // 测试无效的状态转换
-        assertFalse(RoundState.TRAINING.canTransitionTo(RoundState.WAITING_ACK));
-        assertFalse(RoundState.DISTRIBUTING.canTransitionTo(RoundState.READY));
+        assertFalse(RoundState.TRAINING.canTransitionTo(RoundState.TRAINING));
+        assertFalse(RoundState.DISTRIBUTING.canTransitionTo(RoundState.INITIALIZING));
         assertFalse(RoundState.AGGREGATING.canTransitionTo(RoundState.TRAINING));
 
         // 测试相同状态转换

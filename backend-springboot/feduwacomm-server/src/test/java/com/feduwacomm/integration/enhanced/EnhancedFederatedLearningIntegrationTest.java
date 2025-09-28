@@ -263,7 +263,7 @@ class EnhancedFederatedLearningIntegrationTest {
             FederatedAlgorithm.FEDERATED_AVERAGING,
             FederatedAlgorithm.FEDERATED_PROXIMAL,
             FederatedAlgorithm.FEDERATED_NOVA,
-            FederatedAlgorithm.FEDERATED_SCAFFOLD
+            FederatedAlgorithm.SCAFFOLD
         };
 
         Map<String, Long> performanceResults = new HashMap<>();
