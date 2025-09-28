@@ -1,12 +1,13 @@
 """
-联邦学习客户端实现
+联邦学习客户端实现 - 重构为适配WebSocket协议和任务管理
+职责：执行本地训练，与任务管理系统集成
 """
 
 import time
 import logging
 import joblib
 from pathlib import Path
-from typing import Dict, Any, Tuple, TYPE_CHECKING
+from typing import Dict, Any, Tuple, Optional, TYPE_CHECKING
 from dataclasses import asdict
 import pandas as pd
 import numpy as np
@@ -20,18 +21,20 @@ from sklearn.metrics import mean_squared_error, accuracy_score
 
 
 class FederatedLearningClient:
-    """联邦学习客户端"""
+    """联邦学习客户端 - 重构为任务管理集成版本"""
     
     def __init__(self, client_id: str, model: BaseEstimator, 
-                 config: MLConfig = None):
+                 config: MLConfig = None, task_id: Optional[str] = None):
         """初始化联邦学习客户端
         
         Args:
             client_id: 客户端唯一标识
             model: Scikit-learn模型对象
             config: 联邦学习配置
+            task_id: 关联的任务ID
         """
         self.client_id = client_id
+        self.task_id = task_id
         self.model_wrapper = ModelWrapper(model)
         self.config = config or MLConfig()
         self.training_state = TrainingState()
@@ -39,8 +42,9 @@ class FederatedLearningClient:
         self.local_labels = None
         
         # 设置日志
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(f"FedClient-{client_id}")
+        if task_id:
+            self.logger = logging.getLogger(f"FedClient-{task_id}-{client_id}")
         
         # 训练历史
         self.training_history = {
@@ -49,6 +53,22 @@ class FederatedLearningClient:
             'local_accuracies': [],
             'validation_scores': []
         }
+        
+        # 任务管理集成
+        self.websocket_client = None
+        self.task_context = None
+        self.is_task_managed = task_id is not None
+    
+    def set_task_context(self, task_context, websocket_client=None):
+        """设置任务上下文和WebSocket客户端
+        
+        Args:
+            task_context: 任务上下文对象
+            websocket_client: WebSocket客户端对象
+        """
+        self.task_context = task_context
+        self.websocket_client = websocket_client
+        self.logger.info(f"客户端 {self.client_id} 已关联任务上下文")
     
     def load_local_data(self, X: pd.DataFrame, y: pd.Series) -> bool:
         """加载本地训练数据
@@ -71,12 +91,13 @@ class FederatedLearningClient:
             return False
     
     def local_train(self, global_params: Dict[str, Any] = None, 
-                   validation_data: Tuple = None) -> Dict[str, Any]:
-        """执行本地训练
+                   validation_data: Tuple = None, round_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """执行本地训练 - 支持任务管理集成
         
         Args:
             global_params: 全局模型参数
             validation_data: 验证数据元组 (X_val, y_val)
+            round_config: 轮次配置（新增）
             
         Returns:
             dict: 训练结果，包含参数和指标
@@ -92,8 +113,11 @@ class FederatedLearningClient:
             if global_params:
                 self.model_wrapper.set_parameters(global_params)
             
+            # 应用轮次配置
+            if round_config:
+                self._apply_round_config(round_config)
+            
             # 执行本地训练
-            # 训练sklearn模型
             training_result = self._train_sklearn_model(validation_data)
             
             # 更新训练状态
@@ -110,24 +134,79 @@ class FederatedLearningClient:
                 val_score = self._evaluate_model(validation_data[0], validation_data[1])
                 self.training_history['validation_scores'].append(val_score)
             
+            # 任务管理集成：通知任务上下文
+            if self.is_task_managed and self.task_context:
+                self._notify_task_context(training_result)
+            
             self.logger.info(f"本地训练完成 - 轮次: {self.training_state.round_num}, "
                            f"损失: {training_result.get('final_loss', 0):.4f}")
             
-            return {
+            result = {
                 'client_id': self.client_id,
+                'task_id': self.task_id,
                 'parameters': self.model_wrapper.get_parameters(),
                 'num_samples': self.training_state.total_samples,
                 'training_loss': training_result.get('final_loss', 0),
                 'training_accuracy': training_result.get('final_accuracy', 0),
-                'round_num': self.training_state.round_num
+                'round_num': self.training_state.round_num,
+                'timestamp': time.time()
             }
+            
+            return result
             
         except Exception as e:
             self.training_state.error_message = str(e)
             self.logger.error(f"本地训练失败: {e}")
+            
+            # 任务管理集成：通知错误
+            if self.is_task_managed and self.task_context:
+                self._notify_training_error(str(e))
+            
             raise
         finally:
             self.training_state.is_training = False
+    
+    def _apply_round_config(self, round_config: Dict[str, Any]):
+        """应用轮次配置"""
+        try:
+            # 动态调整训练参数
+            if 'localEpochs' in round_config:
+                self.config.local_epochs = round_config['localEpochs']
+            
+            if 'learningRate' in round_config:
+                self.config.learning_rate = round_config['learningRate']
+            
+            if 'batchSize' in round_config:
+                self.config.batch_size = round_config['batchSize']
+            
+            self.logger.info(f"应用轮次配置: epochs={self.config.local_epochs}, "
+                           f"lr={self.config.learning_rate}, batch_size={self.config.batch_size}")
+                           
+        except Exception as e:
+            self.logger.warning(f"应用轮次配置失败: {e}")
+    
+    def _notify_task_context(self, training_result: Dict[str, Any]):
+        """通知任务上下文训练完成"""
+        try:
+            if hasattr(self.task_context, '_update_progress'):
+                # 更新任务进度
+                self.task_context._update_progress(100.0)
+            
+            self.logger.debug(f"已通知任务上下文训练完成")
+            
+        except Exception as e:
+            self.logger.warning(f"通知任务上下文失败: {e}")
+    
+    def _notify_training_error(self, error_message: str):
+        """通知任务上下文训练错误"""
+        try:
+            if hasattr(self.task_context, 'handle_error'):
+                self.task_context.handle_error(error_message)
+            
+            self.logger.debug(f"已通知任务上下文训练错误")
+            
+        except Exception as e:
+            self.logger.warning(f"通知训练错误失败: {e}")
     
     def _train_sklearn_model(self, validation_data: Tuple = None) -> Dict[str, Any]:
         """训练Scikit-learn模型
