@@ -261,10 +261,10 @@ public class WebSocketProtocolRobustnessTest {
         config.put("currentRound", 0);
         data.put("config", config);
 
-        ProtocolMessage msg = buildMessage(ProtocolType.TRAINING_START, TEST_VM_ID, data);
+        ProtocolMessage msg = buildMessage(ProtocolType.FEDERATED_TASK_START, TEST_VM_ID, data);
         ProtocolAck ack = protocolService.handle(msg);
 
-        assertEquals(ProtocolType.TRAINING_START, ack.getType());
+        assertEquals(ProtocolType.FEDERATED_TASK_START, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
     }
 
@@ -292,10 +292,10 @@ public class WebSocketProtocolRobustnessTest {
         
         data.put("status", "RUNNING");
 
-        ProtocolMessage msg = buildMessage(ProtocolType.TRAINING_PROGRESS, TEST_VM_ID, data);
+        ProtocolMessage msg = buildMessage(ProtocolType.VM_STATUS_QUERY, TEST_VM_ID, data);
         ProtocolAck ack = protocolService.handle(msg);
 
-        assertEquals(ProtocolType.TRAINING_PROGRESS, ack.getType());
+        assertEquals(ProtocolType.VM_STATUS_QUERY, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
     }
 
@@ -321,10 +321,10 @@ public class WebSocketProtocolRobustnessTest {
         metrics.put("loss", 0.12);
         data.put("metrics", metrics);
 
-        ProtocolMessage msg = buildMessage(ProtocolType.MODEL_UPLOAD, TEST_VM_ID, data);
+        ProtocolMessage msg = buildMessage(ProtocolType.GRADIENT_UPLOAD, TEST_VM_ID, data);
         ProtocolAck ack = protocolService.handle(msg);
 
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
     }
 
@@ -342,7 +342,7 @@ public class WebSocketProtocolRobustnessTest {
         // 测试无类型消息
         ProtocolMessage msg = ProtocolMessage.builder()
                 .id("test-msg")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(TEST_VM_ID)
                 .build();
         ack = protocolService.handle(msg);
@@ -399,9 +399,9 @@ public class WebSocketProtocolRobustnessTest {
             Future<ProtocolAck> future = executor.submit(() -> {
                 ProtocolType type = switch (index % 5) {
                     case 0 -> ProtocolType.HEARTBEAT;
-                    case 1 -> ProtocolType.STATUS_QUERY;
-                    case 2 -> ProtocolType.TRAINING_PROGRESS;
-                    case 3 -> ProtocolType.STATUS_RESPONSE;
+                    case 1 -> ProtocolType.VM_STATUS_QUERY;
+                    case 2 -> ProtocolType.VM_STATUS_QUERY;
+                    case 3 -> ProtocolType.VM_STATUS_RESPONSE;
                     default -> ProtocolType.CONNECT;
                 };
                 
@@ -438,10 +438,10 @@ public class WebSocketProtocolRobustnessTest {
         queryData.put("includeResources", true);
         queryData.put("includeProcesses", true);
         
-        ProtocolMessage queryMsg = buildMessage(ProtocolType.STATUS_QUERY, TEST_VM_ID, queryData);
+        ProtocolMessage queryMsg = buildMessage(ProtocolType.VM_STATUS_QUERY, TEST_VM_ID, queryData);
         ProtocolAck queryAck = protocolService.handle(queryMsg);
         
-        assertEquals(ProtocolType.STATUS_QUERY, queryAck.getType());
+        assertEquals(ProtocolType.VM_STATUS_QUERY, queryAck.getType());
         assertEquals("FORWARDED", queryAck.getData().get("status"));
 
         // 状态响应
@@ -454,10 +454,10 @@ public class WebSocketProtocolRobustnessTest {
         resourceUsage.put("memory", 82.3);
         responseData.put("resourceUsage", resourceUsage);
         
-        ProtocolMessage responseMsg = buildMessage(ProtocolType.STATUS_RESPONSE, TEST_VM_ID, responseData);
+        ProtocolMessage responseMsg = buildMessage(ProtocolType.VM_STATUS_RESPONSE, TEST_VM_ID, responseData);
         ProtocolAck responseAck = protocolService.handle(responseMsg);
         
-        assertEquals(ProtocolType.STATUS_RESPONSE, responseAck.getType());
+        assertEquals(ProtocolType.VM_STATUS_RESPONSE, responseAck.getType());
         assertEquals("UPDATED", responseAck.getData().get("status"));
     }
 
@@ -522,7 +522,7 @@ public class WebSocketProtocolRobustnessTest {
         return ProtocolMessage.builder()
                 .type(type)
                 .id(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data)
                 .signature("test-signature")
@@ -571,7 +571,7 @@ public class WebSocketProtocolRobustnessTest {
         config.put("currentRound", 0);
         data.put("config", config);
         
-        ProtocolMessage msg = buildMessage(ProtocolType.TRAINING_START, TEST_VM_ID, data);
+        ProtocolMessage msg = buildMessage(ProtocolType.FEDERATED_TASK_START, TEST_VM_ID, data);
         protocolService.handle(msg);
     }
 

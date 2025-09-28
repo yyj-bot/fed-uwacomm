@@ -52,7 +52,7 @@ class WebSocketProtocolTransactionTest {
         ProtocolMessage createMsg = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_CREATE)
                 .id("m1")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm_tx")
                 .data(createData)
                 .build();
@@ -70,7 +70,7 @@ class WebSocketProtocolTransactionTest {
         ProtocolMessage appendMsg = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_APPEND_ROWS)
                 .id("m2")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm_tx")
                 .data(appendData)
                 .build();
@@ -93,7 +93,7 @@ class WebSocketProtocolTransactionTest {
         ProtocolMessage delMsg = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_DELETE)
                 .id("m3")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm_tx")
                 .data(delData)
                 .build();

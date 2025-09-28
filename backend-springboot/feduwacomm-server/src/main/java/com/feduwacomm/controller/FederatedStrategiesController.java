@@ -209,7 +209,7 @@ public class FederatedStrategiesController {
                                 .build())
                         .build();
 
-            case FEDERATED_SCAFFOLD:
+            case SCAFFOLD:
                 return StrategyVO.builder()
                         .algorithm(algorithm.getCode())
                         .name("SCAFFOLD算法")

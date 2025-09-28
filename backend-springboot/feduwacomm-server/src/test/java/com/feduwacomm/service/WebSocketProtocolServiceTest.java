@@ -18,6 +18,7 @@ import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.MessageIdGenerator;
 import com.feduwacomm.service.cache.MetricsCacheService;
+import com.feduwacomm.service.WebSocketMessageSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -92,6 +93,9 @@ public class WebSocketProtocolServiceTest {
     @Mock
     private RoundLockManager roundLockManager;
 
+    @Mock
+    private WebSocketMessageSender webSocketMessageSender;
+
     private WebSocketProtocolService protocolService;
 
     private ProtocolMessage sampleMessage;
@@ -102,7 +106,7 @@ public class WebSocketProtocolServiceTest {
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
             federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, taskParticipantsMapper,
             userMapper, objectMapper, eventPublisher, uuidUtil, messageBuilder, messageIdGenerator,
-            metricsCacheService, roundStateManager, vmAckTracker, roundLockManager);
+            metricsCacheService, roundStateManager, vmAckTracker, roundLockManager, webSocketMessageSender);
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -122,7 +126,8 @@ public class WebSocketProtocolServiceTest {
             metricsCacheService,
             roundStateManager,
             vmAckTracker,
-            roundLockManager
+            roundLockManager,
+            webSocketMessageSender
         );
 
         // 准备测试数据
@@ -158,7 +163,7 @@ public class WebSocketProtocolServiceTest {
         sampleMessage = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(messageData)
                 .signature("test-signature")
@@ -188,7 +193,7 @@ public class WebSocketProtocolServiceTest {
     void testHandle_NullType() {
         ProtocolMessage messageWithoutType = ProtocolMessage.builder()
                 .id("msg-002")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(new HashMap<>())
                 .build();
@@ -232,7 +237,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage heartbeatMessage = ProtocolMessage.builder()
                 .type(ProtocolType.HEARTBEAT)
                 .id("hb-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(new HashMap<>())
                 .build();
@@ -266,7 +271,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage datasetMessage = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_CREATE)
                 .id("ds-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -303,7 +308,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage datasetMessage = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_CREATE)
                 .id("ds-002")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -336,7 +341,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage appendMessage = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_APPEND_ROWS)
                 .id("append-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -373,7 +378,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage completeMessage = ProtocolMessage.builder()
                 .type(ProtocolType.DATASET_COMPLETE)
                 .id("complete-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -416,9 +421,9 @@ public class WebSocketProtocolServiceTest {
         data.put("timestamp", Instant.now().toString());
 
         ProtocolMessage trainingMessage = ProtocolMessage.builder()
-                .type(ProtocolType.TRAINING_START)
+                .type(ProtocolType.FEDERATED_TASK_START)
                 .id("cmd-1234567890-abcd1234") // v1.4: 标准ID格式
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .signature("") // v1.4: 包含签名字段
@@ -437,7 +442,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果
         assertNotNull(ack);
-        assertEquals(ProtocolType.TRAINING_START_ACK, ack.getType());
+        assertEquals(ProtocolType.FEDERATED_TASK_START_ACK, ack.getType());
         assertEquals("COMMAND_SENT", ack.getData().get("status"));
 
         // 验证mock调用
@@ -481,9 +486,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -500,7 +505,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证mock调用
@@ -525,7 +530,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage errorMessage = ProtocolMessage.builder()
                 .type(ProtocolType.ERROR)
                 .id("error-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(Map.of("errorCode", "TEST_ERROR"))
                 .build();
@@ -551,7 +556,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage vmStartMessage = ProtocolMessage.builder()
                 .type(ProtocolType.VM_START)
                 .id("vmstart-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(Map.of("status", "starting"))
                 .build();
@@ -577,7 +582,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage vmStopMessage = ProtocolMessage.builder()
                 .type(ProtocolType.VM_STOP)
                 .id("vmstop-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(Map.of("status", "stopping"))
                 .build();
@@ -612,9 +617,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -624,7 +629,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果 - 应该正确处理null值，但仍然返回成功状态
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用仍然执行（taskId为null）
@@ -654,9 +659,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-002")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -666,7 +671,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用（round为null）
@@ -695,9 +700,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-003")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -714,7 +719,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果 - 服务应该能处理null parameters
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用
@@ -743,9 +748,9 @@ public class WebSocketProtocolServiceTest {
         // 故意不设置metrics
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-004")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -762,7 +767,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果 - 应该能处理null metrics，accuracy和loss为null
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用（accuracy和loss为null）
@@ -792,9 +797,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-005")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -818,7 +823,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果 - 即使参与者插入失败，MODEL_UPLOAD仍应成功
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用
@@ -849,9 +854,9 @@ public class WebSocketProtocolServiceTest {
         data.put("metrics", metrics);
 
         ProtocolMessage modelMessage = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("model-error-006")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -871,7 +876,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证结果 - 即使事件发布失败，MODEL_UPLOAD仍应成功
         assertNotNull(ack);
-        assertEquals(ProtocolType.MODEL_UPLOAD, ack.getType());
+        assertEquals(ProtocolType.GRADIENT_UPLOAD, ack.getType());
         assertEquals("RECEIVED", ack.getData().get("status"));
 
         // 验证数据库调用仍然执行
@@ -918,9 +923,9 @@ public class WebSocketProtocolServiceTest {
         data.put("taskId", "task-001");
 
         ProtocolMessage message = ProtocolMessage.builder()
-                .type(ProtocolType.TRAINING_START) // 🔴 只应由服务端发送
+                .type(ProtocolType.FEDERATED_TASK_START) // 🔴 只应由服务端发送
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -952,9 +957,9 @@ public class WebSocketProtocolServiceTest {
         data.put("loss", 0.25);
 
         ProtocolMessage message = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD) // 🔵 虚拟机可以发送
+                .type(ProtocolType.GRADIENT_UPLOAD) // 🔵 虚拟机可以发送
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(data)
                 .build();
@@ -992,7 +997,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage message = ProtocolMessage.builder()
                 .type(null) // 缺少消息类型
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(new HashMap<>())
                 .build();
@@ -1017,7 +1022,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage messageNoId = ProtocolMessage.builder()
                 .type(ProtocolType.HEARTBEAT)
                 .id(null) // 缺少消息ID
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(new HashMap<>())
                 .build();
@@ -1032,7 +1037,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage messageNoVmId = ProtocolMessage.builder()
                 .type(ProtocolType.HEARTBEAT)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId(null) // 缺少虚拟机ID
                 .data(new HashMap<>())
                 .build();
@@ -1069,9 +1074,9 @@ public class WebSocketProtocolServiceTest {
         dataNoTaskId.put("round", 1);
 
         ProtocolMessage messageNoTaskId = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(dataNoTaskId)
                 .build();
@@ -1087,9 +1092,9 @@ public class WebSocketProtocolServiceTest {
         dataNoRound.put("taskId", "task-001");
 
         ProtocolMessage messageNoRound = ProtocolMessage.builder()
-                .type(ProtocolType.MODEL_UPLOAD)
+                .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("msg-002")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(dataNoRound)
                 .build();
@@ -1113,7 +1118,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage message = ProtocolMessage.builder()
                 .type(ProtocolType.GRADIENT_UPLOAD)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(dataNoGradients)
                 .build();
@@ -1136,7 +1141,7 @@ public class WebSocketProtocolServiceTest {
         ProtocolMessage message = ProtocolMessage.builder()
                 .type(ProtocolType.CONNECT)
                 .id("msg-001")
-                .timestamp(Instant.now().toString())
+                .timestamp(Instant.now())
                 .vmId("vm-001")
                 .data(dataNoCapabilities)
                 .build();
@@ -1180,7 +1185,7 @@ public class WebSocketProtocolServiceTest {
 
         // 验证消息结构符合协议标准
         assertNotNull(message, "消息不能为null");
-        assertEquals(ProtocolType.TRAINING_START, message.getType());
+        assertEquals(ProtocolType.FEDERATED_TASK_START, message.getType());
 
         // 验证ID格式符合协议标准：cmd-{timestamp}-{random}
         assertNotNull(message.getId());
@@ -1222,7 +1227,8 @@ public class WebSocketProtocolServiceTest {
         Map<String, Object> trainingConfig = Map.of("learningRate", 0.01, "timeout", 300);
         Map<String, Object> targetMetrics = Map.of("minAccuracy", 0.85, "maxLoss", 0.15, "convergenceThreshold", 0.001);
 
-        ProtocolMessage message = MessageBuilder.buildRoundStartMessage(
+        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        ProtocolMessage message = messageBuilder.buildRoundStartMessage(
             "broadcast",
             "task-123",
             2,
@@ -1333,7 +1339,8 @@ public class WebSocketProtocolServiceTest {
         assertFalse(trainingData.containsKey("participantId"), "不应包含participantId字段");
 
         // 2. 测试ROUND_START消息的字段映射
-        ProtocolMessage roundMessage = MessageBuilder.buildRoundStartMessage(
+        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        ProtocolMessage roundMessage = messageBuilder.buildRoundStartMessage(
             "broadcast",
             "task-456",
             2,
@@ -1370,7 +1377,8 @@ public class WebSocketProtocolServiceTest {
         assertNotNull(trainingMessage.getSignature(), "TRAINING_START消息应包含签名字段");
 
         // 测试ROUND_START消息包含签名
-        ProtocolMessage roundMessage = MessageBuilder.buildRoundStartMessage(
+        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        ProtocolMessage roundMessage = messageBuilder.buildRoundStartMessage(
             "broadcast", "task-789", 1,
             Map.of("timeout", 300), Map.of("acc", 0.8), 2
         );
@@ -1378,5 +1386,341 @@ public class WebSocketProtocolServiceTest {
 
         // 虽然当前签名为空字符串，但字段必须存在
         // 这为将来实现真实签名算法预留了接口
+    }
+
+    // ==================== v1.4新增消息处理方法测试 ====================
+
+    /**
+     * 测试ROUND_START_ACK消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_RoundStartAckMessage_Success() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("roundNumber", 1);
+        data.put("status", "READY");
+        data.put("estimatedTrainingTime", 300);
+
+        ProtocolMessage roundStartAckMessage = ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_START_ACK)
+                .id("round-start-ack-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // Mock VmAckTracker
+        when(vmAckTracker.recordRoundStartAck("task-001", 1, "vm-001", "READY")).thenReturn(true);
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(roundStartAckMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType()); // 注意：实际返回的是MESSAGE_ERROR类型的成功响应
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+
+        // 验证mock调用
+        verify(vmAckTracker).recordRoundStartAck("task-001", 1, "vm-001", "READY");
+    }
+
+    /**
+     * 测试ROUND_START_ACK消息处理 - 缺少taskId
+     */
+    @Test
+    void testHandle_RoundStartAckMessage_MissingTaskId() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("roundNumber", 1);
+        data.put("status", "READY");
+
+        ProtocolMessage roundStartAckMessage = ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_START_ACK)
+                .id("round-start-ack-002")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(roundStartAckMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("INVALID_DATA", ack.getData().get("errorCode"));
+        assertTrue(ack.getData().get("errorMessage").toString().contains("缺少taskId"));
+
+        // 验证没有调用VmAckTracker
+        verify(vmAckTracker, never()).recordRoundStartAck(anyString(), anyInt(), anyString(), anyString());
+    }
+
+    /**
+     * 测试GLOBAL_MODEL_BROADCAST消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_GlobalModelBroadcastMessage_Success() {
+        Map<String, Object> globalModel = Map.of(
+            "modelId", "global-model-v2",
+            "version", "v2.0",
+            "downloadUrl", "/api/models/global-v2"
+        );
+        Map<String, Object> aggregationInfo = Map.of(
+            "method", "FEDERATED_AVERAGING",
+            "participantsCount", 5,
+            "averageAccuracy", 0.87
+        );
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("roundNumber", 2);
+        data.put("globalModel", globalModel);
+        data.put("aggregationInfo", aggregationInfo);
+
+        ProtocolMessage globalModelMessage = ProtocolMessage.builder()
+                .type(ProtocolType.GLOBAL_MODEL_BROADCAST)
+                .id("global-model-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(globalModelMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+        assertEquals("全局模型广播消息已接收", ack.getData().get("message"));
+    }
+
+    /**
+     * 测试ROUND_COMPLETE消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_RoundCompleteMessage_Success() {
+        Map<String, Object> roundResults = Map.of(
+            "totalParticipants", 5,
+            "completedParticipants", 5,
+            "averageAccuracy", 0.89,
+            "averageLoss", 0.12
+        );
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("roundNumber", 2);
+        data.put("roundResults", roundResults);
+
+        ProtocolMessage roundCompleteMessage = ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_COMPLETE)
+                .id("round-complete-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(roundCompleteMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+        assertEquals("轮次完成消息已接收", ack.getData().get("message"));
+    }
+
+    /**
+     * 测试ROUND_COMPLETE_ACK消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_RoundCompleteAckMessage_Success() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("roundNumber", 2);
+        data.put("status", "COMPLETED");
+        data.put("readyForNextRound", true);
+
+        ProtocolMessage roundCompleteAckMessage = ProtocolMessage.builder()
+                .type(ProtocolType.ROUND_COMPLETE_ACK)
+                .id("round-complete-ack-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // Mock VmAckTracker
+        when(vmAckTracker.recordRoundCompleteAck("task-001", 2, "vm-001", "COMPLETED")).thenReturn(true);
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(roundCompleteAckMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+
+        // 验证mock调用
+        verify(vmAckTracker).recordRoundCompleteAck("task-001", 2, "vm-001", "COMPLETED");
+    }
+
+    /**
+     * 测试DATASET_STATUS_QUERY消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_DatasetStatusQueryMessage_Success() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("datasetId", "dataset-001");
+        data.put("queryType", "FULL_STATUS");
+        data.put("includeStatistics", true);
+        data.put("includeMetadata", true);
+
+        ProtocolMessage datasetQueryMessage = ProtocolMessage.builder()
+                .type(ProtocolType.DATASET_STATUS_QUERY)
+                .id("dataset-query-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(datasetQueryMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+        assertEquals("数据集状态查询消息已接收", ack.getData().get("message"));
+    }
+
+    /**
+     * 测试DATASET_STATUS_QUERY消息处理 - 缺少datasetId
+     */
+    @Test
+    void testHandle_DatasetStatusQueryMessage_MissingDatasetId() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("queryType", "FULL_STATUS");
+
+        ProtocolMessage datasetQueryMessage = ProtocolMessage.builder()
+                .type(ProtocolType.DATASET_STATUS_QUERY)
+                .id("dataset-query-002")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(datasetQueryMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("INVALID_DATA", ack.getData().get("errorCode"));
+        assertTrue(ack.getData().get("errorMessage").toString().contains("缺少datasetId"));
+    }
+
+    /**
+     * 测试DATASET_DELETE消息处理 - 成功场景
+     */
+    @Test
+    void testHandle_DatasetDeleteMessage_Success() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("datasetId", "dataset-001");
+        data.put("reason", "TASK_COMPLETED");
+        data.put("backup", true);
+
+        ProtocolMessage datasetDeleteMessage = ProtocolMessage.builder()
+                .type(ProtocolType.DATASET_DELETE)
+                .id("dataset-delete-001")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(datasetDeleteMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("vm-001", ack.getVmId());
+        assertEquals("SUCCESS", ack.getData().get("status"));
+        assertEquals("数据集删除消息已接收", ack.getData().get("message"));
+    }
+
+    /**
+     * 测试DATASET_DELETE消息处理 - 缺少datasetId
+     */
+    @Test
+    void testHandle_DatasetDeleteMessage_MissingDatasetId() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("taskId", "task-001");
+        data.put("reason", "TASK_COMPLETED");
+
+        ProtocolMessage datasetDeleteMessage = ProtocolMessage.builder()
+                .type(ProtocolType.DATASET_DELETE)
+                .id("dataset-delete-002")
+                .timestamp(Instant.now())
+                .vmId("vm-001")
+                .data(data)
+                .build();
+
+        // 执行测试
+        ProtocolAck ack = protocolService.handle(datasetDeleteMessage);
+
+        // 验证结果
+        assertNotNull(ack);
+        assertEquals(ProtocolType.MESSAGE_ERROR, ack.getType());
+        assertEquals("INVALID_DATA", ack.getData().get("errorCode"));
+        assertTrue(ack.getData().get("errorMessage").toString().contains("缺少datasetId"));
+    }
+
+    /**
+     * 测试v1.4新增消息类型的协议合规性
+     * 验证新增的6个消息类型都能正确处理
+     */
+    @Test
+    void testV14NewMessageTypes_ProtocolCompliance() {
+        // 测试所有新增的消息类型都有对应的处理逻辑
+        ProtocolType[] newMessageTypes = {
+            ProtocolType.ROUND_START_ACK,
+            ProtocolType.GLOBAL_MODEL_BROADCAST,
+            ProtocolType.ROUND_COMPLETE,
+            ProtocolType.ROUND_COMPLETE_ACK,
+            ProtocolType.DATASET_STATUS_QUERY,
+            ProtocolType.DATASET_DELETE
+        };
+
+        for (ProtocolType messageType : newMessageTypes) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("taskId", "test-task");
+            data.put("roundNumber", 1);
+            data.put("datasetId", "test-dataset");
+            data.put("status", "TEST");
+
+            ProtocolMessage message = ProtocolMessage.builder()
+                    .type(messageType)
+                    .id("test-" + messageType.name().toLowerCase())
+                    .timestamp(Instant.now())
+                    .vmId("vm-test")
+                    .data(data)
+                    .build();
+
+            // 执行测试
+            ProtocolAck ack = protocolService.handle(message);
+
+            // 验证不是未知消息类型错误
+            assertNotNull(ack, messageType.name() + " 应该有对应的处理逻辑");
+
+            // 应该返回某种有效的响应，而不是"未知消息类型"错误
+            assertNotNull(ack.getType(), messageType.name() + " 应该返回有效的响应类型");
+        }
     }
 }

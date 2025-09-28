@@ -224,12 +224,12 @@ public class CompleteFederatedLearningFlowTest {
     private void testEnhancedWebSocketFeatures(MockVirtualMachine vm) {
         try {
             // 1. 测试模型类型协商
-            vm.sendModelTypeNegotiation("RANDOM_FOREST");
+            vm.setModelType("RANDOM_FOREST");
             waitForMessageProcessing(500);
             System.out.println("  ✅ " + vm.getVmId() + " 模型类型协商成功");
 
             // 2. 测试策略配置消息
-            vm.sendAlgorithmConfig("FEDERATED_AVERAGING");
+            vm.setAlgorithm("FEDERATED_AVERAGING");
             waitForMessageProcessing(500);
             System.out.println("  ✅ " + vm.getVmId() + " 策略配置消息发送成功");
 
@@ -710,8 +710,7 @@ public class CompleteFederatedLearningFlowTest {
 
         ensureAdminLoggedIn(); // 确保token可用
         ensureTaskCreated(); // 确保任务已创建
-        ensureVmsRegistered(); // 确保虚拟机已注册
-        ensureWebSocketConnections(); // 确保WebSocket连接已建立
+        ensureVmsRegistered(); // 确保虚拟机已注ensureWebSocketConnections(); // 确保WebSocket连接已建立
 
         // 启动标准化协议的联邦学习
         ensureTaskStarted();
@@ -1545,9 +1544,13 @@ public class CompleteFederatedLearningFlowTest {
                     // 短暂延迟以增加竞争条件
                     waitForMessageProcessing(10 + (int)(Math.random() * 50));
 
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("⚠️ 线程 " + threadId + " 被中断");
+                } catch (Exception e) {
+                    if (e instanceof InterruptedException) {
+                        Thread.currentThread().interrupt();
+                        System.err.println("⚠️ 线程 " + threadId + " 被中断");
+                    } else {
+                        System.err.println("❌ 线程 " + threadId + " 执行异常: " + e.getMessage());
+                    }
                 }
             });
             futures.add(future);
@@ -2384,29 +2387,30 @@ public class CompleteFederatedLearningFlowTest {
 
         // 验证所有Mock虚拟机收到的消息
         for (MockVirtualMachine vm : mockVMs) {
-            List<ProtocolMessage> receivedMessages = vm.getReceivedMessages();
+            List<Map<String, Object>> receivedMessages = vm.getReceivedMessages();
             System.out.println("📨 检查VM " + vm.getVmId() + " 收到的 " + receivedMessages.size() + " 条消息");
 
-            for (ProtocolMessage message : receivedMessages) {
+            for (Map<String, Object> messageMap : receivedMessages) {
                 totalMessages++;
 
                 try {
-                    if (message.getType() == ProtocolType.TRAINING_START) {
-                        // 验证TRAINING_START消息格式
-                        assertStandardTrainingStartFormat(message);
+                    String messageType = (String) messageMap.get("type");
+                    if ("FEDERATED_TASK_START".equals(messageType)) {
+                        // 验证FEDERATED_TASK_START消息格式
+                        assertStandardTrainingStartFormat(messageMap);
                         compliantMessages++;
-                        System.out.println("✅ TRAINING_START消息符合协议标准: " + message.getId());
-                    } else if (message.getType() == ProtocolType.ROUND_START) {
+                        System.out.println("✅ FEDERATED_TASK_START消息符合协议标准: " + messageMap.get("id"));
+                    } else if ("ROUND_START".equals(messageType)) {
                         // 验证ROUND_START消息格式
-                        assertStandardRoundStartFormat(message);
+                        assertStandardRoundStartFormat(messageMap);
                         compliantMessages++;
-                        System.out.println("✅ ROUND_START消息符合协议标准: " + message.getId());
+                        System.out.println("✅ ROUND_START消息符合协议标准: " + messageMap.get("id"));
                     } else {
                         // 其他类型消息暂时跳过
-                        System.out.println("ℹ️ 跳过消息类型: " + message.getType() + ", ID: " + message.getId());
+                        System.out.println("ℹ️ 跳过消息类型: " + messageType + ", ID: " + messageMap.get("id"));
                     }
                 } catch (AssertionError e) {
-                    System.err.println("❌ 消息不符合协议标准: " + message.getId() + ", 错误: " + e.getMessage());
+                    System.err.println("❌ 消息不符合协议标准: " + messageMap.get("id") + ", 错误: " + e.getMessage());
                     // 记录但不中断验证，收集所有问题
                 }
             }
@@ -2433,20 +2437,20 @@ public class CompleteFederatedLearningFlowTest {
     /**
      * 验证TRAINING_START消息格式符合协议v1.4标准
      */
-    private void assertStandardTrainingStartFormat(ProtocolMessage message) {
+    private void assertStandardTrainingStartFormat(Map<String, Object> messageMap) {
         // 验证ID格式：cmd-{timestamp}-{random}
-        assertThat(message.getId())
+        assertThat((String) messageMap.get("id"))
             .isNotNull()
             .matches("cmd-\\d+-[a-f0-9]{8}");
 
         // 验证消息类型
-        assertThat(message.getType()).isEqualTo(ProtocolType.TRAINING_START);
+        assertThat((String) messageMap.get("type")).isEqualTo("FEDERATED_TASK_START");
 
         // 验证vmId不为空
-        assertThat(message.getVmId()).isNotNull().isNotEmpty();
+        assertThat((String) messageMap.get("vmId")).isNotNull().isNotEmpty();
 
         // 验证数据字段
-        Map<String, Object> data = message.getData();
+        Map<String, Object> data = (Map<String, Object>) messageMap.get("data");
         assertThat(data).isNotNull();
 
         // 验证必需的标准字段存在
@@ -2466,7 +2470,7 @@ public class CompleteFederatedLearningFlowTest {
         assertThat(data).doesNotContainKeys("instruction", "algorithm", "participantId");
 
         // 验证签名字段存在
-        assertThat(message.getSignature()).isNotNull();
+        assertThat((String) messageMap.get("signature")).isNotNull();
 
         // 验证hyperparameters对象结构
         @SuppressWarnings("unchecked")
@@ -2482,20 +2486,20 @@ public class CompleteFederatedLearningFlowTest {
     /**
      * 验证ROUND_START消息格式符合协议v1.4标准
      */
-    private void assertStandardRoundStartFormat(ProtocolMessage message) {
+    private void assertStandardRoundStartFormat(Map<String, Object> messageMap) {
         // 验证ID格式：server-{timestamp}-{random}
-        assertThat(message.getId())
+        assertThat((String) messageMap.get("id"))
             .isNotNull()
             .matches("server-\\d+-[a-f0-9]{8}");
 
         // 验证消息类型
-        assertThat(message.getType()).isEqualTo(ProtocolType.ROUND_START);
+        assertThat((String) messageMap.get("type")).isEqualTo("ROUND_START");
 
         // 验证vmId为broadcast
-        assertThat(message.getVmId()).isEqualTo("broadcast");
+        assertThat((String) messageMap.get("vmId")).isEqualTo("broadcast");
 
         // 验证数据字段
-        Map<String, Object> data = message.getData();
+        Map<String, Object> data = (Map<String, Object>) messageMap.get("data");
         assertThat(data).isNotNull();
 
         // 验证必需的标准字段存在
@@ -2514,7 +2518,7 @@ public class CompleteFederatedLearningFlowTest {
         assertThat(data).doesNotContainKeys("round", "message", "roundStartTime", "totalRounds");
 
         // 验证签名字段存在
-        assertThat(message.getSignature()).isNotNull();
+        assertThat((String) messageMap.get("signature")).isNotNull();
 
         // 验证trainingConfig对象不为空
         @SuppressWarnings("unchecked")
@@ -2551,19 +2555,19 @@ public class CompleteFederatedLearningFlowTest {
         Map<String, Integer> complianceResults = new HashMap<>();
 
         for (MockVirtualMachine vm : mockVMs) {
-            List<ProtocolMessage> messages = vm.getReceivedMessages();
+            List<Map<String, Object>> messages = vm.getReceivedMessages();
 
-            for (ProtocolMessage message : messages) {
-                String type = message.getType().toString();
+            for (Map<String, Object> messageMap : messages) {
+                String type = (String) messageMap.get("type");
                 messageTypeCounts.merge(type, 1, Integer::sum);
 
                 boolean isCompliant = false;
                 try {
-                    if (message.getType() == ProtocolType.TRAINING_START) {
-                        assertStandardTrainingStartFormat(message);
+                    if ("FEDERATED_TASK_START".equals(type)) {
+                        assertStandardTrainingStartFormat(messageMap);
                         isCompliant = true;
-                    } else if (message.getType() == ProtocolType.ROUND_START) {
-                        assertStandardRoundStartFormat(message);
+                    } else if ("ROUND_START".equals(type)) {
+                        assertStandardRoundStartFormat(messageMap);
                         isCompliant = true;
                     }
                 } catch (AssertionError e) {

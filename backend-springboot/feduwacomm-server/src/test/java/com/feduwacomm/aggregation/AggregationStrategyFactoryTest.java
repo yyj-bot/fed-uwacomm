@@ -79,7 +79,7 @@ class AggregationStrategyFactoryTest {
     @DisplayName("测试获取Scaffold策略")
     void testGetScaffoldStrategy() {
         // When
-        AggregationStrategy strategy = strategyFactory.getStrategy(FederatedAlgorithm.FEDERATED_SCAFFOLD);
+        AggregationStrategy strategy = strategyFactory.getStrategy(FederatedAlgorithm.SCAFFOLD);
 
         // Then
         assertThat(strategy).isNotNull();
@@ -116,7 +116,7 @@ class AggregationStrategyFactoryTest {
             FederatedAlgorithm.FEDERATED_AVERAGING,
             FederatedAlgorithm.FEDERATED_PROXIMAL,
             FederatedAlgorithm.FEDERATED_NOVA,
-            FederatedAlgorithm.FEDERATED_SCAFFOLD
+            FederatedAlgorithm.SCAFFOLD
         };
 
         // When & Then
@@ -146,7 +146,7 @@ class AggregationStrategyFactoryTest {
             FederatedAlgorithm.FEDERATED_AVERAGING,
             FederatedAlgorithm.FEDERATED_PROXIMAL,
             FederatedAlgorithm.FEDERATED_NOVA,
-            FederatedAlgorithm.FEDERATED_SCAFFOLD
+            FederatedAlgorithm.SCAFFOLD
         );
 
         // 确保返回的是不可变集合或副本
@@ -183,7 +183,7 @@ class AggregationStrategyFactoryTest {
             "FEDERATED_AVERAGING",
             "FEDERATED_PROXIMAL",
             "FEDERATED_NOVA",
-            "FEDERATED_SCAFFOLD"
+            "SCAFFOLD"
         );
 
         // 验证每种策略都支持通用模型类型
@@ -200,7 +200,7 @@ class AggregationStrategyFactoryTest {
             FederatedAlgorithm.FEDERATED_AVERAGING,
             FederatedAlgorithm.FEDERATED_PROXIMAL,
             FederatedAlgorithm.FEDERATED_NOVA,
-            FederatedAlgorithm.FEDERATED_SCAFFOLD
+            FederatedAlgorithm.SCAFFOLD
         };
 
         // When & Then
@@ -269,7 +269,7 @@ class AggregationStrategyFactoryTest {
         assertThat(fedNova.getMinimumParticipants()).isEqualTo(2);
 
         // Scaffold - 更复杂的控制变量算法
-        AggregationStrategy scaffold = strategyFactory.getStrategy(FederatedAlgorithm.FEDERATED_SCAFFOLD);
+        AggregationStrategy scaffold = strategyFactory.getStrategy(FederatedAlgorithm.SCAFFOLD);
         assertThat(scaffold.getStrategyName()).isEqualTo("SCAFFOLD");
         assertThat(scaffold.getMinimumParticipants()).isEqualTo(3); // 需要更多参与者
     }

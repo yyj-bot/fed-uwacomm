@@ -89,6 +89,40 @@ public class RoundLockManager {
     }
 
     /**
+     * 尝试获取轮次锁，支持超时
+     *
+     * @param taskId 任务ID
+     * @param timeoutSeconds 超时时间（秒）
+     * @return 是否获取锁成功
+     */
+    public boolean tryAcquireRoundLock(String taskId, int timeoutSeconds) {
+        if (taskId == null || taskId.trim().isEmpty()) {
+            log.error("任务ID不能为空");
+            return false;
+        }
+
+        try {
+            ReentrantLock lock = taskLocks.computeIfAbsent(taskId, k -> new ReentrantLock(true));
+
+            // 尝试在指定时间内获取锁
+            if (lock.tryLock(timeoutSeconds, TimeUnit.SECONDS)) {
+                log.debug("内存锁获取成功: taskId={}, timeout={}s", taskId, timeoutSeconds);
+                return true;
+            } else {
+                log.warn("内存锁获取超时: taskId={}, timeout={}s", taskId, timeoutSeconds);
+                return false;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取内存锁被中断: taskId={}", taskId, e);
+            return false;
+        } catch (Exception e) {
+            log.error("获取轮次锁异常: taskId={}", taskId, e);
+            return false;
+        }
+    }
+
+    /**
      * 释放轮次锁
      *
      * @param taskId 任务ID

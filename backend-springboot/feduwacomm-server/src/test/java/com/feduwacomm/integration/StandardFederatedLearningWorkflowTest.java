@@ -778,10 +778,10 @@ class StandardFederatedLearningWorkflowTest {
         System.out.println("  📨 实时消息传递验证:");
         
         ProtocolType[] messageTypes = {
-            ProtocolType.TRAINING_START,
-            ProtocolType.GLOBAL_MODEL_UPDATE,
-            ProtocolType.TRAINING_PROGRESS_QUERY_NOTIFICATION,
-            ProtocolType.TRAINING_START_NOTIFICATION
+            ProtocolType.FEDERATED_TASK_START,
+            ProtocolType.GLOBAL_MODEL_BROADCAST,
+            ProtocolType.VM_STATUS_QUERY,
+            ProtocolType.FEDERATED_TASK_START
         };
         
         for (ProtocolType messageType : messageTypes) {
