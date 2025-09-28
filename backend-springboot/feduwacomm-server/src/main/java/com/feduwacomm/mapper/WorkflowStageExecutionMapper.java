@@ -76,6 +76,20 @@ public interface WorkflowStageExecutionMapper {
     WorkflowStageExecution selectLatestByOrchestrationId(String orchestrationId);
 
     /**
+     * 根据工作流ID和阶段名查询阶段执行记录
+     */
+    @Select("""
+        SELECT id, orchestration_id, stage_name, status, started_at, completed_at,
+               input_data, output_data, error_message, created_at
+        FROM workflow_stage_executions
+        WHERE orchestration_id = #{orchestrationId} AND stage_name = #{stageName}
+        ORDER BY created_at DESC
+        LIMIT 1
+    """)
+    WorkflowStageExecution selectByOrchestrationIdAndStage(@Param("orchestrationId") String orchestrationId,
+                                                          @Param("stageName") String stageName);
+
+    /**
      * 统计各状态的阶段数量
      */
     @Select("""

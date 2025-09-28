@@ -49,6 +49,20 @@ jwt:
 
 # FedUWAComm自定义配置
 feduwacomm:
+  # 安全配置
+  security:
+    # 数字签名配置
+    signature:
+      # RSA签名配置
+      rsa:
+        key-size: 2048  # RSA密钥长度
+      # ECDSA签名配置
+      ecdsa:
+        curve: secp256r1  # 椭圆曲线参数
+      # 默认签名算法
+      default-algorithm: RSA_SHA256
+
+  # 模块配置
   module:
     name: feduwacomm # 模块名称，用于UUID前缀
   # 网络配置

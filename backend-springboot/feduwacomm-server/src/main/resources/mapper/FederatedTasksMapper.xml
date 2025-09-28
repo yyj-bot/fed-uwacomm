@@ -45,6 +45,7 @@
         <result property="config" column="config"/>
         <result property="finalResults" column="final_results"/>
         <result property="modelInfo" column="model_info"/>
+        <result property="version" column="version"/>
     </resultMap>
 
     <resultMap id="ParticipantResultMap" type="com.feduwacomm.entity.TaskParticipant">
@@ -121,6 +122,30 @@
                 , cancelled_at = #{timestamp}
             </if>
         WHERE id = #{id}
+    </update>
+
+    <!-- 带版本控制的任务状态更新（乐观锁） -->
+    <update id="updateTaskStatusWithVersion">
+        UPDATE federated_tasks SET
+            status = #{status},
+            updated_at = #{timestamp},
+            version = version + 1
+            <if test="status == 'RUNNING'">
+                , started_at = #{timestamp}
+            </if>
+            <if test="status == 'PAUSED'">
+                , paused_at = #{timestamp}
+            </if>
+            <if test="status == 'COMPLETED'">
+                , completed_at = #{timestamp}
+            </if>
+            <if test="status == 'STOPPED'">
+                , stopped_at = #{timestamp}
+            </if>
+            <if test="status == 'CANCELLED'">
+                , cancelled_at = #{timestamp}
+            </if>
+        WHERE id = #{id} AND version = #{expectedVersion}
     </update>
 
     <update id="updateTaskProgress">

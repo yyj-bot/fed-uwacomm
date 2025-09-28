@@ -17,6 +17,7 @@ import com.feduwacomm.enums.FederatedTaskStatus;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.MessageIdGenerator;
+import com.feduwacomm.service.DigitalSignatureService;
 import com.feduwacomm.service.cache.MetricsCacheService;
 import com.feduwacomm.service.WebSocketMessageSender;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,6 +83,9 @@ public class WebSocketProtocolServiceTest {
     private MessageIdGenerator messageIdGenerator;
 
     @Mock
+    private DigitalSignatureService digitalSignatureService;
+
+    @Mock
     private MetricsCacheService metricsCacheService;
 
     @Mock
@@ -106,7 +110,7 @@ public class WebSocketProtocolServiceTest {
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
             federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, taskParticipantsMapper,
             userMapper, objectMapper, eventPublisher, uuidUtil, messageBuilder, messageIdGenerator,
-            metricsCacheService, roundStateManager, vmAckTracker, roundLockManager, webSocketMessageSender);
+            digitalSignatureService, metricsCacheService, roundStateManager, vmAckTracker, roundLockManager, webSocketMessageSender);
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -123,6 +127,7 @@ public class WebSocketProtocolServiceTest {
             uuidUtil,
             messageBuilder,
             messageIdGenerator,
+            digitalSignatureService,
             metricsCacheService,
             roundStateManager,
             vmAckTracker,
@@ -1227,7 +1232,7 @@ public class WebSocketProtocolServiceTest {
         Map<String, Object> trainingConfig = Map.of("learningRate", 0.01, "timeout", 300);
         Map<String, Object> targetMetrics = Map.of("minAccuracy", 0.85, "maxLoss", 0.15, "convergenceThreshold", 0.001);
 
-        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        MessageBuilder messageBuilder = new MessageBuilder(mock(MessageIdGenerator.class), mock(DigitalSignatureService.class));
         ProtocolMessage message = messageBuilder.buildRoundStartMessage(
             "broadcast",
             "task-123",
@@ -1339,7 +1344,7 @@ public class WebSocketProtocolServiceTest {
         assertFalse(trainingData.containsKey("participantId"), "不应包含participantId字段");
 
         // 2. 测试ROUND_START消息的字段映射
-        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        MessageBuilder messageBuilder = new MessageBuilder(mock(MessageIdGenerator.class), mock(DigitalSignatureService.class));
         ProtocolMessage roundMessage = messageBuilder.buildRoundStartMessage(
             "broadcast",
             "task-456",
@@ -1377,7 +1382,7 @@ public class WebSocketProtocolServiceTest {
         assertNotNull(trainingMessage.getSignature(), "TRAINING_START消息应包含签名字段");
 
         // 测试ROUND_START消息包含签名
-        MessageBuilder messageBuilder = new MessageBuilder(new MessageIdGenerator());
+        MessageBuilder messageBuilder = new MessageBuilder(mock(MessageIdGenerator.class), mock(DigitalSignatureService.class));
         ProtocolMessage roundMessage = messageBuilder.buildRoundStartMessage(
             "broadcast", "task-789", 1,
             Map.of("timeout", 300), Map.of("acc", 0.8), 2

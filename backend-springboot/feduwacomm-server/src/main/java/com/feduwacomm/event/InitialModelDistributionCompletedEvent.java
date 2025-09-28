@@ -148,6 +148,27 @@ public class InitialModelDistributionCompletedEvent extends ApplicationEvent {
     public double getSuccessRate() {
         return totalDistributions > 0 ? (double) successfulDistributions / totalDistributions : 0.0;
     }
+
+    /**
+     * 获取成功的虚拟机数量
+     */
+    public int getSuccessVmCount() {
+        return successfulDistributions;
+    }
+
+    /**
+     * 获取失败的虚拟机数量
+     */
+    public int getFailedVmCount() {
+        return failedDistributions;
+    }
+
+    /**
+     * 获取分发持续时间（毫秒）
+     */
+    public long getDuration() {
+        return distributionDuration;
+    }
     
     @Override
     public String toString() {
