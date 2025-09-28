@@ -18,5 +18,6 @@ public class TaskStopDTO {
     @Size(max = 500, message = "停止原因长度不能超过500字符")
     private String reason;
 
+    @Builder.Default
     private Boolean saveCheckpoint = true;
 }

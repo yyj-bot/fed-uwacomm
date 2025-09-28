@@ -90,7 +90,7 @@ public class WebSocketEventListener {
                     .data(data)
                     .signature("temp-signature") // 临时签名，后续应使用真实签名
                     .build();
-                connectMessage.setTimestampFromInstant(Instant.now());
+                connectMessage.setTimestamp(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", connectMessage);
 
             } catch (Exception e) {
@@ -150,7 +150,7 @@ public class WebSocketEventListener {
                     .data(data)
                     .signature("temp-signature") // 临时签名，后续应使用真实签名
                     .build();
-                disconnectMessage.setTimestampFromInstant(Instant.now());
+                disconnectMessage.setTimestamp(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", disconnectMessage);
 
             } catch (Exception e) {
@@ -173,7 +173,7 @@ public class WebSocketEventListener {
                 .data(data)
                 .signature("temp-signature") // 临时签名，后续应使用真实签名
                 .build();
-            leaveMessage.setTimestampFromInstant(Instant.now());
+            leaveMessage.setTimestamp(Instant.now());
             messagingTemplate.convertAndSend("/topic/public", leaveMessage);
         }
     }
