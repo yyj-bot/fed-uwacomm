@@ -321,22 +321,31 @@ const TaskDetailPage: React.FC = () => {
 
   const statusConfig = TASK_STATUS_CONFIG[currentTask.status as keyof typeof TASK_STATUS_CONFIG]
   
-  // 正确计算进度数据
-  const progressPercent = getTaskProgress(currentTask)
+  // 从currentTask中提取进度信息
   const progress = {
-    overallProgress: progressPercent,
+    overallProgress: currentTask.progress || 0,
     currentRound: currentTask.currentRound || 0,
     totalRounds: currentTask.totalRounds || 0
   }
   
-  // 数据已正确获取
+  const isOperating = false  // 简化处理
+  // 根据taskId获取对应的结果和日志数据
+  const results = taskId ? taskResults[taskId] : null
+  const logs = taskId ? taskLogs[taskId] : null
   
-  // 检查是否正在执行操作
-  const isOperating = isTaskOperating(currentTask.taskId)
-  
-  // 使用store中的数据
-  const results = getTaskResults(currentTask.taskId)
-  const logs = getTaskLogs(currentTask.taskId)
+  // 调试信息
+  console.log('TaskDetailPage Debug:', {
+    taskId,
+    currentTask: currentTask?.taskName,
+    status: currentTask?.status,
+    taskResults,
+    taskLogs,
+    results,
+    logs,
+    hasResults: !!results,
+    hasLogs: !!logs,
+    finalResults: results ? (results as any).finalResults : null
+  })
   const trainingData = getTrainingRoundsData()
 
   return (
@@ -440,20 +449,13 @@ const TaskDetailPage: React.FC = () => {
                       {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
                     <Descriptions.Item label="更新时间">
-                      {currentTask.updatedAt ? 
-                        new Date(currentTask.updatedAt).toLocaleString('zh-CN') : 
-                        new Date(currentTask.createdAt).toLocaleString('zh-CN')
-                      }
+                      {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
                     <Descriptions.Item label="算法">
-                      <Tag color="blue">{currentTask.algorithm}</Tag>
+                      {currentTask.algorithm}
                     </Descriptions.Item>
-                    <Descriptions.Item label="数据集ID">{currentTask.datasetConfig?.datasetId || 'N/A'}</Descriptions.Item>
                     <Descriptions.Item label="参与者数量">
                       {currentTask.participantCount || 0}个
-                    </Descriptions.Item>
-                    <Descriptions.Item label="描述" span={2}>
-                      {currentTask.description || '无描述'}
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -493,47 +495,7 @@ const TaskDetailPage: React.FC = () => {
             </Row>
 
             {/* 配置信息 */}
-            <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-              <Col xs={24} lg={12}>
-                <Card title="超参数配置" size="small">
-                  <Descriptions column={1} size="small">
-                    <Descriptions.Item label="学习率">
-                      {currentTask.hyperparameters?.learningRate || 'N/A'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="批次大小">
-                      {currentTask.hyperparameters?.batchSize || 'N/A'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="本地训练轮数">
-                      {currentTask.hyperparameters?.epochs || 'N/A'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="全局训练轮数">
-                      {currentTask.hyperparameters?.rounds || 'N/A'}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </Card>
-              </Col>
-
-              <Col xs={24} lg={12}>
-                <Card title="资源配置" size="small">
-                  <Descriptions column={1} size="small">
-                    <Descriptions.Item label="CPU要求">
-                      {currentTask.participants?.[0]?.constraints?.maxCpuUsage ? 
-                        Math.ceil((currentTask.participants[0].constraints.maxCpuUsage / 100) * 8) : 0} 核心
-                    </Descriptions.Item>
-                    <Descriptions.Item label="内存要求">
-                      {currentTask.participants?.[0]?.constraints?.maxMemoryUsage ? 
-                        Math.ceil((currentTask.participants[0].constraints.maxMemoryUsage / 100) * 8192) : 0} MB
-                    </Descriptions.Item>
-                    <Descriptions.Item label="GPU要求">
-                      {currentTask.participants?.some(p => p.capabilities?.includes('GPU')) ? '是' : '否'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="超时设置">
-                      {currentTask.schedule?.timeout || 0} 秒
-                    </Descriptions.Item>
-                  </Descriptions>
-                </Card>
-              </Col>
-            </Row>
+            {/* 移除超参数配置和资源配置，因为接口3.8不提供这些数据 */}
           </TabPane>
 
           {/* 参与者 */}
@@ -619,30 +581,62 @@ const TaskDetailPage: React.FC = () => {
           {/* 结果 */}
           <TabPane tab="结果" key="results">
             <Card>
-              {results?.finalResults ? (
-                <Descriptions column={2} size="small">
-                  <Descriptions.Item label="最终准确率">
-                    {results.finalResults.accuracy ? `${(results.finalResults.accuracy * 100).toFixed(2)}%` : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="最终损失">
-                    {results.finalResults.loss ? results.finalResults.loss.toFixed(4) : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="精确率">
-                    {results.finalResults.precision ? `${(results.finalResults.precision * 100).toFixed(2)}%` : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="召回率">
-                    {results.finalResults.recall ? `${(results.finalResults.recall * 100).toFixed(2)}%` : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="F1分数">
-                    {results.finalResults.f1Score ? results.finalResults.f1Score.toFixed(4) : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="RMSE">
-                    {results.finalResults.rmse ? results.finalResults.rmse.toFixed(4) : 'N/A'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="MAE">
-                    {results.finalResults.mae ? results.finalResults.mae.toFixed(4) : 'N/A'}
-                  </Descriptions.Item>
-                </Descriptions>
+              {results ? (
+                <div>
+                  {/* 最终结果 */}
+                  {(results as any).finalResults ? (
+                    <div>
+                      <h4>最终结果</h4>
+                      <Descriptions column={2} size="small">
+                        <Descriptions.Item label="最终准确率">
+                          {`${((results as any).finalResults.accuracy * 100).toFixed(2)}%`}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="最终损失">
+                          {(results as any).finalResults.loss.toFixed(4)}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="精确率">
+                          {(results as any).finalResults.precision ? `${((results as any).finalResults.precision * 100).toFixed(2)}%` : 'N/A'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="召回率">
+                          {(results as any).finalResults.recall ? `${((results as any).finalResults.recall * 100).toFixed(2)}%` : 'N/A'}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </div>
+                  ) : (
+                    <div>
+                      <h4>训练进展</h4>
+                      <p>任务正在运行中，最终结果将在完成后显示。</p>
+                    </div>
+                  )}
+                  
+                  {/* 轮次结果 */}
+                  {(results as any).roundResults && (results as any).roundResults.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <h4>轮次结果</h4>
+                      <Table
+                        columns={[
+                          { title: '轮次', dataIndex: 'round', key: 'round' },
+                          { 
+                            title: '准确率', 
+                            dataIndex: 'accuracy', 
+                            key: 'accuracy',
+                            render: (acc: number) => `${(acc * 100).toFixed(2)}%`
+                          },
+                          { 
+                            title: '损失', 
+                            dataIndex: 'loss', 
+                            key: 'loss',
+                            render: (loss: number) => loss.toFixed(4)
+                          }
+                        ]}
+                        dataSource={(results as any).roundResults}
+                        rowKey="round"
+                        pagination={false}
+                        size="small"
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <Empty description="暂无结果数据" />
               )}

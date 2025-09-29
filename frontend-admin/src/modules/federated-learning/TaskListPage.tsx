@@ -346,13 +346,6 @@ const TaskListPage: React.FC = () => {
       )
     },
     {
-      title: '算法',
-      dataIndex: 'algorithm',
-      key: 'algorithm',
-      width: 120,
-      ellipsis: true
-    },
-    {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',

@@ -123,10 +123,8 @@ export const mockFederatedTaskDetails = [
     taskType: 'CLASSIFICATION' as const,
     status: 'RUNNING' as const,
     algorithm: 'FEDERATED_AVERAGING',
-    description: '基于声学传播特征的水声目标分类任务，采用联邦平均算法训练神经网络模型',
     createdAt: '2024-01-01T09:00:00.000Z',
     startedAt: '2024-01-01T10:00:00.000Z',
-    updatedAt: '2024-01-01T17:00:00.000Z',
     currentRound: 5,
     totalRounds: 15,
     progress: 33.33,
@@ -141,7 +139,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.234,
         accuracy: 0.876,
         dataRatio: 0.6,
-        dataSource: 'bellhop_features_001.csv',
         capabilities: ['GPU', 'HIGH_MEMORY'],
         constraints: {
           maxCpuUsage: 80,
@@ -157,7 +154,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.256,
         accuracy: 0.854,
         dataRatio: 0.4,
-        dataSource: 'bellhop_features_002.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 70,
@@ -172,40 +168,14 @@ export const mockFederatedTaskDetails = [
       dataProcessed: 15000,
       estimatedTimeRemaining: 1800
     },
-    hyperparameters: {
-      learningRate: 0.01,
-      batchSize: 32,
-      epochs: 100,
-      rounds: 15,
-      minParticipants: 2,
-      aggregationMethod: 'WEIGHTED_AVERAGE'
-    },
-    modelConfig: {
-      modelType: 'RANDOM_FOREST',
-      featureColumns: ['frequency', 'depth', 'range', 'sound_speed', 'temperature'],
-      targetColumn: 'transmission_loss',
-      testSize: 0.2,
-      randomState: 42
-    },
     datasetConfig: {
       datasetId: 'e5f67890123456789012345678901234',
       distributionStrategy: 'BALANCED',
       totalRows: 10000,
-      distributionRatios: {
-        'a1b2c3d4e5f678901234567890123456': 0.6,
-        'b2c3d4e5f67890123456789012345678': 0.4
-      },
-      validationSplit: 0.2,
-      testSplit: 0.1,
       qualityMetrics: {
         iidScore: 0.85,
         balanceScore: 0.92
       }
-    },
-    schedule: {
-      startTime: '2024-01-01T10:00:00.000Z',
-      endTime: '2024-01-01T18:00:00.000Z',
-      timeout: 3600
     }
   },
   {
@@ -214,10 +184,8 @@ export const mockFederatedTaskDetails = [
     taskType: 'REGRESSION' as const,
     status: 'COMPLETED' as const,
     algorithm: 'FEDERATED_AVERAGING',
-    description: '基于深海声学数据的传播损失回归预测任务，使用联邦平均算法优化线性回归模型',
     createdAt: '2024-01-01T08:00:00.000Z',
     startedAt: '2024-01-01T08:30:00.000Z',
-    updatedAt: '2024-01-01T11:00:00.000Z',
     completedAt: '2024-01-01T11:00:00.000Z',
     currentRound: 12,
     totalRounds: 12,
@@ -233,7 +201,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.089,
         accuracy: 0.912,
         dataRatio: 0.4,
-        dataSource: 'deep_sea_acoustic_001.csv',
         capabilities: ['GPU', 'HIGH_MEMORY'],
         constraints: {
           maxCpuUsage: 80,
@@ -249,7 +216,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.094,
         accuracy: 0.898,
         dataRatio: 0.35,
-        dataSource: 'deep_sea_acoustic_002.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 70,
@@ -265,7 +231,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.098,
         accuracy: 0.885,
         dataRatio: 0.25,
-        dataSource: 'deep_sea_acoustic_003.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 60,
@@ -280,41 +245,14 @@ export const mockFederatedTaskDetails = [
       dataProcessed: 25000,
       estimatedTimeRemaining: 0
     },
-    hyperparameters: {
-      learningRate: 0.005,
-      batchSize: 64,
-      epochs: 80,
-      rounds: 12,
-      minParticipants: 3,
-      aggregationMethod: 'WEIGHTED_AVERAGE'
-    },
-    modelConfig: {
-      modelType: 'LINEAR_REGRESSION',
-      featureColumns: ['frequency', 'depth', 'range', 'sound_speed', 'temperature', 'salinity'],
-      targetColumn: 'arrival_time',
-      testSize: 0.2,
-      randomState: 42
-    },
     datasetConfig: {
       datasetId: 'f6789012345678901234567890123456',
       distributionStrategy: 'BALANCED',
-      totalRows: 25000,
-      distributionRatios: {
-        'a1b2c3d4e5f678901234567890123456': 0.4,
-        'b2c3d4e5f67890123456789012345678': 0.35,
-        'c3d4e5f67890123456789012345678901': 0.25
-      },
-      validationSplit: 0.15,
-      testSplit: 0.15,
+      totalRows: 15000,
       qualityMetrics: {
         iidScore: 0.78,
         balanceScore: 0.88
       }
-    },
-    schedule: {
-      startTime: '2024-01-01T08:30:00.000Z',
-      endTime: '2024-01-01T11:00:00.000Z',
-      timeout: 2700
     }
   },
   {
@@ -323,11 +261,8 @@ export const mockFederatedTaskDetails = [
     taskType: 'ANOMALY_DETECTION' as const,
     status: 'PAUSED' as const,
     algorithm: 'FEDERATED_PROXIMAL',
-    description: '基于水下声学信号的异常事件检测任务，采用联邦近端算法训练异常检测模型',
     createdAt: '2024-01-01T07:00:00.000Z',
     startedAt: '2024-01-01T07:30:00.000Z',
-    updatedAt: '2024-01-01T08:40:00.000Z',
-    pausedAt: '2024-01-01T08:40:00.000Z',
     currentRound: 3,
     totalRounds: 12,
     progress: 25.0,
@@ -342,7 +277,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.345,
         accuracy: 0.789,
         dataRatio: 0.3,
-        dataSource: 'underwater_anomaly_001.csv',
         capabilities: ['GPU', 'HIGH_MEMORY'],
         constraints: {
           maxCpuUsage: 80,
@@ -358,7 +292,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.356,
         accuracy: 0.765,
         dataRatio: 0.25,
-        dataSource: 'underwater_anomaly_002.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 70,
@@ -374,7 +307,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.367,
         accuracy: 0.756,
         dataRatio: 0.25,
-        dataSource: 'underwater_anomaly_003.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 60,
@@ -390,7 +322,6 @@ export const mockFederatedTaskDetails = [
         loss: 0.372,
         accuracy: 0.743,
         dataRatio: 0.2,
-        dataSource: 'underwater_anomaly_004.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 50,
@@ -405,43 +336,14 @@ export const mockFederatedTaskDetails = [
       dataProcessed: 8000,
       estimatedTimeRemaining: 2700
     },
-    hyperparameters: {
-      learningRate: 0.008,
-      batchSize: 16,
-      epochs: 50,
-      rounds: 12,
-      minParticipants: 4,
-      aggregationMethod: 'PROXIMAL',
-      proximalMu: 0.1
-    },
-    modelConfig: {
-      modelType: 'NEURAL_NETWORK',
-      featureColumns: ['amplitude', 'frequency', 'duration', 'spectral_centroid', 'zero_crossing_rate'],
-      targetColumn: 'anomaly_score',
-      testSize: 0.25,
-      randomState: 42
-    },
     datasetConfig: {
       datasetId: 'e5f67890123456789012345678901234',
       distributionStrategy: 'IID_ADAPTIVE',
       totalRows: 12000,
-      distributionRatios: {
-        'a1b2c3d4e5f678901234567890123456': 0.3,
-        'b2c3d4e5f67890123456789012345678': 0.25,
-        'c3d4e5f67890123456789012345678901': 0.25,
-        'd4e5f678901234567890123456789012': 0.2
-      },
-      validationSplit: 0.2,
-      testSplit: 0.2,
       qualityMetrics: {
         iidScore: 0.65,
         balanceScore: 0.82
       }
-    },
-    schedule: {
-      startTime: '2024-01-01T07:30:00.000Z',
-      endTime: '2024-01-01T15:00:00.000Z',
-      timeout: 1800
     }
   },
   {
@@ -450,9 +352,7 @@ export const mockFederatedTaskDetails = [
     taskType: 'CLUSTERING' as const,
     status: 'CONFIGURED' as const,
     algorithm: 'FEDERATED_AVERAGING',
-    description: '基于大规模海洋声学数据的自适应聚类分析任务，使用联邦平均算法优化K-Means聚类模型',
     createdAt: '2024-01-01T06:00:00.000Z',
-    updatedAt: '2024-01-01T06:15:00.000Z',
     currentRound: 0,
     totalRounds: 20,
     progress: 0,
@@ -467,7 +367,6 @@ export const mockFederatedTaskDetails = [
         loss: 0,
         accuracy: 0,
         dataRatio: 0.25,
-        dataSource: 'marine_acoustic_cluster_001.csv',
         capabilities: ['GPU', 'HIGH_MEMORY'],
         constraints: {
           maxCpuUsage: 80,
@@ -483,7 +382,6 @@ export const mockFederatedTaskDetails = [
         loss: 0,
         accuracy: 0,
         dataRatio: 0.2,
-        dataSource: 'marine_acoustic_cluster_002.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 70,
@@ -499,7 +397,6 @@ export const mockFederatedTaskDetails = [
         loss: 0,
         accuracy: 0,
         dataRatio: 0.2,
-        dataSource: 'marine_acoustic_cluster_003.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 60,
@@ -515,7 +412,6 @@ export const mockFederatedTaskDetails = [
         loss: 0,
         accuracy: 0,
         dataRatio: 0.2,
-        dataSource: 'marine_acoustic_cluster_004.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 50,
@@ -531,7 +427,6 @@ export const mockFederatedTaskDetails = [
         loss: 0,
         accuracy: 0,
         dataRatio: 0.15,
-        dataSource: 'marine_acoustic_cluster_005.csv',
         capabilities: ['TRAINING'],
         constraints: {
           maxCpuUsage: 40,
@@ -546,44 +441,14 @@ export const mockFederatedTaskDetails = [
       dataProcessed: 0,
       estimatedTimeRemaining: 3600
     },
-    hyperparameters: {
-      learningRate: 0.02,
-      batchSize: 128,
-      epochs: 200,
-      rounds: 20,
-      minParticipants: 5,
-      aggregationMethod: 'WEIGHTED_AVERAGE',
-      clusterCount: 8
-    },
-    modelConfig: {
-      modelType: 'K_MEANS',
-      featureColumns: ['spectral_features', 'temporal_features', 'frequency_domain', 'statistical_moments'],
-      clusterCount: 8,
-      testSize: 0.3,
-      randomState: 42
-    },
     datasetConfig: {
       datasetId: 'f6789012345678901234567890123456',
       distributionStrategy: 'CLUSTER_BALANCED',
-      totalRows: 50000,
-      distributionRatios: {
-        'a1b2c3d4e5f678901234567890123456': 0.25,
-        'b2c3d4e5f67890123456789012345678': 0.2,
-        'c3d4e5f67890123456789012345678901': 0.2,
-        'd4e5f678901234567890123456789012': 0.2,
-        'e5f67890123456789012345678901234': 0.15
-      },
-      validationSplit: 0.15,
-      testSplit: 0.15,
+      totalRows: 20000,
       qualityMetrics: {
         iidScore: 0.72,
         balanceScore: 0.95
       }
-    },
-    schedule: {
-      startTime: '2024-01-01T08:00:00.000Z',
-      endTime: '2024-01-01T20:00:00.000Z',
-      timeout: 2400
     }
   }
 ]

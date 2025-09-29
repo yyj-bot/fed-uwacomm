@@ -274,24 +274,6 @@ export const federatedTaskHandlers = [
   http.post('/api/federated/tasks/:taskId/start', async ({ params }) => {
     const taskId = params.taskId as string
     
-    // 更新mock数据中的任务状态
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      (mockFederatedTasks[taskIndex] as any).status = 'RUNNING'
-      ;(mockFederatedTasks[taskIndex] as any).startedAt = new Date().toISOString()
-      ;(mockFederatedTasks[taskIndex] as any).updatedAt = new Date().toISOString()
-      ;(mockFederatedTasks[taskIndex] as any).currentRound = 1
-    }
-    
-    // 更新详情数据中的任务状态
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      (mockFederatedTaskDetails[detailIndex] as any).status = 'RUNNING'
-      ;(mockFederatedTaskDetails[detailIndex] as any).startedAt = new Date().toISOString()
-      ;(mockFederatedTaskDetails[detailIndex] as any).updatedAt = new Date().toISOString()
-      ;(mockFederatedTaskDetails[detailIndex] as any).currentRound = 1
-    }
-    
     return HttpResponse.json({
       code: 200,
       message: '任务启动成功',
@@ -299,7 +281,7 @@ export const federatedTaskHandlers = [
         taskId,
         status: 'RUNNING',
         startedAt: new Date().toISOString(),
-        currentRound: 1,
+        currentRound: 0,
         participants: [
           {
             vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -320,22 +302,6 @@ export const federatedTaskHandlers = [
   http.post('/api/federated/tasks/:taskId/pause', async ({ params }) => {
     const taskId = params.taskId as string
     
-    // 更新mock数据中的任务状态
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      (mockFederatedTasks[taskIndex] as any).status = 'PAUSED'
-      ;(mockFederatedTasks[taskIndex] as any).pausedAt = new Date().toISOString()
-      ;(mockFederatedTasks[taskIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
-    // 更新详情数据中的任务状态
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      (mockFederatedTaskDetails[detailIndex] as any).status = 'PAUSED'
-      ;(mockFederatedTaskDetails[detailIndex] as any).pausedAt = new Date().toISOString()
-      ;(mockFederatedTaskDetails[detailIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
     return HttpResponse.json({
       code: 200,
       message: '任务暂停成功',
@@ -343,9 +309,9 @@ export const federatedTaskHandlers = [
         taskId,
         status: 'PAUSED',
         pausedAt: new Date().toISOString(),
-        currentRound: mockFederatedTasks[taskIndex]?.currentRound || 5,
+        currentRound: 5,
         resumePoint: {
-          round: mockFederatedTasks[taskIndex]?.currentRound || 5,
+          round: 5,
           step: 'AGGREGATION'
         }
       }
@@ -356,22 +322,6 @@ export const federatedTaskHandlers = [
   http.post('/api/federated/tasks/:taskId/resume', async ({ params }) => {
     const taskId = params.taskId as string
     
-    // 更新mock数据中的任务状态
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      (mockFederatedTasks[taskIndex] as any).status = 'RUNNING'
-      delete (mockFederatedTasks[taskIndex] as any).pausedAt
-      ;(mockFederatedTasks[taskIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
-    // 更新详情数据中的任务状态
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      (mockFederatedTaskDetails[detailIndex] as any).status = 'RUNNING'
-      delete (mockFederatedTaskDetails[detailIndex] as any).pausedAt
-      ;(mockFederatedTaskDetails[detailIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
     return HttpResponse.json({
       code: 200,
       message: '任务恢复成功',
@@ -379,7 +329,7 @@ export const federatedTaskHandlers = [
         taskId,
         status: 'RUNNING',
         resumedAt: new Date().toISOString(),
-        currentRound: mockFederatedTasks[taskIndex]?.currentRound || 5
+        currentRound: 5
       }
     })
   }),
@@ -389,22 +339,6 @@ export const federatedTaskHandlers = [
     const taskId = params.taskId as string
     const body = await request.json() as any
     
-    // 更新mock数据中的任务状态
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      (mockFederatedTasks[taskIndex] as any).status = 'STOPPED'
-      ;(mockFederatedTasks[taskIndex] as any).completedAt = new Date().toISOString()
-      ;(mockFederatedTasks[taskIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
-    // 更新详情数据中的任务状态
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      (mockFederatedTaskDetails[detailIndex] as any).status = 'STOPPED'
-      ;(mockFederatedTaskDetails[detailIndex] as any).completedAt = new Date().toISOString()
-      ;(mockFederatedTaskDetails[detailIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
     return HttpResponse.json({
       code: 200,
       message: '任务停止成功',
@@ -412,9 +346,9 @@ export const federatedTaskHandlers = [
         taskId,
         status: 'STOPPED',
         stoppedAt: new Date().toISOString(),
-        finalRound: mockFederatedTasks[taskIndex]?.currentRound || 8,
+        finalRound: 8,
         checkpointSaved: body.saveCheckpoint !== false,
-        checkpointPath: body.saveCheckpoint !== false ? `/checkpoints/task_${taskId}_round_${mockFederatedTasks[taskIndex]?.currentRound || 8}.pkl` : undefined
+        checkpointPath: body.saveCheckpoint !== false ? `/checkpoints/task_${taskId}_round_8.pkl` : undefined
       }
     })
   }),
@@ -423,22 +357,6 @@ export const federatedTaskHandlers = [
   http.post('/api/federated/tasks/:taskId/cancel', async ({ params, request }) => {
     const taskId = params.taskId as string
     const body = await request.json() as any
-    
-    // 更新mock数据中的任务状态
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      (mockFederatedTasks[taskIndex] as any).status = 'CANCELLED'
-      ;(mockFederatedTasks[taskIndex] as any).completedAt = new Date().toISOString()
-      ;(mockFederatedTasks[taskIndex] as any).updatedAt = new Date().toISOString()
-    }
-    
-    // 更新详情数据中的任务状态
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      (mockFederatedTaskDetails[detailIndex] as any).status = 'CANCELLED'
-      ;(mockFederatedTaskDetails[detailIndex] as any).completedAt = new Date().toISOString()
-      ;(mockFederatedTaskDetails[detailIndex] as any).updatedAt = new Date().toISOString()
-    }
     
     return HttpResponse.json({
       code: 200,
@@ -732,28 +650,6 @@ export const federatedTaskHandlers = [
   http.delete('/api/federated/tasks/:taskId', async ({ params, request }) => {
     const taskId = params.taskId as string
     const body = await request.json() as any
-    
-    // 从mock数据中删除任务
-    const taskIndex = mockFederatedTasks.findIndex(task => task.taskId === taskId)
-    if (taskIndex !== -1) {
-      mockFederatedTasks.splice(taskIndex, 1)
-    }
-    
-    // 从详情数据中删除任务
-    const detailIndex = mockFederatedTaskDetails.findIndex(task => task.taskId === taskId)
-    if (detailIndex !== -1) {
-      mockFederatedTaskDetails.splice(detailIndex, 1)
-    }
-    
-    // 删除相关的结果和日志数据
-    const resultIndex = mockTaskResults.findIndex(result => result.taskId === taskId)
-    if (resultIndex !== -1) {
-      mockTaskResults.splice(resultIndex, 1)
-    }
-    
-    if (mockTaskLogs[taskId]) {
-      delete mockTaskLogs[taskId]
-    }
     
     return HttpResponse.json({
       code: 200,

@@ -967,14 +967,8 @@ export class FederatedTaskService {
       progress: task.progress,
       finalAccuracy: task.finalAccuracy,
       algorithm: task.algorithm,
-      description: task.description,
-      updatedAt: task.updatedAt,
       participants: task.participants,
-      metrics: task.metrics,
-      hyperparameters: task.hyperparameters,
-      modelConfig: task.modelConfig,
-      datasetConfig: task.datasetConfig,
-      schedule: task.schedule
+      metrics: task.metrics
     }
   }
 

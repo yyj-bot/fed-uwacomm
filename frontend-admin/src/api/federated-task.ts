@@ -2,8 +2,7 @@ import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   PaginatedResponse,
-  PaginationParams,
-  FederatedTaskDetails
+  PaginationParams
 } from '@/types'
 
 // 创建联邦学习任务API实例
@@ -29,7 +28,44 @@ interface FederatedTask {
 }
 
 // 任务详情类型 - v1.3 增强版
-// FederatedTaskDetails 类型定义已移至 types/index.ts
+interface FederatedTaskDetails extends FederatedTask {
+  algorithm: string
+  participants: Array<{
+    vmId: string
+    role: string
+    status: string
+    lastHeartbeat?: string
+    currentEpoch?: number
+    loss?: number
+    accuracy?: number
+    /** @deprecated 使用 datasetConfig 代替 */
+    dataSource?: string
+    // 🆕 v1.3 新增
+    dataRatio?: number
+    capabilities?: string[]
+    constraints?: {
+      maxCpuUsage?: number
+      maxMemoryUsage?: number
+    }
+  }>
+  metrics?: {
+    globalLoss: number
+    globalAccuracy: number
+    communicationRounds: number
+    dataProcessed: number
+    estimatedTimeRemaining: number
+  }
+  // 🆕 v1.3 新增：数据集配置信息
+  datasetConfig?: {
+    datasetId: string
+    distributionStrategy: string
+    totalRows: number
+    qualityMetrics?: {
+      iidScore: number
+      balanceScore: number
+    }
+  }
+}
 
 // 任务结果类型
 interface TaskResults {
@@ -1031,7 +1067,7 @@ export const federatedTask = {
     return response.data.data
   },
 
-  // ==================== v1.4 新增：联邦学习流程编排接口组 ====================
+  // ==================== 新增：联邦学习流程编排接口组 ====================
   
   /**
    * 2.1 启动联邦学习流程
