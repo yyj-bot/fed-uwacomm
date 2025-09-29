@@ -38,6 +38,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private VmJwtUtil vmJwtUtil;
 
     @Autowired
+    @org.springframework.context.annotation.Lazy
     private com.feduwacomm.service.VmInstanceService vmInstanceService;
 
     @Autowired

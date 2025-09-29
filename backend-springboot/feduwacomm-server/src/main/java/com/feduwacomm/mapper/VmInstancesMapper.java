@@ -31,6 +31,14 @@ public interface VmInstancesMapper {
      */
     VmInstance selectByVmId(@Param("id") String id);
 
+    /**
+     * 根据id查询虚拟机实例（别名方法）
+     *
+     * @param id 虚拟机唯一标识
+     * @return 虚拟机实例对象
+     */
+    VmInstance selectById(@Param("id") String id);
+
 
     /**
      * 根据secretId查询虚拟机实例

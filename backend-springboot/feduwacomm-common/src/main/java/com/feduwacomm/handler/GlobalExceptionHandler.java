@@ -83,37 +83,45 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<String> handleRuntimeException(RuntimeException ex) {
+    public ResponseEntity<Result<String>> handleRuntimeException(RuntimeException ex) {
+        // 如果是UserException，跳过此处理器
+        if (ex instanceof UserException) {
+            throw ex; // 重新抛出，让UserException处理器处理
+        }
+
         // 添加详细的异常日志
         System.err.println("=== 全局异常处理器捕获到RuntimeException ===");
         System.err.println("异常类型: " + ex.getClass().getName());
         System.err.println("异常消息: " + ex.getMessage());
         ex.printStackTrace();
         System.err.println("=== 异常处理结束 ===");
-        return Result.failure(500, "服务器内部错误", ex.getMessage());
+
+        Result<String> result = Result.failure(500, "服务器内部错误", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
     /**
      * 处理认证异常
-     * 
+     *
      * @param ex 认证异常
      * @return 错误响应
      */
     @ExceptionHandler(AuthenticationException.class)
-    public Result<String> handleAuthenticationException(AuthenticationException ex) {
-        return Result.failure(401, "认证失败", ex.getMessage());
+    public ResponseEntity<Result<String>> handleAuthenticationException(AuthenticationException ex) {
+        Result<String> result = Result.failure(401, "认证失败", ex.getMessage());
+        return ResponseEntity.status(401).body(result);
     }
 
     /**
      * 处理权限异常
-     * 
+     *
      * @param ex 权限异常
      * @return 错误响应
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public Result<String> handleAccessDeniedException(AccessDeniedException ex) {
-        return Result.failure(403, "权限不足", ex.getMessage());
+    public ResponseEntity<Result<String>> handleAccessDeniedException(AccessDeniedException ex) {
+        Result<String> result = Result.failure(403, "权限不足", ex.getMessage());
+        return ResponseEntity.status(403).body(result);
     }
 
     /**
@@ -123,8 +131,9 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(UserException.class)
-    public Result<String> handleUserException(UserException ex) {
-        return Result.failure(ex.getCode(), ex.getMessage(), ex.getMessage());
+    public ResponseEntity<Result<String>> handleUserException(UserException ex) {
+        Result<String> result = Result.failure(ex.getCode(), ex.getMessage(), ex.getMessage());
+        return ResponseEntity.status(ex.getCode()).body(result);
     }
 
     /**

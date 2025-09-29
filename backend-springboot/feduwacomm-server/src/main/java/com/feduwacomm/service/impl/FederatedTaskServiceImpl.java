@@ -27,6 +27,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -833,19 +834,39 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private TaskDetailVO.MetricsVO buildTaskMetrics(FederatedTask task, List<TaskParticipant> participants) {
         String taskId = task.getId();
 
-        // TODO: 缓存功能将在后续版本中实现，直接使用数据库查询
-        log.debug("使用数据库查询获取全局指标: taskId={}", taskId);
+        // 优先级1：尝试从缓存获取全局指标
+        try {
+            Optional<GlobalMetrics> cachedMetricsOpt = metricsCacheService.getGlobalMetrics(taskId);
+            if (cachedMetricsOpt.isPresent() && cachedMetricsOpt.get().isValid(30)) {
+                GlobalMetrics cachedMetrics = cachedMetricsOpt.get();
+                log.debug("从缓存获取全局指标成功: taskId={}", taskId);
+                return convertGlobalMetricsToVO(cachedMetrics);
+            }
+        } catch (CacheValidationException e) {
+            log.warn("缓存指标验证失败: taskId={}, error={}", taskId, e.getMessage());
+        } catch (Exception e) {
+            log.warn("缓存获取失败，降级到数据库查询: taskId={}, error={}", taskId, e.getMessage());
+        }
 
-        // 第三优先级：降级到数据库查询（原有逻辑）
-        log.info("使用数据库降级查询构建度量指标: taskId={}", taskId);
-        return buildTaskMetricsFromDatabase(task, participants);
+        // 优先级2：降级到数据库查询并更新缓存
+        log.info("使用数据库查询构建度量指标并更新缓存: taskId={}", taskId);
+        TaskDetailVO.MetricsVO metricsVO = buildTaskMetricsFromDatabase(task, participants);
+
+        // 异步更新缓存（不影响主流程）
+        try {
+            GlobalMetrics newMetrics = convertVOToGlobalMetrics(metricsVO, taskId);
+            metricsCacheService.updateGlobalMetrics(taskId, newMetrics);
+            log.debug("已异步更新全局指标缓存: taskId={}", taskId);
+        } catch (Exception e) {
+            log.warn("更新全局指标缓存失败: taskId={}, error={}", taskId, e.getMessage());
+        }
+
+        return metricsVO;
     }
 
     /**
      * 将全局指标缓存对象转换为VO
      */
-    // TODO: 缓存功能将在后续版本中实现
-    /*
     private TaskDetailVO.MetricsVO convertGlobalMetricsToVO(GlobalMetrics globalMetrics) {
         if (globalMetrics == null) {
             throw new CacheValidationException("GlobalMetrics", "unknown", "缓存对象为null");
@@ -859,7 +880,21 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .estimatedTimeRemaining(globalMetrics.getEstimatedTimeRemaining())
                 .build();
     }
-    */
+
+    /**
+     * 将VO对象转换为全局指标缓存对象
+     */
+    private GlobalMetrics convertVOToGlobalMetrics(TaskDetailVO.MetricsVO metricsVO, String taskId) {
+        return GlobalMetrics.builder()
+                .taskId(taskId)
+                .globalLoss(metricsVO.getGlobalLoss())
+                .globalAccuracy(metricsVO.getGlobalAccuracy())
+                .communicationRounds(metricsVO.getCommunicationRounds())
+                .dataProcessed(metricsVO.getDataProcessed())
+                .estimatedTimeRemaining(metricsVO.getEstimatedTimeRemaining())
+                .lastUpdated(LocalDateTime.now())
+                .build();
+    }
 
     /**
      * 从数据库构建度量指标（原有逻辑，作为降级方案）
@@ -997,7 +1032,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .build();
 
             com.feduwacomm.common.PageResult<VmListVO> vmPageResult = vmInstanceService.queryVmList(queryDTO);
-            List<VmListVO> vmList = vmPageResult.getRecords();
+            List<VmListVO> vmList = vmPageResult.getList();
 
             log.info("从数据库查询到 {} 个虚拟机", vmList.size());
 
@@ -2001,6 +2036,366 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         } catch (Exception e) {
             log.error("恢复轮次状态快照失败: taskId={}", taskId, e);
             throw new UserException("任务状态恢复失败");
+        }
+    }
+
+    @Override
+    public TaskStatisticsVO getTaskStatistics() {
+        log.info("获取任务统计信息");
+
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+            LocalDateTime weekStart = now.minusDays(7);
+            LocalDateTime monthStart = now.minusDays(30);
+
+            // 1. 获取基础统计数据
+            TaskQueryDTO allTasksQuery = TaskQueryDTO.builder()
+                .size(Integer.MAX_VALUE)
+                .build();
+            int totalTasks = tasksMapper.countTasksByQuery(allTasksQuery);
+
+            // 2. 按状态统计
+            Map<String, Integer> statusDistribution = new HashMap<>();
+            statusDistribution.put("PENDING", tasksMapper.countTasksByStatus("PENDING"));
+            statusDistribution.put("RUNNING", tasksMapper.countTasksByStatus("RUNNING"));
+            statusDistribution.put("PAUSED", tasksMapper.countTasksByStatus("PAUSED"));
+            statusDistribution.put("COMPLETED", tasksMapper.countTasksByStatus("COMPLETED"));
+            statusDistribution.put("FAILED", tasksMapper.countTasksByStatus("FAILED"));
+            statusDistribution.put("CANCELLED", tasksMapper.countTasksByStatus("CANCELLED"));
+
+            // 3. 按算法统计（查询所有任务进行分组）
+            List<FederatedTask> allTasks = tasksMapper.selectTasksByQuery(allTasksQuery);
+            Map<String, Integer> algorithmDistribution = allTasks.stream()
+                .collect(Collectors.groupingBy(
+                    task -> task.getAlgorithm() != null ? task.getAlgorithm().name() : "UNKNOWN",
+                    Collectors.collectingAndThen(Collectors.counting(), Math::toIntExact)
+                ));
+
+            // 4. 时间范围统计
+            TaskQueryDTO todayQuery = TaskQueryDTO.builder()
+                .startDate(todayStart)
+                .size(Integer.MAX_VALUE)
+                .build();
+            int todayNewTasks = tasksMapper.countTasksByQuery(todayQuery);
+
+            TaskQueryDTO weekQuery = TaskQueryDTO.builder()
+                .startDate(weekStart)
+                .size(Integer.MAX_VALUE)
+                .build();
+            int weekNewTasks = tasksMapper.countTasksByQuery(weekQuery);
+
+            TaskQueryDTO monthQuery = TaskQueryDTO.builder()
+                .startDate(monthStart)
+                .size(Integer.MAX_VALUE)
+                .build();
+            int monthNewTasks = tasksMapper.countTasksByQuery(monthQuery);
+
+            // 5. 关键指标统计
+            int runningTasks = statusDistribution.get("RUNNING");
+            int completedTasks = statusDistribution.get("COMPLETED");
+            int failedTasks = statusDistribution.get("FAILED");
+
+            // 6. 计算成功率
+            int finishedTasks = completedTasks + failedTasks;
+            double successRate = finishedTasks > 0 ? ((double) completedTasks / finishedTasks) * 100 : 0.0;
+
+            // 7. 计算平均完成时间（简化实现）
+            List<FederatedTask> completedTasksList = allTasks.stream()
+                .filter(task -> "COMPLETED".equals(task.getStatus()))
+                .collect(Collectors.toList());
+
+            double averageCompletionTime = completedTasksList.stream()
+                .filter(task -> task.getStartedAt() != null && task.getCompletedAt() != null)
+                .mapToLong(task -> Duration.between(task.getStartedAt(), task.getCompletedAt()).getSeconds())
+                .average()
+                .orElse(0.0);
+
+            // 8. 获取最近7天趋势
+            List<Map<String, Object>> trendData = tasksMapper.selectTaskStatsByDateRange(
+                now.minusDays(6).toLocalDate().atStartOfDay(),
+                now.toLocalDate().atTime(23, 59, 59)
+            );
+
+            List<TaskStatisticsVO.DailyTaskStats> recentTrend = trendData.stream()
+                .map(data -> TaskStatisticsVO.DailyTaskStats.builder()
+                    .date(data.get("date").toString())
+                    .taskCount(((Number) data.get("task_count")).intValue())
+                    .completedCount(((Number) data.get("completed_count")).intValue())
+                    .failedCount(((Number) data.get("failed_count")).intValue())
+                    .build())
+                .collect(Collectors.toList());
+
+            // 9. 构建结果
+            TaskStatisticsVO statistics = TaskStatisticsVO.builder()
+                .totalTasks(totalTasks)
+                .statusDistribution(statusDistribution)
+                .algorithmDistribution(algorithmDistribution)
+                .todayNewTasks(todayNewTasks)
+                .weekNewTasks(weekNewTasks)
+                .monthNewTasks(monthNewTasks)
+                .runningTasks(runningTasks)
+                .completedTasks(completedTasks)
+                .failedTasks(failedTasks)
+                .averageCompletionTime(averageCompletionTime)
+                .successRate(Math.round(successRate * 100.0) / 100.0) // 保留2位小数
+                .recentTrend(recentTrend)
+                .generatedAt(now)
+                .build();
+
+            log.info("任务统计信息获取成功: totalTasks={}, runningTasks={}, completedTasks={}",
+                totalTasks, runningTasks, completedTasks);
+
+            return statistics;
+
+        } catch (Exception e) {
+            log.error("获取任务统计信息失败: {}", e.getMessage(), e);
+            throw new UserException("获取任务统计信息失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public TaskBatchOperationResultVO batchOperateTask(TaskBatchOperationDTO batchDTO, String operatorId) {
+        log.info("执行任务批量操作: operation={}, taskCount={}, operator={}",
+            batchDTO.getOperation(), batchDTO.getTaskIds().size(), operatorId);
+
+        long startTime = System.currentTimeMillis();
+        LocalDateTime executedAt = LocalDateTime.now();
+
+        try {
+            // 1. 验证操作类型
+            String operation = batchDTO.getOperation();
+            if (!isValidBatchOperation(operation)) {
+                throw new UserException("不支持的批量操作类型: " + operation);
+            }
+
+            // 2. 验证任务ID列表
+            List<String> taskIds = batchDTO.getTaskIds();
+            if (taskIds == null || taskIds.isEmpty()) {
+                throw new UserException("任务ID列表不能为空");
+            }
+
+            if (taskIds.size() > 50) { // 限制批量操作数量
+                throw new UserException("批量操作任务数量不能超过50个");
+            }
+
+            // 3. 查询所有目标任务
+            List<FederatedTask> targetTasks = new ArrayList<>();
+            List<String> notFoundTaskIds = new ArrayList<>();
+
+            for (String taskId : taskIds) {
+                FederatedTask task = getTaskById(taskId);
+                if (task == null) {
+                    notFoundTaskIds.add(taskId);
+                } else {
+                    targetTasks.add(task);
+                }
+            }
+
+            // 4. 执行批量操作
+            List<TaskBatchOperationResultVO.TaskOperationDetail> details = new ArrayList<>();
+            int successCount = 0;
+            int failureCount = 0;
+            int skippedCount = 0;
+
+            // 4.1 处理不存在的任务
+            for (String taskId : notFoundTaskIds) {
+                TaskBatchOperationResultVO.TaskOperationDetail detail = TaskBatchOperationResultVO.TaskOperationDetail.builder()
+                    .taskId(taskId)
+                    .taskName("未知")
+                    .previousStatus("UNKNOWN")
+                    .currentStatus("UNKNOWN")
+                    .result("FAILURE")
+                    .message("任务不存在")
+                    .errorCode("TASK_NOT_FOUND")
+                    .operationTime(LocalDateTime.now())
+                    .build();
+                details.add(detail);
+                failureCount++;
+            }
+
+            // 4.2 处理存在的任务
+            for (FederatedTask task : targetTasks) {
+                TaskBatchOperationResultVO.TaskOperationDetail detail = processSingleTaskOperation(
+                    task, operation, batchDTO, operatorId);
+                details.add(detail);
+
+                switch (detail.getResult()) {
+                    case "SUCCESS":
+                        successCount++;
+                        break;
+                    case "FAILURE":
+                        failureCount++;
+                        break;
+                    case "SKIPPED":
+                        skippedCount++;
+                        break;
+                }
+            }
+
+            // 5. 生成结果摘要
+            long duration = System.currentTimeMillis() - startTime;
+            String summary = generateBatchOperationSummary(operation, successCount, failureCount, skippedCount);
+
+            // 6. 构建结果
+            TaskBatchOperationResultVO result = TaskBatchOperationResultVO.builder()
+                .operation(operation)
+                .totalTasks(taskIds.size())
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .skippedCount(skippedCount)
+                .executedAt(executedAt)
+                .durationMs(duration)
+                .isAsync(Boolean.FALSE.equals(batchDTO.getAsync()) ? false : batchDTO.getAsync())
+                .asyncTaskId(null) // 当前实现为同步操作
+                .details(details)
+                .summary(summary)
+                .build();
+
+            log.info("任务批量操作完成: operation={}, success={}, failure={}, skipped={}, duration={}ms",
+                operation, successCount, failureCount, skippedCount, duration);
+
+            return result;
+
+        } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("任务批量操作失败: operation={}, error={}, duration={}ms",
+                batchDTO.getOperation(), e.getMessage(), duration, e);
+            throw new UserException("批量操作失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 验证批量操作类型是否有效
+     */
+    private boolean isValidBatchOperation(String operation) {
+        return operation != null && Arrays.asList(
+            "START", "STOP", "PAUSE", "RESUME", "CANCEL", "DELETE"
+        ).contains(operation.toUpperCase());
+    }
+
+    /**
+     * 处理单个任务的操作
+     */
+    private TaskBatchOperationResultVO.TaskOperationDetail processSingleTaskOperation(
+            FederatedTask task, String operation, TaskBatchOperationDTO batchDTO, String operatorId) {
+
+        String taskId = task.getId();
+        String taskName = task.getTaskName();
+        String previousStatus = task.getStatus().name();
+        LocalDateTime operationTime = LocalDateTime.now();
+
+        try {
+            TaskOperationVO operationResult = null;
+
+            switch (operation.toUpperCase()) {
+                case "START":
+                    operationResult = startTask(taskId, operatorId);
+                    break;
+                case "STOP":
+                    TaskStopDTO stopDTO = TaskStopDTO.builder()
+                        .reason(batchDTO.getReason() != null ? batchDTO.getReason() : "批量停止操作")
+                        .saveCheckpoint(!Boolean.TRUE.equals(batchDTO.getForce())) // force=true表示不保存检查点
+                        .build();
+                    operationResult = stopTask(taskId, stopDTO, operatorId);
+                    break;
+                case "PAUSE":
+                    operationResult = pauseTask(taskId, operatorId);
+                    break;
+                case "RESUME":
+                    operationResult = resumeTask(taskId, operatorId);
+                    break;
+                case "CANCEL":
+                    TaskCancelDTO cancelDTO = TaskCancelDTO.builder()
+                        .reason(batchDTO.getReason() != null ? batchDTO.getReason() : "批量取消操作")
+                        .build();
+                    operationResult = cancelTask(taskId, cancelDTO, operatorId);
+                    break;
+                case "DELETE":
+                    TaskDeleteDTO deleteDTO = TaskDeleteDTO.builder()
+                        .deleteData(Boolean.TRUE.equals(batchDTO.getForce())) // force=true时删除数据
+                        .deleteModel(Boolean.TRUE.equals(batchDTO.getForce())) // force=true时删除模型
+                        .build();
+                    operationResult = deleteTask(taskId, deleteDTO, operatorId);
+                    break;
+                default:
+                    throw new UserException("不支持的操作类型: " + operation);
+            }
+
+            // 操作成功
+            String currentStatus = operationResult.getStatus() != null ?
+                operationResult.getStatus() : previousStatus;
+
+            return TaskBatchOperationResultVO.TaskOperationDetail.builder()
+                .taskId(taskId)
+                .taskName(taskName)
+                .previousStatus(previousStatus)
+                .currentStatus(currentStatus)
+                .result("SUCCESS")
+                .message(operationResult.getReason() != null ? operationResult.getReason() : "操作成功")
+                .errorCode(null)
+                .operationTime(operationTime)
+                .build();
+
+        } catch (Exception e) {
+            // 操作失败
+            log.warn("任务操作失败: taskId={}, operation={}, error={}", taskId, operation, e.getMessage());
+
+            return TaskBatchOperationResultVO.TaskOperationDetail.builder()
+                .taskId(taskId)
+                .taskName(taskName)
+                .previousStatus(previousStatus)
+                .currentStatus(previousStatus) // 失败时状态不变
+                .result("FAILURE")
+                .message("操作失败: " + e.getMessage())
+                .errorCode("OPERATION_FAILED")
+                .operationTime(operationTime)
+                .build();
+        }
+    }
+
+    /**
+     * 生成批量操作摘要
+     */
+    private String generateBatchOperationSummary(String operation, int successCount, int failureCount, int skippedCount) {
+        String operationName = getOperationDisplayName(operation);
+        int totalProcessed = successCount + failureCount + skippedCount;
+
+        StringBuilder summary = new StringBuilder();
+        summary.append(String.format("批量%s操作完成，", operationName));
+        summary.append(String.format("共处理 %d 个任务：", totalProcessed));
+        summary.append(String.format("成功 %d 个", successCount));
+
+        if (failureCount > 0) {
+            summary.append(String.format("，失败 %d 个", failureCount));
+        }
+
+        if (skippedCount > 0) {
+            summary.append(String.format("，跳过 %d 个", skippedCount));
+        }
+
+        return summary.toString();
+    }
+
+    /**
+     * 获取操作的显示名称
+     */
+    private String getOperationDisplayName(String operation) {
+        switch (operation.toUpperCase()) {
+            case "START":
+                return "启动";
+            case "STOP":
+                return "停止";
+            case "PAUSE":
+                return "暂停";
+            case "RESUME":
+                return "恢复";
+            case "CANCEL":
+                return "取消";
+            case "DELETE":
+                return "删除";
+            default:
+                return operation;
         }
     }
 }

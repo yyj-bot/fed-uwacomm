@@ -23,6 +23,8 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -592,16 +594,107 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 生成客户端签名 (简单实现)
-     * TODO: 在生产环境中应该使用真正的数字签名算法
+     * 生成客户端签名（增强安全性实现）
+     * 在测试环境中使用HMAC-SHA256算法进行签名，提供更好的安全性
      * @param messageType 消息类型
      * @param vmId VM标识
-     * @return 简化的签名字符串
+     * @return HMAC-SHA256签名字符串
      */
     private String generateClientSignature(String messageType, String vmId) {
-        // 简单的哈希签名实现，用于测试和开发环境
-        String data = messageType + ":" + vmId + ":" + System.currentTimeMillis();
-        return "client_sig_" + Math.abs(data.hashCode());
+        try {
+            // 使用HMAC-SHA256算法进行签名
+            String secretKey = "feduwacomm-test-secret-" + vmId; // 测试环境的秘钥
+            String timestamp = String.valueOf(System.currentTimeMillis());
+            String nonce = generateNonce();
+
+            // 构建签名数据
+            String signatureData = String.join("|", messageType, vmId, timestamp, nonce);
+
+            // 生成HMAC-SHA256签名
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            javax.crypto.spec.SecretKeySpec secretKeySpec =
+                new javax.crypto.spec.SecretKeySpec(secretKey.getBytes("UTF-8"), "HmacSHA256");
+            mac.init(secretKeySpec);
+
+            byte[] signatureBytes = mac.doFinal(signatureData.getBytes("UTF-8"));
+            String signature = java.util.Base64.getEncoder().encodeToString(signatureBytes);
+
+            // 返回包含时间戳和nonce的完整签名
+            return String.format("%s.%s.%s", signature, timestamp, nonce);
+
+        } catch (Exception e) {
+            log.warn("生成HMAC签名失败，使用简化签名: {}", e.getMessage());
+            // 降级到简化签名实现
+            String data = messageType + ":" + vmId + ":" + System.currentTimeMillis();
+            return "fallback_sig_" + Math.abs(data.hashCode());
+        }
+    }
+
+    /**
+     * 生成随机数字用于防止重放攻击
+     */
+    private String generateNonce() {
+        byte[] nonceBytes = new byte[16];
+        new SecureRandom().nextBytes(nonceBytes);
+        return java.util.Base64.getEncoder().encodeToString(nonceBytes);
+    }
+
+    /**
+     * 验证签名有效性（用于测试环境验证）
+     */
+    private boolean verifySignature(String signature, String messageType, String vmId) {
+        try {
+            if (signature == null || !signature.contains(".")) {
+                return false;
+            }
+
+            String[] parts = signature.split("\\.");
+            if (parts.length != 3) {
+                return false;
+            }
+
+            String signaturePart = parts[0];
+            String timestamp = parts[1];
+            String nonce = parts[2];
+
+            // 检查时间戳有效性（允许5分钟偏差）
+            long signatureTime = Long.parseLong(timestamp);
+            long currentTime = System.currentTimeMillis();
+            if (Math.abs(currentTime - signatureTime) > 5 * 60 * 1000) { // 5分钟
+                log.warn("签名已过期: signatureTime={}, currentTime={}", signatureTime, currentTime);
+                return false;
+            }
+
+            // 重新生成签名进行比较
+            String expectedSignature = regenerateSignatureForVerification(messageType, vmId, timestamp, nonce);
+            return signature.equals(expectedSignature);
+
+        } catch (Exception e) {
+            log.warn("签名验证失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 为验证重新生成签名
+     */
+    private String regenerateSignatureForVerification(String messageType, String vmId, String timestamp, String nonce) {
+        try {
+            String secretKey = "feduwacomm-test-secret-" + vmId;
+            String signatureData = String.join("|", messageType, vmId, timestamp, nonce);
+
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            javax.crypto.spec.SecretKeySpec secretKeySpec =
+                new javax.crypto.spec.SecretKeySpec(secretKey.getBytes("UTF-8"), "HmacSHA256");
+            mac.init(secretKeySpec);
+
+            byte[] signatureBytes = mac.doFinal(signatureData.getBytes("UTF-8"));
+            String signature = java.util.Base64.getEncoder().encodeToString(signatureBytes);
+
+            return String.format("%s.%s.%s", signature, timestamp, nonce);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

@@ -51,4 +51,60 @@ public interface FederatedOrchestrationService {
      * @param orchestrationId 工作流ID
      */
     void terminateWorkflow(String orchestrationId);
+
+    /**
+     * 触发下一个阶段
+     *
+     * @param orchestrationId 工作流ID
+     * @param triggeredBy 触发者
+     * @param context 上下文信息
+     */
+    void triggerNextStage(String orchestrationId, String triggeredBy,
+                         java.util.Map<String, Object> context);
+
+    /**
+     * 终止编排
+     *
+     * @param orchestrationId 工作流ID
+     * @param reason 终止原因
+     */
+    void terminateOrchestration(String orchestrationId, String reason);
+
+    /**
+     * 回滚到指定阶段
+     *
+     * @param taskId 任务ID
+     * @param targetStage 目标阶段
+     * @param reason 回滚原因
+     */
+    void rollbackToStage(String taskId, String targetStage, String reason);
+
+    /**
+     * 更新阶段状态
+     *
+     * @param orchestrationId 工作流ID
+     * @param stageName 阶段名称
+     * @param status 状态
+     * @return 更新是否成功
+     */
+    boolean updateStageStatus(String orchestrationId, String stageName, String status);
+
+    /**
+     * 更新工作流编排状态
+     *
+     * @param orchestrationId 工作流ID
+     * @param status 状态
+     * @return 更新是否成功
+     */
+    boolean updateOrchestrationStatus(String orchestrationId, String status);
+
+    /**
+     * 触发指定阶段
+     *
+     * @param orchestrationId 工作流ID
+     * @param stageName 阶段名称
+     * @param input 输入数据
+     * @return 触发是否成功
+     */
+    boolean triggerStage(String orchestrationId, String stageName, java.util.Map<String, Object> input);
 }

@@ -132,6 +132,14 @@
         WHERE task_id = #{taskId}
     </select>
 
+    <!-- 统计任务中活跃参与者数量 -->
+    <select id="countActiveParticipants" resultType="int">
+        SELECT COUNT(*)
+        FROM task_participants
+        WHERE task_id = #{taskId}
+          AND status IN ('ACTIVE', 'TRAINING', 'READY', 'CONNECTED')
+    </select>
+
     <!-- 查询任务所有参与者 -->
     <select id="selectParticipantsByTaskId" resultMap="TaskParticipantResultMap">
         SELECT *

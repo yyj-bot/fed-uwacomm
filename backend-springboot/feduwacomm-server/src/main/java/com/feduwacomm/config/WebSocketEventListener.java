@@ -2,6 +2,9 @@ package com.feduwacomm.config;
 
 import com.feduwacomm.dto.WebSocketMessage;
 import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.service.DigitalSignatureService;
+import com.feduwacomm.service.MessageIdGenerator;
+import com.feduwacomm.service.impl.WebSocketCommandServiceImpl;
 import com.feduwacomm.utils.UuidUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +35,22 @@ public class WebSocketEventListener {
     private final SimpMessageSendingOperations messagingTemplate;
     private final VmInstanceService vmInstanceService;
     private final UuidUtil uuidUtil;
+    private final DigitalSignatureService digitalSignatureService;
+    private final MessageIdGenerator messageIdGenerator;
+    private final WebSocketCommandServiceImpl webSocketCommandService;
 
     public WebSocketEventListener(SimpMessageSendingOperations messagingTemplate,
                                  VmInstanceService vmInstanceService,
-                                 UuidUtil uuidUtil) {
+                                 UuidUtil uuidUtil,
+                                 DigitalSignatureService digitalSignatureService,
+                                 MessageIdGenerator messageIdGenerator,
+                                 WebSocketCommandServiceImpl webSocketCommandService) {
         this.messagingTemplate = messagingTemplate;
         this.vmInstanceService = vmInstanceService;
         this.uuidUtil = uuidUtil;
+        this.digitalSignatureService = digitalSignatureService;
+        this.messageIdGenerator = messageIdGenerator;
+        this.webSocketCommandService = webSocketCommandService;
     }
 
     /**
@@ -75,6 +87,8 @@ public class WebSocketEventListener {
         if ("vm".equals(category) && StringUtils.hasText(vmId)) {
             try {
                 vmInstanceService.updateConnectionStatus(vmId, "CONNECTED", sessionId);
+                // 通知WebSocket命令服务VM上线
+                webSocketCommandService.addOnlineVm(vmId);
                 logger.info("VM连接状态已更新为CONNECTED - VmId: {}, SessionId: {}", vmId, sessionId);
 
                 // 发送VM连接成功消息
@@ -83,14 +97,27 @@ public class WebSocketEventListener {
                 data.put("vmId", vmId);
                 data.put("status", "CONNECTED");
 
+                String messageId = messageIdGenerator.generateVmConnectionMessageId(true);
+                String messageType = "VM_CONNECT";
+
+                // 生成真实的数字签名
+                String signature;
+                try {
+                    signature = digitalSignatureService.signWebSocketMessage(
+                        messageType, messageId, vmId, data.toString());
+                } catch (DigitalSignatureService.SignatureException e) {
+                    logger.error("生成VM连接消息签名失败: vmId={}, messageId={}", vmId, messageId, e);
+                    signature = "signature-error";
+                }
+
                 WebSocketMessage connectMessage = WebSocketMessage.builder()
-                    .type("VM_CONNECT")
-                    .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
+                    .type(messageType)
+                    .id(messageId)
                     .vmId(vmId)
                     .data(data)
-                    .signature("temp-signature") // 临时签名，后续应使用真实签名
+                    .signature(signature)
                     .build();
-                connectMessage.setTimestampFromInstant(Instant.now());
+                connectMessage.setTimestamp(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", connectMessage);
 
             } catch (Exception e) {
@@ -135,6 +162,8 @@ public class WebSocketEventListener {
         if ("vm".equals(category) && StringUtils.hasText(vmId)) {
             try {
                 vmInstanceService.disconnectVm(vmId);
+                // 通知WebSocket命令服务VM下线
+                webSocketCommandService.removeOnlineVm(vmId);
                 logger.info("VM连接状态已更新为DISCONNECTED - VmId: {}", vmId);
 
                 // 发送VM断开消息
@@ -143,14 +172,27 @@ public class WebSocketEventListener {
                 data.put("vmId", vmId);
                 data.put("status", "DISCONNECTED");
 
+                String messageId = messageIdGenerator.generateVmConnectionMessageId(false);
+                String messageType = "VM_DISCONNECT";
+
+                // 生成真实的数字签名
+                String signature;
+                try {
+                    signature = digitalSignatureService.signWebSocketMessage(
+                        messageType, messageId, vmId, data.toString());
+                } catch (DigitalSignatureService.SignatureException e) {
+                    logger.error("生成VM断开消息签名失败: vmId={}, messageId={}", vmId, messageId, e);
+                    signature = "signature-error";
+                }
+
                 WebSocketMessage disconnectMessage = WebSocketMessage.builder()
-                    .type("VM_DISCONNECT")
-                    .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
+                    .type(messageType)
+                    .id(messageId)
                     .vmId(vmId)
                     .data(data)
-                    .signature("temp-signature") // 临时签名，后续应使用真实签名
+                    .signature(signature)
                     .build();
-                disconnectMessage.setTimestampFromInstant(Instant.now());
+                disconnectMessage.setTimestamp(Instant.now());
                 messagingTemplate.convertAndSend("/topic/vm-status", disconnectMessage);
 
             } catch (Exception e) {
@@ -166,14 +208,28 @@ public class WebSocketEventListener {
             data.put("username", username);
             data.put("action", "leave");
 
+            String messageId = messageIdGenerator.generateSystemNotificationMessageId();
+            String messageType = "USER_LEAVE";
+            String systemVmId = "system"; // 系统消息使用固定vmId
+
+            // 生成真实的数字签名
+            String signature;
+            try {
+                signature = digitalSignatureService.signWebSocketMessage(
+                    messageType, messageId, systemVmId, data.toString());
+            } catch (DigitalSignatureService.SignatureException e) {
+                logger.error("生成用户离开消息签名失败: username={}, messageId={}", username, messageId, e);
+                signature = "signature-error";
+            }
+
             WebSocketMessage leaveMessage = WebSocketMessage.builder()
-                .type("USER_LEAVE")
-                .id(uuidUtil.generateUuid()) // 临时使用UUID，后续应使用MessageIdGenerator
-                .vmId("system") // 系统消息使用固定vmId
+                .type(messageType)
+                .id(messageId)
+                .vmId(systemVmId)
                 .data(data)
-                .signature("temp-signature") // 临时签名，后续应使用真实签名
+                .signature(signature)
                 .build();
-            leaveMessage.setTimestampFromInstant(Instant.now());
+            leaveMessage.setTimestamp(Instant.now());
             messagingTemplate.convertAndSend("/topic/public", leaveMessage);
         }
     }

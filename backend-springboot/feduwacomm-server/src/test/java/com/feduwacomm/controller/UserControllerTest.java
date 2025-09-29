@@ -346,14 +346,13 @@ public class UserControllerTest {
 
     @Test
     void testRegister_WithInvalidContentType_ShouldReturn415() throws Exception {
-        // 当前系统行为：返回200状态码但Response Body包含错误信息
+        // 错误的Content-Type应该返回415状态码
         mockMvc.perform(post("/api/user/register")
                 .contentType(MediaType.TEXT_PLAIN) // 错误的Content-Type
                 .content(objectMapper.writeValueAsString(registerDTO)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(500))
-            .andExpect(jsonPath("$.message").value("未知错误"))
-            .andExpect(jsonPath("$.data").value(containsString("Content-Type 'text/plain' is not supported")));
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.code").value(415))
+            .andExpect(jsonPath("$.message").value("不支持的媒体类型"));
     }
 
     @Test
@@ -361,7 +360,7 @@ public class UserControllerTest {
         mockMvc.perform(post("/api/user/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{invalid json}")) // 格式错误的JSON
-            .andExpect(status().isOk()) // 全局异常处理器处理
+            .andExpect(status().isInternalServerError()) // 全局异常处理器处理
             .andExpect(jsonPath("$.code").value(500)); // 内部错误码
     }
 
@@ -427,22 +426,19 @@ public class UserControllerTest {
 
     @Test
     void testHttpMethodValidation_OnlyPostAllowed() throws Exception {
-        // GET请求到注册端点应该返回200状态码但包含错误信息
-        // 注意：当前系统行为是返回200状态码，但Response Body包含错误信息
+        // GET请求到注册端点应该返回405状态码
         mockMvc.perform(get("/api/user/register"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(500))
-            .andExpect(jsonPath("$.message").value("未知错误"))
-            .andExpect(jsonPath("$.data").value("Request method 'GET' is not supported"));
+            .andExpect(status().isMethodNotAllowed())
+            .andExpect(jsonPath("$.code").value(405))
+            .andExpect(jsonPath("$.message").value("方法不被允许"));
 
-        // PUT请求到注册端点应该返回200状态码但包含错误信息
+        // PUT请求到注册端点应该返回405状态码
         mockMvc.perform(put("/api/user/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(registerDTO)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(500))
-            .andExpect(jsonPath("$.message").value("未知错误"))
-            .andExpect(jsonPath("$.data").value("Request method 'PUT' is not supported"));
+            .andExpect(status().isMethodNotAllowed())
+            .andExpect(jsonPath("$.code").value(405))
+            .andExpect(jsonPath("$.message").value("方法不被允许"));
     }
 
     @Test

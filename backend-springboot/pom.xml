@@ -14,7 +14,7 @@
 
     <groupId>com.feduwacomm</groupId>
     <artifactId>feduwacomm-parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.4.0</version>
     <packaging>pom</packaging>
     <name>FedUWAComm Parent</name>
     <description>水声联邦学习后端服务 - 父级项目</description>
@@ -33,6 +33,8 @@
         <spring-boot.version>3.4.4</spring-boot.version>
         <!-- Added: Pin Lombok version for JDK 24 compatibility -->
         <lombok.version>1.18.38</lombok.version>
+        <!-- MySQL版本统一管理 -->
+        <mysql.version>8.0.33</mysql.version>
     </properties>
 
     <dependencyManagement>
@@ -56,6 +58,13 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- MySQL Connector 版本管理 -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

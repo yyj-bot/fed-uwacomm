@@ -153,7 +153,7 @@ public class VmAssignmentServiceTest {
 
         // Then
         assertNotNull(result);
-        assertTrue(result.getRecords().size() >= 0);
+        assertTrue(result.getList().size() >= 0);
     }
 
     @Test

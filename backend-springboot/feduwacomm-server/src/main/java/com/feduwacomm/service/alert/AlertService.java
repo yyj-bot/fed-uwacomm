@@ -1,6 +1,7 @@
 package com.feduwacomm.service.alert;
 
 import com.feduwacomm.service.LogService;
+import com.feduwacomm.service.NotificationService;
 import com.feduwacomm.mapper.SystemLogMapper;
 import com.feduwacomm.dto.LogQueryDTO;
 import com.feduwacomm.utils.IpUtil;
@@ -31,6 +32,9 @@ public class AlertService {
     
     @Autowired
     private LogService logService;
+
+    @Autowired
+    private NotificationService notificationService;
     
     // 告警规则配置
     private final Map<String, AlertRule> alertRules = new ConcurrentHashMap<>();
@@ -382,17 +386,23 @@ public class AlertService {
      */
     private void sendAlertNotification(AlertRule rule, String message, double currentValue) {
         try {
-            // TODO: 实现具体的通知机制
-            // - 邮件通知
-            // - 短信通知  
-            // - 企业微信/钉钉通知
-            // - Webhook通知
-            // - WebSocket推送给前端
-            
-            logger.info("发送告警通知: {}", message);
-            
+            // 使用统一的通知服务发送告警通知
+            boolean success = notificationService.sendAlertNotification(
+                rule.getId(),
+                rule.getName(),
+                message,
+                rule.getSeverity(),
+                currentValue
+            );
+
+            if (success) {
+                logger.info("告警通知发送成功: rule={}, message={}", rule.getName(), message);
+            } else {
+                logger.warn("告警通知发送失败: rule={}, message={}", rule.getName(), message);
+            }
+
         } catch (Exception e) {
-            logger.warn("发送告警通知失败: {}", e.getMessage());
+            logger.error("发送告警通知异常: rule={}, error={}", rule.getName(), e.getMessage(), e);
         }
     }
     

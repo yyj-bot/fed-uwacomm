@@ -6,6 +6,8 @@ import com.feduwacomm.service.TrainingDataService;
 import com.feduwacomm.utils.UserJwtUtil;
 import com.feduwacomm.config.JwtConfig;
 import com.feduwacomm.vo.*;
+import com.feduwacomm.vo.TrainingDataListResponseVO;
+import com.feduwacomm.vo.TrainingDataDetailResponseVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -534,7 +536,100 @@ public class TrainingDataControllerTest {
     }
     
     private void setupServiceMocks() {
-        // TODO: Add proper service mocks - for now just basic setup
-        // Will add specific mocks as needed based on test failures
+        // 设置基本的服务Mock行为
+        setupTrainingDataServiceMocks();
+        setupFileOperationMocks();
+    }
+
+    /**
+     * 设置TrainingDataService的Mock行为
+     */
+    private void setupTrainingDataServiceMocks() {
+        // 模拟成功上传数据
+        when(trainingDataService.uploadFile(any(), any(), any()))
+            .thenAnswer(invocation -> {
+                String datasetName = invocation.getArgument(1);
+                return TrainingDataUploadVO.builder()
+                    .datasetId("dataset_" + System.currentTimeMillis())
+                    .datasetDescription(datasetName + "_test.csv")
+                    .status("UPLOADED")
+                    .build();
+            });
+
+        // 模拟查询数据集列表
+        when(trainingDataService.queryDataList(any()))
+            .thenReturn(createMockDatasetList());
+
+        // 模拟查询数据集详情
+        when(trainingDataService.getDataDetail(anyString()))
+            .thenReturn(createMockDatasetDetail());
+
+        // 模拟删除数据集
+        when(trainingDataService.deleteData(anyString(), any(), anyString()))
+            .thenReturn(TrainingDataDeleteVO.builder()
+                .datasetId("dataset_001")
+                .deletedAt(LocalDateTime.now())
+                .deletedBy("admin")
+                .fileDeleted(true)
+                .metadataPreserved(false)
+                .build());
+    }
+
+
+    /**
+     * 设置文件操作Mock
+     */
+    private void setupFileOperationMocks() {
+        // 如果有文件操作相关的Mock，可以在这里设置
+        // 例如：文件存储、文件验证等
+    }
+
+    /**
+     * 创建模拟的数据集列表
+     */
+    private TrainingDataListVO createMockDatasetList() {
+        List<TrainingDataListVO.TrainingDataItemVO> datasets = List.of(
+            TrainingDataListVO.TrainingDataItemVO.builder()
+                .datasetId("dataset_001")
+                .vmId("vm_001")
+                .datasetDescription("水声特征数据集")
+                .datasetType("ACOUSTIC_FEATURES")
+                .status("READY")
+                .build(),
+            TrainingDataListVO.TrainingDataItemVO.builder()
+                .datasetId("dataset_002")
+                .vmId("vm_002")
+                .datasetDescription("传播数据集")
+                .datasetType("PROPAGATION_DATA")
+                .status("PROCESSING")
+                .build()
+        );
+
+        return TrainingDataListVO.builder()
+            .total(2L)
+            .page(1)
+            .size(10)
+            .dataList(datasets)
+            .build();
+    }
+
+    /**
+     * 创建模拟的数据集详情
+     */
+    private TrainingDataVO createMockDatasetDetail() {
+        return TrainingDataVO.builder()
+            .datasetId("dataset_001")
+            .vmId("vm_001")
+            .datasetDescription("水声特征数据集")
+            .datasetType("ACOUSTIC_FEATURES")
+            .uploadTime(LocalDateTime.of(2025, 1, 1, 10, 0, 0))
+            .status("READY")
+            .uploadedBy("admin")
+            .metadata(Map.of(
+                "mean_frequency", 1500.0,
+                "std_amplitude", 0.1,
+                "missing_values", 5
+            ))
+            .build();
     }
 }

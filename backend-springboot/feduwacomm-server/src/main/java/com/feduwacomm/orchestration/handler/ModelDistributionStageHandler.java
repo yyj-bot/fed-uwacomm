@@ -71,7 +71,7 @@ public class ModelDistributionStageHandler extends AbstractStageHandler {
                         .page(1)
                         .size(100)
                         .build();
-                    List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getRecords();
+                    List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getList();
                     targetVmIds = availableVms.stream()
                         .map(VmListVO::getVmId)
                         .limit(5)  // 限制为前5个VM

@@ -106,4 +106,30 @@ public class WorkflowContext {
     public void clearVariables() {
         variables.clear();
     }
+
+    /**
+     * 获取当前阶段的数据
+     */
+    public Map<String, Object> getStageData() {
+        WorkflowStage currentStage = getCurrentStage();
+        if (currentStage == null) {
+            return new HashMap<>();
+        }
+
+        Map<String, Object> stageData = new HashMap<>();
+        stageData.put("stage", currentStage.name());
+        stageData.put("stageDescription", currentStage.getDescription());
+        stageData.put("orchestrationId", getOrchestrationId());
+        stageData.put("taskId", getTaskId());
+
+        // 添加与当前阶段相关的变量
+        String stagePrefix = currentStage.name().toLowerCase() + "_";
+        for (Map.Entry<String, Object> entry : variables.entrySet()) {
+            if (entry.getKey().startsWith(stagePrefix)) {
+                stageData.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        return stageData;
+    }
 }

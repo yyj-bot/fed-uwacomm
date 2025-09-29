@@ -105,9 +105,9 @@ class LogControllerTest {
         
         PageResult<LogListVO> pageResult = PageResult.<LogListVO>builder()
             .total(1000L)
-            .current(1L)
+            .page(1L)
             .size(10L)
-            .records(Arrays.asList(logVO))
+            .list(Arrays.asList(logVO))
             .build();
         
         when(logService.queryLogs(any(LogQueryDTO.class))).thenReturn(pageResult);

@@ -67,6 +67,11 @@ public class WorkflowStageExecution {
     private LocalDateTime createdAt;
 
     /**
+     * 更新时间
+     */
+    private LocalDateTime updatedAt;
+
+    /**
      * 阶段执行状态枚举
      */
     public enum StageExecutionStatus {
