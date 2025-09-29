@@ -8,8 +8,8 @@
         <result property="uploadedBy" column="uploaded_by"/>
         <result property="name" column="name"/>
         <result property="description" column="description"/>
-        <result property="dataType" column="data_type"/>
-        <result property="status" column="status"/>
+        <result property="dataType" column="data_type" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result property="status" column="status" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
         <result property="uploadTime" column="upload_time"/>
     </resultMap>
 
@@ -38,8 +38,10 @@
             id, uploaded_by, name, description, data_type, status, metadata, upload_time
         )
         VALUES (
-            #{id}, #{uploadedBy}, #{name}, #{description}, #{dataType}, #{status},
-            #{metadata}, #{uploadTime}
+            #{id}, #{uploadedBy}, #{name}, #{description},
+            #{dataType,typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+            #{status,typeHandler=org.apache.ibatis.type.EnumTypeHandler},
+            CAST(#{metadata} AS JSON), #{uploadTime}
         )
     </insert>
 

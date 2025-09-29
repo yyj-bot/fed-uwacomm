@@ -66,6 +66,8 @@ public enum ProtocolType {
     GLOBAL_MODEL_BROADCAST,
     /** 全局模型广播确认 */
     GLOBAL_MODEL_BROADCAST_ACK,
+    /** 模型接收确认 */
+    MODEL_RECEIVE_ACK,
     /** 轮次完成通知 */
     ROUND_COMPLETE,
     /** 轮次完成确认 */
@@ -110,6 +112,10 @@ public enum ProtocolType {
     DATASET_DELETE,
     /** 数据集删除确认 */
     DATASET_DELETE_ACK,
+    /** 数据集列表查询 */
+    DATASET_LIST_QUERY,
+    /** 数据集列表响应 */
+    DATASET_LIST_RESPONSE,
 
     // ==================== 向后兼容性错误类型 ====================
     /** 连接错误 */
