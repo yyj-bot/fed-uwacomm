@@ -117,7 +117,7 @@ public class VmTestData {
         double gpuFactor = gpuCount > 0 ? 0.6 : 1.0;
         double memoryFactor = memoryMb < 8192 ? 1.2 : 1.0;
 
-        return (int)(2000 * cpuFactor * gpuFactor * memoryFactor);
+        return (int)(200 * cpuFactor * gpuFactor * memoryFactor); // 减少10倍训练时间
     }
 
     /**

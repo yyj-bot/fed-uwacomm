@@ -7,7 +7,7 @@ public enum FederatedAlgorithm {
     FEDERATED_AVERAGING("FEDERATED_AVERAGING", "联邦平均算法"),
     FEDERATED_PROXIMAL("FEDERATED_PROXIMAL", "联邦近端算法"),
     FEDERATED_NOVA("FEDERATED_NOVA", "联邦Nova算法"),
-    FEDERATED_SCAFFOLD("FEDERATED_SCAFFOLD", "SCAFFOLD算法");
+    SCAFFOLD("SCAFFOLD", "SCAFFOLD算法");
 
     private final String code;
     private final String description;

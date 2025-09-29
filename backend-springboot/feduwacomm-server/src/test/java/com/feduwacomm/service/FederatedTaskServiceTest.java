@@ -12,6 +12,7 @@ import com.feduwacomm.exception.UserException;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.service.impl.FederatedTaskServiceImpl;
 import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -52,6 +54,9 @@ public class FederatedTaskServiceTest {
 
     @Mock
     private UuidUtil uuidUtil;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private FederatedTaskServiceImpl federatedTaskService;
@@ -589,5 +594,239 @@ public class FederatedTaskServiceTest {
 
         // 验证日志服务调用
         verify(logService).logTask(taskId, level, message, source, vmId, details);
+    }
+
+    // ==================== 协议v1.4标准化验证测试 ====================
+
+    /**
+     * 测试sendTrainingStartCommand使用标准消息格式
+     * 验证新的MessageBuilder构建的消息是否符合协议v1.4标准
+     */
+    @Test
+    void testSendTrainingStartCommandWithStandardFormat() {
+        String taskId = "test-task-123";
+
+        // 创建测试参与者
+        List<TaskParticipant> participants = Arrays.asList(
+            TaskParticipant.builder()
+                .vmId("vm-001")
+                .dataSource("/data/vm001")
+                .role(ParticipantRole.PARTICIPANT)
+                .build(),
+            TaskParticipant.builder()
+                .vmId("vm-002")
+                .dataSource("/data/vm002")
+                .role(ParticipantRole.PARTICIPANT)
+                .build()
+        );
+
+        // 创建测试任务，包含算法配置
+        FederatedTask testTask = FederatedTask.builder()
+            .id(taskId)
+            .taskName("标准协议测试任务")
+            .algorithm(FederatedAlgorithm.FEDERATED_AVERAGING)
+            .learningRate(0.01)
+            .batchSize(32)
+            .epochs(100)
+            .status(FederatedTaskStatus.RUNNING)
+            .build();
+
+        // Mock任务查询
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(testTask);
+
+        // 创建模拟的联邦任务服务实例
+        FederatedTaskServiceImpl spyService = spy(federatedTaskService);
+        doReturn(testTask).when(spyService).getTaskById(taskId);
+
+        // 使用反射调用私有方法 sendTrainingStartCommand
+        try {
+            java.lang.reflect.Method method = FederatedTaskServiceImpl.class
+                .getDeclaredMethod("sendTrainingStartCommand", String.class, List.class);
+            method.setAccessible(true);
+            method.invoke(spyService, taskId, participants);
+        } catch (Exception e) {
+            fail("反射调用sendTrainingStartCommand失败: " + e.getMessage());
+        }
+
+        // 验证发送的消息格式
+        ArgumentCaptor<ProtocolMessage> messageCaptor = ArgumentCaptor.forClass(ProtocolMessage.class);
+        ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
+
+        // 验证每个参与者都收到了消息
+        verify(messagingTemplate, times(participants.size())).convertAndSend(
+            topicCaptor.capture(),
+            messageCaptor.capture()
+        );
+
+        List<ProtocolMessage> sentMessages = messageCaptor.getAllValues();
+        List<String> topics = topicCaptor.getAllValues();
+
+        // 验证消息数量正确
+        assertEquals(participants.size(), sentMessages.size(), "发送的消息数量应该等于参与者数量");
+
+        // 验证每个消息都符合协议v1.4标准
+        for (int i = 0; i < sentMessages.size(); i++) {
+            ProtocolMessage message = sentMessages.get(i);
+            String topic = topics.get(i);
+            TaskParticipant participant = participants.get(i);
+
+            // 验证topic格式
+            assertEquals("/topic/vm/" + participant.getVmId(), topic, "Topic格式不正确");
+
+            // 验证消息类型
+            assertEquals(ProtocolType.FEDERATED_TASK_START, message.getType(), "消息类型应该是TRAINING_START");
+
+            // 验证ID格式符合协议标准：cmd-{timestamp}-{random}
+            assertNotNull(message.getId(), "消息ID不能为null");
+            assertTrue(message.getId().matches("cmd-\\d+-[a-f0-9]{8}"),
+                "ID格式不符合标准：" + message.getId());
+
+            // 验证vmId
+            assertEquals(participant.getVmId(), message.getVmId(), "vmId不匹配");
+
+            // 验证数据字段符合协议v1.4标准
+            Map<String, Object> data = message.getData();
+            assertNotNull(data, "消息数据不能为null");
+
+            // 验证必需的标准字段
+            assertEquals(taskId, data.get("taskId"), "taskId不匹配");
+            assertEquals(1, data.get("roundNumber"), "roundNumber应该是1");
+            assertEquals("FEDERATED_AVERAGING", data.get("mlAlgorithm"), "mlAlgorithm不匹配");
+            assertEquals("请开始本地ML训练任务", data.get("message"), "message不匹配");
+
+            // 验证复杂对象字段存在且为Map类型
+            assertNotNull(data.get("hyperparameters"), "hyperparameters字段不能为null");
+            assertTrue(data.get("hyperparameters") instanceof Map, "hyperparameters应该是Map对象");
+
+            assertNotNull(data.get("globalModel"), "globalModel字段不能为null");
+            assertTrue(data.get("globalModel") instanceof Map, "globalModel应该是Map对象");
+
+            assertNotNull(data.get("timestamp"), "timestamp字段不能为null");
+
+            // 验证不包含非标准字段
+            assertFalse(data.containsKey("instruction"), "不应包含instruction字段");
+            assertFalse(data.containsKey("participantId"), "不应包含participantId字段");
+            assertFalse(data.containsKey("algorithm"), "不应包含algorithm字段");
+
+            // 验证签名字段存在
+            assertNotNull(message.getSignature(), "签名字段不能为null");
+        }
+    }
+
+    /**
+     * 测试sendTrainingStartCommand - 空参与者列表
+     * 验证处理边界情况的健壮性
+     */
+    @Test
+    void testSendTrainingStartCommand_EmptyParticipants() {
+        String taskId = "test-task-empty";
+        List<TaskParticipant> emptyParticipants = Collections.emptyList();
+
+        // 使用反射调用私有方法
+        try {
+            java.lang.reflect.Method method = FederatedTaskServiceImpl.class
+                .getDeclaredMethod("sendTrainingStartCommand", String.class, List.class);
+            method.setAccessible(true);
+            method.invoke(federatedTaskService, taskId, emptyParticipants);
+        } catch (Exception e) {
+            fail("反射调用sendTrainingStartCommand失败: " + e.getMessage());
+        }
+
+        // 验证没有发送任何消息
+        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+    }
+
+    /**
+     * 测试sendTrainingStartCommand - 任务不存在
+     * 验证错误处理逻辑
+     */
+    @Test
+    void testSendTrainingStartCommand_TaskNotFound() {
+        String taskId = "non-existent-task";
+        List<TaskParticipant> participants = Arrays.asList(
+            TaskParticipant.builder().vmId("vm-001").build()
+        );
+
+        // Mock任务查询返回null
+        when(tasksMapper.selectTaskById(taskId)).thenReturn(null);
+
+        FederatedTaskServiceImpl spyService = spy(federatedTaskService);
+        doReturn(null).when(spyService).getTaskById(taskId);
+
+        // 使用反射调用私有方法
+        try {
+            java.lang.reflect.Method method = FederatedTaskServiceImpl.class
+                .getDeclaredMethod("sendTrainingStartCommand", String.class, List.class);
+            method.setAccessible(true);
+            method.invoke(spyService, taskId, participants);
+        } catch (Exception e) {
+            fail("反射调用sendTrainingStartCommand失败: " + e.getMessage());
+        }
+
+        // 验证没有发送任何消息
+        verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+    }
+
+    /**
+     * 测试MessageBuilder构建的超参数对象结构
+     * 验证hyperparameters对象包含正确的字段
+     */
+    @Test
+    void testMessageBuilderHyperparametersStructure() {
+        // 创建测试任务
+        FederatedTask task = FederatedTask.builder()
+            .learningRate(0.001)
+            .batchSize(64)
+            .epochs(200)
+            .build();
+
+        // 构建超参数对象
+        Map<String, Object> hyperparameters = MessageBuilder.buildHyperparameters(task);
+
+        // 验证超参数对象结构
+        assertNotNull(hyperparameters, "超参数对象不能为null");
+
+        // 验证包含正确的字段和值
+        assertEquals(0.001, hyperparameters.get("learningRate"), "learningRate值不正确");
+        assertEquals(64, hyperparameters.get("batchSize"), "batchSize值不正确");
+        assertEquals(200, hyperparameters.get("epochs"), "epochs值不正确");
+        assertEquals(300, hyperparameters.get("timeout"), "timeout应该有默认值300");
+
+        // 验证字段类型
+        assertTrue(hyperparameters.get("learningRate") instanceof Number, "learningRate应该是数值类型");
+        assertTrue(hyperparameters.get("batchSize") instanceof Number, "batchSize应该是数值类型");
+        assertTrue(hyperparameters.get("epochs") instanceof Number, "epochs应该是数值类型");
+        assertTrue(hyperparameters.get("timeout") instanceof Number, "timeout应该是数值类型");
+    }
+
+    /**
+     * 测试MessageBuilder构建的全局模型对象结构
+     * 验证globalModel对象包含正确的字段
+     */
+    @Test
+    void testMessageBuilderGlobalModelStructure() {
+        String taskId = "test-task-456";
+        int roundNumber = 3;
+
+        // 构建全局模型对象
+        Map<String, Object> globalModel = MessageBuilder.buildGlobalModel(taskId, roundNumber);
+
+        // 验证全局模型对象结构
+        assertNotNull(globalModel, "全局模型对象不能为null");
+
+        // 验证包含正确的字段和值
+        String expectedModelId = "global-model-" + taskId + "-round-" + roundNumber;
+        assertEquals(expectedModelId, globalModel.get("modelId"), "modelId格式不正确");
+
+        String expectedVersion = "v" + roundNumber + ".0";
+        assertEquals(expectedVersion, globalModel.get("version"), "version格式不正确");
+
+        String expectedDownloadUrl = "/api/federated/models/" + taskId + "/global/round/" + roundNumber;
+        assertEquals(expectedDownloadUrl, globalModel.get("downloadUrl"), "downloadUrl格式不正确");
+
+        // 验证字段类型
+        assertTrue(globalModel.get("modelId") instanceof String, "modelId应该是字符串类型");
+        assertTrue(globalModel.get("version") instanceof String, "version应该是字符串类型");
+        assertTrue(globalModel.get("downloadUrl") instanceof String, "downloadUrl应该是字符串类型");
     }
 }

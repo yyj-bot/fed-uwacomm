@@ -182,7 +182,7 @@ public class GlobalModelDistributionService {
         data.put("expectedClientsInNextRound", "ALL_PARTICIPANTS");
 
         return ProtocolMessage.builder()
-                .type(ProtocolType.GLOBAL_MODEL_UPDATE)
+                .type(ProtocolType.GLOBAL_MODEL_BROADCAST)
                 .id("global-model-" + System.currentTimeMillis())
                 .timestamp(Instant.now())
                 .data(data)
@@ -246,7 +246,7 @@ public class GlobalModelDistributionService {
         ProtocolMessage vmMessage = ProtocolMessage.builder()
                 .type(globalModelMessage.getType())
                 .id(globalModelMessage.getId() + "-" + vmId)
-                .timestamp(globalModelMessage.getTimestamp())
+                .timestamp(globalModelMessage.getTimestamp()) // Instant类型直接使用
                 .vmId(vmId)
                 .data(globalModelMessage.getData())
                 .build();

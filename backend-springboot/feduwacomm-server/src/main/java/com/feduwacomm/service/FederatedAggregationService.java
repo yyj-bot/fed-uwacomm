@@ -7,15 +7,20 @@ import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.VmRoundModel;
 import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.GlobalModelStatus;
+import com.feduwacomm.enums.RoundState;
 import com.feduwacomm.event.AggregationCompletedEvent;
 import com.feduwacomm.event.AggregationTriggeredEvent;
 import com.feduwacomm.event.ModelUploadEvent;
 import com.feduwacomm.event.RoundCompleteEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.GlobalModelMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
-import com.feduwacomm.strategy.AggregationStrategy;
-import com.feduwacomm.strategy.AggregationStrategyFactory;
+import com.feduwacomm.aggregation.AggregationStrategy;
+import com.feduwacomm.aggregation.AggregationStrategyFactory;
+import com.feduwacomm.aggregation.UniversalAggregationEngine;
+import com.feduwacomm.aggregation.UniversalAggregationEngine.AggregationResult;
+import com.feduwacomm.enums.FederatedAlgorithm;
 import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * 联邦学习聚合服务
@@ -49,12 +55,18 @@ public class FederatedAggregationService {
     private final VmRoundModelsMapper vmRoundModelsMapper;
     private final FederatedTasksMapper federatedTasksMapper;
     private final GlobalModelMapper globalModelMapper;
-    private final ModelAggregatorEngine aggregatorEngine;
+    private final TaskParticipantsMapper taskParticipantsMapper;
+    private final UniversalAggregationEngine aggregationEngine;
     private final AggregationStrategyFactory strategyFactory;
     private final AggregationConfig aggregationConfig;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
+
+    // 🔧 轮次同步组件
+    private final RoundStateManager roundStateManager;
+    private final RoundLockManager roundLockManager;
+    private final VmAckTracker vmAckTracker;
 
     // 聚合状态管理
     private final Map<String, LocalDateTime> roundStartTimes = new ConcurrentHashMap<>();
@@ -73,15 +85,13 @@ public class FederatedAggregationService {
         Integer roundNumber = event.getRoundNumber();
         String aggregationKey = buildAggregationKey(taskId, roundNumber);
 
-        log.info("处理模型上传事件: 任务ID={}, 轮次={}, 虚拟机ID={}", 
+        log.info("处理模型上传事件: 任务ID={}, 轮次={}, 虚拟机ID={}",
                 taskId, roundNumber, event.getVmId());
 
         try {
-            // 获取聚合锁，避免并发触发
-            ReentrantLock lock = aggregationLocks.computeIfAbsent(aggregationKey, k -> new ReentrantLock());
-            
-            if (!lock.tryLock()) {
-                log.debug("聚合已在进行中，跳过: {}", aggregationKey);
+            // 🔧 使用轮次锁管理器获取分布式锁，防止竞态条件
+            if (!roundLockManager.acquireRoundLock(taskId)) {
+                log.warn("获取轮次锁失败，跳过聚合检查: 任务ID={}, 轮次={}", taskId, roundNumber);
                 return;
             }
 
@@ -89,18 +99,29 @@ public class FederatedAggregationService {
                 // 记录轮次开始时间（如果还没记录）
                 roundStartTimes.putIfAbsent(aggregationKey, LocalDateTime.now());
 
+                // 🔧 增强轮次状态检查，确保轮次同步
+                RoundState currentState = roundStateManager.getCurrentRoundState(taskId);
+                log.debug("当前轮次状态: 任务ID={}, 状态={}", taskId, currentState);
+
                 // 检查聚合条件
                 if (shouldTriggerAggregation(taskId, roundNumber)) {
                     triggerAggregation(taskId, roundNumber, "MODEL_UPLOAD_COMPLETE");
                 }
-                
+
             } finally {
-                lock.unlock();
+                // 🔧 确保轮次锁被正确释放
+                roundLockManager.releaseRoundLock(taskId);
             }
 
         } catch (Exception e) {
-            log.error("处理模型上传事件失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("处理模型上传事件失败: 任务ID={}, 轮次={}, 错误={}",
                     taskId, roundNumber, e.getMessage(), e);
+            // 异常情况下也要释放锁
+            try {
+                roundLockManager.releaseRoundLock(taskId);
+            } catch (Exception lockEx) {
+                log.error("释放轮次锁失败: 任务ID={}", taskId, lockEx);
+            }
         }
     }
 
@@ -172,33 +193,124 @@ public class FederatedAggregationService {
 
     /**
      * 检查是否应该触发聚合
+     * 采用动态轮次检测策略：检测参与者的最新完成轮次并触发相应的聚合
      */
     private boolean shouldTriggerAggregation(String taskId, Integer roundNumber) {
         try {
-            // 获取期望参与者数量
-            int expectedParticipants = getExpectedParticipantCount(taskId);
-            
-            // 获取当前已上传模型数量
-            int currentParticipants = vmRoundModelsMapper.countReadyModels(taskId, roundNumber);
-            
+            // 获取任务总参与者数量
+            int totalParticipants = taskParticipantsMapper.countTotalParticipants(taskId);
+            if (totalParticipants == 0) {
+                log.warn("任务{}没有参与者，无法进行聚合", taskId);
+                return false;
+            }
+
+            // 🔧 增强调试：安全地获取参与者详细状态信息
+            List<Map<String, Object>> participantDetails = null;
+            try {
+                participantDetails = taskParticipantsMapper.getParticipantStatusDetails(taskId);
+                log.debug("参与者状态详情查询: 任务ID={}, 原始结果数量={}", taskId,
+                         participantDetails != null ? participantDetails.size() : "null");
+
+                // 🔧 强化null过滤：确保返回的列表不包含null元素
+                if (participantDetails != null) {
+                    int originalSize = participantDetails.size();
+                    participantDetails = participantDetails.stream()
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                    int filteredSize = participantDetails.size();
+
+                    if (originalSize != filteredSize) {
+                        log.warn("🔧 过滤null参与者元素: 任务ID={}, 原始数量={}, 过滤后数量={}",
+                                taskId, originalSize, filteredSize);
+                    }
+                } else {
+                    participantDetails = new ArrayList<>();
+                }
+
+                log.debug("参与者状态详情处理完成: 任务ID={}, 有效参与者数量={}", taskId, participantDetails.size());
+            } catch (Exception e) {
+                log.error("获取参与者详情失败: 任务ID={}, 错误={}", taskId, e.getMessage());
+                participantDetails = new ArrayList<>(); // 使用空列表避免后续null检查
+            }
+
+            // 🔧 增强轮次检测逻辑：智能适应轮次同步问题
+            log.debug("开始轮次检测: 任务ID={}, 期望轮次={}", taskId, roundNumber);
+
+            // 首先检查传入的roundNumber是否有完成的参与者
+            int completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
+            log.debug("初始检查: 任务ID={}, 检查轮次={}, 已完成参与者={}",
+                    taskId, roundNumber, completedParticipants);
+
+            // 🔧 如果传入轮次没有完成参与者，智能查找实际轮次
+            if (completedParticipants == 0) {
+                // 查询参与者实际完成的最新轮次
+                Integer actualCompletedRound = getLatestCompletedRound(taskId);
+                log.debug("查询到参与者实际完成轮次: 任务ID={}, 实际轮次={}", taskId, actualCompletedRound);
+
+                if (actualCompletedRound != null) {
+                    // 🔧 智能轮次选择：选择合适的轮次进行聚合检查
+                    Integer targetRound = determineTargetRoundForAggregation(taskId, roundNumber, actualCompletedRound);
+
+                    if (!targetRound.equals(roundNumber)) {
+                        log.info("🔄 轮次修正检测: 任务ID={}, 期望轮次={}, 实际轮次={}, 目标轮次={}",
+                                taskId, roundNumber, actualCompletedRound, targetRound);
+
+                        // 使用目标轮次重新统计
+                        completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, targetRound);
+                        roundNumber = targetRound; // 更新为目标轮次
+
+                        log.info("✅ 轮次修正完成: 任务ID={}, 使用轮次={}, 已完成参与者={}",
+                                taskId, targetRound, completedParticipants);
+                    }
+                } else {
+                    log.warn("⚠️ 未找到参与者完成轮次: 任务ID={}, 可能是新任务或数据同步问题", taskId);
+                }
+            }
+
             // 计算等待时间
             String aggregationKey = buildAggregationKey(taskId, roundNumber);
             LocalDateTime startTime = roundStartTimes.get(aggregationKey);
-            long waitTimeSeconds = startTime != null ? 
+            long waitTimeSeconds = startTime != null ?
                     ChronoUnit.SECONDS.between(startTime, LocalDateTime.now()) : 0;
 
-            boolean shouldTrigger = aggregationConfig.shouldTriggerAggregation(
-                    currentParticipants, expectedParticipants, waitTimeSeconds);
+            // 严格的同步策略：所有参与者必须完成当前轮次
+            boolean allParticipantsCompleted = (completedParticipants == totalParticipants);
 
-            log.debug("聚合条件检查: 任务ID={}, 轮次={}, 当前参与者={}, 期望参与者={}, " +
-                      "等待时间={}秒, 是否触发={}", 
-                    taskId, roundNumber, currentParticipants, expectedParticipants, 
-                    waitTimeSeconds, shouldTrigger);
+            // 超时处理：如果等待时间过长，允许部分参与者的聚合
+            boolean isTimeout = waitTimeSeconds >= aggregationConfig.getMaxWaitTimeSeconds();
+            boolean hasMinParticipants = completedParticipants >= aggregationConfig.getMinParticipants();
+
+            boolean shouldTrigger = allParticipantsCompleted || (isTimeout && hasMinParticipants);
+
+            // 🔧 增强日志：提供更详细的聚合决策信息
+            if (completedParticipants == 0 && totalParticipants > 0) {
+                log.warn("📊 聚合服务计数错误: 已完成参与者=0/{}, 等待时间={}秒, 满足最少参与者={}, 是否触发={}",
+                        totalParticipants, waitTimeSeconds, hasMinParticipants, shouldTrigger);
+
+                // 🔧 修复：输出每个参与者的状态（现已预先过滤null元素）
+                if (participantDetails != null && !participantDetails.isEmpty()) {
+                    log.debug("参与者详情数量: {}", participantDetails.size());
+                    for (int i = 0; i < participantDetails.size(); i++) {
+                        Map<String, Object> participant = participantDetails.get(i);
+                        // 由于已经预先过滤，这里的participant不应该为null
+                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, 参与者ID={}",
+                                i, participant.get("vm_id"), participant.get("current_epoch"),
+                                participant.get("status"), participant.get("updated_at"), participant.get("participant_id"));
+                    }
+                } else {
+                    log.warn("⚠️ 参与者详情列表为空: 任务ID={}, 可能的原因: 1)任务无参与者 2)数据同步问题 3)查询条件过严", taskId);
+                }
+            } else {
+                log.info("聚合条件检查: 任务ID={}, 轮次={}, 已完成参与者={}/{}, 等待时间={}秒, " +
+                          "所有完成={}, 超时={}, 满足最少参与者={}, 是否触发={}",
+                        taskId, roundNumber, completedParticipants, totalParticipants, waitTimeSeconds,
+                        allParticipantsCompleted, isTimeout, hasMinParticipants, shouldTrigger);
+            }
 
             return shouldTrigger;
 
         } catch (Exception e) {
-            log.error("检查聚合条件失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("检查聚合条件失败: 任务ID={}, 轮次={}, 错误={}",
                     taskId, roundNumber, e.getMessage(), e);
             return false;
         }
@@ -252,7 +364,7 @@ public class FederatedAggregationService {
                     .toList();
             
             AggregationTriggeredEvent triggeredEvent = new AggregationTriggeredEvent(
-                    this, taskId, roundNumber, task.getAlgorithm().getCode(), 
+                    this, taskId, roundNumber, task.getAlgorithm().getCode(),
                     participantVmIds, triggerReason);
             eventPublisher.publishEvent(triggeredEvent);
 
@@ -281,47 +393,47 @@ public class FederatedAggregationService {
      */
     private void executeAggregation(FederatedTask task, List<VmRoundModel> localModels, Integer roundNumber) {
         String taskId = task.getId();
-        String algorithm = task.getAlgorithm().getCode();
-        
-        log.info("执行聚合计算: 任务ID={}, 算法={}, 模型数量={}", 
+        FederatedAlgorithm algorithm = task.getAlgorithm();
+
+        log.info("执行聚合计算: 任务ID={}, 算法={}, 模型数量={}",
                 taskId, algorithm, localModels.size());
 
         try {
-            // 获取聚合策略
-            AggregationStrategy strategy = strategyFactory.getStrategy(algorithm);
-            
-            // 验证前置条件
-            AggregationStrategy.ValidationResult validation = 
-                    strategy.validatePreconditions(localModels, task);
-            
-            if (!validation.isValid()) {
-                throw new IllegalArgumentException("聚合前置条件验证失败: " + validation.getErrorMessage());
-            }
+            // 构建任务配置参数
+            Map<String, Object> taskConfig = buildTaskConfig(task, roundNumber);
 
             // 执行聚合
-            ModelAggregatorEngine.AggregationResult result = 
-                    strategy.aggregate(localModels, task, aggregatorEngine);
+            AggregationResult result = aggregationEngine.aggregate(localModels, algorithm, taskConfig);
 
             if (result.isSuccess()) {
                 // 保存全局模型
                 GlobalModel globalModel = saveGlobalModel(task, roundNumber, result);
-                
+
                 // 分发全局模型
                 distributeGlobalModel(task, roundNumber, result.getGlobalParameters());
-                
+
                 // 更新任务进度
                 updateTaskProgress(taskId, roundNumber + 1);
-                
-                // 发布成功事件
+
+                // 发布成功事件 - 转换Map<String, Double>为Map<String, BigDecimal>
+                final Map<String, BigDecimal> metricsAsBigDecimal;
+                if (result.getGlobalMetrics() != null) {
+                    metricsAsBigDecimal = new HashMap<>();
+                    result.getGlobalMetrics().forEach((key, value) ->
+                        metricsAsBigDecimal.put(key, BigDecimal.valueOf(value)));
+                } else {
+                    metricsAsBigDecimal = null;
+                }
+
                 AggregationCompletedEvent successEvent = AggregationCompletedEvent.success(
-                        this, taskId, roundNumber, globalModel.getId(), 
-                        result.getGlobalMetrics(), result.getParticipantCount(),
+                        this, taskId, roundNumber, globalModel.getId(),
+                        metricsAsBigDecimal, result.getParticipantCount(),
                         result.getAggregationDuration(), result.getAlgorithm());
                 eventPublisher.publishEvent(successEvent);
-                
-                log.info("聚合成功完成: 任务ID={}, 轮次={}, 参与者数量={}, 耗时={}ms", 
+
+                log.info("聚合成功完成: 任务ID={}, 轮次={}, 参与者数量={}, 耗时={}ms",
                         taskId, roundNumber, result.getParticipantCount(), result.getAggregationDuration());
-                
+
             } else {
                 throw new RuntimeException("聚合执行失败: " + result.getErrorMessage());
             }
@@ -333,10 +445,40 @@ public class FederatedAggregationService {
     }
 
     /**
+     * 构建任务配置参数
+     */
+    private Map<String, Object> buildTaskConfig(FederatedTask task, Integer roundNumber) {
+        Map<String, Object> config = new HashMap<>();
+
+        // 基本任务信息
+        config.put("taskId", task.getId());
+        config.put("roundNumber", roundNumber);
+        config.put("algorithm", task.getAlgorithm().getCode());
+
+        // 任务超参数
+        config.put("learningRate", task.getLearningRate());
+        config.put("batchSize", task.getBatchSize());
+        config.put("epochs", task.getEpochs());
+        config.put("totalRounds", task.getTotalRounds());
+
+        // 聚合配置
+        config.put("minParticipants", task.getMinParticipants());
+
+        // 模型配置
+        config.put("modelType", task.getModelType());
+        config.put("featureColumns", task.getFeatureColumns());
+        config.put("targetColumn", task.getTargetColumn());
+        config.put("testSize", task.getTestSize());
+        config.put("randomState", task.getRandomState());
+
+        return config;
+    }
+
+    /**
      * 保存全局模型到数据库
      */
-    private GlobalModel saveGlobalModel(FederatedTask task, Integer roundNumber, 
-                                      ModelAggregatorEngine.AggregationResult result) {
+    private GlobalModel saveGlobalModel(FederatedTask task, Integer roundNumber,
+                                      AggregationResult result) {
         try {
             GlobalModel globalModel = GlobalModel.builder()
                     .id(uuidUtil.generateUuid())
@@ -355,19 +497,25 @@ public class FederatedAggregationService {
 
             // 设置全局指标
             if (result.getGlobalMetrics() != null) {
-                globalModel.setGlobalLoss(result.getGlobalMetrics().get("loss"));
-                globalModel.setGlobalAccuracy(result.getGlobalMetrics().get("accuracy"));
+                Double loss = result.getGlobalMetrics().get("average_loss");
+                Double accuracy = result.getGlobalMetrics().get("average_accuracy");
+                if (loss != null) {
+                    globalModel.setGlobalLoss(BigDecimal.valueOf(loss));
+                }
+                if (accuracy != null) {
+                    globalModel.setGlobalAccuracy(BigDecimal.valueOf(accuracy));
+                }
             }
 
             globalModelMapper.insertGlobalModel(globalModel);
-            
-            log.debug("全局模型已保存: ID={}, 任务ID={}, 轮次={}", 
+
+            log.debug("全局模型已保存: ID={}, 任务ID={}, 轮次={}",
                     globalModel.getId(), task.getId(), roundNumber);
-            
+
             return globalModel;
 
         } catch (Exception e) {
-            log.error("保存全局模型失败: 任务ID={}, 轮次={}, 错误={}", 
+            log.error("保存全局模型失败: 任务ID={}, 轮次={}, 错误={}",
                     task.getId(), roundNumber, e.getMessage(), e);
             throw new RuntimeException("保存全局模型失败", e);
         }
@@ -377,22 +525,79 @@ public class FederatedAggregationService {
      * 分发全局模型给所有参与的客户端
      * 注：实际分发由GlobalModelDistributionService通过事件监听自动处理
      */
-    private void distributeGlobalModel(FederatedTask task, Integer roundNumber, 
-                                     Map<String, Object> globalParameters) {
-        log.info("全局模型分发将通过AggregationCompletedEvent自动触发: 任务ID={}, 轮次={}", 
+    private void distributeGlobalModel(FederatedTask task, Integer roundNumber,
+                                     Map<String, Object> aggregatedModel) {
+        log.info("全局模型分发将通过AggregationCompletedEvent自动触发: 任务ID={}, 轮次={}",
                 task.getId(), roundNumber);
         // 分发逻辑已通过GlobalModelDistributionService的事件监听器实现
     }
 
     /**
-     * 更新任务进度
+     * 更新任务进度并重置参与者状态准备新轮次
+     * 🔧 使用RoundStateManager确保轮次推进的原子性和一致性
      */
+    @Transactional(rollbackFor = Exception.class)
     private void updateTaskProgress(String taskId, Integer nextRound) {
         try {
-            federatedTasksMapper.updateTaskProgress(taskId, nextRound, null, "RUNNING");
-            log.debug("任务进度已更新: 任务ID={}, 下一轮次={}", taskId, nextRound);
+            log.info("🔄 开始原子性轮次推进: 任务ID={}, 目标轮次={}", taskId, nextRound);
+
+            // 🔧 使用RoundStateManager安全推进轮次
+            boolean roundAdvanced = roundStateManager.advanceRound(taskId);
+            if (!roundAdvanced) {
+                throw new RuntimeException("轮次推进失败: 任务ID=" + taskId);
+            }
+
+            // 🔧 验证轮次推进成功
+            FederatedTask afterUpdate = federatedTasksMapper.selectTaskById(taskId);
+            if (afterUpdate == null) {
+                throw new RuntimeException("任务不存在: " + taskId);
+            }
+
+            Integer currentRound = afterUpdate.getCurrentRound();
+            if (!nextRound.equals(currentRound)) {
+                throw new RuntimeException(String.format(
+                    "轮次推进验证失败: 任务ID=%s, 期望轮次=%d, 实际轮次=%s",
+                    taskId, nextRound, currentRound));
+            }
+
+            // 🔧 创建新轮次的全局模型记录
+            boolean modelCreated = roundStateManager.createRoundModel(taskId, nextRound);
+            if (!modelCreated) {
+                log.warn("新轮次模型创建失败，但继续处理: 任务ID={}, 轮次={}", taskId, nextRound);
+            }
+
+            // 🔧 统一参与者状态同步：确保所有参与者为新轮次做好准备
+            int resetCount = taskParticipantsMapper.resetParticipantsForNewRound(taskId, nextRound);
+
+            // 🔧 增强验证：确保参与者状态与任务轮次同步
+            if (resetCount > 0) {
+                // 验证参与者状态确实重置
+                List<Map<String, Object>> participantStatus = taskParticipantsMapper.getParticipantStatusDetails(taskId);
+                long trainingCount = participantStatus.stream()
+                    .filter(p -> "TRAINING".equals(p.get("status")))
+                    .count();
+
+                log.info("✅ 轮次推进完成: 任务ID={}, 当前轮次={}, 重置参与者数量={}, 训练中参与者={}",
+                         taskId, currentRound, resetCount, trainingCount);
+
+                if (trainingCount != resetCount) {
+                    log.warn("⚠️ 参与者状态不一致: 重置数量={}, 实际训练中数量={}", resetCount, trainingCount);
+                }
+
+                // 🔧 轮次状态验证：确保轮次状态同步
+                RoundState newRoundState = roundStateManager.getCurrentRoundState(taskId);
+                log.info("轮次状态同步完成: 任务ID={}, 轮次={}, 状态={}",
+                        taskId, currentRound, newRoundState);
+
+            } else {
+                log.warn("⚠️ 没有参与者状态被重置: 任务ID={}, 轮次={}", taskId, nextRound);
+            }
+
         } catch (Exception e) {
-            log.error("更新任务进度失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
+            log.error("❌ 更新任务进度失败: 任务ID={}, 目标轮次={}, 错误={}",
+                     taskId, nextRound, e.getMessage(), e);
+            // 重新抛出异常以触发事务回滚
+            throw new RuntimeException("更新任务进度失败", e);
         }
     }
 
@@ -407,6 +612,64 @@ public class FederatedAggregationService {
         } catch (Exception e) {
             log.warn("获取期望参与者数量失败，使用默认值: {}", e.getMessage());
             return aggregationConfig.getMinParticipants();
+        }
+    }
+
+    /**
+     * 获取指定任务中参与者实际完成的最新轮次
+     */
+    private Integer getLatestCompletedRound(String taskId) {
+        try {
+            return taskParticipantsMapper.getLatestCompletedRound(taskId);
+        } catch (Exception e) {
+            log.error("获取最新完成轮次失败: 任务ID={}, 错误={}", taskId, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 🔧 智能确定聚合目标轮次
+     * 解决轮次同步问题中的竞态条件
+     *
+     * @param taskId 任务ID
+     * @param expectedRound 期望的轮次（通常来自事件）
+     * @param actualCompletedRound 参与者实际完成的轮次
+     * @return 应该用于聚合检查的目标轮次
+     */
+    private Integer determineTargetRoundForAggregation(String taskId, Integer expectedRound, Integer actualCompletedRound) {
+        try {
+            // 获取当前任务状态
+            FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            if (task == null) {
+                log.warn("任务不存在，使用期望轮次: taskId={}, expectedRound={}", taskId, expectedRound);
+                return expectedRound;
+            }
+
+            Integer taskCurrentRound = task.getCurrentRound();
+            log.debug("轮次选择分析: 任务ID={}, 任务轮次={}, 期望轮次={}, 实际完成轮次={}",
+                    taskId, taskCurrentRound, expectedRound, actualCompletedRound);
+
+            // 🔧 智能选择策略：
+            // 1. 如果参与者实际完成轮次 > 任务当前轮次，说明存在轮次推进延迟
+            // 2. 如果参与者实际完成轮次 == 期望轮次，使用期望轮次
+            // 3. 如果存在同步问题，优先使用参与者实际完成的轮次进行聚合
+
+            if (actualCompletedRound.equals(expectedRound)) {
+                log.debug("轮次匹配，使用期望轮次: {}", expectedRound);
+                return expectedRound;
+            } else if (actualCompletedRound > (taskCurrentRound != null ? taskCurrentRound : 0)) {
+                log.info("🔄 检测到轮次推进延迟: 任务轮次={}, 参与者完成轮次={}, 使用参与者轮次",
+                        taskCurrentRound, actualCompletedRound);
+                return actualCompletedRound;
+            } else {
+                log.debug("使用期望轮次: {}", expectedRound);
+                return expectedRound;
+            }
+
+        } catch (Exception e) {
+            log.error("确定目标轮次失败: 任务ID={}, 错误={}, 使用期望轮次={}",
+                    taskId, e.getMessage(), expectedRound);
+            return expectedRound;
         }
     }
 

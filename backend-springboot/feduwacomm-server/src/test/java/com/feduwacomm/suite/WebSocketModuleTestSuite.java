@@ -2,7 +2,6 @@ package com.feduwacomm.suite;
 
 import com.feduwacomm.controller.WebSocketProtocolControllerTest;
 import com.feduwacomm.service.WebSocketProtocolServiceTest;
-import com.feduwacomm.service.WebSocketServiceTest;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 
@@ -13,8 +12,7 @@ import org.junit.platform.suite.api.Suite;
 @Suite
 @SelectClasses({
     WebSocketProtocolControllerTest.class,
-    WebSocketProtocolServiceTest.class,
-    WebSocketServiceTest.class
+    WebSocketProtocolServiceTest.class
 })
 public class WebSocketModuleTestSuite {
     // 测试套件类，无需实现方法

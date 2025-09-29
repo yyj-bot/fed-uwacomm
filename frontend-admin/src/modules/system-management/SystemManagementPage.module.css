@@ -1,0 +1,104 @@
+/**
+ * 系统管理页面样式
+ */
+
+.fed-system-management-page {
+  background: transparent;
+  min-height: auto;
+}
+
+.fed-system-management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.fed-system-management-title {
+  flex: 1;
+}
+
+.fed-system-management-title .ant-typography {
+  margin-bottom: 0;
+}
+
+.fed-system-management-title .ant-typography + .ant-typography {
+  margin-top: 4px;
+}
+
+.fed-system-management-actions {
+  flex-shrink: 0;
+  margin-left: 24px;
+}
+
+.fed-system-management-stats {
+  margin-bottom: 24px;
+}
+
+.fed-stat-card {
+  text-align: center;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.fed-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.fed-stat-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.fed-system-management-content {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.fed-system-management-content .ant-tabs-nav {
+  margin-bottom: 0;
+  padding: 0 24px;
+  background: #fafafa;
+  border-radius: 8px 8px 0 0;
+}
+
+.fed-system-management-content .ant-tabs-content-holder {
+  padding: 24px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .fed-system-management-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .fed-system-management-actions {
+    margin-left: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .fed-system-management-content .ant-tabs-content-holder {
+    padding: 16px;
+  }
+}
+
+/* 用户管理组件样式 */
+:global(.fed-user-management) {
+  background: transparent;
+  min-height: auto;
+}
+
+:global(.fed-user-toolbar) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 16px 0;
+  background: transparent;
+}

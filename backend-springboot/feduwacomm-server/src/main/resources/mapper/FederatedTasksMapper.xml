@@ -124,9 +124,8 @@
     </update>
 
     <update id="updateTaskProgress">
-        UPDATE federated_tasks SET 
+        UPDATE federated_tasks SET
             current_round = #{currentRound},
-            progress = #{progress},
             status = #{status},
             updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}

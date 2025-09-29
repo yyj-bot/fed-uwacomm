@@ -24,7 +24,8 @@ public class VmRegisterResponseVO {
     private LocalDateTime createdAt;
     private String sessionId;
     private String accessToken;
-    private String secretId;
+    private String secretId; // vm_secrets表的ID
+    private String rawApiKey; // 明文API Key，仅此一次返回
     private Long tokenExpireSeconds;
     
     /**

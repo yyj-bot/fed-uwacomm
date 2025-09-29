@@ -105,62 +105,43 @@ export class SystemLogService {
   // ==================== 日志导出接口 ====================
 
   /**
-   * 导出日志
+   * 同步下载日志文件
    * @param exportData 导出配置
-   * @returns 导出任务信息
-   */
-  async exportLogs(exportData: LogExportData): Promise<LogExportResponse> {
-    try {
-      this.validateLogExportData(exportData)
-      const result = await log.exportLogs(exportData)
-      return this.transformLogExportResponse(result)
-    } catch (error) {
-      throw this.handleServiceError(error, '创建日志导出任务失败')
-    }
-  }
-
-  /**
-   * 获取导出状态
-   * @param exportId 导出任务ID
-   * @returns 导出任务状态
-   */
-  async getExportStatus(exportId: string): Promise<ExportTask> {
-    try {
-      this.validateExportId(exportId)
-      const result = await log.getExportStatus(exportId)
-      return this.transformExportTask(result)
-    } catch (error) {
-      throw this.handleServiceError(error, `获取导出状态失败 (ExportID: ${exportId})`)
-    }
-  }
-
-  /**
-   * 下载导出文件
-   * @param exportId 导出任务ID
    * @returns 文件Blob
    */
-  async downloadExportFile(exportId: string): Promise<Blob> {
+  async downloadLogs(exportData: LogExportData): Promise<Blob> {
     try {
-      this.validateExportId(exportId)
-      const result = await log.downloadExportFile(exportId)
-      return result
+      this.validateLogExportData(exportData)
+      const blob = await log.downloadLogs(exportData)
+      
+      // 自动触发下载
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      
+      // 生成文件名
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+      const format = exportData.format?.toLowerCase() || 'csv'
+      let filename = `logs_${timestamp}.${format}`
+      
+      // 根据过滤条件生成更详细的文件名
+      if (exportData.level) {
+        filename = `logs_${exportData.level.toLowerCase()}_${timestamp}.${format}`
+      }
+      if (exportData.category) {
+        filename = `logs_${exportData.level?.toLowerCase() || 'all'}_${exportData.category.toLowerCase()}_${timestamp}.${format}`
+      }
+      
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      return blob
     } catch (error) {
-      throw this.handleServiceError(error, `下载导出文件失败 (ExportID: ${exportId})`)
-    }
-  }
-
-  /**
-   * 获取导出历史
-   * @param params 查询参数
-   * @returns 导出历史列表
-   */
-  async getExportHistory(params: ExportHistoryParams = {}): Promise<PaginatedResponse<ExportTask>> {
-    try {
-      this.validateExportHistoryParams(params)
-      const result = await log.getExportHistory(params)
-      return this.transformExportHistory(result)
-    } catch (error) {
-      throw this.handleServiceError(error, '获取导出历史失败')
+      throw this.handleServiceError(error, '下载日志文件失败')
     }
   }
 
@@ -201,7 +182,7 @@ export class SystemLogService {
    * @param params 查询参数
    * @returns 清理历史列表
    */
-  async getCleanupHistory(params: CleanupHistoryParams = {}): Promise<PaginatedResponse<CleanupTask>> {
+  async getCleanupHistory(params: CleanupHistoryParams = {}): Promise<SystemLogPaginatedResponse<CleanupTask>> {
     try {
       this.validateCleanupHistoryParams(params)
       const result = await log.getCleanupHistory(params)
@@ -360,7 +341,7 @@ export class SystemLogService {
   }
 
   private validateCleanupStrategy(strategy: CleanupStrategy): void {
-    const validStrategies: CleanupStrategy[] = ['TIME_BASED', 'LEVEL_BASED', 'SIZE_BASED']
+    const validStrategies: CleanupStrategy[] = ['TIME_BASED', 'LEVEL_BASED', 'CATEGORY_BASED']
     if (!validStrategies.includes(strategy)) {
       throw new Error(`清理策略无效，必须为：${validStrategies.join(', ')}`)
     }
@@ -472,11 +453,6 @@ export class SystemLogService {
       this.validateLogLevel(cleanupData.level)
     }
     
-    if (cleanupData.strategy === 'SIZE_BASED' && cleanupData.maxSizeGB !== undefined) {
-      if (cleanupData.maxSizeGB < 0.1 || cleanupData.maxSizeGB > 1000) {
-        throw new Error('最大大小必须在0.1GB-1000GB范围内')
-      }
-    }
 
     if (cleanupData.category !== undefined) {
       this.validateLogCategory(cleanupData.category)
@@ -527,17 +503,23 @@ export class SystemLogService {
 
   // ==================== 私有转换方法 ====================
 
-  private transformLogList(result: any): SystemLogPaginatedResponse<SystemLog> {
+  private transformLogList(result: {
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: SystemLog[]
+  }): SystemLogPaginatedResponse<SystemLog> {
     return {
       total: result.total,
       pages: result.pages,
       current: result.current,
       size: result.size,
-      records: result.records.map((item: any) => this.transformLogDetail(item))
+      records: result.records.map((item: SystemLog) => this.transformLogDetail(item))
     }
   }
 
-  private transformLogDetail(detail: any): SystemLog {
+  private transformLogDetail(detail: SystemLog): SystemLog {
     return {
       logId: detail.logId,
       level: detail.level,
@@ -550,15 +532,19 @@ export class SystemLogService {
     }
   }
 
-  private transformRealtimeLogs(result: any): RealtimeLogsResponse {
+  private transformRealtimeLogs(result: {
+    logs: SystemLog[]
+    totalCount: number
+    lastUpdateTime: string
+  }): RealtimeLogsResponse {
     return {
-      logs: result.logs.map((item: any) => this.transformLogDetail(item)),
+      logs: result.logs.map((item: SystemLog) => this.transformLogDetail(item)),
       totalCount: result.totalCount,
       lastUpdateTime: result.lastUpdateTime
     }
   }
 
-  private transformLogStatistics(result: any): LogStatisticsResponse {
+  private transformLogStatistics(result: LogStatisticsResponse): LogStatisticsResponse {
     return {
       totalLogs: result.totalLogs,
       levelDistribution: result.levelDistribution,
@@ -609,15 +595,15 @@ export class SystemLogService {
       cleanupId: result.cleanupId,
       status: result.status,
       estimatedRecords: result.estimatedRecords,
-      estimatedSize: result.estimatedSize,
-      dryRun: result.dryRun
+      estimatedSize: result.estimatedSize
     }
   }
 
-  private transformCleanupTask(result: any): CleanupTask {
+  private transformCleanupTask(result: CleanupTask): CleanupTask {
     return {
       cleanupId: result.cleanupId,
       status: result.status,
+      strategy: result.strategy,
       estimatedRecords: result.estimatedRecords,
       estimatedSize: result.estimatedSize,
       dryRun: result.dryRun,
@@ -625,18 +611,23 @@ export class SystemLogService {
       deletedRecords: result.deletedRecords,
       freedSpace: result.freedSpace,
       createdAt: result.createdAt,
-      completedAt: result.completedAt,
-      strategy: result.strategy
+      completedAt: result.completedAt
     }
   }
 
-  private transformCleanupHistory(result: any): PaginatedResponse<CleanupTask> {
+  private transformCleanupHistory(result: {
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: CleanupTask[]
+  }): SystemLogPaginatedResponse<CleanupTask> {
     return {
       total: result.total,
-      page: result.page || result.current || 1,
+      current: result.current,
       size: result.size,
       pages: result.pages,
-      records: result.records.map((item: any) => this.transformCleanupTask(item))
+      records: result.records.map((item: CleanupTask) => this.transformCleanupTask(item))
     }
   }
 

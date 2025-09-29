@@ -653,6 +653,376 @@ export const mockFederatedTaskApi = {
       dataDeleted: deleteData,
       modelPreserved: !deleteModel
     }, '任务删除成功')
+  },
+
+  /**
+   * Mock获取角色配置选项 - v1.4版本：只支持PARTICIPANT角色
+   */
+  getRoleConfigs: (): ApiResponse<{
+    roles: Array<{
+      role: 'PARTICIPANT'
+      name: string
+      description: string
+      requirements: {
+        minCpuCores: number
+        minMemoryMb: number
+        requiredCapabilities: string[]
+      }
+      compatibleAlgorithms: string[]
+    }>
+  }> => {
+    return createSuccessResponse({
+      roles: [
+        {
+          role: 'PARTICIPANT',
+          name: '参与者',
+          description: '参与联邦学习训练的客户端节点，所有虚拟机均为参与者角色，聚合由后端服务统一处理',
+          requirements: {
+            minCpuCores: 2,
+            minMemoryMb: 4096,
+            requiredCapabilities: ['PYTHON', 'MACHINE_LEARNING']
+          },
+          compatibleAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_SGD', 'FEDPROX']
+        }
+      ]
+    }, '查询角色配置成功')
+  },
+
+  // ==================== v1.4 新增：联邦学习流程编排Mock接口 ====================
+
+  /**
+   * 启动联邦学习流程Mock
+   */
+  startOrchestration: (orchestrationData: {
+    taskId: string
+    workflowConfig: any
+    schedulingOptions?: any
+  }): ApiResponse<{
+    orchestrationId: string
+    taskId: string
+    status: string
+    startedAt: string
+    estimatedCompletion: string
+    currentStage: string
+    workflowPlan: {
+      totalStages: number
+      estimatedDuration: string
+      stages: Array<{
+        name: string
+        status: string
+        estimatedDuration: string
+      }>
+    }
+    resourceAllocation: {
+      allocatedMemory: string
+      allocatedCpuCores: number
+      allocatedBandwidth: string
+      participatingVms: string[]
+    }
+  }> => {
+    const orchestrationId = generateTaskId()
+    const estimatedHours = Math.floor(Math.random() * 5) + 1
+    
+    return createSuccessResponse({
+      orchestrationId,
+      taskId: orchestrationData.taskId,
+      status: 'INITIALIZING',
+      startedAt: generateTimestamp(),
+      estimatedCompletion: generateTimestamp(-estimatedHours),
+      currentStage: '初始模型生成',
+      workflowPlan: {
+        totalStages: 5,
+        estimatedDuration: `${estimatedHours}小时`,
+        stages: [
+          { name: '初始模型生成', status: 'IN_PROGRESS', estimatedDuration: '30分钟' },
+          { name: '数据分发', status: 'PENDING', estimatedDuration: '15分钟' },
+          { name: '模型分发', status: 'PENDING', estimatedDuration: '10分钟' },
+          { name: '联邦训练', status: 'PENDING', estimatedDuration: `${estimatedHours - 1}小时` },
+          { name: '模型聚合与评估', status: 'PENDING', estimatedDuration: '15分钟' }
+        ]
+      },
+      resourceAllocation: {
+        allocatedMemory: '16GB',
+        allocatedCpuCores: 8,
+        allocatedBandwidth: '1Gbps',
+        participatingVms: Array.from({ length: 3 }, () => generateVMId())
+      }
+    }, '联邦学习流程启动成功')
+  },
+
+  /**
+   * 查询流程状态Mock
+   */
+  getOrchestrationStatus: (orchestrationId: string, params?: {
+    includeDetails?: boolean
+    includeMetrics?: boolean
+    refresh?: boolean
+  }): ApiResponse<any> => {
+    const statuses = ['INITIALIZING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED']
+    const stages = ['初始模型生成', '数据分发', '模型分发', '联邦训练', '模型聚合与评估']
+    const currentStage = stages[Math.floor(Math.random() * stages.length)]
+    const status = statuses[Math.floor(Math.random() * statuses.length)]
+    const progress = status === 'COMPLETED' ? 100 : Math.floor(Math.random() * 90) + 10
+    
+    return createSuccessResponse({
+      orchestrationId,
+      taskId: generateTaskId(),
+      status,
+      startedAt: generateTimestamp(1),
+      completedAt: status === 'COMPLETED' ? generateTimestamp() : undefined,
+      currentStage,
+      progress,
+      workflow: {
+        currentRound: Math.floor(Math.random() * 10) + 1,
+        totalRounds: 20,
+        participatingVms: 3,
+        avgAccuracy: status === 'COMPLETED' ? 0.95 : 0.78 + Math.random() * 0.15
+      },
+      stages: [
+        { 
+          name: '初始模型生成', 
+          status: 'COMPLETED', 
+          startedAt: generateTimestamp(1), 
+          completedAt: generateTimestamp(1),
+          duration: '25分钟'
+        },
+        { 
+          name: '数据分发', 
+          status: progress > 20 ? 'COMPLETED' : 'IN_PROGRESS', 
+          startedAt: generateTimestamp(1), 
+          completedAt: progress > 20 ? generateTimestamp(1) : undefined,
+          duration: progress > 20 ? '12分钟' : undefined
+        },
+        { 
+          name: '模型分发', 
+          status: progress > 40 ? 'COMPLETED' : progress > 20 ? 'IN_PROGRESS' : 'PENDING', 
+          startedAt: progress > 20 ? generateTimestamp(1) : undefined, 
+          completedAt: progress > 40 ? generateTimestamp(1) : undefined,
+          duration: progress > 40 ? '8分钟' : undefined
+        },
+        { 
+          name: '联邦训练', 
+          status: progress > 80 ? 'COMPLETED' : progress > 40 ? 'IN_PROGRESS' : 'PENDING', 
+          startedAt: progress > 40 ? generateTimestamp(1) : undefined, 
+          completedAt: progress > 80 ? generateTimestamp() : undefined,
+          duration: progress > 80 ? '2小时35分钟' : undefined
+        },
+        { 
+          name: '模型聚合与评估', 
+          status: status === 'COMPLETED' ? 'COMPLETED' : progress > 80 ? 'IN_PROGRESS' : 'PENDING', 
+          startedAt: progress > 80 ? generateTimestamp() : undefined, 
+          completedAt: status === 'COMPLETED' ? generateTimestamp() : undefined,
+          duration: status === 'COMPLETED' ? '18分钟' : undefined
+        }
+      ],
+      metrics: params?.includeMetrics ? {
+        resourceUtilization: {
+          avgCpuUsage: Math.floor(Math.random() * 30) + 60,
+          avgMemoryUsage: Math.floor(Math.random() * 20) + 70,
+          networkThroughput: `${Math.floor(Math.random() * 300) + 200}MB/s`
+        },
+        performance: {
+          trainingAccuracy: 0.78 + Math.random() * 0.17,
+          validationAccuracy: 0.75 + Math.random() * 0.18,
+          loss: Math.random() * 0.5 + 0.1,
+          convergenceRate: Math.random() * 0.1 + 0.02
+        }
+      } : undefined
+    }, '查询流程状态成功')
+  },
+
+  /**
+   * 暂停流程执行Mock
+   */
+  pauseOrchestration: (orchestrationId: string, pauseData?: any): ApiResponse<any> => {
+    return createSuccessResponse({
+      orchestrationId,
+      status: 'PAUSED',
+      pausedAt: generateTimestamp(),
+      pausedStage: '联邦训练',
+      pausedRound: Math.floor(Math.random() * 15) + 5,
+      reason: pauseData?.reason || '用户主动暂停',
+      canResume: true,
+      stateSnapshot: {
+        snapshotId: generateTaskId(),
+        createdAt: generateTimestamp(),
+        modelVersions: {
+          globalModel: 'v1.5.3',
+          participantModels: ['v1.5.1', 'v1.5.2', 'v1.5.3']
+        },
+        trainingProgress: Math.floor(Math.random() * 40) + 40,
+        participantStates: {
+          vm1: { status: 'READY', lastUpdate: generateTimestamp() },
+          vm2: { status: 'READY', lastUpdate: generateTimestamp() },
+          vm3: { status: 'READY', lastUpdate: generateTimestamp() }
+        }
+      }
+    }, '流程暂停成功')
+  },
+
+  /**
+   * 恢复流程执行Mock
+   */
+  resumeOrchestration: (orchestrationId: string, resumeData?: any): ApiResponse<any> => {
+    return createSuccessResponse({
+      orchestrationId,
+      status: 'RUNNING',
+      resumedAt: generateTimestamp(),
+      resumedStage: '联邦训练',
+      resumedRound: Math.floor(Math.random() * 15) + 5,
+      stateValidation: {
+        passed: true,
+        modelsVerified: 3,
+        stateConsistent: true
+      },
+      estimatedRemainingTime: `${Math.floor(Math.random() * 2) + 1}小时${Math.floor(Math.random() * 60)}分钟`
+    }, '流程恢复成功')
+  },
+
+  /**
+   * 终止流程执行Mock
+   */
+  terminateOrchestration: (orchestrationId: string, params?: any): ApiResponse<any> => {
+    const completedRounds = Math.floor(Math.random() * 15) + 5
+    
+    return createSuccessResponse({
+      orchestrationId,
+      status: 'TERMINATED',
+      terminatedAt: generateTimestamp(),
+      terminatedStage: '联邦训练',
+      terminatedRound: completedRounds,
+      completedRounds,
+      partialResults: {
+        bestModel: {
+          roundNumber: completedRounds - 1,
+          accuracy: 0.75 + Math.random() * 0.15,
+          modelId: generateTaskId()
+        },
+        savedModels: completedRounds,
+        trainingMetrics: `metrics_${orchestrationId}.json`
+      },
+      cleanup: {
+        resourcesReleased: true,
+        temporaryDataCleared: params?.cleanup !== false,
+        participantsNotified: true
+      }
+    }, '流程终止成功')
+  },
+
+  /**
+   * 获取流程时间线Mock
+   */
+  getOrchestrationTimeline: (orchestrationId: string, params?: any): ApiResponse<any> => {
+    const events = [
+      { type: 'STAGE_START', stage: '初始模型生成', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'MODEL_GENERATED', stage: '初始模型生成', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'STAGE_COMPLETE', stage: '初始模型生成', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'STAGE_START', stage: '数据分发', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'DATA_DISTRIBUTED', stage: '数据分发', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'STAGE_COMPLETE', stage: '数据分发', timestamp: generateTimestamp(1), level: 'MAJOR' },
+      { type: 'STAGE_START', stage: '联邦训练', timestamp: generateTimestamp(), level: 'MAJOR' },
+      { type: 'ROUND_START', stage: '联邦训练', round: 1, timestamp: generateTimestamp(), level: 'ALL' },
+      { type: 'ROUND_COMPLETE', stage: '联邦训练', round: 1, accuracy: 0.65, timestamp: generateTimestamp(), level: 'ALL' }
+    ]
+
+    return createSuccessResponse({
+      orchestrationId,
+      timeline: {
+        totalEvents: events.length,
+        events: params?.includeEvents ? events : [],
+        summary: {
+          duration: '2小时15分钟',
+          completedStages: 3,
+          totalStages: 5,
+          completedRounds: Math.floor(Math.random() * 10) + 5,
+          currentAccuracy: 0.78 + Math.random() * 0.12
+        }
+      }
+    }, '获取流程时间线成功')
+  },
+
+  /**
+   * 获取流程列表Mock
+   */
+  getOrchestrationList: (params?: any): ApiResponse<any> => {
+    const page = params?.page || 1
+    const size = params?.size || 20
+    const total = 45
+    
+    const orchestrations = Array.from({ length: Math.min(size, total) }, (_, i) => ({
+      orchestrationId: generateTaskId(),
+      taskId: generateTaskId(),
+      status: ['RUNNING', 'COMPLETED', 'PAUSED', 'FAILED'][Math.floor(Math.random() * 4)],
+      startedAt: generateTimestamp(Math.floor(Math.random() * 7)),
+      completedAt: Math.random() > 0.5 ? generateTimestamp() : undefined,
+      currentStage: ['初始模型生成', '数据分发', '联邦训练', '模型聚合'][Math.floor(Math.random() * 4)],
+      progress: Math.floor(Math.random() * 100),
+      duration: `${Math.floor(Math.random() * 4) + 1}小时${Math.floor(Math.random() * 60)}分钟`,
+      participatingVms: Math.floor(Math.random() * 5) + 2,
+      completedRounds: Math.floor(Math.random() * 20) + 1,
+      totalRounds: 20,
+      finalAccuracy: Math.random() > 0.5 ? 0.75 + Math.random() * 0.2 : undefined,
+      success: Math.random() > 0.3
+    }))
+
+    return createSuccessResponse({
+      total,
+      page,
+      size,
+      items: orchestrations
+    }, '获取流程列表成功')
+  },
+
+  /**
+   * 获取流程性能分析Mock
+   */
+  getOrchestrationAnalytics: (orchestrationId: string, params?: any): ApiResponse<any> => {
+    return createSuccessResponse({
+      orchestrationId,
+      performanceMetrics: {
+        overall: {
+          totalDuration: '3小时25分钟',
+          efficiency: 0.85,
+          resourceUtilization: 0.78,
+          cost: 125.50
+        },
+        stages: [
+          { 
+            name: '初始模型生成', 
+            duration: '25分钟', 
+            efficiency: 0.92, 
+            resourceUsage: { cpu: 65, memory: 70, network: 20 } 
+          },
+          { 
+            name: '数据分发', 
+            duration: '12分钟', 
+            efficiency: 0.88, 
+            resourceUsage: { cpu: 30, memory: 45, network: 85 } 
+          },
+          { 
+            name: '联邦训练', 
+            duration: '2小时35分钟', 
+            efficiency: 0.82, 
+            resourceUsage: { cpu: 85, memory: 80, network: 65 } 
+          }
+        ],
+        training: {
+          convergenceRate: 0.075,
+          finalAccuracy: 0.91,
+          averageRoundTime: '8分钟',
+          participantStability: 0.95
+        }
+      },
+      bottlenecks: [
+        { stage: '联邦训练', issue: '网络延迟', impact: 'MEDIUM', suggestion: '考虑增加带宽或优化数据传输' },
+        { stage: '模型聚合', issue: 'CPU利用率', impact: 'LOW', suggestion: '可以适当增加CPU核心数' }
+      ],
+      recommendations: params?.includeRecommendations ? [
+        '建议在下次训练中增加参与者数量以提高模型精度',
+        '考虑使用更高效的聚合算法来减少训练时间',
+        '建议优化数据预处理流程以提高整体效率'
+      ] : undefined
+    }, '获取流程性能分析成功')
   }
 }
 

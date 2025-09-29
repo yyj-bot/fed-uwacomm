@@ -1,0 +1,520 @@
+/**
+ * 登录页面样式
+ */
+
+.fed-login-page {
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 背景 */
+.fed-login-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #667eea 100%);
+  z-index: -2;
+}
+
+.fed-login-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.2) 0%, transparent 50%);
+  z-index: -1;
+}
+
+.fed-login-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.1);
+  z-index: -1;
+}
+
+/* 主容器 */
+.fed-login-container {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  min-height: 600px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin: 20px;
+}
+
+/* 左侧内容区 */
+.fed-login-content {
+  flex: 1;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: white;
+}
+
+/* 登录头部 */
+.fed-login-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.fed-login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.fed-logo-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #1890ff, #722ed1);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 28px;
+  box-shadow: 0 8px 32px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.fed-logo-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(24, 144, 255, 0.4);
+}
+
+.fed-logo-main-icon {
+  font-size: 32px !important;
+}
+
+.fed-login-title {
+  color: #000000d9;
+  margin-bottom: 8px !important;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1890ff, #722ed1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.fed-login-subtitle {
+  color: #00000073;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.fed-login-slogan {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: rgba(24, 144, 255, 0.1);
+  border-radius: 20px;
+  display: inline-block;
+}
+
+/* 登录卡片 */
+.fed-login-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.fed-login-card .ant-card-body {
+  padding: 32px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+}
+
+.fed-login-form-header {
+  text-align: center;
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.fed-login-form-header::after {
+  content: '';
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(135deg, #1890ff, #722ed1);
+  border-radius: 2px;
+}
+
+.fed-form-title {
+  color: #1a1a1a !important;
+  font-weight: 600;
+}
+
+.fed-form-subtitle {
+  font-size: 15px;
+}
+
+.fed-login-form-header .ant-typography {
+  margin-bottom: 8px;
+}
+
+/* 登录表单 */
+.fed-login-form .ant-form-item {
+  margin-bottom: 24px;
+}
+
+.fed-input {
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.fed-input:hover {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.fed-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.fed-form-icon {
+  color: #1890ff;
+  font-size: 16px;
+}
+
+.fed-login-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.fed-checkbox-label {
+  color: #000000d9;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.fed-forgot-link {
+  font-size: 14px;
+}
+
+.fed-login-button {
+  height: 52px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1890ff, #722ed1);
+  border: none;
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.fed-login-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(24, 144, 255, 0.4);
+  background: linear-gradient(135deg, #40a9ff, #9254de);
+}
+
+/* 其他登录方式 */
+.fed-login-alternative {
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* 页脚 */
+.fed-login-footer {
+  text-align: center;
+  margin-top: auto;
+}
+
+.fed-login-footer .ant-space {
+  margin-bottom: 16px;
+}
+
+.fed-login-copyright {
+  margin-top: 16px;
+}
+
+/* 右侧信息面板 */
+.fed-login-info {
+  flex: 1;
+  background: linear-gradient(135deg, rgba(30, 60, 114, 0.95), rgba(42, 82, 152, 0.9));
+  padding: 60px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.fed-login-info::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.fed-info-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 400px;
+}
+
+.fed-info-features {
+  margin-top: 40px;
+  space-y: 24px;
+}
+
+.fed-info-feature {
+  display: flex;
+  align-items: flex-start;
+  text-align: left;
+  margin-bottom: 32px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.fed-info-feature:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.fed-feature-icon {
+  font-size: 32px;
+  margin-right: 20px;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fed-feature-text {
+  flex: 1;
+}
+
+.fed-feature-title {
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.fed-feature-desc {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  line-height: 1.6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 响应式样式 */
+@media (max-width: 1024px) {
+  .fed-login-container {
+    flex-direction: column;
+    max-width: 480px;
+    margin: 20px;
+  }
+  
+  .fed-login-info {
+    order: -1;
+    padding: 40px 20px;
+    min-height: 200px;
+  }
+  
+  .fed-info-features {
+    display: none;
+  }
+  
+  .fed-login-content {
+    padding: 40px 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fed-login-page {
+    padding: 16px;
+  }
+  
+  .fed-login-container {
+    margin: 0;
+    max-width: 100%;
+    min-height: auto;
+  }
+  
+  .fed-login-content {
+    padding: 32px 24px;
+  }
+  
+  .fed-login-header {
+    margin-bottom: 32px;
+  }
+  
+  .fed-login-card {
+    margin-bottom: 32px;
+  }
+  
+  .fed-login-form-header {
+    margin-bottom: 24px;
+  }
+  
+  .fed-login-form .ant-form-item {
+    margin-bottom: 20px;
+  }
+  
+  .fed-login-info {
+    padding: 32px 24px;
+    min-height: 150px;
+  }
+  
+  .fed-info-content h3 {
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .fed-login-page {
+    padding: 8px;
+  }
+  
+  .fed-login-content {
+    padding: 24px 20px;
+  }
+  
+  .fed-login-header {
+    margin-bottom: 24px;
+  }
+  
+  .fed-logo-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  
+  .fed-login-title {
+    font-size: 24px;
+  }
+  
+  .fed-login-subtitle {
+    font-size: 14px;
+  }
+  
+  .fed-login-form-header {
+    margin-bottom: 20px;
+  }
+  
+  .fed-login-form .ant-form-item {
+    margin-bottom: 16px;
+  }
+  
+  .fed-login-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .fed-login-button {
+    height: 44px;
+    font-size: 15px;
+  }
+}
+
+/* 动画效果 */
+.fed-login-container {
+  animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fed-login-card {
+  animation: slideInLeft 0.8s ease-out 0.3s both;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fed-login-info .fed-info-content {
+  animation: slideInRight 0.8s ease-out 0.5s both;
+}
+
+.fed-welcome-title {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-weight: 700;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 加载状态 */
+.fed-login-button.ant-btn-loading {
+  pointer-events: none;
+}
+
+/* 错误状态 */
+.fed-login-form .ant-form-item-has-error .ant-input {
+  border-color: #ff4d4f;
+}
+
+.fed-login-form .ant-form-item-has-error .fed-form-icon {
+  color: #ff4d4f;
+}

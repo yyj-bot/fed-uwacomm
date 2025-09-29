@@ -1,0 +1,65 @@
+{
+  "model_metadata": {
+    "model_id": "rf_classifier_20250115_103045",
+    "model_type": "sklearn",
+    "algorithm": "RandomForest",
+    "task_type": "classification",
+    "created_at": "2025-01-15T10:30:45Z",
+    "version": "1.0.0",
+    "description": "RandomForest分类模型用于水声信道状态分类"
+  },
+  "parameters": {
+    "feature_importances_": [0.22, 0.18, 0.16, 0.20, 0.14, 0.10],
+    "n_estimators": 100
+  },
+  "training_config": {
+    "max_depth": 8,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt",
+    "bootstrap": true,
+    "criterion": "gini",
+    "random_state": 42,
+    "n_jobs": -1,
+    "class_weight": "balanced",
+    "feature_names": [
+      "frequency_hz",
+      "source_depth_m",
+      "receiver_depth_m",
+      "range_km",
+      "water_temperature_c",
+      "salinity_psu"
+    ],
+    "target_name": "channel_stability",
+    "class_mapping": {
+      "stable": 0,
+      "moderate": 1,
+      "unstable": 2
+    }
+  },
+  "metadata": {
+    "model_purpose": "水声信道稳定性分类",
+    "expected_performance": {
+      "accuracy": 0.88,
+      "precision": 0.85,
+      "recall": 0.87,
+      "f1_score": 0.86
+    },
+    "class_distribution": {
+      "stable": 0.45,
+      "moderate": 0.35,
+      "unstable": 0.20
+    },
+    "usage_notes": [
+      "适用于水声信道状态实时分类",
+      "支持三种稳定性等级判别",
+      "考虑了环境参数的综合影响",
+      "建议结合时序信息提升准确率"
+    ],
+    "data_requirements": {
+      "min_samples_per_class": 50,
+      "feature_scaling": "recommended",
+      "class_balance": "handled_by_class_weight"
+    }
+  }
+}

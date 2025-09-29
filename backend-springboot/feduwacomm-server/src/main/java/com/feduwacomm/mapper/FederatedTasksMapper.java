@@ -25,7 +25,6 @@ public interface FederatedTasksMapper {
     
     int updateTaskProgress(@Param("id") String id,
                           @Param("currentRound") Integer currentRound,
-                          @Param("progress") Double progress,
                           @Param("status") String status);
     
     int deleteTask(@Param("id") String id);
@@ -60,6 +59,11 @@ public interface FederatedTasksMapper {
 
     // v1.3 新增：检查VM占用情况
     int countTasksByVmIdAndStatuses(@Param("vmId") String vmId, @Param("statuses") List<String> statuses);
+
+    // v1.4 新增：轮次状态和VM确认跟踪清理
+    int deleteRoundStatesByTaskId(@Param("taskId") String taskId);
+
+    int deleteVmAckTrackingByTaskId(@Param("taskId") String taskId);
     
     // 兼容旧方法
     @Deprecated

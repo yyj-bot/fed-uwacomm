@@ -19,8 +19,9 @@ import {
   WarningOutlined
 } from '@ant-design/icons'
 
-import { useDashboard, useVM, useTask, useWebSocket } from '@/store'
+import { useDashboard, useVM, useTask } from '@/store'
 import { StatusIndicator, Table } from '@/components'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { 
   OverviewCards, 
   SystemStatus, 
@@ -28,7 +29,7 @@ import {
   RecentActivities,
   PerformanceCharts 
 } from './components'
-import './DashboardPage.module.css'
+import styles from './DashboardPage.module.css'
 
 const { Title, Text } = Typography
 
@@ -45,7 +46,6 @@ const DashboardPage: React.FC = () => {
   
   const { vmList } = useVM()
   const { taskList } = useTask()
-  const { isConnected } = useWebSocket()
   
   // 计算虚拟机统计
   const totalVMs = vmList?.length || 0
@@ -59,30 +59,78 @@ const DashboardPage: React.FC = () => {
 
   // 页面加载时获取数据
   useEffect(() => {
-    fetchOverview()
-    fetchChartData()
-    fetchRecentActivities()
+    const loadData = async () => {
+      // 检查认证状态
+      const token = localStorage.getItem('access_token')
+      console.log('📋 Dashboard加载数据前检查:', {
+        hasToken: !!token,
+        tokenPreview: token ? '***' + token.slice(-10) : 'null',
+        pathname: window.location.pathname
+      })
+      
+      if (!token) {
+        console.warn('⚠️ Dashboard没有token，跳过数据加载')
+        return
+      }
+      
+      // 延迟500ms再加载数据，确保认证状态稳定
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      console.log('📊 开始加载Dashboard数据')
+      
+      try {
+        await fetchOverview()
+        console.log('✅ 概览数据加载成功')
+      } catch (error) {
+        console.error('❌ 仪表盘概览数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
+      }
+      
+      try {
+        await fetchChartData()
+        console.log('✅ 图表数据加载成功')
+      } catch (error) {
+        console.error('❌ 图表数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
+      }
+      
+      try {
+        await fetchRecentActivities()
+        console.log('✅ 活动数据加载成功')
+      } catch (error) {
+        console.error('❌ 最近活动数据加载失败:', error)
+        // 不要因为API失败就停止，继续显示页面
+      }
+      
+      console.log('🎯 Dashboard数据加载流程完成（忽略API错误）')
+    }
+    
+    loadData()
   }, [fetchOverview, fetchChartData, fetchRecentActivities])
 
+  // 如果正在加载，显示加载状态
+  if (overviewLoading) {
+    return (
+      <div className="fed-dashboard">
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <div>正在加载仪表盘数据...</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="fed-dashboard">
+    <div className={styles['fed-dashboard']}>
       {/* 页面标题 */}
-      <div className="fed-dashboard-header">
-        <div className="fed-dashboard-title">
+      <div className={styles['fed-dashboard-header']}>
+        <div className={styles['fed-dashboard-title']}>
           <Title level={2}>仪表盘</Title>
           <Text type="secondary">系统运行状态一览</Text>
         </div>
-        <div className="fed-dashboard-actions">
-          <Space>
-            <StatusIndicator
-              status={isConnected ? 'online' : 'offline'}
-              text={isConnected ? '系统正常' : '连接异常'}
-              variant="badge"
-            />
-            <Button type="primary" onClick={() => window.location.reload()}>
-              刷新数据
-            </Button>
-          </Space>
+        <div className={styles['fed-dashboard-actions']}>
+          <Button type="primary" onClick={() => window.location.reload()}>
+            刷新数据
+          </Button>
         </div>
       </div>
 
@@ -93,7 +141,7 @@ const DashboardPage: React.FC = () => {
       />
 
       {/* 主要内容区域 */}
-      <Row gutter={[24, 24]} className="fed-dashboard-content">
+      <Row gutter={[24, 24]} className={styles['fed-dashboard-content']}>
         {/* 左侧列 */}
         <Col xs={24} lg={16}>
           {/* 系统状态监控 */}
@@ -103,10 +151,19 @@ const DashboardPage: React.FC = () => {
           <TaskProgress tasks={tasks} />
           
           {/* 性能图表 */}
-          <PerformanceCharts 
-            chartData={chartData}
-            loading={overviewLoading}
-          />
+          <ErrorBoundary fallback={
+            <Card title="性能监控" className={styles['fed-dashboard-card']}>
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <WarningOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
+                <p>图表组件加载失败，请刷新页面重试</p>
+              </div>
+            </Card>
+          }>
+            <PerformanceCharts 
+              chartData={chartData}
+              loading={overviewLoading}
+            />
+          </ErrorBoundary>
         </Col>
 
         {/* 右侧列 */}
@@ -115,7 +172,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="快速操作" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
           >
             <Space direction="vertical" style={{ width: '100%' }}>
               <Button 
@@ -150,7 +207,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="运行中的虚拟机" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
             extra={<Text type="secondary">{runningVMs}/{totalVMs}</Text>}
           >
             <List
@@ -187,7 +244,7 @@ const DashboardPage: React.FC = () => {
           <Card 
             title="活跃任务" 
             size="small"
-            className="fed-dashboard-card"
+            className={styles['fed-dashboard-card']}
             extra={<Text type="secondary">{activeTasks?.length || 0}</Text>}
           >
             <List

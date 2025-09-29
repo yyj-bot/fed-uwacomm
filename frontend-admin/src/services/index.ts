@@ -113,11 +113,33 @@ export type {
 export { systemLogService } from './system-log'
 export type {
   SystemLogService,
+  SystemLogPaginatedResponse,
   SystemLogListParams,
   RealtimeLogsParams,
+  RealtimeLogsResponse,
+  LogStatisticsParams,
+  LogStatisticsResponse,
   LogExportData,
+  LogExportResponse,
+  ExportTask,
+  ExportHistoryParams,
   LogCleanupData,
-  SystemLogServiceError
+  LogCleanupResponse,
+  CleanupTask,
+  CleanupHistoryParams,
+  SystemMonitor,
+  LogMonitorParams,
+  LogMonitor,
+  PerformanceMonitorParams,
+  PerformanceMonitor,
+  AlertConfig,
+  LogConfig,
+  LogConfigUpdateData,
+  LogConfigUpdateResponse,
+  CleanupStrategy,
+  SystemLogOperation,
+  SystemLogServiceError,
+  SystemLogOperationError
 } from './system-log'
 
 // VM轮次模型服务

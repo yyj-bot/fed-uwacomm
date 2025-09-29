@@ -3,9 +3,12 @@
 
 export { DashboardPage } from './dashboard'
 export { LoginPage } from './login'
-export { AdminPage } from './admin'
+export { SystemManagementPage } from './system-management'
 export { FederatedLearningPage } from './federated-learning'
 export { ModelManagementPage } from './model-management'
-export { SystemLogsPage } from './system-logs'
+export { SystemLogsPage } from './system-log'
 export { UnderwaterOptimizationPage } from './underwater-optimization'
-export { EnvironmentAnalysisPage } from './environment-analysis' 
+export { EnvironmentAnalysisPage } from './environment-analysis'
+
+// 用户模块
+export { UserProfilePage, AccountSettingsPage } from './user' 

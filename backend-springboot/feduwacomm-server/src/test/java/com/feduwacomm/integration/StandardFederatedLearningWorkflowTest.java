@@ -777,12 +777,17 @@ class StandardFederatedLearningWorkflowTest {
     private void verifyRealtimeMessaging() {
         System.out.println("  📨 实时消息传递验证:");
         
-        String[] messageTypes = {"TRAINING_START", "MODEL_UPDATE", "AGGREGATION_COMPLETE", "TRAINING_COMPLETE"};
+        ProtocolType[] messageTypes = {
+            ProtocolType.FEDERATED_TASK_START,
+            ProtocolType.GLOBAL_MODEL_BROADCAST,
+            ProtocolType.VM_STATUS_QUERY,
+            ProtocolType.FEDERATED_TASK_START
+        };
         
-        for (String messageType : messageTypes) {
+        for (ProtocolType messageType : messageTypes) {
             try {
                 // 模拟发送实时消息
-                System.out.println(String.format("    发送消息: %s", messageType));
+                System.out.println(String.format("    发送消息: %s", messageType.name()));
                 
                 // for (String vmId : vmIds) {
                 //     WebSocketMessageDTO message = new WebSocketMessageDTO();

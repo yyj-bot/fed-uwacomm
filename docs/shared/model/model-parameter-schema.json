@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scikit-learn Initial Model Parameter Schema",
+  "description": "基于ModelWrapper的初始模型JSON参数验证模式",
+  "type": "object",
+  "required": ["model_metadata", "parameters"],
+  "properties": {
+    "model_metadata": {
+      "type": "object",
+      "required": ["model_id", "model_type", "algorithm", "task_type", "created_at", "version"],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "minLength": 5,
+          "maxLength": 100,
+          "description": "模型唯一标识符"
+        },
+        "model_type": {
+          "type": "string",
+          "enum": ["sklearn"],
+          "description": "框架类型，ModelWrapper识别用"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["RandomForest"],
+          "description": "算法类型"
+        },
+        "task_type": {
+          "type": "string",
+          "enum": ["regression", "classification"],
+          "description": "任务类型"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "模型创建时间(ISO8601格式)"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "语义化版本号"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "模型描述信息"
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "required": ["feature_importances_", "n_estimators", "n_features_"],
+      "properties": {
+        "feature_importances_": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "minItems": 1,
+          "maxItems": 1000,
+          "description": "特征重要性数组，值为非负数且总和应接近1.0"
+        },
+        "n_estimators": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "决策树数量"
+        },
+        "n_features_": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "特征数量"
+        },
+        "n_outputs_": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "输出数量（回归模型）"
+        },
+        "n_classes_": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
+          "description": "类别数量（分类模型）"
+        },
+        "classes_": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 1000,
+          "description": "类别标签数组（分类模型）"
+        }
+      },
+      "if": {
+        "properties": {
+          "n_classes_": {
+            "type": "integer"
+          }
+        },
+        "required": ["n_classes_"]
+      },
+      "then": {
+        "required": ["classes_"],
+        "properties": {
+          "classes_": {
+            "type": "array",
+            "minItems": {
+              "$data": "1/n_classes_"
+            },
+            "maxItems": {
+              "$data": "1/n_classes_"
+            }
+          }
+        }
+      },
+      "description": "模型参数，必须与ModelWrapper的get_parameters()格式兼容"
+    },
+    "training_config": {
+      "type": "object",
+      "properties": {
+        "max_depth": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 100,
+          "description": "最大树深度"
+        },
+        "min_samples_split": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
+          "description": "最小分裂样本数"
+        },
+        "min_samples_leaf": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "叶子节点最小样本数"
+        },
+        "max_features": {
+          "type": ["string", "integer", "number"],
+          "description": "最大特征数或策略"
+        },
+        "bootstrap": {
+          "type": "boolean",
+          "description": "是否使用bootstrap采样"
+        },
+        "criterion": {
+          "type": "string",
+          "enum": ["squared_error", "absolute_error", "friedman_mse", "poisson", "gini", "entropy", "log_loss"],
+          "description": "分裂准则"
+        },
+        "random_state": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "随机种子"
+        },
+        "n_jobs": {
+          "type": "integer",
+          "minimum": -1,
+          "description": "并行作业数"
+        },
+        "feature_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "特征名称列表"
+        },
+        "target_name": {
+          "type": "string",
+          "description": "目标变量名称"
+        }
+      },
+      "description": "训练配置参数"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model_purpose": {
+          "type": "string",
+          "description": "模型用途描述"
+        },
+        "expected_performance": {
+          "type": "object",
+          "description": "预期性能指标"
+        },
+        "usage_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "使用注意事项"
+        },
+        "data_requirements": {
+          "type": "object",
+          "description": "数据要求"
+        }
+      },
+      "description": "额外元数据信息"
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "model_metadata": {
+        "model_id": "rf_regressor_example",
+        "model_type": "sklearn",
+        "algorithm": "RandomForest",
+        "task_type": "regression",
+        "created_at": "2025-01-15T10:30:45Z",
+        "version": "1.0.0"
+      },
+      "parameters": {
+        "feature_importances_": [0.25, 0.20, 0.15, 0.18, 0.12, 0.10],
+        "n_estimators": 100,
+        "n_features_": 6,
+        "n_outputs_": 1
+      }
+    }
+  ]
+}
