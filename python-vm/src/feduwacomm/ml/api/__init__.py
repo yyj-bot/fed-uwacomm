@@ -6,8 +6,7 @@
 
 from .vm_api_client import VMApiClient
 from .exceptions import VMApiError, VMApiErrorCode, parse_vm_api_response
-from .websocket_client import WebSocketClient, ConnectionStatus, MessageType
-from .message_handler import MessageHandler
+from ..websocket.client import WebSocketClient, ConnectionStatus
 
 __all__ = [
     'VMApiClient',
@@ -15,8 +14,6 @@ __all__ = [
     'VMApiErrorCode',
     'parse_vm_api_response',
     'WebSocketClient',
-    'ConnectionStatus',
-    'MessageType',
-    'MessageHandler'
+    'ConnectionStatus'
 ]
 

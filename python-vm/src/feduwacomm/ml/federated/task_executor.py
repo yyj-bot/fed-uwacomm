@@ -13,8 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .config import MLConfig, MLAlgorithm
-from .client import FederatedLearningClient
-from .coordinator import FederatedLearningCoordinator
+# 注意：client.py和coordinator.py已被删除，使用新的WebSocket v1.4架构
 
 # Scikit-learn是必需依赖
 from sklearn.base import BaseEstimator
@@ -44,8 +43,6 @@ class TaskExecutor:
         
         # 核心组件
         self.ml_config = None
-        self.client = None
-        self.coordinator = None
         self.model = None
         
         # 数据
@@ -71,18 +68,8 @@ class TaskExecutor:
             if not self.model:
                 raise ValueError("无法创建模型")
             
-            # 创建联邦学习客户端
-            self.client = FederatedLearningClient(
-                client_id=f"client-{self.task_id}",
-                model=self.model,
-                config=self.ml_config
-            )
-            
-            # 创建协调器
-            self.coordinator = FederatedLearningCoordinator(
-                task_id=self.task_id,
-                config=self.ml_config
-            )
+            # 注意：新架构中不再需要单独的客户端和协调器
+            # 训练逻辑直接在TaskExecutor中实现
             
             self.is_initialized = True
             self.logger.info(f"任务执行器 {self.task_id} 初始化成功")
@@ -178,10 +165,11 @@ class TaskExecutor:
             if not self.is_initialized:
                 raise RuntimeError("执行器未初始化")
             
-            # 初始化协调器
-            success = self.coordinator.initialize(model_data)
-            if not success:
-                raise RuntimeError("协调器初始化失败")
+            # 在新架构中，直接加载模型参数到本地模型
+            if "model_params" in model_data:
+                # 加载模型参数
+                model_params = model_data["model_params"]
+                self._apply_model_params(model_params)
             
             self.logger.info(f"任务 {self.task_id} 全局模型加载成功")
             return True
@@ -195,20 +183,81 @@ class TaskExecutor:
         try:
             self.dataset_id = dataset_id
             
-            # 这里应该从数据管理系统加载数据
-            # 暂时使用模拟数据
-            self.training_data, self.training_labels = self._load_mock_data()
-            
-            # 加载到客户端
-            success = self.client.load_local_data(self.training_data, self.training_labels)
+            # 尝试从实际数据源加载数据
+            success = self._load_real_data(dataset_id)
             if not success:
-                raise RuntimeError("客户端数据加载失败")
+                self.logger.warning(f"无法加载真实数据集 {dataset_id}，使用模拟数据")
+                self.training_data, self.training_labels = self._load_mock_data()
+            
+            # 验证数据
+            if not self._validate_training_data():
+                raise RuntimeError("训练数据验证失败")
+            
+            # 在新架构中，数据直接存储在执行器中
+            # 数据已经加载到self.training_data和self.training_labels
             
             self.logger.info(f"任务 {self.task_id} 训练数据加载成功: {len(self.training_data)} 样本")
             return True
             
         except Exception as e:
             self.logger.error(f"加载训练数据失败: {e}")
+            return False
+    
+    def _load_real_data(self, dataset_id: str) -> bool:
+        """尝试加载真实数据"""
+        try:
+            # 尝试从SQLite存储加载数据
+            from ..storage.sqlite_storage import VMStorage
+            
+            # 使用默认存储路径
+            storage = VMStorage()
+            
+            # 这里可以扩展为从不同数据源加载
+            # 例如：CSV文件、数据库、API等
+            
+            # 目前返回False，使用模拟数据
+            return False
+            
+        except Exception as e:
+            self.logger.debug(f"加载真实数据失败: {e}")
+            return False
+    
+    def _validate_training_data(self) -> bool:
+        """验证训练数据"""
+        try:
+            if self.training_data is None or self.training_labels is None:
+                return False
+            
+            if len(self.training_data) == 0 or len(self.training_labels) == 0:
+                return False
+            
+            if len(self.training_data) != len(self.training_labels):
+                self.logger.error("特征数据和标签数据长度不匹配")
+                return False
+            
+            # 检查数据类型
+            if not isinstance(self.training_data, pd.DataFrame):
+                self.logger.error("训练数据必须是pandas DataFrame")
+                return False
+            
+            if not isinstance(self.training_labels, pd.Series):
+                self.logger.error("标签数据必须是pandas Series")
+                return False
+            
+            # 检查是否有缺失值
+            if self.training_data.isnull().any().any():
+                self.logger.warning("训练数据包含缺失值，将进行处理")
+                self.training_data = self.training_data.fillna(self.training_data.mean())
+            
+            if self.training_labels.isnull().any():
+                self.logger.warning("标签数据包含缺失值，将进行处理")
+                self.training_labels = self.training_labels.fillna(self.training_labels.mode()[0])
+            
+            self.logger.info(f"数据验证通过: {len(self.training_data)} 样本, {len(self.training_data.columns)} 特征")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"数据验证失败: {e}")
             return False
     
     def _load_mock_data(self) -> tuple:
@@ -237,19 +286,15 @@ class TaskExecutor:
         if not self.is_initialized:
             raise RuntimeError("执行器未初始化")
         
-        if not self.client or not self.coordinator:
-            raise RuntimeError("客户端或协调器未初始化")
+        if not self.model or not self.is_initialized:
+            raise RuntimeError("模型或执行器未初始化")
         
         self.current_round += 1
         round_num = round_config.get("roundNumber", self.current_round)
         
         try:
             # 执行本地训练
-            training_result = self.coordinator.execute_local_training(
-                round_num=round_num,
-                round_config=round_config,
-                client=self.client
-            )
+            training_result = self._execute_local_training(round_config)
             
             # 记录结果
             self.training_results.append(training_result)
@@ -264,18 +309,18 @@ class TaskExecutor:
     def extract_gradients(self) -> Dict[str, Any]:
         """提取梯度/模型参数"""
         try:
-            if not self.client:
-                raise RuntimeError("客户端未初始化")
+            if not self.model:
+                raise RuntimeError("模型未初始化")
             
             # 获取模型参数
-            model_params = self.client.model_wrapper.get_parameters()
+            model_params = self._get_model_parameters()
             
             # 计算梯度信息
             gradient_info = {
-                "model_type": self.client.model_wrapper.model_type,
+                "model_type": type(self.model).__name__,
                 "algorithm": self.algorithm,
                 "parameters": model_params,
-                "parameter_count": self.client.model_wrapper.get_parameter_count(),
+                "parameter_count": len(str(model_params)),
                 "training_samples": len(self.training_data) if self.training_data is not None else 0,
                 "round_number": self.current_round,
                 "timestamp": time.time()
@@ -295,10 +340,13 @@ class TaskExecutor:
     def update_global_model(self, model_data: Dict[str, Any]) -> bool:
         """更新全局模型"""
         try:
-            if not self.coordinator:
-                raise RuntimeError("协调器未初始化")
+            # 在新架构中，直接更新本地模型
+            if "model_params" in model_data:
+                model_params = model_data["model_params"]
+                success = self._apply_model_params(model_params)
+            else:
+                success = True  # 如果没有参数，认为更新成功
             
-            success = self.coordinator.update_global_model(model_data)
             if success:
                 self.logger.info(f"任务 {self.task_id} 全局模型更新成功")
             
@@ -311,8 +359,9 @@ class TaskExecutor:
     def get_statistics(self) -> Dict[str, Any]:
         """获取执行器统计信息"""
         try:
-            client_status = self.client.get_training_status() if self.client else {}
-            coordinator_stats = self.coordinator.get_training_statistics() if self.coordinator else {}
+            # 在新架构中，直接获取模型和训练统计信息
+            model_info = {"model_type": type(self.model).__name__} if self.model else {}
+            training_stats = {"total_rounds": len(self.training_results)}
             
             return {
                 "task_id": self.task_id,
@@ -322,8 +371,8 @@ class TaskExecutor:
                 "total_training_rounds": len(self.training_results),
                 "dataset_id": self.dataset_id,
                 "training_samples": len(self.training_data) if self.training_data is not None else 0,
-                "client_status": client_status,
-                "coordinator_stats": coordinator_stats,
+                "model_info": model_info,
+                "training_stats": training_stats,
                 "last_training_results": self.training_results[-3:] if self.training_results else []
             }
             
@@ -336,8 +385,7 @@ class TaskExecutor:
         self.logger.info(f"清理任务执行器 {self.task_id}")
         
         try:
-            if self.coordinator:
-                self.coordinator.cleanup()
+            # 在新架构中，直接清理模型和数据
             
             # 清理数据
             self.training_data = None
@@ -350,3 +398,54 @@ class TaskExecutor:
             
         except Exception as e:
             self.logger.error(f"清理资源失败: {e}")
+    
+    def _execute_local_training(self, round_config: Dict[str, Any]) -> Dict[str, Any]:
+        """执行本地训练"""
+        start_time = time.time()
+        
+        # 训练模型
+        self.model.fit(self.training_data, self.training_labels)
+        
+        # 计算训练指标
+        train_pred = self.model.predict(self.training_data)
+        
+        # 根据模型类型计算指标
+        if hasattr(self.model, 'predict_proba'):
+            # 分类模型
+            accuracy = accuracy_score(self.training_labels, train_pred)
+            final_loss = 1.0 - accuracy
+            final_metric = accuracy
+        else:
+            # 回归模型
+            mse = mean_squared_error(self.training_labels, train_pred)
+            final_loss = mse
+            final_metric = 1.0 / (1.0 + mse)  # 简化的评分
+        
+        training_time = time.time() - start_time
+        
+        return {
+            "algorithm": self.algorithm,
+            "round_number": self.current_round,
+            "training_time": training_time,
+            "samples_count": len(self.training_data),
+            "final_loss": final_loss,
+            "final_accuracy": final_metric
+        }
+    
+    def _get_model_parameters(self) -> Dict[str, Any]:
+        """获取模型参数"""
+        if hasattr(self.model, 'get_params'):
+            return self.model.get_params()
+        else:
+            return {}
+    
+    def _apply_model_params(self, model_params: Dict[str, Any]) -> bool:
+        """应用模型参数"""
+        try:
+            if hasattr(self.model, 'set_params'):
+                self.model.set_params(**model_params)
+                return True
+            return True
+        except Exception as e:
+            self.logger.error(f"应用模型参数失败: {e}")
+            return False
