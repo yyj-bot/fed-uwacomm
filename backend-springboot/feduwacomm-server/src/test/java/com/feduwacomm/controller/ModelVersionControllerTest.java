@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.service.ModelVersionService;
 import com.feduwacomm.vo.*;
-import com.feduwacomm.config.TestSecurityConfig;
+import com.feduwacomm.config.TestJwtInterceptorConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@ContextConfiguration(classes = TestSecurityConfig.class)
+@ContextConfiguration(classes = TestJwtInterceptorConfig.class)
 public class ModelVersionControllerTest {
 
     @Autowired

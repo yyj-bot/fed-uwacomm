@@ -1,6 +1,5 @@
 """
-任务上下文管理
-职责：单个任务的状态管理和执行控制
+任务上下文管理 - 单任务状态和执行控制
 """
 
 import time
@@ -232,15 +231,18 @@ class TaskContext:
     def _notify_gradient_ready(self, gradients: Dict[str, Any], training_result: Dict[str, Any]):
         """通知梯度准备就绪"""
         try:
-            # 这里应该调用父客户端的方法上传梯度
-            # 为了简化，这里只是记录日志
-            logger.info(f"任务 {self.task_id} 梯度准备完成，准备上传")
-
-            # 在实际实现中，这里会调用类似以下的方法：
-            # self.parent_client.upload_gradients(self.task_id, self.current_round, gradients, training_result)
+            # 通过回调函数通知父客户端上传梯度
+            if hasattr(self, 'gradient_ready_callback') and self.gradient_ready_callback:
+                self.gradient_ready_callback(self.task_id, self.current_round, gradients, training_result)
+            else:
+                logger.info(f"任务 {self.task_id} 梯度准备完成，等待上传")
 
         except Exception as e:
             logger.error(f"通知梯度就绪失败: {e}")
+    
+    def set_gradient_ready_callback(self, callback):
+        """设置梯度准备就绪回调函数"""
+        self.gradient_ready_callback = callback
 
     def _notify_training_error(self, error_message: str):
         """通知训练错误"""
