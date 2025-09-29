@@ -123,12 +123,18 @@ export interface FederatedTask {
 export interface TaskParticipant {
   readonly vmId: string
   readonly role: 'PARTICIPANT'
-  readonly status: 'CONNECTED' | 'TRAINING' | 'IDLE' | 'ERROR'
-  readonly dataSource: string
+  readonly status: 'CONNECTED' | 'TRAINING' | 'IDLE' | 'ERROR' | 'READY' | 'PAUSED' | 'COMPLETED'
+  readonly dataSource?: string
   readonly lastHeartbeat?: string
   readonly currentEpoch?: number
   readonly loss?: number
   readonly accuracy?: number
+  readonly dataRatio?: number
+  readonly capabilities?: string[]
+  readonly constraints?: {
+    readonly maxCpuUsage?: number
+    readonly maxMemoryUsage?: number
+  }
 }
 
 export interface TaskMetrics {
@@ -141,10 +147,44 @@ export interface TaskMetrics {
 
 export interface FederatedTaskDetails extends FederatedTask {
   readonly algorithm: string
+  readonly description?: string
+  readonly updatedAt?: string
   readonly participants: TaskParticipant[]
   readonly metrics?: TaskMetrics
-  readonly hyperparameters?: Record<string, unknown>
-  readonly modelConfig?: Record<string, unknown>
+  readonly hyperparameters?: {
+    readonly learningRate?: number
+    readonly batchSize?: number
+    readonly epochs?: number
+    readonly rounds?: number
+    readonly minParticipants?: number
+    readonly aggregationMethod?: string
+    readonly [key: string]: unknown
+  }
+  readonly modelConfig?: {
+    readonly modelType?: string
+    readonly featureColumns?: string[]
+    readonly targetColumn?: string
+    readonly testSize?: number
+    readonly randomState?: number
+    readonly [key: string]: unknown
+  }
+  readonly datasetConfig?: {
+    readonly datasetId: string
+    readonly distributionStrategy?: string
+    readonly totalRows?: number
+    readonly distributionRatios?: Record<string, number>
+    readonly validationSplit?: number
+    readonly testSplit?: number
+    readonly qualityMetrics?: {
+      readonly iidScore?: number
+      readonly balanceScore?: number
+    }
+  }
+  readonly schedule?: {
+    readonly startTime?: string
+    readonly endTime?: string
+    readonly timeout?: number
+  }
 }
 
 export interface TaskResults {
@@ -158,6 +198,9 @@ export interface TaskResults {
     readonly recall?: number
     readonly f1Score?: number
     readonly confusionMatrix?: number[][]
+    // 回归任务特有指标
+    readonly rmse?: number
+    readonly mae?: number
   }
   readonly roundResults: Array<{
     readonly round: number

@@ -2,7 +2,8 @@ import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
   PaginatedResponse,
-  PaginationParams
+  PaginationParams,
+  FederatedTaskDetails
 } from '@/types'
 
 // 创建联邦学习任务API实例
@@ -28,44 +29,7 @@ interface FederatedTask {
 }
 
 // 任务详情类型 - v1.3 增强版
-interface FederatedTaskDetails extends FederatedTask {
-  algorithm: string
-  participants: Array<{
-    vmId: string
-    role: string
-    status: string
-    lastHeartbeat?: string
-    currentEpoch?: number
-    loss?: number
-    accuracy?: number
-    /** @deprecated 使用 datasetConfig 代替 */
-    dataSource?: string
-    // 🆕 v1.3 新增
-    dataRatio?: number
-    capabilities?: string[]
-    constraints?: {
-      maxCpuUsage?: number
-      maxMemoryUsage?: number
-    }
-  }>
-  metrics?: {
-    globalLoss: number
-    globalAccuracy: number
-    communicationRounds: number
-    dataProcessed: number
-    estimatedTimeRemaining: number
-  }
-  // 🆕 v1.3 新增：数据集配置信息
-  datasetConfig?: {
-    datasetId: string
-    distributionStrategy: string
-    totalRows: number
-    qualityMetrics?: {
-      iidScore: number
-      balanceScore: number
-    }
-  }
-}
+// FederatedTaskDetails 类型定义已移至 types/index.ts
 
 // 任务结果类型
 interface TaskResults {
@@ -199,11 +163,11 @@ interface AvailableDataset {
   uploadedBy: string
 }
 
-// 角色配置类型
+// 角色配置类型 - v1.4 更新：只支持 PARTICIPANT 角色
 interface RoleConfig {
   role: 'PARTICIPANT'
   name: string
-  description: string
+  description: string  // v1.4 新增：详细描述字段，说明角色职责
   requirements: {
     minCpuCores: number
     minMemoryMb: number
@@ -1341,6 +1305,114 @@ export const federatedTask = {
     metricsLevel?: 'BASIC' | 'DETAILED' | 'FULL'
   } = {}): Promise<WorkflowPerformanceAnalysis> {
     const response = await orchestrationApiInstance.get<ApiResponse<WorkflowPerformanceAnalysis>>(`/orchestration/${orchestrationId}/analytics`, { params })
+    return response.data.data
+  },
+
+  // ==================== v1.4 新增：聚合引擎监控接口组 ====================
+  
+  /**
+   * 3.1 聚合引擎状态查询
+   * 查询UniversalAggregationEngine的运行状态
+   */
+  async getAggregationEngineStatus(): Promise<{
+    engineStatus: 'RUNNING' | 'STOPPED' | 'ERROR' | 'MAINTENANCE'
+    currentTasks: Array<{
+      taskId: string
+      status: 'AGGREGATING' | 'WAITING' | 'COMPLETED' | 'FAILED'
+      currentRound: number
+      algorithm: string
+      participantCount: number
+    }>
+    systemMetrics: {
+      cpuUsage: number
+      memoryUsage: number
+      diskUsage: number
+    }
+    aggregationMetrics: {
+      totalAggregations: number
+      successRate: number
+      averageAggregationTime: number
+    }
+    supportedAlgorithms: string[]
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      engineStatus: 'RUNNING' | 'STOPPED' | 'ERROR' | 'MAINTENANCE'
+      currentTasks: Array<{
+        taskId: string
+        status: 'AGGREGATING' | 'WAITING' | 'COMPLETED' | 'FAILED'
+        currentRound: number
+        algorithm: string
+        participantCount: number
+      }>
+      systemMetrics: {
+        cpuUsage: number
+        memoryUsage: number
+        diskUsage: number
+      }
+      aggregationMetrics: {
+        totalAggregations: number
+        successRate: number
+        averageAggregationTime: number
+      }
+      supportedAlgorithms: string[]
+    }>>('/engine/status')
+    return response.data.data
+  },
+
+  /**
+   * 3.2 可用聚合策略查询
+   * 查询系统支持的所有聚合策略
+   */
+  async getAvailableStrategies(): Promise<{
+    total: number
+    strategies: Array<{
+      algorithm: string
+      name: string
+      description: string
+      category: 'AVERAGING' | 'PROXIMAL' | 'SCAFFOLD' | 'NOVA' | 'CUSTOM'
+      supportedModelTypes: string[]
+      parameters: Array<{
+        name: string
+        type: 'DOUBLE' | 'INTEGER' | 'BOOLEAN' | 'STRING'
+        description: string
+        defaultValue: unknown
+        range?: {
+          min: number
+          max: number
+        }
+      }>
+      requirements: {
+        minParticipants: number
+        maxParticipants: number
+        recommendedParticipants: number
+      }
+    }>
+  }> {
+    const response = await federatedTaskApiInstance.get<ApiResponse<{
+      total: number
+      strategies: Array<{
+        algorithm: string
+        name: string
+        description: string
+        category: 'AVERAGING' | 'PROXIMAL' | 'SCAFFOLD' | 'NOVA' | 'CUSTOM'
+        supportedModelTypes: string[]
+        parameters: Array<{
+          name: string
+          type: 'DOUBLE' | 'INTEGER' | 'BOOLEAN' | 'STRING'
+          description: string
+          defaultValue: unknown
+          range?: {
+            min: number
+            max: number
+          }
+        }>
+        requirements: {
+          minParticipants: number
+          maxParticipants: number
+          recommendedParticipants: number
+        }
+      }>
+    }>>('/strategies/available')
     return response.data.data
   },
 } as const

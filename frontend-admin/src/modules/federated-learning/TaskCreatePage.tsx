@@ -144,7 +144,26 @@ const TaskCreatePage: React.FC = () => {
   // 初始化数据
   useEffect(() => {
     loadInitialData()
+    // v1.4 新增：加载可用策略
+    loadAvailableStrategies()
   }, [])
+
+  // v1.4 新增：加载可用聚合策略
+  const loadAvailableStrategies = async () => {
+    try {
+      const { federatedTask } = await import('@/api/federated-task')
+      const strategiesResponse = await federatedTask.getAvailableStrategies()
+      
+      console.log('✅ 成功加载聚合策略:', strategiesResponse.total, '个策略')
+      console.log('策略详情:', strategiesResponse.strategies)
+      
+      // 可以在这里处理策略数据，例如更新算法模板
+      // 暂时只记录日志，不影响现有逻辑
+    } catch (error) {
+      console.warn('⚠️ 获取聚合策略失败，使用默认算法模板:', error)
+      // 失败时不影响现有功能
+    }
+  }
 
   // 从数据集中获取特征列信息的辅助函数
   const getFeatureColumnsFromDataset = useCallback((datasetId?: string): string[] => {
@@ -282,14 +301,16 @@ const TaskCreatePage: React.FC = () => {
       
       // 检查是否有数据集数据
       if (datasetsResponse.availableDatasets.length === 0) {
-        console.warn('⚠️ 后端没有可用的数据集')
-        throw new Error('后端没有可用的数据集数据，请先上传数据集')
+        console.warn('⚠️ 后端没有可用的数据集，但接口调用成功')
+        setAvailableDatasets([])  // 设置空数组，前端显示"暂无数据"
+      } else {
+        setAvailableDatasets(datasetsResponse.availableDatasets)
       }
       
-      setAvailableDatasets(datasetsResponse.availableDatasets)
-      
       console.log('✅ 成功加载真实数据集数据:', datasetsResponse.availableDatasets.length, '个数据集')
-      console.log('数据集 IDs:', datasetsResponse.availableDatasets.map(ds => ds.datasetId))
+      if (datasetsResponse.availableDatasets.length > 0) {
+        console.log('数据集 IDs:', datasetsResponse.availableDatasets.map(ds => ds.datasetId))
+      }
 
       // 🔧 修复：使用真实API获取算法模板，而不是模拟数据
       console.log('🔄 开始获取算法模板...')
@@ -316,19 +337,28 @@ const TaskCreatePage: React.FC = () => {
       
       // 检查是否有算法模板数据
       if (algorithmsResponse.templates.length === 0) {
-        console.warn('⚠️ 后端没有可用的算法模板')
-        throw new Error('后端没有可用的算法模板数据，请先配置算法模板')
+        console.warn('⚠️ 后端没有可用的算法模板，但接口调用成功')
+        setAlgorithmTemplates([])  // 设置空数组，前端显示"暂无数据"
+      } else {
+        setAlgorithmTemplates(algorithmsResponse.templates)
       }
       
-      setAlgorithmTemplates(algorithmsResponse.templates)
-      
       console.log('✅ 成功加载真实算法模板数据:', algorithmsResponse.templates.length, '个算法')
-      console.log('算法列表:', algorithmsResponse.templates.map(alg => alg.algorithm))
+      if (algorithmsResponse.templates.length > 0) {
+        console.log('算法列表:', algorithmsResponse.templates.map(alg => alg.algorithm))
+      }
       
     } catch (error) {
       console.error('❌ 加载数据失败，使用备用模拟数据:', error)
+      console.error('❌ 错误详情:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: typeof error
+      })
       
-      // 🚨 备用方案：如果API失败，使用模拟数据（但使用更真实的UUID格式）
+      // 🚨 备用方案：如果API失败，使用模拟数据（包含多台虚拟机以支持联邦学习）
+      console.warn('⚠️ 无法获取真实VM数据，使用备用模拟数据。请检查后端VM API接口。')
+      
       setAvailableVMs([
         {
           vmId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',  // 32位UUID格式
@@ -336,18 +366,50 @@ const TaskCreatePage: React.FC = () => {
           ipAddress: '192.168.1.100',
           status: 'RUNNING' as const,
           connectionStatus: 'CONNECTED',
-          osType: 'Linux',
-          supportedAlgorithms: ['FEDERATED_AVERAGING'],
+          osType: 'Ubuntu 20.04',
+          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_PROXIMAL'],
           currentUsage: { cpuUsage: 25.5, memoryUsage: 42.3, networkUsage: 15.8 },
           resources: { cpuCores: 8, memoryMb: 16384, diskGb: 500, gpuCount: 1, gpuMemoryMb: 8192 },
           capabilities: ['GPU'],
           networkInfo: { bandwidth: 1000, latency: 5, uploadSpeed: 800, downloadSpeed: 1000 },
           reliability: { uptime: 99.9, avgResponseTime: 120, taskSuccessRate: 98.5 },
           lastHeartbeat: new Date().toISOString()
+        },
+        {
+          vmId: 'b2c3d4e5-f6g7-8901-bcde-f23456789012',
+          name: '备用水声联邦学习节点-002',
+          ipAddress: '192.168.1.101',
+          status: 'RUNNING' as const,
+          connectionStatus: 'CONNECTED',
+          osType: 'Ubuntu 22.04',
+          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_NOVA'],
+          currentUsage: { cpuUsage: 32.1, memoryUsage: 38.7, networkUsage: 22.3 },
+          resources: { cpuCores: 6, memoryMb: 12288, diskGb: 300, gpuCount: 0, gpuMemoryMb: 0 },
+          capabilities: ['CPU_ONLY'],
+          networkInfo: { bandwidth: 1000, latency: 8, uploadSpeed: 750, downloadSpeed: 950 },
+          reliability: { uptime: 98.7, avgResponseTime: 150, taskSuccessRate: 96.2 },
+          lastHeartbeat: new Date().toISOString()
+        },
+        {
+          vmId: 'c3d4e5f6-g7h8-9012-cdef-345678901234',
+          name: '备用水声联邦学习节点-003',
+          ipAddress: '192.168.1.102',
+          status: 'RUNNING' as const,
+          connectionStatus: 'CONNECTED',
+          osType: 'CentOS 7',
+          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_SCAFFOLD'],
+          currentUsage: { cpuUsage: 18.9, memoryUsage: 55.2, networkUsage: 12.1 },
+          resources: { cpuCores: 4, memoryMb: 8192, diskGb: 200, gpuCount: 1, gpuMemoryMb: 4096 },
+          capabilities: ['GPU'],
+          networkInfo: { bandwidth: 500, latency: 12, uploadSpeed: 400, downloadSpeed: 480 },
+          reliability: { uptime: 99.2, avgResponseTime: 180, taskSuccessRate: 94.8 },
+          lastHeartbeat: new Date().toISOString()
         }
       ])
       
       // 备用数据集数据
+      console.warn('⚠️ 无法获取真实数据集数据，使用备用模拟数据。请检查后端数据集API接口。')
+      
       setAvailableDatasets([
         {
           datasetId: 'backup-dataset-001',
@@ -378,6 +440,8 @@ const TaskCreatePage: React.FC = () => {
       ])
       
       // 备用算法模板
+      console.warn('⚠️ 无法获取真实算法模板，使用备用模拟数据。请检查后端算法模板API接口。')
+      
       setAlgorithmTemplates([
         {
           algorithm: 'FEDERATED_AVERAGING',

@@ -4,6 +4,7 @@
  */
 
 import { http, HttpResponse } from 'msw'
+import { federatedTaskHandlers } from './handlers/federatedTaskHandlers'
 
 export const handlers = [
   // 用户登录 - 支持绝对路径和相对路径
@@ -32,11 +33,11 @@ export const handlers = [
       })
     }
     
-      return HttpResponse.json({
-        code: 401,
-        message: '用户名或密码错误',
-        data: null
-      }, { status: 401 })
+    return HttpResponse.json({
+      code: 401,
+      message: '用户名或密码错误',
+      data: null
+    }, { status: 401 })
   }),
 
   // 获取用户信息
@@ -132,39 +133,6 @@ export const handlers = [
     })
   }),
 
-  // 任务列表
-  http.get('http://localhost:5173/api/tasks', () => {
-    return HttpResponse.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: [
-          {
-            taskId: '1',
-            taskName: '水声信道建模任务',
-            status: 'RUNNING',
-            progress: 75,
-            participantCount: 5,
-            createdAt: new Date().toISOString(),
-            estimatedEndTime: new Date(Date.now() + 3600000).toISOString()
-          },
-          {
-            taskId: '2',
-            taskName: '联邦学习训练',
-            status: 'RUNNING',
-            progress: 35,
-            participantCount: 8,
-            createdAt: new Date().toISOString(),
-            estimatedEndTime: new Date(Date.now() + 7200000).toISOString()
-          }
-        ],
-        total: 2,
-        page: 1,
-        size: 10
-      }
-    })
-  }),
-
   // 管理员用户列表
   http.get('http://localhost:5173/api/admin/user/list', () => {
     return HttpResponse.json({
@@ -234,5 +202,8 @@ export const handlers = [
         size: 10
       }
     })
-  })
+  }),
+
+  // ==================== 联邦学习任务管理 API ====================
+  ...federatedTaskHandlers
 ]

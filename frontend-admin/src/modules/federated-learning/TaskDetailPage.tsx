@@ -320,10 +320,23 @@ const TaskDetailPage: React.FC = () => {
   }
 
   const statusConfig = TASK_STATUS_CONFIG[currentTask.status as keyof typeof TASK_STATUS_CONFIG]
-  const progress = { overallProgress: 0, currentRound: 0, totalRounds: 0 }  // 简化处理
-  const isOperating = false  // 简化处理
-  const results = null  // 简化处理
-  const logs = null  // 简化处理
+  
+  // 正确计算进度数据
+  const progressPercent = getTaskProgress(currentTask)
+  const progress = {
+    overallProgress: progressPercent,
+    currentRound: currentTask.currentRound || 0,
+    totalRounds: currentTask.totalRounds || 0
+  }
+  
+  // 数据已正确获取
+  
+  // 检查是否正在执行操作
+  const isOperating = isTaskOperating(currentTask.taskId)
+  
+  // 使用store中的数据
+  const results = getTaskResults(currentTask.taskId)
+  const logs = getTaskLogs(currentTask.taskId)
   const trainingData = getTrainingRoundsData()
 
   return (
@@ -427,17 +440,20 @@ const TaskDetailPage: React.FC = () => {
                       {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
                     <Descriptions.Item label="更新时间">
-                      {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
+                      {currentTask.updatedAt ? 
+                        new Date(currentTask.updatedAt).toLocaleString('zh-CN') : 
+                        new Date(currentTask.createdAt).toLocaleString('zh-CN')
+                      }
                     </Descriptions.Item>
                     <Descriptions.Item label="算法">
                       <Tag color="blue">{currentTask.algorithm}</Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="数据集ID">{(currentTask as any).datasetId || 'N/A'}</Descriptions.Item>
+                    <Descriptions.Item label="数据集ID">{currentTask.datasetConfig?.datasetId || 'N/A'}</Descriptions.Item>
                     <Descriptions.Item label="参与者数量">
                       {currentTask.participantCount || 0}个
                     </Descriptions.Item>
                     <Descriptions.Item label="描述" span={2}>
-                      {(currentTask as any).description || '无描述'}
+                      {currentTask.description || '无描述'}
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -482,16 +498,16 @@ const TaskDetailPage: React.FC = () => {
                 <Card title="超参数配置" size="small">
                   <Descriptions column={1} size="small">
                     <Descriptions.Item label="学习率">
-                      {(currentTask as any).hyperparameters?.learningRate || 'N/A'}
+                      {currentTask.hyperparameters?.learningRate || 'N/A'}
                     </Descriptions.Item>
                     <Descriptions.Item label="批次大小">
-                      {(currentTask as any).hyperparameters?.batchSize || 'N/A'}
+                      {currentTask.hyperparameters?.batchSize || 'N/A'}
                     </Descriptions.Item>
                     <Descriptions.Item label="本地训练轮数">
-                      {(currentTask as any).hyperparameters?.epochs || 'N/A'}
+                      {currentTask.hyperparameters?.epochs || 'N/A'}
                     </Descriptions.Item>
                     <Descriptions.Item label="全局训练轮数">
-                      {(currentTask as any).hyperparameters?.rounds || 'N/A'}
+                      {currentTask.hyperparameters?.rounds || 'N/A'}
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -501,16 +517,18 @@ const TaskDetailPage: React.FC = () => {
                 <Card title="资源配置" size="small">
                   <Descriptions column={1} size="small">
                     <Descriptions.Item label="CPU要求">
-                      {(currentTask as any).resourceConfig?.minCpuCores || 0} 核心
+                      {currentTask.participants?.[0]?.constraints?.maxCpuUsage ? 
+                        Math.ceil((currentTask.participants[0].constraints.maxCpuUsage / 100) * 8) : 0} 核心
                     </Descriptions.Item>
                     <Descriptions.Item label="内存要求">
-                      {(currentTask as any).resourceConfig?.minMemoryMb || 0} MB
+                      {currentTask.participants?.[0]?.constraints?.maxMemoryUsage ? 
+                        Math.ceil((currentTask.participants[0].constraints.maxMemoryUsage / 100) * 8192) : 0} MB
                     </Descriptions.Item>
                     <Descriptions.Item label="GPU要求">
-                      {(currentTask as any).resourceConfig?.requiresGpu ? '是' : '否'}
+                      {currentTask.participants?.some(p => p.capabilities?.includes('GPU')) ? '是' : '否'}
                     </Descriptions.Item>
                     <Descriptions.Item label="超时设置">
-                      {(currentTask as any).schedule?.timeout || 0} 秒
+                      {currentTask.schedule?.timeout || 0} 秒
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -523,7 +541,7 @@ const TaskDetailPage: React.FC = () => {
             <Card>
               <Table
                 columns={participantColumns}
-                dataSource={(currentTask as any).participantConfig?.participants || []}
+                dataSource={currentTask.participants || []}
                 rowKey="vmId"
                 pagination={false}
                 loading={currentTaskLoading}
@@ -601,19 +619,28 @@ const TaskDetailPage: React.FC = () => {
           {/* 结果 */}
           <TabPane tab="结果" key="results">
             <Card>
-              {results ? (
+              {results?.finalResults ? (
                 <Descriptions column={2} size="small">
                   <Descriptions.Item label="最终准确率">
-                    {(results as any).finalAccuracy ? `${((results as any).finalAccuracy * 100).toFixed(2)}%` : 'N/A'}
+                    {results.finalResults.accuracy ? `${(results.finalResults.accuracy * 100).toFixed(2)}%` : 'N/A'}
                   </Descriptions.Item>
                   <Descriptions.Item label="最终损失">
-                    {(results as any).finalLoss ? (results as any).finalLoss.toFixed(4) : 'N/A'}
+                    {results.finalResults.loss ? results.finalResults.loss.toFixed(4) : 'N/A'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="训练时长">
-                    {(results as any).trainingDuration || 'N/A'}
+                  <Descriptions.Item label="精确率">
+                    {results.finalResults.precision ? `${(results.finalResults.precision * 100).toFixed(2)}%` : 'N/A'}
                   </Descriptions.Item>
-                  <Descriptions.Item label="收敛轮次">
-                    {(results as any).convergenceRound || 'N/A'}
+                  <Descriptions.Item label="召回率">
+                    {results.finalResults.recall ? `${(results.finalResults.recall * 100).toFixed(2)}%` : 'N/A'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="F1分数">
+                    {results.finalResults.f1Score ? results.finalResults.f1Score.toFixed(4) : 'N/A'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="RMSE">
+                    {results.finalResults.rmse ? results.finalResults.rmse.toFixed(4) : 'N/A'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="MAE">
+                    {results.finalResults.mae ? results.finalResults.mae.toFixed(4) : 'N/A'}
                   </Descriptions.Item>
                 </Descriptions>
               ) : (
@@ -625,9 +652,9 @@ const TaskDetailPage: React.FC = () => {
           {/* 日志 */}
           <TabPane tab="日志" key="logs">
             <Card>
-              {logs && logs.length > 0 ? (
+              {logs && Array.isArray(logs) && logs.length > 0 ? (
                 <Timeline mode="left">
-                  {logs.map((log, index) => (
+                  {logs.map((log: any, index: number) => (
                     <Timeline.Item
                       key={index}
                       color={log.level === 'ERROR' ? 'red' : log.level === 'WARN' ? 'orange' : 'blue'}

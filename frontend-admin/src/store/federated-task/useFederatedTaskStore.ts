@@ -351,7 +351,8 @@ export const useTask = () => {
    */
   const canStartTask = useCallback((task: FederatedTask | FederatedTaskDetails): boolean => {
     if (!task) return false
-    return ['CREATED', 'CONFIGURED', 'PAUSED'].includes(task.status) && !isTaskOperating(task.taskId)
+    // 启动任务：仅用于首次启动，不包括暂停状态
+    return ['CREATED', 'CONFIGURED'].includes(task.status) && !isTaskOperating(task.taskId)
   }, [isTaskOperating])
 
   /**
