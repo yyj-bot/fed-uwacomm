@@ -1032,7 +1032,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .build();
 
             com.feduwacomm.common.PageResult<VmListVO> vmPageResult = vmInstanceService.queryVmList(queryDTO);
-            List<VmListVO> vmList = vmPageResult.getRecords();
+            List<VmListVO> vmList = vmPageResult.getList();
 
             log.info("从数据库查询到 {} 个虚拟机", vmList.size());
 

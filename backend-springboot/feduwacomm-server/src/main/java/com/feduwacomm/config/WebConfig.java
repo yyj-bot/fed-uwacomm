@@ -7,9 +7,12 @@ import com.feduwacomm.interceptor.LoggingInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+
+import java.util.List;
 
 /**
  * Web配置类
@@ -33,6 +36,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private LoggingInterceptor loggingInterceptor;
 
+    @Autowired
+    private InterceptorExceptionResolver interceptorExceptionResolver;
+
     @Value("${test.interceptors.vm-jwt.enabled:true}")
     private boolean vmJwtInterceptorEnabled;
 
@@ -48,9 +54,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册用户JWT认证拦截器
+        // 注册用户JWT认证拦截器（包括联邦学习接口）
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/federated/**", "/api/model/**", "/api/workflow/**") // 用户相关接口、VM管理接口、训练数据管理接口、联邦学习接口、模型管理接口和工作流接口需要用户JWT认证
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/model/**", "/api/workflow/**", "/api/federated/**") // 包括联邦学习接口
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
@@ -74,9 +80,9 @@ public class WebConfig implements WebMvcConfigurer {
                     );
         }
 
-        // 注册权限拦截器
+        // 注册权限拦截器（包括联邦学习接口）
         registry.addInterceptor(permissionInterceptor)
-                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/federated/**", "/api/model/**", "/api/workflow/**") // 对用户相关接口、日志接口、VM管理接口、训练数据管理接口、联邦学习接口、模型管理接口和工作流接口进行权限检查
+                .addPathPatterns("/api/user/**", "/api/admin/**", "/api/log/**", "/api/vm/**", "/api/training-data/**", "/api/model/**", "/api/workflow/**", "/api/federated/**") // 包括联邦学习接口
                 .excludePathPatterns(
                         "/api/user/register", // 注册接口
                         "/api/user/login", // 登录接口
@@ -95,5 +101,15 @@ public class WebConfig implements WebMvcConfigurer {
                         "/error", // 错误页面
                         "/favicon.ico" // 网站图标
                 );
+    }
+
+    /**
+     * 配置异常处理器
+     * 用于处理拦截器抛出的异常
+     */
+    @Override
+    public void configureHandlerExceptionResolvers(List<HandlerExceptionResolver> resolvers) {
+        // 添加自定义的拦截器异常处理器（优先级最高）
+        resolvers.add(interceptorExceptionResolver);
     }
 }
