@@ -18,7 +18,7 @@ from .random_forest_trainer import *
 from .vm_client import VMClient
 from .api import (
     VMApiClient, VMApiError, VMApiErrorCode,
-    WebSocketClient, ConnectionStatus, MessageType, MessageHandler
+    WebSocketClient, ConnectionStatus
 )
 from .federated import (
     FederatedLearningClient,
@@ -45,8 +45,6 @@ __all__ = [
     'VMApiErrorCode',
     'WebSocketClient',
     'ConnectionStatus',
-    'MessageType',
-    'MessageHandler',
     'FederatedLearningClient',
     'FederatedLearningCoordinator', 
     'FederatedAggregator',

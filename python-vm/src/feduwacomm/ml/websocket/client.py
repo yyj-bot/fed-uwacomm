@@ -1,6 +1,5 @@
 """
-FedUWAComm WebSocket 客户端 v1.4
-基于中心化架构的被动响应式设计
+WebSocket 客户端 v1.4 - 被动响应式设计
 """
 
 import json
@@ -30,11 +29,8 @@ class ConnectionStatus(Enum):
     ERROR = "ERROR"
 
 
-class FederatedLearningClient:
-    """
-    联邦学习WebSocket客户端
-    实现完全被动响应式的v1.4协议
-    """
+class WebSocketClient:
+    """WebSocket客户端 - 被动响应式v1.4协议"""
 
     def __init__(self, server_url: str, access_token: str, vm_id: str):
         """初始化客户端
@@ -83,7 +79,7 @@ class FederatedLearningClient:
         # 启动时间
         self.start_time = time.time()
 
-        logger.info(f"初始化FederatedLearningClient，VM ID: {vm_id}")
+        logger.info(f"初始化WebSocketClient，VM ID: {vm_id}")
 
     def initialize(self):
         """初始化客户端组件"""
@@ -412,6 +408,44 @@ class FederatedLearningClient:
                 logger.info(f"任务 {task_id} 已清理")
             except Exception as e:
                 logger.error(f"清理任务 {task_id} 失败: {e}")
+
+    def upload_gradients(self, task_id: str, round_number: int, gradients: Dict[str, Any], training_result: Dict[str, Any]) -> bool:
+        """上传梯度到服务器"""
+        try:
+            # 编码梯度数据
+            gradients_json = json.dumps(gradients, ensure_ascii=False)
+            gradients_b64 = base64.b64encode(gradients_json.encode('utf-8')).decode('utf-8')
+            
+            upload_message = {
+                "type": "GRADIENT_UPLOAD",
+                "id": self._generate_message_id(),
+                "timestamp": self._get_current_timestamp(),
+                "vmId": self.vm_id,
+                "data": {
+                    "taskId": task_id,
+                    "roundNumber": round_number,
+                    "gradients": gradients_b64,
+                    "trainingResult": training_result,
+                    "clientInfo": {
+                        "vmId": self.vm_id,
+                        "timestamp": self._get_current_timestamp(),
+                        "trainingTime": training_result.get("training_time", 0),
+                        "sampleCount": training_result.get("samples_count", 0)
+                    }
+                }
+            }
+            
+            success = self._send_message(upload_message)
+            if success:
+                logger.info(f"任务 {task_id} 第 {round_number} 轮梯度上传成功")
+            else:
+                logger.error(f"任务 {task_id} 第 {round_number} 轮梯度上传失败")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"上传梯度失败: {e}")
+            return False
 
     def get_status(self) -> Dict[str, Any]:
         """获取客户端状态"""

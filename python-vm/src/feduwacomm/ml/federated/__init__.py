@@ -17,8 +17,8 @@ from .config import (
 )
 from .model_wrapper import ModelWrapper
 from .aggregator import FederatedAggregator
-from .client import FederatedLearningClient
-from .coordinator import FederatedLearningCoordinator
+# 注意：client.py和coordinator.py已被删除，功能已集成到WebSocket v1.4架构中
+from .task_executor import TaskExecutor
 
 __all__ = [
     # 配置和数据结构
@@ -35,7 +35,6 @@ __all__ = [
     # 核心组件
     'ModelWrapper',
     'FederatedAggregator',
-    'FederatedLearningClient',
-    'FederatedLearningCoordinator'
+    'TaskExecutor'
 ]
 

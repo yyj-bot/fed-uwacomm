@@ -1,5 +1,5 @@
 """
-主虚拟机客户端 - 整合所有功能的统一入口
+主虚拟机客户端 - 统一功能入口
 """
 
 import logging
@@ -7,19 +7,15 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 
 from .api.vm_api_client import VMApiClient
-from .api.websocket_client import WebSocketClient
+from .websocket.client import WebSocketClient
 from .api.exceptions import VMApiError
 from .federated.config import VMRegisterRequest
-from .federated.client import FederatedLearningClient
+# 注意：旧的FederatedLearningClient已被删除，现在使用WebSocket v1.4客户端
 from .storage.sqlite_storage import VMStorage
 
 
 class VMClient:
-    """主虚拟机客户端
-    
-    整合HTTP API客户端、WebSocket客户端、联邦学习客户端和本地存储功能。
-    提供统一的接口来管理虚拟机的注册、认证、通信和学习功能。
-    """
+    """主虚拟机客户端 - 整合API、WebSocket、联邦学习和存储功能"""
     
     def __init__(self, vm_id: str, base_url: str, storage_path: str = None):
         """初始化虚拟机客户端
@@ -183,27 +179,15 @@ class VMClient:
         return True
     
     def create_federated_client(self, model, config=None) -> bool:
-        """创建联邦学习客户端
+        """创建联邦学习客户端（已废弃）
         
-        Args:
-            model: Scikit-learn机器学习模型
-            config: 联邦学习配置
-            
+        注意：此方法已废弃，联邦学习功能现在通过WebSocket v1.4客户端实现
+        
         Returns:
-            bool: 创建是否成功
+            bool: 总是返回False，提示使用新的WebSocket客户端
         """
-        try:
-            self.federated_client = FederatedLearningClient(
-                client_id=self.vm_id,
-                model=model,
-                config=config
-            )
-            self.logger.info("联邦学习客户端创建成功")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"创建联邦学习客户端失败: {e}")
-            return False
+        self.logger.warning("create_federated_client已废弃，请使用WebSocket v1.4客户端")
+        return False
     
     def create_websocket_client(self) -> bool:
         """创建WebSocket客户端

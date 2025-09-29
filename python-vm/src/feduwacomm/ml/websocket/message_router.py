@@ -1,6 +1,5 @@
 """
-消息路由器 - 负责分发v1.4协议消息
-基于中心化架构的被动响应式设计
+消息路由器 - v1.4协议消息分发
 """
 
 import logging
@@ -290,6 +289,9 @@ class MessageRouter:
             # 创建任务上下文
             from .task_context import TaskContext
             task_context = TaskContext(task_id, task_data)
+            
+            # 设置梯度上传回调
+            task_context.set_gradient_ready_callback(self.client.upload_gradients)
 
             # 初始化任务
             success = task_context.initialize()
