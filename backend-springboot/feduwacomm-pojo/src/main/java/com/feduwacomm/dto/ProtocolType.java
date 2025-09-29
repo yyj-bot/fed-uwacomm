@@ -1,5 +1,8 @@
 package com.feduwacomm.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 /**
  * WebSocket协议类型枚举 - v1.4简化版
  *
@@ -112,5 +115,33 @@ public enum ProtocolType {
     /** 连接错误 */
     CONNECTION_ERROR,
     /** 消息错误 */
-    MESSAGE_ERROR
+    MESSAGE_ERROR;
+
+    /**
+     * Jackson序列化方法 - 将枚举转换为字符串
+     * @return 枚举名称
+     */
+    @JsonValue
+    @Override
+    public String toString() {
+        return this.name();
+    }
+
+    /**
+     * Jackson反序列化方法 - 将字符串转换为枚举
+     * @param value 字符串值
+     * @return 对应的枚举值
+     * @throws IllegalArgumentException 如果字符串不匹配任何枚举值
+     */
+    @JsonCreator
+    public static ProtocolType fromString(String value) {
+        if (value == null) {
+            throw new IllegalArgumentException("协议类型不能为null");
+        }
+        try {
+            return ProtocolType.valueOf(value.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("未知的协议类型: " + value, e);
+        }
+    }
 } 

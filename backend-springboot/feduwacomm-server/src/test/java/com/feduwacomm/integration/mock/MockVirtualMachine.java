@@ -238,6 +238,16 @@ public class MockVirtualMachine {
                 data.put("vmId", vmData.getVmId());
                 data.put("capabilities", vmData.getCapabilities());
                 data.put("supportedMLAlgorithms", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL"));
+
+                // 添加WebSocket协议v1.4要求的必需字段
+                data.put("version", "1.4.0");
+
+                // 使用VmTestData中已有的系统信息，并添加内存信息
+                Map<String, Object> systemInfo = new HashMap<>(vmData.getSystemInfo());
+                systemInfo.put("memory", vmData.getMemoryMb() + "MB");
+                systemInfo.put("cpu", "Intel CPU " + vmData.getCpuCores() + " cores");
+                data.put("systemInfo", systemInfo);
+
                 connectMessage.put("data", data);
 
                 stompSession.send("/app/protocol", connectMessage);
@@ -1268,7 +1278,7 @@ public class MockVirtualMachine {
                 } else if (isProtocolType(type, ProtocolType.ERROR) ||
                            isProtocolType(type, ProtocolType.CONNECTION_ERROR) ||
                            isProtocolType(type, ProtocolType.MESSAGE_ERROR)) {
-                    System.err.println("❌ " + vmData.getName() + " 收到错误消息: " + type);
+                    System.err.println("❌ [CLIENT][" + vmData.getName() + "] 收到错误消息: " + type);
                     handleErrorMessage(messageData);
                 } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST_ACK) ||
                            isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK) ||
@@ -2636,7 +2646,7 @@ public class MockVirtualMachine {
                 String status = (String) data.get("status");
                 String suggestion = (String) data.get("suggestion");
 
-                System.err.println("🚨 [" + vmData.getName() + "] 服务端错误消息:");
+                System.err.println("🚨 [CLIENT][" + vmData.getName() + "] 服务端错误消息:");
                 System.err.println("    错误类型: " + messageType);
                 System.err.println("    消息ID: " + messageId);
                 System.err.println("    时间戳: " + timestamp);
@@ -2654,7 +2664,7 @@ public class MockVirtualMachine {
                 handleSpecificError(messageType, errorCode, errorMessage, data);
             }
         } catch (Exception e) {
-            System.err.println("❌ " + vmData.getName() + " 处理错误消息失败: " + e.getMessage());
+            System.err.println("❌ [CLIENT][" + vmData.getName() + "] 处理错误消息失败: " + e.getMessage());
         }
     }
 
@@ -2709,7 +2719,7 @@ public class MockVirtualMachine {
                 System.err.println("📋 " + vmData.getName() + " VM ID列表无效");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知消息错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知消息错误码: " + errorCode);
         }
     }
 
@@ -2734,7 +2744,7 @@ public class MockVirtualMachine {
                 System.err.println("🚫 " + vmData.getName() + " 协议违规");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知连接错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知连接错误码: " + errorCode);
         }
     }
 
@@ -2766,7 +2776,7 @@ public class MockVirtualMachine {
                 System.err.println("📴 " + vmData.getName() + " 虚拟机离线");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知状态查询错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知状态查询错误码: " + errorCode);
         }
     }
 
@@ -2808,7 +2818,7 @@ public class MockVirtualMachine {
         }
 
         // 输出错误统计
-        System.out.println("📈 [" + vmData.getName() + "] 错误统计: " +
+        System.out.println("📈 [CLIENT][" + vmData.getName() + "] 错误统计: " +
             "消息错误=" + messageErrorCount +
             ", 连接错误=" + connectionErrorCount +
             ", 状态错误=" + statusQueryErrorCount +

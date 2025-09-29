@@ -1,6 +1,6 @@
-# WebSocket 联邦学习流程示例文档 v1.4
+# WebSocket 联邦学习流程示例文档 v1.5
 
-本目录包含基于 WebSocket 协议 v1.4 的联邦学习完整实现流程文档，严格遵循中心化架构设计，确保实现与文档100%一致。
+本目录包含基于 WebSocket 协议 v1.5 的联邦学习完整实现流程文档，严格遵循中心化架构设计，确保实现与文档100%一致。v1.5版本引入13步标准化流程和数据集关联管理功能。
 
 ## 🏗️ 架构设计理念
 
@@ -8,24 +8,30 @@
 - **后端作为"大脑"**: 完全控制所有状态管理、决策逻辑、任务编排和轮次同步
 - **虚拟机作为"手脚"**: 严格被动响应模式，只响应后端指令，执行训练，上报结果
 - **精确任务控制**: 通过 taskId 实现任务级别的精确控制和多任务并发管理
-- **简化协议架构**: 专注34个核心协议消息，移除冗余的协商和状态同步机制
+- **数据集统一管理**: 🆕 v1.5新增 assignedDatasetId 统一ID管理机制
+- **简化协议架构**: 专注36个核心协议消息，移除冗余的协商和状态同步机制
 
-### 联邦学习流程标准
-严格按照以下流程执行：
+### v1.5联邦学习13步标准流程
+严格按照以下13步流程执行：
 
-**虚拟机链路**：
+**阶段A: 任务启动和数据集管理 (步骤1-4)**：
 ```
-接收任务启动 → 开始第一轮训练 → 训练完成上传梯度 →
-进入等待状态 → 接收新全局模型 → 使用新模型进行下一轮训练 →
-重复直到所有轮次完成
+1. 任务启动指令 (包含assignedDatasetId) → 2. 任务启动确认 →
+3. 数据集状态查询 (🆕 v1.5) → 4. 数据集创建确认 (🆕 v1.5)
 ```
 
-**后端链路**：
+**阶段B: 轮次训练循环 (步骤5-13)**：
 ```
-发起训练 → 发起第一轮训练 → 接收所有虚拟机梯度 →
-执行模型聚合 → 广播新全局模型 → 发起下一轮训练 →
-重复直到所有轮次完成 → 生成最终模型
+5. 轮次开始指令 → 6. 轮次开始确认 → 7. 本地训练执行 →
+8. 梯度上传 (包含assignedDatasetId) → 9. 梯度上传确认 →
+10. 虚拟机等待状态 → 11. 后端模型聚合 →
+12. 全局模型广播 → 13. 模型确认和轮次完成
 ```
+
+**v1.5增强特性**：
+- **统一ID管理**: 后端生成assignedDatasetId，确保数据集一致性
+- **分发确认机制**: 主动查询数据集创建状态，确保所有虚拟机准备就绪
+- **完整流程控制**: 13步覆盖从任务启动到轮次完成的全过程
 
 ## 📚 文档结构
 
@@ -63,16 +69,20 @@
 
 ## 🔧 技术特性
 
-### 协议版本特性
-- **WebSocket 协议 v1.4**: 精简的34个核心协议消息，专注联邦学习核心流程
+### v1.5协议版本特性
+- **WebSocket 协议 v1.5**: 增强的36个协议消息，新增数据集管理协议
+- **13步标准化流程**: 完整的任务启动+数据集管理+轮次循环控制
+- **数据集关联管理**: 统一的assignedDatasetId机制和分发确认流程
 - **完整生命周期覆盖**: START→STOP→RESUME→DELETE的任务管理 + 轮次循环控制
 - **中心化状态管理**: 后端维护所有任务、轮次、参与者状态，虚拟机完全无状态
+- **⚠️ 破坏性变更**: 数据集管理完全不兼容v1.4，实现统一assignedDatasetId架构
 
-### 联邦学习支持
+### v1.5联邦学习支持
 - **四大联邦算法**: FEDERATED_AVERAGING、FEDERATED_PROXIMAL、FEDERATED_NOVA、SCAFFOLD
-- **数据集管理**: 支持datasetId精确指定和多任务数据隔离
+- **数据集统一管理**: 🆕 支持assignedDatasetId统一ID管理和分发确认机制
+- **数据集状态跟踪**: 🆕 支持PENDING/CREATED/UPLOADING/COMPLETED/FAILED状态监控
 - **任务级精确控制**: 每个taskId独立管理，支持单VM多任务并发
-- **轮次同步机制**: 严格的轮次开始→训练→上传→聚合→分发→完成循环
+- **13步标准化流程**: 🆕 任务启动4步+轮次循环9步的完整控制机制
 
 ### 架构优势
 - **完全可控**: 后端控制每个训练轮次的启动、执行、完成
@@ -108,21 +118,55 @@ End Loop
 任务状态更新为COMPLETED，保存最终模型
 ```
 
-### 数据集指定机制
+### v1.5数据集统一管理机制
 ```json
 {
   "type": "FEDERATED_TASK_START",
   "data": {
     "taskId": "fedtask-123456",
     "dataConfig": {
-      "datasetId": "dataset-abc123",  // 精确指定数据集
-      "dataPath": "/data/training"    // 备选本地路径
+      "assignedDatasetId": "dataset-uuid-generated-by-backend",  // 🆕 v1.5：统一数据集ID，替换原datasetId
+      "dataPath": "/data/training"    // 本地路径
     }
   }
 }
 ```
 
+**v1.5数据集确认流程**:
+```json
+// 数据集状态查询
+{
+  "type": "DATASET_LIST_QUERY",
+  "data": {
+    "taskId": "fedtask-123456",
+    "queryType": "ASSIGNED_DATASETS"
+  }
+}
+
+// 数据集状态响应
+{
+  "type": "DATASET_LIST_RESPONSE",
+  "data": {
+    "datasets": [
+      {
+        "assignedDatasetId": "dataset-uuid-generated-by-backend",
+        "status": "CREATED",  // 确认数据集已创建
+        "localPath": "/data/assigned/dataset-uuid-generated-by-backend"
+      }
+    ]
+  }
+}
+```
+
 ## 更新记录
+
+- **v1.5** (2025-01-28) - 基于增强 WebSocket 协议 v1.5 的功能升级
+  - 🆕 引入13步标准化联邦学习流程
+  - 🆕 新增assignedDatasetId统一数据集管理机制
+  - 🆕 实现数据集分发确认和状态跟踪功能
+  - 🆕 增加DATASET_LIST_QUERY/RESPONSE协议支持
+  - ⚠️ 数据集管理破坏性变更：完全移除对v1.4 datasetId的兼容
+  - 📖 更新所有示例文档以反映v1.5新特性
 
 - **v1.4** (2025-01-28) - 基于简化 WebSocket 协议 v1.4 的完整重构
   - 采用中心化架构设计，后端完全控制
@@ -132,8 +176,10 @@ End Loop
 
 ## 相关文档
 
-- [WebSocket协议文档-中心化-简化.md](../WebSocket协议文档-中心化-简化.md) - 主要协议文档（v1.4版本）
+- [WebSocket协议文档-中心化-简化.md](../WebSocket协议文档-中心化-简化.md) - 主要协议文档（v1.5版本）
 - [WebSocket消息格式定义.md](../WebSocket消息格式定义.md) - 消息格式规范
+- [v1.5修改接口文档](../modified/modified-interfaces-v1.5.md) - v1.5版本变更说明
+- [v1.5移除接口文档](../removed/removed-interfaces-v1.5.md) - v1.5版本废弃说明
 - [联邦学习API参考文档](../../HTTP/federated-task-api-reference.md) - HTTP API接口文档
 - [数据库架构文档](../../../database/database_schema.md) - 数据库表结构设计
 

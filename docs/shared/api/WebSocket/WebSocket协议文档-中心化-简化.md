@@ -1,11 +1,17 @@
-# 水声联邦学习系统 WebSocket 通信协议 - 中心化简化版
+# 水声联邦学习系统 WebSocket 通信协议 - 中心化简化版 v1.5
 
 ## 0. 概述
 
-本文档定义了水声联邦学习系统的简化WebSocket通信协议，专注于联邦学习的核心流程，移除了冗余和非必要的协议消息。
+本文档定义了水声联邦学习系统的简化WebSocket通信协议v1.5版本，专注于联邦学习的核心流程，并新增完整的数据集关联和分发机制。
+
+### v1.5版本主要新增特性
+- **数据集预查询机制**: 任务创建前主动查询虚拟机可用数据集
+- **完整数据集关联流程**: 建立前端-后端-虚拟机的完整数据集分发链路
+- **统一ID管理**: 所有数据集ID由后端UuidUtil统一生成，确保ID一致性
+- **智能数据集分配**: 后端实现数据集分配算法，支持多种分配策略
 
 ### 0.1 设计原则
-- **完整性**: 34个核心协议覆盖完整的联邦学习生态系统
+- **完整性**: 36个核心协议覆盖完整的联邦学习生态系统，包含数据集预查询机制
 - **实时性**: 通过WebSocket直接分发模型和数据，确保同步
 - **分层清晰**: 连接层、任务层、轮次层、监控层、控制层、数据层职责明确
 - **原子性**: 任务配置和初始模型分发在同一消息中完成
@@ -13,11 +19,13 @@
 - **多任务并发**: 通过taskId字段实现精确的任务级别控制，支持单VM运行多任务
 - **协议简洁**: 移除冗余功能，统一状态监控机制
 - **完整生命周期**: 支持任务的创建、执行、停止、删除完整生命周期管理
+- **数据集关联**: 建立完整的前端-后端-虚拟机数据集关联机制，支持智能分配
+- **ID统一管理**: 所有关键ID由后端UuidUtil生成，确保全局唯一性和一致性
 
 ### 0.2 基础信息
 - **WebSocket URL**: `ws://localhost:8080/ws` (开发环境)
 - **WebSocket Secure URL**: `wss://your-domain.com/ws` (生产环境)
-- **协议版本**: v1.4
+- **协议版本**: v1.5
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
@@ -27,6 +35,8 @@
 ```
 连接管理层: CONNECT, HEARTBEAT (4个协议)
      ↓
+数据集预查询层: DATASET_LIST_QUERY, DATASET_LIST_RESPONSE (2个协议) 🆕 v1.5新增
+     ↓
 任务管理层: FEDERATED_TASK_START/STOP/RESUME/DELETE + FEDERATED_TASK_STATUS_QUERY (10个协议)
      ↓
 轮次管理层: ROUND_START/ABORT → GRADIENT_UPLOAD → GLOBAL_MODEL_BROADCAST → ROUND_COMPLETE (9个协议)
@@ -35,7 +45,7 @@
      ↓
 虚拟机控制层: VM_START, VM_STOP (4个协议)
      ↓
-数据集管理层: DATASET_CREATE, DATASET_APPEND_ROWS, DATASET_COMPLETE, DATASET_STATUS_QUERY, DATASET_DELETE (4个协议)
+数据集管理层: DATASET_CREATE, DATASET_APPEND_ROWS, DATASET_COMPLETE, DATASET_STATUS_QUERY, DATASET_DELETE (6个协议)
 ```
 
 ### 任务生命周期管理
@@ -228,6 +238,7 @@ VM-001 同时执行:
 - 包含完整的任务初始化信息
 - **支持多任务并发**: 通过taskId字段实现精确的任务级别控制
 - **支持多种联邦算法**: FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA, SCAFFOLD
+- **🆕 v1.5新增数据集关联**: 通过assignedDatasetId字段指定虚拟机使用的数据集
 
 ```json
 {
@@ -279,6 +290,7 @@ VM-001 同时执行:
       }
     },
     "dataConfig": {
+      "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID，替换原datasetId
       "dataPath": "/data/training",
       "validationSplit": 0.2,
       "shuffle": true
@@ -643,6 +655,7 @@ VM-001 同时执行:
   "data": {
     "taskId": "fedtask-123456",
     "roundNumber": 6,
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：关联的数据集ID，用于验证数据溯源
     "gradientData": {
       "weights": {
         "layer1": [0.001, -0.002, 0.003],
@@ -1049,7 +1062,94 @@ VM-001 同时执行:
 
 ## 6. 数据集管理协议
 
-### 6.1 创建数据集 (DATASET_CREATE) 🔵
+### 6.1 数据集列表查询 (DATASET_LIST_QUERY) 🟢 🆕 v1.5新增
+
+**消息作用**: 后端向虚拟机查询可用数据集列表，用于任务创建前的数据集发现和选择。
+
+**使用场景**:
+- 联邦学习任务创建前查询虚拟机可用数据集
+- 数据集分配算法的数据源发现
+- 前端界面展示可用数据集列表
+- 数据集状态健康检查
+
+**消息格式**:
+```json
+{
+  "type": "DATASET_LIST_QUERY",
+  "id": "server-1704067200000-300001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "includePreview": true,
+    "maxPreviewRows": 10,
+    "includeStatistics": true,
+    "datasetTypes": ["ACOUSTIC", "ENVIRONMENTAL", "ALL"]
+  }
+}
+```
+
+**字段说明**:
+- `includePreview`: 是否包含数据集预览样本
+- `maxPreviewRows`: 预览数据最大行数
+- `includeStatistics`: 是否包含数据集统计信息
+- `datasetTypes`: 查询的数据集类型过滤器
+
+### 6.2 数据集列表响应 (DATASET_LIST_RESPONSE) 🔵 🆕 v1.5新增
+
+**消息作用**: 虚拟机响应数据集列表查询，返回可用数据集的详细信息。
+
+**响应格式**:
+```json
+{
+  "type": "DATASET_LIST_RESPONSE",
+  "id": "client-1704067200000-300001",
+  "timestamp": "2024-01-01T00:00:00.100Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "totalDatasets": 3,
+    "datasets": [
+      {
+        "localDatasetId": "local-dataset-001",
+        "name": "acoustic_features_v1",
+        "description": "水声传播特征数据集",
+        "datasetType": "ACOUSTIC",
+        "rowCount": 10000,
+        "sizeBytes": 2048576,
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "lastModified": "2024-01-01T12:00:00.000Z",
+        "status": "READY",
+        "preview": [
+          {
+            "frequency": 1000,
+            "amplitude": 0.85,
+            "phase": 1.57,
+            "snr": 25.4
+          }
+        ],
+        "statistics": {
+          "featureCount": 4,
+          "labelCount": 2,
+          "missingValues": 0,
+          "dataQuality": "HIGH"
+        }
+      }
+    ]
+  }
+}
+```
+
+**关键字段说明**:
+- `localDatasetId`: 虚拟机本地数据集标识符（待后端分配新ID）
+- `name`: 数据集名称
+- `description`: 数据集描述
+- `datasetType`: 数据集类型（ACOUSTIC/ENVIRONMENTAL等）
+- `rowCount`: 数据行数
+- `sizeBytes`: 数据集大小（字节）
+- `status`: 数据集状态（READY/LOADING/ERROR等）
+- `preview`: 数据预览样本
+- `statistics`: 数据集统计信息
+
+### 6.3 创建数据集 (DATASET_CREATE) 🔵
 
 **消息作用**: 虚拟机向后端请求创建新的数据集，或后端通知虚拟机准备接收数据集。
 
@@ -1076,7 +1176,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "datasetName": "acoustic_features_v1",
     "datasetDescription": "水声传播特征数据集",
     "datasetType": "ACOUSTIC",
@@ -1111,7 +1211,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "batchId": "batch-001",
     "totalBatches": 10,
     "currentBatch": 1,
@@ -1156,7 +1256,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "finalRowCount": 9856,
     "totalBatches": 10,
     "uploadDuration": 9.5,
@@ -1191,7 +1291,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "queryType": "FULL",
     "includeStatistics": true,
     "includeMetadata": true,
@@ -1225,7 +1325,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "queryType": "FULL",
     "includeStatistics": true,
     "includeMetadata": true,
@@ -1253,7 +1353,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "status": "READY",
     "rowCount": 9856,
     "sizeBytes": 2048576,
@@ -1293,7 +1393,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "reason": "TASK_COMPLETED",
     "backup": false,
     "force": false
@@ -1304,63 +1404,126 @@ VM-001 同时执行:
 
 ## 7. 标准联邦学习流程
 
-### 7.1 单任务标准流程
+### 7.1 v1.5 完整13步联邦学习流程 🆕
+
+#### 阶段一：环境准备（步骤1-2）
 
 ```
 1. 虚拟机启动控制
    Backend → VM_START → VM
    VM → VM_START_ACK → Backend
 
-2. 虚拟机连接
+2. 虚拟机连接建立
    VM → CONNECT → Backend
    Backend → CONNECT_ACK → VM
+```
 
-3. 数据集分发 (任务前准备)
-   VM → DATASET_CREATE(taskId) → Backend
-   VM → DATASET_APPEND_ROWS(taskId) → Backend (批量)
-   VM → DATASET_COMPLETE(taskId) → Backend
-   Backend → DATASET_STATUS_QUERY(taskId) → VM
-   VM → DATASET_STATUS_RESPONSE(taskId) → Backend
+#### 阶段二：前端任务创建（步骤3-5）
 
-4. 任务启动 (一次性)
-   Backend → FEDERATED_TASK_START(taskId) → All VMs
-   All VMs → FEDERATED_TASK_START_ACK(taskId) → Backend
+```
+3. 前端创建联邦学习任务
+   Frontend → Backend HTTP API: POST /api/federated-tasks
+   // 前端通过REST API创建任务，指定参与虚拟机和数据集要求
 
-5. 轮次循环 (重复执行)
-   Loop for each round:
-     Backend → ROUND_START(taskId, roundNumber) → All VMs
-     All VMs → ROUND_START_ACK(taskId, roundNumber) → Backend
+4. 后端生成数据集关联配置
+   Backend Internal:
+   - 使用 UuidUtil 生成 taskId
+   - 使用 UuidUtil 生成每个虚拟机的 assignedDatasetId
+   - 在 task_participants 表中建立关联关系
 
-     [本地训练执行...]
+5. 后端任务配置确认
+   Backend Internal:
+   - 验证虚拟机可用性
+   - 确认数据集分配策略
+   - 准备任务启动参数
+```
 
-     All VMs → GRADIENT_UPLOAD(taskId, roundNumber) → Backend
-     Backend → GRADIENT_UPLOAD_ACK(taskId, roundNumber) → All VMs
+#### 阶段三：数据集分发（步骤6-8）
 
-     [后端聚合处理...]
+```
+6. 数据集创建分发 🆕 v1.5 优化
+   Backend → DATASET_CREATE(assignedDatasetId) → Specific VMs
+   // 后端向每个虚拟机分发其被分配的数据集ID（由后端生成）
 
-     Backend → GLOBAL_MODEL_BROADCAST(taskId, roundNumber) → All VMs
-     All VMs → GLOBAL_MODEL_BROADCAST_ACK(taskId, roundNumber) → Backend
+7. 数据集内容分发
+   Backend → DATASET_APPEND_ROWS(assignedDatasetId, data) → Specific VMs (批量)
+   Backend → DATASET_COMPLETE(assignedDatasetId) → Specific VMs
+   // 虚拟机使用后端提供的assignedDatasetId保存数据集
 
-     Backend → ROUND_COMPLETE(taskId, roundNumber) → All VMs
-     All VMs → ROUND_COMPLETE_ACK(taskId, roundNumber) → Backend
-   End Loop
+8. 数据集创建确认 🆕 v1.5 新增
+   Backend → DATASET_STATUS_QUERY(assignedDatasetId) → Specific VMs
+   Specific VMs → DATASET_STATUS_RESPONSE(assignedDatasetId) → Backend
+   // 后端确认指定ID的数据集已在虚拟机中成功创建
+```
 
-6. 心跳维持 (并行执行)
+#### 阶段四：任务启动（步骤9-10）
+
+```
+9. 联邦学习任务启动 🆕 v1.5 改进
+   Backend → FEDERATED_TASK_START(taskId, assignedDatasetId) → All VMs
+   // 任务启动消息现在包含后端分配的数据集ID
+
+10. 任务启动确认
+    All VMs → FEDERATED_TASK_START_ACK(taskId, datasetStatus) → Backend
+    // 虚拟机确认任务启动并报告数据集状态
+```
+
+#### 阶段五：训练轮次执行（步骤11）
+
+```
+11. 轮次循环执行 (重复执行)
+    Loop for each round:
+      Backend → ROUND_START(taskId, roundNumber) → All VMs
+      All VMs → ROUND_START_ACK(taskId, roundNumber) → Backend
+
+      [虚拟机使用assignedDatasetId执行本地训练...]
+
+      All VMs → GRADIENT_UPLOAD(taskId, roundNumber, gradients) → Backend
+      Backend → GRADIENT_UPLOAD_ACK(taskId, roundNumber) → All VMs
+
+      [后端执行模型聚合...]
+
+      Backend → GLOBAL_MODEL_BROADCAST(taskId, roundNumber, model) → All VMs
+      All VMs → GLOBAL_MODEL_BROADCAST_ACK(taskId, roundNumber) → Backend
+
+      Backend → ROUND_COMPLETE(taskId, roundNumber) → All VMs
+      All VMs → ROUND_COMPLETE_ACK(taskId, roundNumber) → Backend
+    End Loop
+```
+
+#### 阶段六：任务完成清理（步骤12-13）
+
+```
+12. 任务结束处理
+    Backend → FEDERATED_TASK_STOP(taskId) → All VMs
+    All VMs → FEDERATED_TASK_STOP_ACK(taskId) → Backend
+
+13. 资源清理回收
+    Backend → FEDERATED_TASK_DELETE(taskId) → All VMs
+    All VMs → FEDERATED_TASK_DELETE_ACK(taskId) → Backend
+    Backend → DATASET_DELETE(assignedDatasetId) → All VMs
+    Backend → VM_STOP → All VMs
+    All VMs → VM_STOP_ACK → Backend
+```
+
+#### 并行维护流程
+
+```
+心跳维持 (并行执行)
    Every 30s:
      VM → HEARTBEAT → Backend
      Backend → HEARTBEAT_ACK → VM
 
-7. 状态查询 (按需)
+状态查询 (按需执行)
    Backend → VM_STATUS_QUERY → VM
    VM → VM_STATUS_RESPONSE → Backend (包含所有任务概览)
    Backend → FEDERATED_TASK_STATUS_QUERY(taskId) → VM
    VM → FEDERATED_TASK_STATUS_RESPONSE(taskId) → Backend (特定任务详情)
 
-8. 错误处理 (按需)
-   Any time:
-     VM/Backend → ERROR → Recipient
+错误处理 (任何时候)
+   VM/Backend → ERROR → Recipient
 
-9. 任务恢复流程 (可选)
+任务恢复流程 (可选)
    Backend → FEDERATED_TASK_STOP(taskId) → VM
    VM → FEDERATED_TASK_STOP_ACK(taskId) → Backend
 
@@ -1370,15 +1533,6 @@ VM-001 同时执行:
    VM → FEDERATED_TASK_RESUME_ACK(taskId) → Backend
 
    [继续执行轮次循环，从指定轮次开始...]
-
-10. 任务结束清理
-   Backend → FEDERATED_TASK_STOP(taskId) → VM
-   VM → FEDERATED_TASK_STOP_ACK(taskId) → Backend
-   Backend → FEDERATED_TASK_DELETE(taskId) → VM
-   VM → FEDERATED_TASK_DELETE_ACK(taskId) → Backend
-   Backend → DATASET_DELETE(taskId) → VM
-   Backend → VM_STOP → VM
-   VM → VM_STOP_ACK → Backend
 ```
 
 ### 7.2 多任务并发流程示例
@@ -1473,14 +1627,19 @@ VM-001 并发执行两个任务的典型场景:
 - ~~MODEL_TYPE_NEGOTIATION / MODEL_TYPE_NEGOTIATION_ACK~~ → 任务启动时指定
 - ~~ALGORITHM_CONFIG / ALGORITHM_CONFIG_ACK~~ → 合并到任务配置
 
-### 8.2 保留的协议 (27个)
+### 8.2 v1.5 保留和新增的协议 (36个) 🆕
 
 **连接管理 (4个): ✅**
 - CONNECT / CONNECT_ACK
 - HEARTBEAT / HEARTBEAT_ACK
 
-**任务管理 (4个): ✅**
-- FEDERATED_TASK_START / FEDERATED_TASK_START_ACK
+**数据集预查询 (2个): 🆕 v1.5 新增**
+- DATASET_LIST_QUERY → 后端查询虚拟机可用数据集
+- DATASET_LIST_RESPONSE → 虚拟机响应数据集列表
+
+**任务管理 (6个): ✅ v1.5 增强**
+- FEDERATED_TASK_START / FEDERATED_TASK_START_ACK → 现在包含assignedDatasetId
+- FEDERATED_TASK_STOP / FEDERATED_TASK_STOP_ACK
 - FEDERATED_TASK_RESUME / FEDERATED_TASK_RESUME_ACK
 
 **轮次管理 (8个): ✅**
@@ -1489,34 +1648,39 @@ VM-001 并发执行两个任务的典型场景:
 - GLOBAL_MODEL_BROADCAST / GLOBAL_MODEL_BROADCAST_ACK
 - ROUND_COMPLETE / ROUND_COMPLETE_ACK
 
-**状态监控 (3个): ✅**
-- STATUS_QUERY / STATUS_RESPONSE
+**状态监控 (6个): ✅**
+- VM_STATUS_QUERY / VM_STATUS_RESPONSE
+- FEDERATED_TASK_STATUS_QUERY / FEDERATED_TASK_STATUS_RESPONSE
 - ERROR
 
-**虚拟机控制 (4个): ✅ 重新保留**
+**虚拟机控制 (4个): ✅**
 - VM_START / VM_START_ACK → 后端集中控制虚拟机启动
 - VM_STOP / VM_STOP_ACK → 后端集中控制虚拟机停止
 
-**数据集管理 (5个): ✅ 重新保留**
-- DATASET_CREATE → 动态创建数据集
+**数据集管理 (6个): ✅ v1.5 优化**
+- DATASET_CREATE → 现在由后端分发assignedDatasetId
 - DATASET_APPEND_ROWS → 批量数据同步
 - DATASET_COMPLETE → 数据集上传完成通知
 - DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE → 数据集状态管理
 - DATASET_DELETE → 任务后清理数据集
 
-### 8.3 v1.4协议优化效果
+### 8.3 v1.5协议优化效果 🆕
 
-- **协议数量**: 46 → 34 (减少26%，保留多任务支持)
+- **协议数量**: 46 → 36 (减少22%，新增数据集关联管理)
+- **数据集关联**: 🆕 新增2个协议实现13步完整数据集关联流程
+- **ID统一管理**: 🆕 所有ID由后端UuidUtil生成，确保一致性
 - **多任务支持**: 通过taskId字段实现精确的任务级别控制
 - **完整生命周期**: 支持START→STOP→RESUME→DELETE的完整任务生命周期管理
-- **任务恢复机制**: 新增RESUME协议支持从停止状态精确恢复任务执行
-- **数据集管理**: 保留DATASET_STATUS_QUERY/RESPONSE，支持后端数据集监控
+- **任务恢复机制**: RESUME协议支持从停止状态精确恢复任务执行
+- **数据集管理增强**: 🆕 支持assignedDatasetId精确分发和状态确认
+- **前端后端协调**: 🆕 完整的Frontend→Backend→VM三层协调机制
 - **状态监控统一**: 双层监控机制 - VM整体状态 + 任务详细状态
 - **网络往返**: 减少不必要的RTT，消除协议重复
 - **实现复杂度**: 显著降低整体复杂度，增强任务管理能力
 - **维护成本**: 大幅降低，提供清晰的状态转换机制
 - **集中控制**: 增强后端对虚拟机和数据的完全控制
 - **资源管理**: DELETE协议支持彻底的资源清理和回收
+- **数据隔离**: 🆕 assignedDatasetId确保多任务数据集精确隔离
 
 ## 9. 实施建议
 
@@ -1526,35 +1690,57 @@ VM-001 并发执行两个任务的典型场景:
 3. **兼容性处理**: 提供协议版本协商机制
 4. **集中控制实施**: 先实现虚拟机控制，再实现数据集管理
 
-### 9.2 测试重点
-1. **模型分发一致性**: 确保所有虚拟机收到相同的初始模型
-2. **轮次同步**: 验证所有参与者的轮次同步
-3. **多任务并发**: 测试单VM同时运行多个联邦学习任务
-4. **任务级别控制**: 验证通过taskId进行精确任务控制
-5. **虚拟机生命周期**: 测试启动、停止和故障恢复
-6. **数据集隔离**: 验证多任务场景下的数据集独立性
-7. **状态监控**: 测试VM_STATUS_RESPONSE的多任务状态展示
-8. **错误恢复**: 测试各种异常情况的处理
-9. **性能对比**: 与原协议进行性能基准测试
+### 9.2 v1.5测试重点 🆕
+1. **13步完整流程**: 验证从前端创建到资源清理的完整13步流程
+2. **数据集关联**: 🆕 测试assignedDatasetId的精确分发和关联
+3. **ID一致性**: 🆕 验证UuidUtil生成的ID在整个系统中的一致性
+4. **数据集状态确认**: 🆕 测试DATASET_STATUS_QUERY/RESPONSE的确认机制
+5. **模型分发一致性**: 确保所有虚拟机收到相同的初始模型
+6. **轮次同步**: 验证所有参与者的轮次同步
+7. **多任务并发**: 测试单VM同时运行多个联邦学习任务
+8. **任务级别控制**: 验证通过taskId进行精确任务控制
+9. **虚拟机生命周期**: 测试启动、停止和故障恢复
+10. **数据集隔离**: 验证多任务场景下的数据集独立性
+11. **状态监控**: 测试VM_STATUS_RESPONSE的多任务状态展示
+12. **错误恢复**: 测试各种异常情况的处理
+13. **前端后端协调**: 🆕 测试Frontend→Backend→VM的三层协调
+14. **性能对比**: 与v1.4协议进行性能基准测试
 
-### 9.3 监控指标
-1. **协议覆盖率**: 确保34个协议覆盖所有场景
-2. **多任务性能**: 监控单VM多任务执行效率
-3. **任务生命周期**: 监控START→STOP→RESUME→DELETE完整流程的执行效率
-4. **数据集监控**: 验证DATASET_STATUS_QUERY的数据集管理效果
-5. **任务隔离度**: 监控任务间的资源隔离效果
-6. **状态监控效率**: 验证双层监控机制的有效性
-7. **资源清理效率**: 监控DELETE协议的资源回收效果
-8. **消息传输效率**: 监控网络使用情况
-9. **虚拟机管理效率**: 监控启停时间和成功率
-10. **数据同步性能**: 监控数据传输速度和完整性
-11. **错误率**: 跟踪协议执行的成功率
-12. **同步精度**: 监控虚拟机间的时序一致性
-13. **资源利用率**: 监控VM资源在多任务间的分配效率
+### 9.3 v1.5监控指标 🆕
+1. **协议覆盖率**: 确保36个协议覆盖所有场景
+2. **13步流程完整性**: 🆕 监控从前端创建到资源清理的完整13步执行
+3. **数据集关联准确性**: 🆕 监控assignedDatasetId的分发和关联准确率
+4. **ID一致性检查**: 🆕 验证UuidUtil生成的ID在系统中的一致性
+5. **数据集状态确认效率**: 🆕 监控DATASET_STATUS_QUERY/RESPONSE的响应时间
+6. **多任务性能**: 监控单VM多任务执行效率
+7. **任务生命周期**: 监控START→STOP→RESUME→DELETE完整流程的执行效率
+8. **数据集监控**: 验证DATASET_STATUS_QUERY的数据集管理效果
+9. **任务隔离度**: 监控任务间的资源隔离效果
+10. **状态监控效率**: 验证双层监控机制的有效性
+11. **资源清理效率**: 监控DELETE协议的资源回收效果
+12. **消息传输效率**: 监控网络使用情况
+13. **虚拟机管理效率**: 监控启停时间和成功率
+14. **数据同步性能**: 监控数据传输速度和完整性
+15. **错误率**: 跟踪协议执行的成功率
+16. **同步精度**: 监控虚拟机间的时序一致性
+17. **资源利用率**: 监控VM资源在多任务间的分配效率
+18. **前端响应性能**: 🆕 监控Frontend→Backend API的响应时间
+19. **数据集隔离效果**: 🆕 验证assignedDatasetId的多任务隔离效果
 
 ---
 
-**协议版本**: v1.4
-**文档版本**: 1.0
-**最后更新**: 2024-01-01
+**协议版本**: v1.5 🆕
+**文档版本**: 2.0
+**最后更新**: 2025-01-29
 **维护者**: FedUWAComm开发团队
+
+## v1.5 更新记录
+
+- **2025-01-29**: 升级到v1.5版本
+  - 新增13步完整联邦学习流程，包含数据集关联管理
+  - 新增2个数据集预查询协议：DATASET_LIST_QUERY/RESPONSE
+  - 优化FEDERATED_TASK_START协议，新增assignedDatasetId字段
+  - 强化ID统一管理，所有ID由后端UuidUtil生成
+  - 增强前端→后端→虚拟机三层协调机制
+  - 协议总数从34个增加到36个
+  - 更新测试重点和监控指标以适应v1.5新特性

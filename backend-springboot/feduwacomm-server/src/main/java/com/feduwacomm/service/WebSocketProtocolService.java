@@ -1109,8 +1109,13 @@ public class WebSocketProtocolService {
         // 根据协议文档，某些消息只能由特定方向发送
         switch (type) {
             // 🔵 只能由虚拟机发送给服务器的消息类型（v1.4协议）
+            case CONNECT:
+            case HEARTBEAT:
             case GRADIENT_UPLOAD:
             case GRADIENT_UPLOAD_ACK:
+            case GLOBAL_MODEL_BROADCAST_ACK:
+            case ROUND_START_ACK:
+            case ROUND_COMPLETE_ACK:
             case FEDERATED_TASK_START_ACK:
             case FEDERATED_TASK_STOP_ACK:
             case FEDERATED_TASK_RESUME_ACK:
@@ -1139,10 +1144,15 @@ public class WebSocketProtocolService {
             case FEDERATED_TASK_STOP:
             case FEDERATED_TASK_RESUME:
             case FEDERATED_TASK_DELETE:
+            case ROUND_START:
+            case ROUND_COMPLETE:
+            case GLOBAL_MODEL_BROADCAST:
             case VM_START:
             case VM_STOP:
             case VM_STATUS_QUERY:
             case FEDERATED_TASK_STATUS_QUERY:
+            case DATASET_STATUS_QUERY:
+            case DATASET_DELETE:
                 // 这些消息应该由服务器发送，如果在handle方法中收到说明有违规
                 log.warn("🚫 协议违规检测: 收到了只应由服务器发送的消息类型: {}", type);
                 return createErrorAck("PROTOCOL_VIOLATION",
