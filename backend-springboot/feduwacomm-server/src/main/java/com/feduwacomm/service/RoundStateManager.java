@@ -509,11 +509,32 @@ public class RoundStateManager {
         log.info("清理任务轮次状态数据: taskId={}", taskId);
 
         try {
-            // 清理内存中的轮次状态缓存
+            // 清理内存中的轮次状态缓存和数据库中的相关数据
             String taskPrefix = "round:" + taskId + ":";
-            // TODO: 实现具体的清理逻辑，从缓存和数据库中移除相关数据
 
-            log.info("任务轮次状态清理完成: taskId={}", taskId);
+            int cleanupCount = 0;
+
+            // 清理全局模型数据
+            try {
+                int deletedModels = globalModelMapper.deleteByTaskId(taskId);
+                cleanupCount += deletedModels;
+                log.debug("已清理全局模型记录: taskId={}, 删除数量={}", taskId, deletedModels);
+            } catch (Exception e) {
+                log.warn("清理全局模型记录时出错: taskId={}, error={}", taskId, e.getMessage());
+            }
+
+            // 重置任务的轮次信息
+            try {
+                int result = federatedTasksMapper.updateTaskProgress(taskId, 0, "PENDING");
+                if (result > 0) {
+                    cleanupCount += result;
+                    log.debug("已重置任务轮次进度: taskId={}", taskId);
+                }
+            } catch (Exception e) {
+                log.warn("重置任务轮次进度时出错: taskId={}, error={}", taskId, e.getMessage());
+            }
+
+            log.info("任务轮次状态清理完成: taskId={}, 清理项目数={}", taskId, cleanupCount);
             return true;
         } catch (Exception e) {
             log.error("清理任务轮次状态失败: taskId={}, error={}", taskId, e.getMessage(), e);

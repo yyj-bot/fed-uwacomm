@@ -9,6 +9,7 @@ import com.feduwacomm.enums.DataStatus;
 import com.feduwacomm.enums.DataType;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
 import com.feduwacomm.mapper.TrainingDatasetRowMapper;
+import com.feduwacomm.service.TrainingDataAnalysisService;
 import com.feduwacomm.service.TrainingDataService;
 import com.feduwacomm.utils.DataValidationUtil;
 import com.feduwacomm.utils.UuidUtil;
@@ -46,6 +47,9 @@ public class TrainingDataServiceImpl implements TrainingDataService {
 
     @Autowired
     private TrainingDatasetRowMapper trainingDatasetRowMapper;
+
+    @Autowired
+    private TrainingDataAnalysisService analysisService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -126,7 +130,15 @@ public class TrainingDataServiceImpl implements TrainingDataService {
             result.setUploadTime(LocalDateTime.now());
             result.setUploadedBy(userId);
             result.setProgress(100);
-            result.setRowCount(8000); // 临时硬编码用于测试
+            // 使用数据分析服务获取实际的行数统计
+            try {
+                TrainingDataAnalysisService.DataStatistics stats = analysisService.analyzeFile(file);
+                result.setRowCount((int) Math.min(stats.getRowCount(), Integer.MAX_VALUE));
+                log.info("文件分析完成: {}", stats);
+            } catch (Exception e) {
+                log.warn("文件分析失败，使用默认值: {}", e.getMessage());
+                result.setRowCount(1000); // 分析失败时的默认值
+            }
             return result;
 
         } catch (Exception e) {
@@ -189,7 +201,16 @@ public class TrainingDataServiceImpl implements TrainingDataService {
             result.setUploadTime(LocalDateTime.now());
             result.setUploadedBy(userId);
             result.setProgress(100);
-            result.setRowCount(1000); // 临时硬编码用于测试
+            // 使用数据分析服务获取实际的行数统计
+            try {
+                TrainingDataAnalysisService.DataStatistics stats = analysisService.analyzeText(
+                    textDTO.getTextData(), textDTO.getDataType());
+                result.setRowCount((int) Math.min(stats.getRowCount(), Integer.MAX_VALUE));
+                log.info("文本数据分析完成: {}", stats);
+            } catch (Exception e) {
+                log.warn("文本数据分析失败，使用默认值: {}", e.getMessage());
+                result.setRowCount(500); // 分析失败时的默认值
+            }
             return result;
 
         } catch (Exception e) {

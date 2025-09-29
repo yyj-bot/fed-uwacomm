@@ -10,12 +10,23 @@ import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.VmInstance;
 import com.feduwacomm.entity.VmSecret;
+import com.feduwacomm.entity.User;
+import com.feduwacomm.entity.VmAssignment;
+import com.feduwacomm.entity.ProjectMember;
+import com.feduwacomm.entity.VmShare;
+import com.feduwacomm.entity.VmTempPermission;
 import com.feduwacomm.enums.ConnectionStatus;
 import com.feduwacomm.enums.VmStatus;
 import com.feduwacomm.enums.VmSecretStatus;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.VmSecretsMapper;
+import com.feduwacomm.mapper.UserMapper;
+import com.feduwacomm.mapper.VmAssignmentMapper;
+import com.feduwacomm.mapper.ProjectMemberMapper;
+import com.feduwacomm.mapper.VmShareMapper;
+import com.feduwacomm.mapper.VmTempPermissionMapper;
 import com.feduwacomm.service.VmInstanceService;
+import com.feduwacomm.service.WebSocketCommandService;
 import com.feduwacomm.utils.VmJwtUtil;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.utils.ApiKeyUtil;
@@ -63,6 +74,9 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     private VmJwtUtil vmJwtUtil;
 
     @Autowired
+    private WebSocketCommandService webSocketCommandService;
+
+    @Autowired
     private NetworkProperties networkProperties;
 
     @Autowired
@@ -70,6 +84,24 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
     @Autowired
     private UuidUtil uuidUtil;
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private VmInstancesMapper vmInstanceMapper;
+
+    @Autowired
+    private VmAssignmentMapper vmAssignmentMapper;
+
+    @Autowired
+    private ProjectMemberMapper projectMemberMapper;
+
+    @Autowired
+    private VmShareMapper vmShareMapper;
+
+    @Autowired
+    private VmTempPermissionMapper vmTempPermissionMapper;
 
     @Value("${server.port:8080}")
     private String serverPort;
@@ -351,11 +383,11 @@ public class VmInstanceServiceImpl implements VmInstanceService {
 
             if (total == 0) {
                 return PageResult.<VmListVO>builder()
-                    .current(queryDTO.getPage().longValue())
+                    .page(queryDTO.getPage().longValue())
                     .size(queryDTO.getSize().longValue())
                     .total(0L)
                     .pages(0L)
-                    .records(Collections.emptyList())
+                    .list(Collections.emptyList())
                     .build();
             }
 
@@ -380,11 +412,11 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             long pages = (long) Math.ceil((double) total / queryDTO.getSize());
 
             return PageResult.<VmListVO>builder()
-                .current(queryDTO.getPage().longValue())
+                .page(queryDTO.getPage().longValue())
                 .size(queryDTO.getSize().longValue())
                 .total((long) total)
                 .pages(pages)
-                .records(voList)
+                .list(voList)
                 .build();
 
         } catch (Exception e) {
@@ -597,10 +629,64 @@ public class VmInstanceServiceImpl implements VmInstanceService {
             // 4. 生成命令ID
             String commandId = uuidUtil.generateUuidWithHyphens();
 
-            // 5. 这里应该通过WebSocket向虚拟机发送启动命令，暂时模拟
-            // TODO: 实现WebSocket命令发送
+            // 5. 通过WebSocket向虚拟机发送启动命令
+            Map<String, Object> commandData = new HashMap<>();
+            commandData.put("operation", "start");
+            commandData.put("force", controlDTO.getForce());
+            commandData.put("timeout", controlDTO.getTimeout());
+            commandData.put("reason", controlDTO.getReason());
 
-            logger.info("虚拟机启动命令已发送: vmId={}, commandId={}", vmId, commandId);
+            String wsCommandId = webSocketCommandService.sendCommand(
+                vmId,
+                WebSocketCommandService.CommandType.VM_START,
+                commandData,
+                controlDTO.getTimeout() != null ? controlDTO.getTimeout() : 30,
+                new WebSocketCommandService.CommandCallback() {
+                    @Override
+                    public void onCommandSent(String commandId, String vmId) {
+                        logger.info("VM启动命令发送成功: vmId={}, commandId={}", vmId, commandId);
+                    }
+
+                    @Override
+                    public void onCommandResult(String commandId, String vmId, WebSocketCommandService.CommandResult result, Object resultData) {
+                        logger.info("VM启动命令执行结果: vmId={}, commandId={}, result={}", vmId, commandId, result);
+                        if (result == WebSocketCommandService.CommandResult.SUCCESS) {
+                            // 更新VM状态为运行中
+                            try {
+                                vmInstancesMapper.updateStatus(vmId, "RUNNING");
+                            } catch (Exception e) {
+                                logger.error("更新VM状态失败: vmId={}", vmId, e);
+                            }
+                        } else {
+                            // 启动失败，恢复状态
+                            try {
+                                vmInstancesMapper.updateStatus(vmId, "STOPPED");
+                            } catch (Exception e) {
+                                logger.error("恢复VM状态失败: vmId={}", vmId, e);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onCommandError(String commandId, String vmId, String error) {
+                        logger.error("VM启动命令执行错误: vmId={}, commandId={}, error={}", vmId, commandId, error);
+                        try {
+                            vmInstancesMapper.updateStatus(vmId, "STOPPED");
+                        } catch (Exception e) {
+                            logger.error("恢复VM状态失败: vmId={}", vmId, e);
+                        }
+                    }
+                }
+            );
+
+            if (wsCommandId != null) {
+                logger.info("虚拟机启动命令已发送: vmId={}, commandId={}, wsCommandId={}", vmId, commandId, wsCommandId);
+            } else {
+                logger.warn("虚拟机启动命令发送失败: vmId={}, commandId={}", vmId, commandId);
+                // 恢复状态
+                vmInstancesMapper.updateStatus(vmId, "STOPPED");
+                throw new BusinessException("虚拟机启动命令发送失败");
+            }
 
             return VmControlResponseVO.builder()
                 .vmId(vmId)
@@ -797,16 +883,110 @@ public class VmInstanceServiceImpl implements VmInstanceService {
     @Override
     @Transactional(readOnly = true)
     public Boolean hasVmPermission(String vmId, String userId) {
-        // 这里简化权限检查，实际应该根据具体的权限模型实现
-        // TODO: 实现基于用户和虚拟机的权限控制逻辑
         logger.debug("检查虚拟机权限: vmId={}, userId={}", vmId, userId);
-        
-        if (userId == null || userId.trim().isEmpty()) {
+
+        try {
+            // 参数验证
+            if (userId == null || userId.trim().isEmpty()) {
+                logger.warn("用户ID为空，权限检查失败");
+                return false;
+            }
+
+            if (vmId == null || vmId.trim().isEmpty()) {
+                logger.warn("虚拟机ID为空，权限检查失败");
+                return false;
+            }
+
+            // 1. 检查用户是否存在且状态正常
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                logger.warn("用户不存在，权限检查失败: userId={}", userId);
+                return false;
+            }
+
+            if (!"ACTIVE".equals(user.getStatus())) {
+                logger.warn("用户状态异常，权限检查失败: userId={}, status={}", userId, user.getStatus());
+                return false;
+            }
+
+            // 2. 检查虚拟机是否存在
+            VmInstance vm = vmInstanceMapper.selectById(vmId);
+            if (vm == null) {
+                logger.warn("虚拟机不存在，权限检查失败: vmId={}", vmId);
+                return false;
+            }
+
+            // 3. 管理员拥有所有虚拟机的权限
+            if ("ADMIN".equals(user.getRole())) {
+                logger.debug("管理员用户，拥有所有虚拟机权限: userId={}, role={}", userId, user.getRole());
+                return true;
+            }
+
+            // 4. 检查虚拟机所有者权限
+            if (userId.equals(vm.getOwnerId())) {
+                logger.debug("虚拟机所有者，拥有权限: userId={}, vmId={}", userId, vmId);
+                return true;
+            }
+
+            // 5. 检查虚拟机分配关系
+            VmAssignment assignment = vmAssignmentMapper.selectByUserIdAndVmId(userId, vmId);
+            if (assignment != null && "ACTIVE".equals(assignment.getStatus())) {
+                logger.debug("用户已被分配虚拟机，拥有权限: userId={}, vmId={}, assignmentId={}",
+                            userId, vmId, assignment.getId());
+                return true;
+            }
+
+            // 6. 检查项目组权限（如果虚拟机属于某个项目组，且用户是项目组成员）
+            if (vm.getProjectId() != null) {
+                ProjectMember projectMember = projectMemberMapper.selectByProjectIdAndUserId(vm.getProjectId(), userId);
+                if (projectMember != null && "ACTIVE".equals(projectMember.getStatus())) {
+                    logger.debug("用户是项目组成员，拥有虚拟机权限: userId={}, vmId={}, projectId={}",
+                                userId, vmId, vm.getProjectId());
+                    return true;
+                }
+            }
+
+            // 7. 检查共享权限（如果虚拟机设置为共享）
+            if (Boolean.TRUE.equals(vm.getIsShared())) {
+                // 检查用户是否在共享白名单中
+                List<VmShare> shares = vmShareMapper.selectByVmId(vmId);
+                for (VmShare share : shares) {
+                    if (userId.equals(share.getSharedUserId()) && "ACTIVE".equals(share.getStatus())) {
+                        logger.debug("用户在虚拟机共享列表中，拥有权限: userId={}, vmId={}", userId, vmId);
+                        return true;
+                    }
+                }
+
+                // 如果虚拟机设置为公开共享，且用户角色为研究员或以上
+                if (Boolean.TRUE.equals(vm.getIsPublicShared()) &&
+                    ("RESEARCHER".equals(user.getRole()) || "OPERATOR".equals(user.getRole()) || "ADMIN".equals(user.getRole()))) {
+                    logger.debug("虚拟机公开共享，用户角色符合要求: userId={}, vmId={}, role={}",
+                                userId, vmId, user.getRole());
+                    return true;
+                }
+            }
+
+            // 8. 检查临时权限（时间限制的临时访问权限）
+            List<VmTempPermission> tempPermissions = vmTempPermissionMapper.selectByUserIdAndVmId(userId, vmId);
+            for (VmTempPermission tempPermission : tempPermissions) {
+                if ("ACTIVE".equals(tempPermission.getStatus()) &&
+                    System.currentTimeMillis() >= tempPermission.getStartTime() &&
+                    System.currentTimeMillis() <= tempPermission.getEndTime()) {
+                    logger.debug("用户拥有临时权限: userId={}, vmId={}, tempPermissionId={}",
+                                userId, vmId, tempPermission.getId());
+                    return true;
+                }
+            }
+
+            // 9. 默认拒绝访问
+            logger.debug("用户没有虚拟机访问权限: userId={}, vmId={}", userId, vmId);
+            return false;
+
+        } catch (Exception e) {
+            logger.error("检查虚拟机权限时发生异常: vmId={}, userId={}", vmId, userId, e);
+            // 异常情况下默认拒绝访问
             return false;
         }
-        
-        // 暂时允许所有已认证用户访问所有虚拟机
-        return true;
     }
 
     // ==================== 私有辅助方法 ====================

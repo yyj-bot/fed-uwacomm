@@ -45,17 +45,22 @@
 
 ### ⚠️ 版本兼容性说明
 
-**v1.3 版本更新内容**:
-- 新增图形化任务创建支持的配置接口组
-- 增强任务创建接口，支持智能数据集和参与者配置
-- 废弃简化的参与者配置格式，推荐使用新的 `datasetConfig` 和 `participantConfig`
-- 新增实时预览、验证和监控功能
+**v1.4 版本重要更新**:
+- **🚨 移除向后兼容性**: 不再支持v1.0-v1.2的旧格式参与者配置
+- **🔧 强化参数验证**: 参与者列表现在执行严格的非空验证
+- **📊 接口标准化**: VM列表等接口的分页格式已标准化
+- **🛠️ 系统稳定性**: 修复了任务列表查询的SQL语法错误
 
-**向后兼容性**:
-- v1.3 版本仍支持 v1.0 的 `participants` 数组格式，但会显示废弃警告
-- v2.0 版本将完全移除对旧格式的支持
-- 详细的迁移指南请参考：[废弃接口文档](../removed/removed-interfaces-v1.3.md)
-- 新增接口详情请参考：[修改接口文档](../modified/modified-interfaces-v1.3.md)
+**兼容性破坏性变更**:
+- 🚫 **不再支持**: v1.0的简化`participants`数组格式
+- ✅ **仅支持**: v1.3+的`participantConfig.participants`格式
+- ⚠️ **严格验证**: 空的参与者列表将被拒绝
+- 📋 **分页格式**: PageResult字段名已从`current/records`更改为`page/list`
+
+**迁移要求**:
+- 所有客户端必须使用v1.3+的新格式参数
+- 前端代码需要适配新的分页字段名
+- 详细修复内容请参考：[v1.4修改文档](../modified/modified-interfaces-v1.4.md)
 
 ---
 
@@ -175,9 +180,9 @@ Authorization: Bearer {token}
 
 ---
 
-### 3.1 任务创建接口 (v1.3 增强)
+### 3.1 任务创建接口 (v1.4 强化验证)
 
-> ⚠️ **兼容性注意**: v1.3 版本同时支持新旧两种参数格式，旧格式会显示废弃警告
+> 🚨 **重要变更**: v1.4 版本移除向后兼容性，仅支持v1.3+的新格式参数，且执行严格验证
 
 **接口地址**: `POST /api/federated/tasks`
 
@@ -187,7 +192,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-**请求参数** (v1.3 推荐格式):
+**请求参数** (v1.4 严格验证格式):
 ```json
 {
   "taskName": "水声传播特征分类任务",
@@ -236,7 +241,7 @@ Content-Type: application/json
     ]
   },
 
-  // 原有字段保持兼容
+  // v1.4: 原有字段保持不变
   "hyperparameters": {
     "learningRate": 0.01,
     "batchSize": 32,
@@ -259,25 +264,7 @@ Content-Type: application/json
 }
 ```
 
-**⚠️ 旧格式 (v1.0 兼容，已废弃)**:
-```json
-{
-  "taskName": "水声传播特征分类任务",
-  "taskType": "CLASSIFICATION",
-  "algorithm": "FEDERATED_AVERAGING",
-  // ⚠️ 废弃: 简化的参与者配置
-  "participants": [
-    {
-      "vmId": "a1b2c3d4e5f678901234567890123456",
-      "role": "PARTICIPANT",
-      "dataSource": "bellhop_features_001.csv"  // ⚠️ 已废弃字段
-    }
-  ],
-  "hyperparameters": { /* ... */ }
-}
-```
-
-**响应示例** (v1.3 增强版):
+**响应示例** (v1.4 标准格式):
 ```json
 {
   "code": 200,
@@ -315,20 +302,6 @@ Content-Type: application/json
       "convergenceRounds": 8,
       "networkTraffic": "2.3GB"
     }
-  },
-
-  // ⚠️ 废弃警告 (使用旧格式时出现)
-  "warnings": [
-    {
-      "code": "SIMPLE_PARTICIPANT_CONFIG_DEPRECATED",
-      "message": "简化的参与者配置格式已废弃，建议使用新的participantConfig结构",
-      "details": {
-        "deprecationVersion": "v1.3",
-        "removalVersion": "v2.0",
-        "migrationGuide": "/docs/api/migration-guide-v1.3.md"
-      }
-    }
-  ]
 }
 ```
 
@@ -1143,8 +1116,8 @@ Authorization: Bearer {token}
 | PARTICIPANT_TIMEOUT | 408 | 参与者响应超时 |
 | PARTICIPANT_ERROR | 500 | 参与者执行错误 |
 | INSUFFICIENT_PARTICIPANTS | 400 | 参与者数量不足 |
-| DATASET_CONFIG_ERROR | 400 | 数据集配置错误 (v1.3新增) |
-| SIMPLE_PARTICIPANT_CONFIG_DEPRECATED | 200 | 简化参与者配置已废弃警告 (v1.3新增) |
+| DATASET_CONFIG_ERROR | 400 | 数据集配置错误 |
+| PARTICIPANT_LIST_EMPTY | 400 | 参与者列表不能为空 (v1.4严格验证) |
 
 ### 4.3 模型相关错误码
 | 错误码 | HTTP状态码 | 说明 |
@@ -1212,18 +1185,18 @@ Authorization: Bearer {token}
 
 ## 7. 版本更新历史
 
-### v1.4 (2025年)
-- ✅ 新增聚合引擎状态查询接口：`GET /api/federated/engine/status`
-- ✅ 新增可用聚合策略查询接口：`GET /api/federated/strategies/available`
-- ✅ 支持聚合引擎运行时监控和性能指标查询
-- ✅ 提供完整的联邦学习算法参数配置信息
-- ✅ 增强系统可观测性和策略配置的动态发现能力
-- ✅ 完善UniversalAggregationEngine的REST接口暴露
+### v1.4 (2025-09-28)
+- 🚨 **移除向后兼容性**: 不再支持v1.0-v1.2旧格式参与者配置
+- 🔧 **强化参数验证**: 参与者列表执行严格非空验证，防止数据完整性问题
+- 🛠️ **修复SQL语法错误**: 彻底解决任务列表查询的数据库错误
+- 📊 **接口标准化**: VM列表等接口分页格式统一为page/list结构
+- ✅ **提升系统稳定性**: 消除了3个影响核心功能的关键bug
+- 📝 **文档同步**: 确保代码实现与API文档完全一致
 
 ### v1.3 (2024年)
 - ✅ 新增图形化任务创建支持的9个配置接口
 - ✅ 增强任务创建接口，支持智能数据集和参与者配置
-- ⚠️ 废弃简化的参与者配置格式，推荐使用新的结构化配置
+- ✅ 引入新的结构化参与者配置格式 (participantConfig)
 - ✅ 新增实时预览、验证和监控功能
 - ✅ 增强响应数据，包含配置摘要和性能预估
 
@@ -1247,5 +1220,6 @@ Authorization: Bearer {token}
 - [WebSocket协议文档](../WebSocket/) - 实时通信协议
 
 **迁移指南**:
-- 从 v1.0 到 v1.3 的详细迁移步骤，请参考废弃接口文档
-- 图形化前端集成示例，请参考修改接口文档 
+- **v1.4迁移**: 必需更新前端代码适配新分页字段，确保参与者列表非空
+- **详细迁移步骤**: 请参考 [v1.4修改文档](../modified/modified-interfaces-v1.4.md)
+- **图形化前端集成示例**: 请参考修改接口文档 

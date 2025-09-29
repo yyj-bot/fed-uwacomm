@@ -19,9 +19,22 @@ public interface FederatedTasksMapper {
     
     int updateTask(FederatedTask task);
     
-    int updateTaskStatus(@Param("id") String id, 
-                         @Param("status") String status, 
+    int updateTaskStatus(@Param("id") String id,
+                         @Param("status") String status,
                          @Param("timestamp") LocalDateTime timestamp);
+
+    /**
+     * 带版本控制的任务状态更新（乐观锁）
+     * @param id 任务ID
+     * @param status 新状态
+     * @param timestamp 更新时间
+     * @param expectedVersion 期望的版本号
+     * @return 更新行数，如果为0表示版本冲突
+     */
+    int updateTaskStatusWithVersion(@Param("id") String id,
+                                   @Param("status") String status,
+                                   @Param("timestamp") LocalDateTime timestamp,
+                                   @Param("expectedVersion") Long expectedVersion);
     
     int updateTaskProgress(@Param("id") String id,
                           @Param("currentRound") Integer currentRound,

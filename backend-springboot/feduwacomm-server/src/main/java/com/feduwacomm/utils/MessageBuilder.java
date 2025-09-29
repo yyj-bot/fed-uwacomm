@@ -3,9 +3,13 @@ package com.feduwacomm.utils;
 import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.service.DigitalSignatureService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,11 +23,13 @@ import java.util.UUID;
  * @author FedUWAComm Team
  * @version 1.4.0
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MessageBuilder {
 
     private final MessageIdGenerator messageIdGenerator;
+    private final DigitalSignatureService digitalSignatureService;
 
     /**
      * 创建服务端标准协议消息
@@ -41,7 +47,7 @@ public class MessageBuilder {
                 .timestamp(Instant.now())
                 .vmId(vmId)
                 .data(data != null ? data : new HashMap<>())
-                .signature(generateSignature(type, vmId, data)) // TODO: 实现签名生成
+                .signature(generateSignature(type, vmId, data))
                 .build();
     }
 
@@ -181,8 +187,8 @@ public class MessageBuilder {
     }
 
     /**
-     * 生成消息签名（占位实现）
-     * TODO: 实现真实的数字签名算法
+     * 生成消息签名
+     * 使用数字签名服务实现真实的消息签名算法
      *
      * @param type 消息类型
      * @param vmId 虚拟机ID
@@ -190,10 +196,36 @@ public class MessageBuilder {
      * @return 签名字符串
      */
     private String generateSignature(ProtocolType type, String vmId, Map<String, Object> data) {
-        // 临时实现：生成简单的哈希值作为签名
-        // 生产环境中应该实现真实的数字签名算法
-        String content = type.name() + vmId + (data != null ? data.toString() : "");
-        return "sig_" + Math.abs(content.hashCode());
+        try {
+            // 构建待签名的消息内容
+            String content = buildSignatureContent(type, vmId, data);
+
+            // 使用数字签名服务生成签名
+            return digitalSignatureService.signMessage(content, DigitalSignatureService.SignatureAlgorithm.RSA_SHA256);
+        } catch (Exception e) {
+            // 签名失败时记录日志并返回空签名，避免消息发送中断
+            log.warn("消息签名生成失败: type={}, vmId={}, error={}", type, vmId, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * 构建待签名的消息内容
+     * 按照协议v1.4标准格式组织消息内容用于签名
+     */
+    private String buildSignatureContent(ProtocolType type, String vmId, Map<String, Object> data) {
+        StringBuilder content = new StringBuilder();
+        content.append("type:").append(type != null ? type.name() : "");
+        content.append("|vmId:").append(vmId != null ? vmId : "");
+
+        if (data != null && !data.isEmpty()) {
+            content.append("|data:");
+            data.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey()) // 确保签名一致性
+                .forEach(entry -> content.append(entry.getKey()).append("=").append(entry.getValue()).append(";"));
+        }
+
+        return content.toString();
     }
 
     /**
@@ -313,7 +345,7 @@ public class MessageBuilder {
                 .id(messageId)
                 .vmId(vmId)
                 .data(data)
-                .signature(addSignature(data))
+                .signature(addStaticSignature(data))
                 .timestamp(Instant.now())
                 .build();
     }
@@ -410,7 +442,7 @@ public class MessageBuilder {
                 .id(messageId)
                 .vmId(vmId)
                 .data(data)
-                .signature(addSignature(data))
+                .signature(addStaticSignature(data))
                 .timestamp(Instant.now())
                 .build();
     }
@@ -446,21 +478,117 @@ public class MessageBuilder {
                 .id(messageId)
                 .vmId(vmId)
                 .data(data)
-                .signature(addSignature(data))
+                .signature(addStaticSignature(data))
                 .timestamp(Instant.now())
                 .build();
     }
 
     /**
-     * 添加消息签名（当前实现为空签名）
-     * TODO: 实现真实的消息签名算法
+     * 添加消息签名
+     * 使用数字签名服务为消息数据生成签名
      *
      * @param data 消息数据
      * @return 签名字符串
      */
-    public static String addSignature(Map<String, Object> data) {
-        // TODO: 实现真实的消息签名算法
-        return ""; // 暂时返回空签名
+    public String addSignature(Map<String, Object> data) {
+        try {
+            // 将Map数据转换为待签名的字符串格式
+            String content = buildDataSignatureContent(data);
+
+            // 使用数字签名服务生成签名
+            return digitalSignatureService.signMessage(content, DigitalSignatureService.SignatureAlgorithm.RSA_SHA256);
+        } catch (Exception e) {
+            log.warn("数据签名生成失败: data={}, error={}", data, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * 添加静态签名（用于静态方法）
+     * 使用SHA-256为消息数据生成签名
+     *
+     * @param data 消息数据
+     * @return 签名字符串
+     */
+    public static String addStaticSignature(Map<String, Object> data) {
+        try {
+            // 将Map数据转换为待签名的字符串格式
+            String content = buildStaticDataContent(data);
+
+            // 使用SHA-256生成签名
+            return java.util.Base64.getEncoder().encodeToString(
+                java.security.MessageDigest.getInstance("SHA-256")
+                .digest(content.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (Exception e) {
+            System.err.println("静态数据签名生成失败: data=" + data + ", error=" + e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * 构建数据签名内容
+     * 将Map数据按照统一格式转换为字符串用于签名
+     */
+    private String buildDataSignatureContent(Map<String, Object> data) {
+        if (data == null || data.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder content = new StringBuilder();
+        data.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey()) // 确保签名一致性
+            .forEach(entry -> content.append(entry.getKey()).append("=").append(entry.getValue()).append(";"));
+
+        return content.toString();
+    }
+
+    /**
+     * 构建静态数据内容（静态方法使用）
+     */
+    private static String buildStaticDataContent(Map<String, Object> data) {
+        if (data == null || data.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder content = new StringBuilder();
+        data.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey()) // 确保签名一致性
+            .forEach(entry -> content.append(entry.getKey()).append("=").append(entry.getValue()).append(";"));
+
+        return content.toString();
+    }
+
+    /**
+     * 为消息生成签名（实例方法使用）
+     */
+    private String generateSignatureForMessage(String messageId, Instant timestamp, Map<String, Object> data) {
+        try {
+            // 构建待签名内容：messageId + timestamp + data
+            String content = messageId + "|" + timestamp.toString() + "|" + buildDataSignatureContent(data);
+            return digitalSignatureService.signMessage(content, DigitalSignatureService.SignatureAlgorithm.RSA_SHA256);
+        } catch (Exception e) {
+            log.warn("消息签名生成失败: messageId={}, error={}", messageId, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * 为静态消息生成签名（静态方法使用）
+     */
+    private static String generateStaticSignature(String messageId, Instant timestamp, Map<String, Object> data) {
+        try {
+            // 静态方法使用简化的签名算法，基于SHA-256哈希
+            String content = messageId + "|" + timestamp.toString() + "|" + buildStaticDataContent(data);
+            return java.util.Base64.getEncoder().encodeToString(
+                java.security.MessageDigest.getInstance("SHA-256")
+                .digest(content.getBytes(StandardCharsets.UTF_8))
+            );
+        } catch (Exception e) {
+            // 静态方法无法访问logger，使用System.err
+            System.err.println("静态消息签名生成失败: messageId=" + messageId + ", error=" + e.getMessage());
+            return "";
+        }
     }
 
     /**
@@ -470,11 +598,18 @@ public class MessageBuilder {
      * @return ProtocolMessage构建器
      */
     public ProtocolMessage.ProtocolMessageBuilder buildMessage() {
+        Map<String, Object> data = new HashMap<>();
+        String messageId = messageIdGenerator.generateServerMessageId();
+        Instant timestamp = Instant.now();
+
+        // 生成真实签名
+        String signature = generateSignatureForMessage(messageId, timestamp, data);
+
         return ProtocolMessage.builder()
-                .id(messageIdGenerator.generateServerMessageId())
-                .timestamp(Instant.now())
-                .data(new HashMap<>())
-                .signature(""); // 空签名，待实现
+                .id(messageId)
+                .timestamp(timestamp)
+                .data(data)
+                .signature(signature);
     }
 
     /**
@@ -484,11 +619,18 @@ public class MessageBuilder {
      * @return ProtocolMessage构建器
      */
     public static ProtocolMessage.ProtocolMessageBuilder buildStaticMessage() {
+        Map<String, Object> data = new HashMap<>();
+        String messageId = generateStandardId("msg");
+        Instant timestamp = Instant.now();
+
+        // 静态方法使用简化签名（或者使用标准签名算法）
+        String signature = generateStaticSignature(messageId, timestamp, data);
+
         return ProtocolMessage.builder()
-                .id(generateStandardId("msg"))
-                .timestamp(Instant.now())
-                .data(new HashMap<>())
-                .signature(""); // 空签名，待实现
+                .id(messageId)
+                .timestamp(timestamp)
+                .data(data)
+                .signature(signature);
     }
 
     // ==================== v1.4协议专用消息构建方法 ====================

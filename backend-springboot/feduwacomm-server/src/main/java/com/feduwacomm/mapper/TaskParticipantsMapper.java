@@ -59,6 +59,11 @@ public interface TaskParticipantsMapper {
     int countTotalParticipants(@Param("taskId") String taskId);
 
     /**
+     * 统计指定任务中状态为活跃的参与者数量
+     */
+    int countActiveParticipants(@Param("taskId") String taskId);
+
+    /**
      * 查询指定任务的所有参与者
      */
     List<TaskParticipant> selectParticipantsByTaskId(@Param("taskId") String taskId);

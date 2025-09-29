@@ -207,4 +207,14 @@ public interface FederatedTaskService {
      * 获取任务全局模型列表
      */
     GlobalModelsVO getTaskGlobalModels(String taskId);
+
+    /**
+     * 获取任务统计信息
+     */
+    TaskStatisticsVO getTaskStatistics();
+
+    /**
+     * 批量操作任务
+     */
+    TaskBatchOperationResultVO batchOperateTask(TaskBatchOperationDTO batchDTO, String operatorId);
 }
