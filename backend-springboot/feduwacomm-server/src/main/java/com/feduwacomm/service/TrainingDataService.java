@@ -74,4 +74,29 @@ public interface TrainingDataService {
      * 导出文件下载
      */
     byte[] downloadExportFile(String taskId);
+
+    // ========== v1.5数据集上传和预处理增强 ==========
+
+    /**
+     * v1.5数据集上传和预处理 (v1.5)
+     * 🎯 实现目标：步骤4-5：数据集上传和解析
+     * 📊 实现进度：待实现
+     *
+     * @param file 上传的数据集文件
+     * @param uploadedBy 上传者ID
+     * @return 数据集上传结果
+     */
+    DatasetUploadResult uploadAndPreprocessDataset(MultipartFile file, String uploadedBy);
+
+    /**
+     * v1.5数据集分配准备 (v1.5)
+     * 🎯 实现目标：为联邦学习任务准备数据集分配
+     * 📊 实现进度：待实现
+     *
+     * @param originalDatasetId 原始数据集ID
+     * @param participantVmIds 参与者虚拟机ID列表
+     * @return 数据集分配准备结果
+     */
+    DatasetAllocationPreparation prepareDatasetForAllocation(String originalDatasetId,
+                                                             java.util.List<String> participantVmIds);
 }

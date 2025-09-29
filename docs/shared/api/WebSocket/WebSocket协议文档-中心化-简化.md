@@ -291,7 +291,6 @@ VM-001 同时执行:
     },
     "dataConfig": {
       "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID，替换原datasetId
-      "dataPath": "/data/training",
       "validationSplit": 0.2,
       "shuffle": true
     }

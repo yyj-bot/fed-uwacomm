@@ -188,6 +188,7 @@ public class TaskCreateDTO {
         @DecimalMin(value = "0.0", message = "测试集比例不能小于0.0")
         @DecimalMax(value = "0.3", message = "测试集比例不能大于0.3")
         private Double testSplit = 0.1;
+
     }
 
     // v1.3 新增：参与者配置DTO

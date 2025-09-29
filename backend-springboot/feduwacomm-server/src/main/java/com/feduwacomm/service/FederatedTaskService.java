@@ -217,4 +217,35 @@ public interface FederatedTaskService {
      * 批量操作任务
      */
     TaskBatchOperationResultVO batchOperateTask(TaskBatchOperationDTO batchDTO, String operatorId);
+
+    // ========== v1.5标准联邦学习接口 ==========
+
+    /**
+     * 标准联邦学习任务创建流程 (v1.5)
+     * 实现13步标准化流程的步骤6-12
+     * 🎯 实现目标：完整的标准任务创建链路，包含数据集分配
+     */
+    TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy);
+
+    /**
+     * 数据集分配和assignedDatasetId生成 (v1.5)
+     * 实现步骤8：通过算法将数据集进行分配
+     * 🎯 实现目标：为每个VM生成唯一的assignedDatasetId
+     */
+    com.feduwacomm.dto.DatasetAllocationResult allocateDatasets(String taskId, List<String> participantVmIds,
+                                                                String originalDatasetPath);
+
+    /**
+     * 查询数据集状态并验证 (v1.5)
+     * 实现步骤9：向虚拟机查询数据集数据
+     * 🎯 实现目标：确保所有VM的数据集就绪
+     */
+    com.feduwacomm.dto.DatasetValidationResult validateParticipantDatasets(String taskId);
+
+    /**
+     * 启动联邦学习流程 (v1.5)
+     * 实现步骤12-13：发送任务消息并开始联邦学习
+     * 🎯 实现目标：启动完整的联邦学习流程
+     */
+    TaskOperationVO startFederatedLearningFlow(String taskId);
 }

@@ -11,8 +11,11 @@ import jakarta.annotation.PreDestroy;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -398,5 +401,116 @@ public class CacheServiceImpl implements CacheService {
         } catch (Exception e) {
             log.error("驱逐LRU缓存条目失败: {}", e.getMessage(), e);
         }
+    }
+
+    // ======================== ACK专用缓存操作实现 ========================
+
+    @Override
+    public Set<String> getKeysByPrefix(String prefix) {
+        if (prefix == null) {
+            return new HashSet<>();
+        }
+
+        Set<String> matchingKeys = new HashSet<>();
+        for (String key : cache.keySet()) {
+            if (key.startsWith(prefix)) {
+                // 检查条目是否过期
+                CacheEntry entry = cache.get(key);
+                if (entry != null && !entry.isExpired()) {
+                    matchingKeys.add(key);
+                }
+            }
+        }
+
+        log.debug("按前缀查找缓存键: prefix={}, count={}", prefix, matchingKeys.size());
+        return matchingKeys;
+    }
+
+    @Override
+    public <T> Map<String, T> batchGet(Set<String> keys, Class<T> valueType) {
+        if (keys == null || keys.isEmpty() || valueType == null) {
+            return new HashMap<>();
+        }
+
+        Map<String, T> result = new HashMap<>();
+        for (String key : keys) {
+            Optional<T> value = get(key, valueType);
+            if (value.isPresent()) {
+                result.put(key, value.get());
+            }
+        }
+
+        log.debug("批量获取缓存: requested={}, found={}", keys.size(), result.size());
+        return result;
+    }
+
+    @Override
+    public void batchPut(Map<String, Object> keyValueMap, Duration ttl) {
+        if (keyValueMap == null || keyValueMap.isEmpty()) {
+            return;
+        }
+
+        for (Map.Entry<String, Object> entry : keyValueMap.entrySet()) {
+            put(entry.getKey(), entry.getValue(), ttl);
+        }
+
+        log.debug("批量设置缓存: count={}, ttl={}", keyValueMap.size(), ttl);
+    }
+
+    @Override
+    public void batchPut(Map<String, Object> keyValueMap) {
+        batchPut(keyValueMap, DEFAULT_TTL);
+    }
+
+    @Override
+    public long increment(String key, long delta, long initialValue) {
+        if (key == null) {
+            throw new IllegalArgumentException("缓存键不能为空");
+        }
+
+        synchronized (this) { // 确保原子性
+            Optional<Long> currentValue = get(key, Long.class);
+            long newValue;
+
+            if (currentValue.isPresent()) {
+                newValue = currentValue.get() + delta;
+            } else {
+                newValue = initialValue + delta;
+            }
+
+            put(key, newValue);
+            log.debug("缓存计数器递增: key={}, delta={}, newValue={}", key, delta, newValue);
+            return newValue;
+        }
+    }
+
+    @Override
+    public long increment(String key, long delta) {
+        return increment(key, delta, 0L);
+    }
+
+    @Override
+    public Optional<Duration> getTtl(String key) {
+        if (key == null) {
+            return Optional.empty();
+        }
+
+        CacheEntry entry = cache.get(key);
+        if (entry == null || entry.isExpired()) {
+            return Optional.empty();
+        }
+
+        LocalDateTime expiresAt = entry.getExpiresAt();
+        if (expiresAt == null) {
+            return Optional.empty(); // 永不过期
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(expiresAt)) {
+            return Optional.empty(); // 已过期
+        }
+
+        Duration ttl = Duration.between(now, expiresAt);
+        return Optional.of(ttl);
     }
 }

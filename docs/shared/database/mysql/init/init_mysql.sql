@@ -766,12 +766,9 @@ CREATE TABLE IF NOT EXISTS vm_ack_tracking (
                                                task_id VARCHAR(64) NOT NULL,
                                                round_number INT NULL COMMENT 'NULL表示任务级别确认',
                                                vm_id VARCHAR(32) NOT NULL,
-                                               ack_type ENUM(
-                                                   'TASK_START', 'TASK_STOP', 'TASK_RESUME', 'TASK_DELETE',
-                                                   'ROUND_START', 'GRADIENT_UPLOAD', 'GLOBAL_MODEL_BROADCAST', 'ROUND_COMPLETE',
-                                                   'DATASET_LIST_QUERY', 'DATASET_CREATE', 'DATASET_STATUS_QUERY'
-                                                   ) NOT NULL COMMENT 'v1.4/v1.5确认类型',
+                                               ack_type VARCHAR(50) NOT NULL COMMENT 'v1.4/v1.5确认类型',
                                                status ENUM('PENDING', 'SUCCESS', 'FAILED', 'TIMEOUT') NOT NULL DEFAULT 'PENDING' COMMENT '确认状态',
+                                               message_id VARCHAR(128) NULL COMMENT '消息ID，用于消息跟踪和去重',
                                                ack_data JSON NULL COMMENT '确认数据',
                                                error_message TEXT NULL COMMENT '错误信息',
                                                acknowledged_at TIMESTAMP NULL COMMENT '确认时间',

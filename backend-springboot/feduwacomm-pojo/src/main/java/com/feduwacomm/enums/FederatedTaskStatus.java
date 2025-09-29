@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  */
 public enum FederatedTaskStatus {
     CREATED("CREATED", "已创建"),
+    CREATING("CREATING", "创建中"),
     CONFIGURED("CONFIGURED", "已配置"),
     PENDING("PENDING", "等待中"),
     RUNNING("RUNNING", "运行中"),

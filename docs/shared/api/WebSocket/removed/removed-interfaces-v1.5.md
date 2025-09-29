@@ -100,8 +100,7 @@ v1.5版本继续坚持v1.4确立的简化设计模式：
   "type": "FEDERATED_TASK_START",
   "data": {
     "dataConfig": {
-      "datasetId": "用户指定ID",          // 简单指定
-      "dataPath": "/data/training"      // 本地路径
+      "datasetId": "用户指定ID"           // 简单指定
     }
   }
 }
@@ -111,14 +110,41 @@ v1.5版本继续坚持v1.4确立的简化设计模式：
   "type": "FEDERATED_TASK_START",
   "data": {
     "dataConfig": {
-      "assignedDatasetId": "backend-generated-uuid",  // 🆕 v1.5：唯一数据集标识符
-      "dataPath": "/data/training"
+      "assignedDatasetId": "backend-generated-uuid"   // 🆕 v1.5：唯一数据集标识符
     }
   }
 }
 ```
 
 **技术影响**: ⚠️ 破坏性变更 - v1.4的datasetId完全移除，必须使用assignedDatasetId
+
+#### 2.2.3 数据集路径后端传输 (字段移除) 🆕
+
+**移除原因**: 数据集路径应由虚拟机内部管理，后端不应传输和存储虚拟机的内部路径
+
+```
+❌ 移除字段: TaskCreateDTO中的datasetPath字段
+// v1.5之前的实现
+public static class DatasetConfigDTO {
+    private String datasetId;
+    private String datasetPath;  // ❌ 已移除：虚拟机内部路径不应由后端管理
+    // ...
+}
+
+✅ v1.5修正实现: 移除datasetPath字段
+public static class DatasetConfigDTO {
+    private String datasetId;
+    // datasetPath字段已完全移除
+    // 数据集路径由虚拟机内部根据assignedDatasetId自主管理
+    // ...
+}
+```
+
+**技术影响**:
+- **🚫 破坏性变更**: TaskCreateDTO.DatasetConfigDTO中的datasetPath字段完全移除
+- **✅ 职责清晰**: 后端只管理assignedDatasetId，虚拟机自主管理数据集存储路径
+- **✅ 安全性提升**: 避免后端获取虚拟机内部路径信息
+- **✅ 解耦优化**: 数据集逻辑与路径管理完全分离
 
 ## 3. 数据集管理破坏性变更
 

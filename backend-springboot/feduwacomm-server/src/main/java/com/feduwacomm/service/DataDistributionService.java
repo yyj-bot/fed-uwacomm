@@ -2,6 +2,8 @@ package com.feduwacomm.service;
 
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.dto.DataDistributionDTO;
+import com.feduwacomm.dto.DatasetSlice;
+import com.feduwacomm.dto.DatasetAllocationValidation;
 import com.feduwacomm.vo.DataDistributionTaskVO;
 
 import java.util.List;
@@ -229,4 +231,36 @@ public interface DataDistributionService {
      * @return 实时性能指标
      */
     DataDistributionTaskVO.DistributionStatistics getDistributionPerformanceMetrics(String distributionId);
+
+    // ========== v1.5数据集分片和assignedDatasetId管理功能 ==========
+
+    /**
+     * 生成数据集分片 (v1.5)
+     * 🎯 实现目标：根据参与者数量和数据分布策略分配数据集
+     *
+     * @param originalDatasetPath 原始数据集路径
+     * @param vmId 虚拟机ID
+     * @return 数据集分片信息
+     */
+    DatasetSlice generateDatasetSlice(String originalDatasetPath, String vmId);
+
+    /**
+     * IID数据分配策略 (v1.5)
+     * 使用独立同分布算法分配数据
+     *
+     * @param originalDatasetPath 原始数据集路径
+     * @param vmIndex 虚拟机索引
+     * @param totalVms 总虚拟机数量
+     * @return 分配的数据集分片
+     */
+    DatasetSlice performIIDAllocation(String originalDatasetPath, int vmIndex, int totalVms);
+
+    /**
+     * 验证数据集分配结果 (v1.5)
+     * 检查所有分配是否正确和完整
+     *
+     * @param taskId 任务ID
+     * @return 验证结果
+     */
+    DatasetAllocationValidation validateAllocation(String taskId);
 }

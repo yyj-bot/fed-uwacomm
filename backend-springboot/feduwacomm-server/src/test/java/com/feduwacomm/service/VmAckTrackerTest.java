@@ -3,11 +3,13 @@ package com.feduwacomm.service;
 import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.ModelDistribution;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.entity.VmAckTracking;
 import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.enums.ParticipantStatus;
 import com.feduwacomm.mapper.GlobalModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.service.cache.model.AckProgress;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -39,6 +42,9 @@ class VmAckTrackerTest {
 
     @Mock
     private TaskParticipantsMapper taskParticipantsMapper;
+
+    @Mock
+    private AckCacheService ackCacheService;
 
     @InjectMocks
     private VmAckTracker vmAckTracker;
@@ -90,7 +96,7 @@ class VmAckTrackerTest {
     }
 
     @Test
-    void testRecordAck_NewDistribution_ShouldCreateRecord() {
+    void testRecordAck_NewDistribution_ShouldCreateRecordAndUpdateCache() {
         // Given
         when(globalModelMapper.selectByTaskIdAndRound(testTaskId, testRoundNumber))
                 .thenReturn(mockModel);
@@ -98,6 +104,9 @@ class VmAckTrackerTest {
                 .thenReturn(null); // 没有现有记录
         when(modelDistributionMapper.insertModelDistribution(any(ModelDistribution.class)))
                 .thenReturn(1);
+        doNothing().when(ackCacheService).updateAckStatus(anyString(), anyString(),
+                any(VmAckTracking.AckType.class), any(VmAckTracking.AckStatus.class));
+        doNothing().when(ackCacheService).updateAckProgress(anyString(), any(VmAckTracking.AckType.class));
 
         // When
         boolean result = vmAckTracker.recordAck(testTaskId, testVmId, testRoundNumber);
@@ -107,10 +116,14 @@ class VmAckTrackerTest {
         verify(modelDistributionMapper).insertModelDistribution(any(ModelDistribution.class));
         verify(modelDistributionMapper, never()).updateDistributionStatus(anyString(),
                 anyString(), any(), any());
+        // 验证缓存更新
+        verify(ackCacheService).updateAckStatus(eq(testTaskId), eq(testVmId),
+                eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST), eq(VmAckTracking.AckStatus.SUCCESS));
+        verify(ackCacheService).updateAckProgress(eq(testTaskId), eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST));
     }
 
     @Test
-    void testRecordAck_ExistingDistribution_ShouldUpdateRecord() {
+    void testRecordAck_ExistingDistribution_ShouldUpdateRecordAndCache() {
         // Given
         ModelDistribution existingDistribution = createDistribution(testVmId, "PENDING");
         when(globalModelMapper.selectByTaskIdAndRound(testTaskId, testRoundNumber))
@@ -123,6 +136,9 @@ class VmAckTrackerTest {
         when(modelDistributionMapper.updateVerificationStatus(
                 eq(existingDistribution.getId()), eq(true), any(LocalDateTime.class)))
                 .thenReturn(1);
+        doNothing().when(ackCacheService).updateAckStatus(anyString(), anyString(),
+                any(VmAckTracking.AckType.class), any(VmAckTracking.AckStatus.class));
+        doNothing().when(ackCacheService).updateAckProgress(anyString(), any(VmAckTracking.AckType.class));
 
         // When
         boolean result = vmAckTracker.recordAck(testTaskId, testVmId, testRoundNumber);
@@ -133,10 +149,14 @@ class VmAckTrackerTest {
                 eq(existingDistribution.getId()), eq("COMPLETED"), any(LocalDateTime.class), isNull());
         verify(modelDistributionMapper).updateVerificationStatus(
                 eq(existingDistribution.getId()), eq(true), any(LocalDateTime.class));
+        // 验证缓存更新
+        verify(ackCacheService).updateAckStatus(eq(testTaskId), eq(testVmId),
+                eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST), eq(VmAckTracking.AckStatus.SUCCESS));
+        verify(ackCacheService).updateAckProgress(eq(testTaskId), eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST));
     }
 
     @Test
-    void testRecordAck_ModelNotFound_ShouldFail() {
+    void testRecordAck_ModelNotFound_ShouldFailWithoutCacheUpdate() {
         // Given
         when(globalModelMapper.selectByTaskIdAndRound(testTaskId, testRoundNumber))
                 .thenReturn(null);
@@ -149,6 +169,10 @@ class VmAckTrackerTest {
         verify(modelDistributionMapper, never()).insertModelDistribution(any());
         verify(modelDistributionMapper, never()).updateDistributionStatus(anyString(),
                 anyString(), any(), any());
+        // 验证缓存不会被更新
+        verify(ackCacheService, never()).updateAckStatus(anyString(), anyString(),
+                any(VmAckTracking.AckType.class), any(VmAckTracking.AckStatus.class));
+        verify(ackCacheService, never()).updateAckProgress(anyString(), any(VmAckTracking.AckType.class));
     }
 
     @Test
@@ -391,6 +415,114 @@ class VmAckTrackerTest {
         // Then
         assertTrue(result1);
         assertFalse(result2); // 第二次应该失败，避免重复记录
+    }
+
+    /**
+     * 测试缓存错误回滚机制
+     */
+    @Test
+    void testRecordAck_CacheError_ShouldTriggerRollback() {
+        // Given
+        when(globalModelMapper.selectByTaskIdAndRound(testTaskId, testRoundNumber))
+                .thenReturn(mockModel);
+        when(modelDistributionMapper.selectByModelIdAndVmId(mockModel.getId(), testVmId))
+                .thenReturn(null);
+        when(modelDistributionMapper.insertModelDistribution(any(ModelDistribution.class)))
+                .thenReturn(1);
+
+        // 模拟缓存更新失败
+        doThrow(new RuntimeException("Cache update failed"))
+                .when(ackCacheService).updateAckStatus(anyString(), anyString(),
+                        any(VmAckTracking.AckType.class), any(VmAckTracking.AckStatus.class));
+        doNothing().when(ackCacheService).clearAckTypeCache(anyString(), any(VmAckTracking.AckType.class));
+
+        // When
+        boolean result = vmAckTracker.recordAck(testTaskId, testVmId, testRoundNumber);
+
+        // Then
+        assertFalse(result); // 应该失败
+        verify(ackCacheService).clearAckTypeCache(eq(testTaskId), eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST));
+    }
+
+    /**
+     * 测试waitForAllAcknowledgments缓存查询功能
+     */
+    @Test
+    void testWaitForAllAcknowledgments_UsingCache_ShouldSucceed() {
+        // Given
+        Set<String> taskParticipants = new HashSet<>(Arrays.asList("vm-001", "vm-002", "vm-003"));
+        when(ackCacheService.getTaskParticipants(testTaskId))
+                .thenReturn(taskParticipants);
+
+        // 模拟进度变化：从未完成到完成
+        AckProgress initialProgress = AckProgress.builder()
+                .taskId(testTaskId)
+                .ackType(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST)
+                .totalVms(3)
+                .acknowledgedVms(1)
+                .allCompleted(false)
+                .allSuccess(false)
+                .progressPercentage(33.3)
+                .build();
+
+        AckProgress finalProgress = AckProgress.builder()
+                .taskId(testTaskId)
+                .ackType(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST)
+                .totalVms(3)
+                .acknowledgedVms(3)
+                .allCompleted(true)
+                .allSuccess(true)
+                .progressPercentage(100.0)
+                .build();
+
+        when(ackCacheService.getAckProgress(eq(testTaskId), eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST)))
+                .thenReturn(initialProgress)  // 第一次查询
+                .thenReturn(finalProgress);   // 第二次查询
+
+        // When
+        boolean result = vmAckTracker.waitForAllAcknowledgments(testTaskId,
+                VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST, 5000, 100);
+
+        // Then
+        assertTrue(result);
+        verify(ackCacheService, atLeast(2)).getAckProgress(eq(testTaskId),
+                eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST));
+    }
+
+    /**
+     * 测试waitForAllAcknowledgments超时场景
+     */
+    @Test
+    void testWaitForAllAcknowledgments_Timeout_ShouldReturnFalse() {
+        // Given
+        Set<String> taskParticipants = new HashSet<>(Arrays.asList("vm-001", "vm-002", "vm-003"));
+        when(ackCacheService.getTaskParticipants(testTaskId))
+                .thenReturn(taskParticipants);
+
+        // 模拟始终未完成的进度
+        AckProgress progress = AckProgress.builder()
+                .taskId(testTaskId)
+                .ackType(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST)
+                .totalVms(3)
+                .acknowledgedVms(2)
+                .allCompleted(false)
+                .allSuccess(false)
+                .progressPercentage(66.7)
+                .build();
+
+        when(ackCacheService.getAckProgress(eq(testTaskId), eq(VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST)))
+                .thenReturn(progress);
+
+        // When
+        long startTime = System.currentTimeMillis();
+        boolean result = vmAckTracker.waitForAllAcknowledgments(testTaskId,
+                VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST, 500, 100); // 500ms超时
+        long duration = System.currentTimeMillis() - startTime;
+
+        // Then
+        assertFalse(result);
+        assertTrue(duration >= 500, "应该等待至少500ms");
+        assertTrue(duration < 1000, "不应该等待超过1秒");
     }
 
     @Test

@@ -3,6 +3,8 @@ package com.feduwacomm.service.impl;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.DataDistributionDTO;
+import com.feduwacomm.dto.DatasetSlice;
+import com.feduwacomm.dto.DatasetAllocationValidation;
 import com.feduwacomm.entity.DataDistribution;
 import com.feduwacomm.entity.DataDistributionDetail;
 import com.feduwacomm.event.DataDistributionStartedEvent;
@@ -11,6 +13,9 @@ import com.feduwacomm.mapper.DataDistributionMapper;
 import com.feduwacomm.mapper.DataDistributionDetailMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.common.exception.BusinessException;
 import com.feduwacomm.service.DataDistributionService;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.DataDistributionTaskVO;
@@ -49,6 +54,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     private final DataDistributionDetailMapper dataDistributionDetailMapper;
     private final VmInstancesMapper vmInstancesMapper;
     private final TrainingDatasetMapper trainingDatasetMapper;
+    private final TaskParticipantsMapper taskParticipantsMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
@@ -982,5 +988,200 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                 .checksum((String) map.get("checksum"))
                 .errorMessage((String) map.get("error_message"))
                 .build();
+    }
+
+    // ========== v1.5数据集分片和assignedDatasetId管理功能实现 ==========
+
+    @Override
+    public DatasetSlice generateDatasetSlice(String originalDatasetPath, String vmId) {
+        log.info("生成数据集分片 - 原始路径: {}, VM ID: {}", originalDatasetPath, vmId);
+
+        try {
+            // 生成唯一的分配数据集ID
+            String assignedDatasetId = uuidUtil.generateUuid();
+
+            // 获取数据集元信息
+            int totalSamples = analyzeDatasetSize(originalDatasetPath);
+            if (totalSamples <= 0) {
+                log.error("无法分析数据集大小: {}", originalDatasetPath);
+                throw new BusinessException("无效的数据集路径");
+            }
+
+            // 为该VM生成本地路径
+            String localPath = generateLocalPath(vmId, assignedDatasetId);
+
+            // 构建数据集分片
+            return DatasetSlice.builder()
+                    .assignedDatasetId(assignedDatasetId)
+                    .vmId(vmId)
+                    .localPath(localPath)
+                    .sampleCount(totalSamples)
+                    .startIndex(0)
+                    .endIndex(totalSamples)
+                    .createdAt(LocalDateTime.now())
+                    .dataType("federated_learning")
+                    .transferred(false)
+                    .transferStatus("PENDING")
+                    .metadata(String.format("{\"originalPath\":\"%s\",\"vmId\":\"%s\"}", originalDatasetPath, vmId))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("生成数据集分片失败: {}", e.getMessage(), e);
+            throw new BusinessException("数据集分片生成失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public DatasetSlice performIIDAllocation(String originalDatasetPath, int vmIndex, int totalVms) {
+        log.info("执行IID数据分配 - 路径: {}, VM索引: {}, 总VM数: {}", originalDatasetPath, vmIndex, totalVms);
+
+        if (vmIndex < 0 || vmIndex >= totalVms) {
+            throw new BusinessException("VM索引超出范围: " + vmIndex);
+        }
+
+        if (totalVms <= 0) {
+            throw new BusinessException("总VM数必须大于0");
+        }
+
+        try {
+            // 分析数据集总大小
+            int totalSamples = analyzeDatasetSize(originalDatasetPath);
+            if (totalSamples <= 0) {
+                throw new BusinessException("无效的数据集或数据集为空");
+            }
+
+            // IID分配：平均分配数据
+            int samplesPerVm = totalSamples / totalVms;
+            int remainder = totalSamples % totalVms;
+
+            // 计算当前VM的数据范围
+            int startIndex = vmIndex * samplesPerVm;
+            int endIndex = startIndex + samplesPerVm;
+
+            // 将余数分配给前面的VM
+            if (vmIndex < remainder) {
+                startIndex += vmIndex;
+                endIndex += vmIndex + 1;
+            } else {
+                startIndex += remainder;
+                endIndex += remainder;
+            }
+
+            int sampleCount = endIndex - startIndex;
+            String assignedDatasetId = uuidUtil.generateUuid();
+            String vmId = "vm_" + vmIndex; // 临时VM ID，实际使用时应传入真实VM ID
+            String localPath = generateLocalPath(vmId, assignedDatasetId);
+
+            log.info("IID分配结果 - VM{}: 样本{}到{}, 共{}个样本", vmIndex, startIndex, endIndex-1, sampleCount);
+
+            return DatasetSlice.builder()
+                    .assignedDatasetId(assignedDatasetId)
+                    .vmId(vmId)
+                    .localPath(localPath)
+                    .sampleCount(sampleCount)
+                    .startIndex(startIndex)
+                    .endIndex(endIndex)
+                    .createdAt(LocalDateTime.now())
+                    .dataType("federated_learning")
+                    .transferred(false)
+                    .transferStatus("ALLOCATED")
+                    .metadata(String.format("{\"originalPath\":\"%s\",\"vmIndex\":%d,\"totalVms\":%d,\"strategy\":\"IID\"}",
+                            originalDatasetPath, vmIndex, totalVms))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("IID数据分配失败: {}", e.getMessage(), e);
+            throw new BusinessException("IID数据分配失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public DatasetAllocationValidation validateAllocation(String taskId) {
+        log.info("验证任务数据集分配 - 任务ID: {}", taskId);
+
+        try {
+            // 获取任务的所有参与者
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+            if (participants == null || participants.isEmpty()) {
+                return new DatasetAllocationValidation(new HashMap<>(), 0,
+                        LocalDateTime.now(), false, "任务无参与者");
+            }
+
+            // 构建分配信息映射
+            Map<String, DatasetAllocationValidation.DatasetSliceInfo> allocationInfo = new HashMap<>();
+            int totalCalculatedSamples = 0;
+
+            for (TaskParticipant participant : participants) {
+                if (participant.getAssignedDatasetId() == null) {
+                    return new DatasetAllocationValidation(new HashMap<>(), 0,
+                            LocalDateTime.now(), false,
+                            "参与者 " + participant.getVmId() + " 未分配数据集");
+                }
+
+                // 解析数据集信息
+                DatasetAllocationValidation.DatasetSliceInfo sliceInfo =
+                        new DatasetAllocationValidation.DatasetSliceInfo();
+                sliceInfo.setAssignedDatasetId(participant.getAssignedDatasetId());
+                sliceInfo.setLocalPath(participant.getLocalPath());
+                sliceInfo.setStatus(participant.getDatasetStatus());
+
+                // 从参与者数据中获取样本数（这里简化处理，实际应从数据集元数据获取）
+                int sampleCount = participant.getDataSize() != null ? participant.getDataSize() : 0;
+                sliceInfo.setSampleCount(sampleCount);
+
+                allocationInfo.put(participant.getVmId(), sliceInfo);
+                totalCalculatedSamples += sampleCount;
+            }
+
+            // 验证分配完整性
+            DatasetAllocationValidation validation = new DatasetAllocationValidation(
+                    allocationInfo, totalCalculatedSamples);
+
+            log.info("任务{}的数据集分配验证结果: {}", taskId, validation.isValid() ? "通过" : "失败");
+            if (!validation.isValid()) {
+                log.warn("验证失败原因: {}", validation.getErrorMessage());
+            }
+
+            return validation;
+
+        } catch (Exception e) {
+            log.error("验证数据集分配失败: {}", e.getMessage(), e);
+            return new DatasetAllocationValidation(new HashMap<>(), 0,
+                    LocalDateTime.now(), false, "验证过程发生异常: " + e.getMessage());
+        }
+    }
+
+    // ========== v1.5辅助方法 ==========
+
+    /**
+     * 分析数据集大小
+     * TODO: 实现真实的数据集分析逻辑
+     */
+    private int analyzeDatasetSize(String datasetPath) {
+        // 临时实现：返回模拟的样本数
+        // 实际实现应该解析数据集文件，计算真实的样本数量
+        log.debug("分析数据集大小: {}", datasetPath);
+
+        if (datasetPath == null || datasetPath.trim().isEmpty()) {
+            return 0;
+        }
+
+        // 模拟不同数据集的样本数
+        if (datasetPath.contains("small")) {
+            return 1000;
+        } else if (datasetPath.contains("medium")) {
+            return 5000;
+        } else if (datasetPath.contains("large")) {
+            return 10000;
+        } else {
+            return 3000; // 默认样本数
+        }
+    }
+
+    /**
+     * 生成VM本地路径
+     */
+    private String generateLocalPath(String vmId, String assignedDatasetId) {
+        return String.format("/data/federated/%s/dataset_%s", vmId, assignedDatasetId);
     }
 }

@@ -350,7 +350,7 @@ public class CompleteFederatedLearningFlowTestV15 {
             .description("基于WebSocket v1.5协议的标准联邦学习任务")
             .federatedAlgorithm("FEDERATED_AVERAGING")
             .totalRounds(5)
-            .datasetPath(originalDatasetId)  // 使用原始数据集ID
+            .datasetId(originalDatasetId)  // 使用原始数据集ID
             .participantConfig(ParticipantConfigDTO.builder()
                 .participants(registeredVmIds)  // 所有注册的VM参与
                 .minParticipants(3)

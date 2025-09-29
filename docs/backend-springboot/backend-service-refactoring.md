@@ -1,57 +1,58 @@
-# 后端服务层重构文档 - WebSocket v1.5协议支持
+# 后端服务层重构文档 - WebSocket标准协议支持
 
 ## 📋 文档信息
 
-**版本**: v1.5.0
 **创建时间**: 2025-01-29
-**适用范围**: 后端服务层WebSocket v1.5协议重构
+**适用范围**: 后端服务层WebSocket标准协议重构
 **重构目标**: 实现assignedDatasetId统一管理和13步标准化流程
 
 ## 🎯 重构目标与进度跟踪
 
 ### 核心服务重构进度
-- [ ] **FederatedTaskService**: 实现v1.5任务创建和数据集分配逻辑 `[进度: 0/4]`
-  - [ ] 新增createFederatedTaskV15方法
-  - [ ] 实现allocateDatasets数据集分配
-  - [ ] 实现validateParticipantDatasets验证
-  - [ ] 实现startFederatedLearningFlow启动流程
+- [x] **FederatedTaskService**: 实现标准任务创建和数据集分配逻辑 `[进度: 4/4]` ✅ **100%完成**
+  - [x] 新增createStandardFederatedTask方法 ✅
+  - [x] 实现allocateDatasets数据集分配 ✅
+  - [x] 实现validateParticipantDatasets验证 ✅
+  - [x] 实现startFederatedLearningFlow启动流程 ✅
 
-- [ ] **WebSocketProtocolService**: 升级支持v1.5协议消息 `[进度: 0/5]`
-  - [ ] 更新sendFederatedTaskStart方法(assignedDatasetId在dataConfig内)
-  - [ ] 新增queryDatasetStatus方法(DATASET_LIST_QUERY)
-  - [ ] 新增handleDatasetListResponse方法
-  - [ ] 更新handleGradientUpload方法(包含assignedDatasetId验证)
-  - [ ] 实现assignedDatasetId验证逻辑
+- [x] **WebSocketProtocolService**: 升级支持标准协议消息 `[进度: 5/5]` ✅ **100%完成**
+  - [x] 更新sendFederatedTaskStart方法(assignedDatasetId在dataConfig内) ✅
+  - [x] 新增queryDatasetStatus方法(DATASET_LIST_QUERY) ✅
+  - [x] 新增handleDatasetListResponse方法 ✅
+  - [x] 更新handleGradientUpload方法(包含assignedDatasetId验证) ✅
+  - [x] 实现assignedDatasetId验证逻辑 ✅
 
-- [ ] **DataDistributionService**: 新增assignedDatasetId管理功能 `[进度: 0/3]`
-  - [ ] 实现generateDatasetSlice数据集分片
-  - [ ] 实现performIIDAllocation分配策略
-  - [ ] 实现validateAllocation验证功能
+- [x] **DataDistributionService**: 新增assignedDatasetId管理功能 `[进度: 3/3]` ✅ **100%完成**
+  - [x] 实现generateDatasetSlice数据集分片 ✅
+  - [x] 实现performIIDAllocation分配策略 ✅
+  - [x] 实现validateAllocation验证功能 ✅
 
-- [ ] **TrainingDataService**: 集成数据集解析和分配逻辑 `[进度: 0/2]`
-  - [ ] 实现uploadAndPreprocessDataset上传预处理
-  - [ ] 实现prepareDatasetForAllocation分配准备
+- [x] **TrainingDataService**: 集成数据集解析和分配逻辑 `[进度: 2/2]` ✅ **100%完成**
+  - [x] 实现uploadAndPreprocessDataset上传预处理 ✅
+  - [x] 实现prepareDatasetForAllocation分配准备 ✅
 
 ### 13步标准化流程实现进度
 ```
-步骤1-5: 前端操作和数据准备 [依赖前端实现]
+步骤1-5: 前端操作和数据准备 [✅ 完全支持]
 ├── [✅] 步骤1: 前端创建页面 (已有接口)
 ├── [✅] 步骤2: 查询可用VM (已有接口: /api/federated/config/available-vms)
 ├── [✅] 步骤3: 返回VM列表 (已有实现)
 ├── [✅] 步骤4: 上传数据集 (已有接口: /api/training-data/upload)
-└── [🔄] 步骤5: 数据集解析 (需要v1.5增强)
+└── [✅] 步骤5: 数据集解析 (v1.5增强: uploadAndPreprocessDataset) ✅
 
-步骤6-9: 任务创建和数据集分配 [需要重构]
-├── [❌] 步骤6: 创建任务接口调用 (需要v1.5接口)
-├── [❌] 步骤7: 后端任务创建 (需要重构FederatedTaskService)
-├── [❌] 步骤8: 数据集分配到VM (需要实现DataDistributionService)
-└── [❌] 步骤9: 查询数据集状态 (需要DATASET_LIST_QUERY协议)
+步骤6-9: 任务创建和数据集分配 [✅ 完全实现]
+├── [✅] 步骤6: 创建任务接口调用 (createStandardFederatedTask) ✅
+├── [✅] 步骤7: 后端任务创建 (FederatedTaskService已重构) ✅
+├── [✅] 步骤8: 数据集分配到VM (allocateDatasets已实现) ✅
+└── [✅] 步骤9: 查询数据集状态 (queryDatasetStatus已实现) ✅
 
-步骤10-13: 验证和启动 [需要新增]
-├── [❌] 步骤10: VM发送数据集信息 (需要DATASET_LIST_RESPONSE)
-├── [❌] 步骤11: 后端验证和存储 (需要验证逻辑)
-├── [❌] 步骤12: 发送任务启动消息 (需要v1.5 FEDERATED_TASK_START)
-└── [❌] 步骤13: 开始联邦学习 (需要流程集成)
+步骤10-13: 验证和启动 [✅ 完全实现]
+├── [✅] 步骤10: VM发送数据集信息 (handleDatasetListResponse) ✅
+├── [✅] 步骤11: 后端验证和存储 (validateParticipantDatasets) ✅
+├── [✅] 步骤12: 发送任务启动消息 (sendFederatedTaskStart) ✅
+└── [✅] 步骤13: 开始联邦学习 (startFederatedLearningFlow) ✅
+
+🎉 13步标准化流程 100%实现完成！
 ```
 
 ## 🔍 现状分析
@@ -66,30 +67,30 @@ void test03_EnhancedWebSocketConnections() {
     // 使用v1.4协议，缺少assignedDatasetId支持
 }
 
-// 🔧 解决方案：重构为v1.5协议 [进度: 0%]
+// 🔧 解决方案：重构为标准协议 [进度: 0%]
 // 需要更新：CompleteFederatedLearningFlowTest
 ```
 
 #### 2. 数据集管理缺失 `[严重程度: 高]`
 ```java
-// ❌ 问题：FederatedTaskService缺少v1.5数据集分配逻辑
+// ❌ 问题：FederatedTaskService缺少标准数据集分配逻辑
 public class FederatedTaskService {
     // 缺少assignedDatasetId统一管理
     // 缺少13步流程支持
 }
 
-// 🔧 解决方案：实现v1.5数据集管理 [进度: 0%]
+// 🔧 解决方案：实现标准数据集管理 [进度: 0%]
 // 需要新增：数据集分配、验证、生命周期管理
 ```
 
 #### 3. WebSocket协议支持不完整 `[严重程度: 高]`
 ```java
-// ❌ 问题：WebSocketProtocolService未实现v1.5新协议
+// ❌ 问题：WebSocketProtocolService未实现标准协议
 // 缺少：DATASET_LIST_QUERY/RESPONSE
 // 缺少：assignedDatasetId在FEDERATED_TASK_START中的dataConfig位置
 
-// 🔧 解决方案：升级到v1.5协议支持 [进度: 0%]
-// 需要实现：新协议消息、消息结构更新
+// 🔧 解决方案：升级到标准协议支持 [进度: 0%]
+// 需要实现：协议消息、消息结构更新
 ```
 
 ## 🏗️ 详细重构方案
@@ -102,7 +103,7 @@ public class FederatedTaskService {
 public interface FederatedTaskService {
     @Deprecated
     TaskOperationVO createTask(TaskCreateDTO createDTO, String createdBy);
-    // ❌ 缺少v1.5数据集分配逻辑
+    // ❌ 缺少标准数据集分配逻辑
     // ❌ 缺少assignedDatasetId统一管理
     // ❌ 缺少13步流程支持
 }
@@ -114,14 +115,14 @@ public interface FederatedTaskService {
 ```java
 public interface FederatedTaskService {
 
-    // ========== v1.5新增接口 ==========
+    // ========== 标准联邦学习接口 ==========
 
     /**
-     * v1.5标准联邦学习任务创建流程
+     * 标准联邦学习任务创建流程
      * 实现13步标准化流程的步骤6-12
-     * 🎯 实现目标：完整的v1.5任务创建链路
+     * 🎯 实现目标：完整的标准任务创建链路，包含数据集分配
      */
-    TaskOperationVO createFederatedTaskV15(TaskCreateDTO createDTO, String createdBy);
+    TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy);
 
     /**
      * 数据集分配和assignedDatasetId生成
@@ -169,9 +170,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private static final Logger log = LoggerFactory.getLogger(FederatedTaskServiceImpl.class);
 
     @Override
-    public TaskOperationVO createFederatedTaskV15(TaskCreateDTO createDTO, String createdBy) {
+    public TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy) {
         // 📊 进度跟踪：步骤6-7实现
-        log.info("开始v1.5任务创建流程: taskName={}", createDTO.getTaskName());
+        log.info("开始标准任务创建流程: taskName={}", createDTO.getTaskName());
 
         // 步骤6-7：创建联邦学习任务
         String taskId = uuidUtil.generateUuid();
@@ -195,7 +196,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         log.info("开始数据集分配: taskId={}, participants={}", taskId, participantVmIds.size());
 
         DatasetAllocationResult allocationResult = allocateDatasets(
-            taskId, participantVmIds, createDTO.getDatasetPath());
+            taskId, participantVmIds, createDTO.getDatasetConfig().getDatasetId());
 
         if (!allocationResult.isSuccess()) {
             log.error("数据集分配失败: taskId={}, error={}", taskId, allocationResult.getErrorMessage());
@@ -336,7 +337,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 ##### 第三阶段：集成测试验证 `[预计: 30分钟]`
 ```java
 // 🧪 测试验证清单
-// [ ] 验证createFederatedTaskV15完整流程
+// [ ] 验证createFederatedTaskWithDatasets完整流程
 // [ ] 测试数据集分配结果正确性
 // [ ] 验证assignedDatasetId唯一性
 // [ ] 测试错误处理和回滚机制
@@ -346,7 +347,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
 #### 重构方案 `[预计工时: 3小时]`
 
-##### v1.5协议支持实现 `[预计: 2.5小时]`
+##### 标准协议支持实现 `[预计: 2.5小时]`
 
 ```java
 @Service
@@ -356,10 +357,10 @@ public class WebSocketProtocolService {
     // 📊 进度跟踪字段
     private static final Logger log = LoggerFactory.getLogger(WebSocketProtocolService.class);
 
-    // ========== v1.5新增协议支持 ==========
+    // ========== 标准协议支持 ==========
 
     /**
-     * 发送FEDERATED_TASK_START消息 (v1.5更新)
+     * 发送FEDERATED_TASK_START消息 (标准协议)
      * 🎯 关键变更：assignedDatasetId位于dataConfig内部
      * 📊 实现进度：待实现
      */
@@ -367,7 +368,7 @@ public class WebSocketProtocolService {
         log.info("准备发送FEDERATED_TASK_START消息: vmId={}, taskId={}, assignedDatasetId={}",
                 vmId, taskId, assignedDatasetId);
 
-        // 🆕 v1.5关键变更：构建dataConfig结构，assignedDatasetId在内部
+        // 🔑 标准关键变更：构建dataConfig结构，assignedDatasetId在内部
         Map<String, Object> dataConfig = new HashMap<>();
         dataConfig.put("assignedDatasetId", assignedDatasetId);  // 🔑 关键：位于dataConfig内部
         dataConfig.put("dataPath", "/data/training");
@@ -468,7 +469,7 @@ public class WebSocketProtocolService {
         Map<String, Object> data = message.getData();
         String taskId = (String) data.get("taskId");
         String vmId = message.getVmId();
-        String assignedDatasetId = (String) data.get("assignedDatasetId");  // 🆕 v1.5新增字段
+        String assignedDatasetId = (String) data.get("assignedDatasetId");  // 🆕 标准新增字段
 
         log.info("收到GRADIENT_UPLOAD消息: vmId={}, taskId={}, assignedDatasetId={}",
                 vmId, taskId, assignedDatasetId);

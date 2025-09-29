@@ -105,8 +105,7 @@
       "learningRate": 0.001
     },
     "dataConfig": {
-      "datasetId": "dataset-abc123",  // ❌ v1.5中完全移除
-      "dataPath": "/data/training"
+      "datasetId": "dataset-abc123"   // ❌ v1.5中完全移除
     }
   }
 }
@@ -125,8 +124,7 @@
       "learningRate": 0.001
     },
     "dataConfig": {
-      "assignedDatasetId": "dataset-uuid-generated-by-backend",  // 🆕 v1.5：完全替换datasetId
-      "dataPath": "/data/training"
+      "assignedDatasetId": "dataset-uuid-generated-by-backend"   // 🆕 v1.5：完全替换datasetId
     }
   }
 }
