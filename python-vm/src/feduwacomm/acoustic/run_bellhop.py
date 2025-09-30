@@ -89,6 +89,11 @@ class BellhopProcessor:
             time.sleep(0.5)
         
         self.logger.info(f"Processing completed: success {success_count}/{len(env_files)}")
+        # 添加处理统计信息
+        if success_count == len(env_files):
+            self.logger.info("✅ All environment files processed successfully!")
+        else:
+            self.logger.warning(f"⚠️ {len(env_files) - success_count} files failed to process")
 
 def main():
     processor = BellhopProcessor()
