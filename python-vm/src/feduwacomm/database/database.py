@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Database Connection and Operations Module
-Handle SQLite database operations for BELLHOP feature data with automatic CSV structure matching
+数据库连接和操作模块
+处理BELLHOP特征数据的SQLite数据库操作，具有自动CSV结构匹配功能
 """
 
 import os
@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables - 智能查找.env文件
+# 加载环境变量 - 智能查找.env文件
 def find_env_file():
     """智能查找.env文件"""
     env_paths = [
@@ -33,25 +33,25 @@ env_file = find_env_file()
 load_dotenv(env_file)
 
 class DatabaseManager:
-    """Enhanced database manager with automatic table structure matching using SQLite"""
+    """增强的数据库管理器，使用SQLite具有自动表结构匹配功能"""
     
     def __init__(self):
-        # SQLite database file path
+        # SQLite数据库文件路径
         self.db_path = os.getenv('DB_PATH', 'bellhop_data.db')
         self.table = os.getenv('DB_TABLE', 'features')
         self.connection = None
         
-        # Ensure database directory exists
+        # 确保数据库目录存在
         db_dir = Path(self.db_path).parent
         if db_dir != Path('.'):
             db_dir.mkdir(parents=True, exist_ok=True)
         
-        # Set up logging
+        # 设置日志
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
     def connect(self) -> bool:
-        """Establish database connection"""
+        """建立数据库连接"""
         try:
             self.connection = sqlite3.connect(self.db_path)
             # Enable row factory for dict-like access
@@ -63,27 +63,27 @@ class DatabaseManager:
             return False
     
     def disconnect(self):
-        """Close database connection"""
+        """关闭数据库连接"""
         if self.connection:
             self.connection.close()
             self.connection = None
             self.logger.info("Database connection closed")
     
     def analyze_csv_structure(self, csv_file_path: str) -> Dict[str, str]:
-        """Analyze CSV file to determine column types for SQLite"""
+        """分析CSV文件以确定SQLite的列类型"""
         df = pd.read_csv(csv_file_path)
         
         column_types = {}
         
         for col in df.columns:
-            # Get sample values (non-null)
+            # 获取样本值（非空）
             sample_values = df[col].dropna()
             
             if len(sample_values) == 0:
                 column_types[col] = "TEXT"
                 continue
             
-            # Check data type - SQLite uses simplified type system
+            # 检查数据类型 - SQLite使用简化的类型系统
             first_non_null = sample_values.iloc[0]
             
             if col in ['env_id']:
@@ -97,36 +97,36 @@ class DatabaseManager:
             elif pd.api.types.is_float_dtype(sample_values):
                 column_types[col] = "REAL"
             elif pd.api.types.is_bool_dtype(sample_values):
-                column_types[col] = "INTEGER"  # SQLite stores booleans as integers
+                column_types[col] = "INTEGER"  # SQLite将布尔值存储为整数
             else:
                 column_types[col] = "TEXT"
         
         return column_types
     
     def create_table_from_csv(self, csv_file_path: str, drop_existing: bool = True) -> bool:
-        """Create table structure matching CSV file"""
+        """创建与CSV文件匹配的表结构"""
         
         if not self.connection:
             self.logger.error("No database connection")
             return False
         
         try:
-            # Analyze CSV structure
+            # 分析CSV结构
             column_types = self.analyze_csv_structure(csv_file_path)
             self.logger.info(f"Analyzed {len(column_types)} columns from CSV")
             
             cursor = self.connection.cursor()
             
-            # Drop existing table if requested
+            # 如果请求则删除现有表
             if drop_existing:
                 cursor.execute(f"DROP TABLE IF EXISTS {self.table}")
                 self.logger.info(f"Dropped existing table {self.table}")
             
-            # Create table SQL - SQLite syntax
+            # 创建表SQL - SQLite语法
             columns_sql = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
             
             for col, col_type in column_types.items():
-                # SQLite doesn't need backticks for column names, but we'll use quotes for safety
+                # SQLite不需要列名的反引号，但为了安全我们使用引号
                 escaped_col = f'"{col}"'
                 columns_sql.append(f"{escaped_col} {col_type}")
             
@@ -138,7 +138,7 @@ class DatabaseManager:
             
             cursor.execute(create_sql)
             
-            # Create indexes separately in SQLite
+            # 在SQLite中单独创建索引
             try:
                 cursor.execute(f'CREATE INDEX IF NOT EXISTS idx_env_id ON {self.table}("env_id")')
                 cursor.execute(f'CREATE INDEX IF NOT EXISTS idx_timestamp ON {self.table}("timestamp")')
@@ -155,34 +155,34 @@ class DatabaseManager:
             return False
     
     def insert_csv_data(self, csv_file_path: str) -> bool:
-        """Insert data from CSV file into database"""
+        """将CSV文件中的数据插入数据库"""
         
         if not self.connection:
             self.logger.error("No database connection")
             return False
         
         try:
-            # Read CSV
+            # 读取CSV
             df = pd.read_csv(csv_file_path)
             self.logger.info(f"Reading {len(df)} rows from CSV")
             
             cursor = self.connection.cursor()
             
-            # Prepare data for batch insertion
-            columns = [f'"{col}"' for col in df.columns]  # Escape column names with quotes
+            # 为批量插入准备数据
+            columns = [f'"{col}"' for col in df.columns]  # 用引号转义列名
             columns_str = ', '.join(columns)
-            placeholders = ', '.join(['?'] * len(df.columns))  # SQLite uses ? placeholders
+            placeholders = ', '.join(['?'] * len(df.columns))  # SQLite使用?占位符
             
             insert_sql = f"INSERT INTO {self.table} ({columns_str}) VALUES ({placeholders})"
             
-            # Prepare all rows for batch insert
+            # 为批量插入准备所有行
             rows_data = []
             for index, row in df.iterrows():
                 values = []
                 for col in df.columns:
                     value = row[col]
                     
-                    # Handle different data types
+                    # 处理不同的数据类型
                     if pd.isna(value):
                         values.append(None)
                     elif isinstance(value, str):
@@ -197,7 +197,7 @@ class DatabaseManager:
                 
                 rows_data.append(values)
             
-            # Execute batch insert
+            # 执行批量插入
             cursor.executemany(insert_sql, rows_data)
             self.connection.commit()
             
@@ -209,21 +209,21 @@ class DatabaseManager:
             return False
     
     def create_features_table(self):
-        """Create features table if it doesn't exist (legacy method for backward compatibility)"""
+        """如果特征表不存在则创建（用于向后兼容的传统方法）"""
         if not self.connection:
             self.logger.error("No database connection")
             return False
             
         try:
             cursor = self.connection.cursor()
-            # Create comprehensive features table - SQLite syntax
+            # 创建综合特征表 - SQLite语法
             create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {self.table} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 env_id TEXT NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 
-                -- Environment file features
+                -- 环境文件特征
                 env_frequency REAL,
                 env_source_count INTEGER,
                 env_receiver_count INTEGER,
@@ -231,7 +231,7 @@ class DatabaseManager:
                 env_max_depth REAL,
                 env_ssp_type TEXT,
                 
-                -- PRT file features (arrival mode)
+                -- PRT文件特征（到达模式）
                 prt_arr_success INTEGER DEFAULT 0,
                 prt_arr_freq REAL,
                 prt_arr_ssp_points INTEGER,
@@ -247,7 +247,7 @@ class DatabaseManager:
                 prt_arr_ranges TEXT,
                 prt_arr_run_time REAL,
                 
-                -- PRT file features (ray mode)
+                -- PRT文件特征（射线模式）
                 prt_ray_success INTEGER DEFAULT 0,
                 prt_ray_freq REAL,
                 prt_ray_ssp_points INTEGER,
@@ -340,7 +340,7 @@ class DatabaseManager:
             return False
     
     def insert_features(self, features_df: pd.DataFrame) -> bool:
-        """Insert features dataframe into database (legacy method for backward compatibility)"""
+        """将特征数据框插入数据库（用于向后兼容的传统方法）"""
         if not self.connection:
             self.logger.error("No database connection")
             return False
@@ -388,7 +388,7 @@ class DatabaseManager:
             return False
     
     def get_features_for_training(self, env_ids: Optional[List[str]] = None) -> pd.DataFrame:
-        """Get features data for machine learning training"""
+        """获取用于机器学习训练的特征数据"""
         if not self.connection:
             self.logger.error("No database connection")
             return pd.DataFrame()
@@ -421,7 +421,7 @@ class DatabaseManager:
             return pd.DataFrame()
     
     def get_numeric_features(self) -> pd.DataFrame:
-        """Get only numeric features for ML training"""
+        """仅获取用于ML训练的数值特征"""
         df = self.get_features_for_training()
         
         if df.empty:
@@ -445,7 +445,7 @@ class DatabaseManager:
         return numeric_df
     
     def calculate_derived_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate derived features for machine learning"""
+        """计算用于机器学习的派生特征"""
         if df.empty:
             return df
             
