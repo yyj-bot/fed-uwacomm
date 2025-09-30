@@ -1,8 +1,10 @@
 package com.feduwacomm.vo;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -15,6 +17,8 @@ import java.util.Map;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class VmRegisterResponseVO {
 
     private String vmId;
@@ -40,15 +44,19 @@ public class VmRegisterResponseVO {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class WebSocketInfo {
         private String sockjs;
-        
+
         @JsonProperty("native")
         private String nativeWs;
     }
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ApiEndpoints {
         private String status;
         private String control;

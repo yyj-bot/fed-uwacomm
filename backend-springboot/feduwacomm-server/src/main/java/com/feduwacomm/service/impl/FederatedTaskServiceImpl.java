@@ -1576,7 +1576,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 设置v1.3特有字段
         if (participantDTO.getCapabilities() != null) {
-            participant.setCapabilities(String.join(",", participantDTO.getCapabilities()));
+            try {
+                // 将List转换为JSON数组字符串，以便正确存储到MySQL的JSON列
+                participant.setCapabilities(objectMapper.writeValueAsString(participantDTO.getCapabilities()));
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to convert capabilities to JSON, using comma-separated string", e);
+                participant.setCapabilities(String.join(",", participantDTO.getCapabilities()));
+            }
         }
         if (participantDTO.getConstraints() != null) {
             participant.setMaxCpuUsage(participantDTO.getConstraints().getMaxCpuUsage());

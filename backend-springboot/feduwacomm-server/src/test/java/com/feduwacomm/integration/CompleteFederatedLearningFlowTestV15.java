@@ -71,9 +71,12 @@ import static org.junit.jupiter.api.Assertions.fail;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CompleteFederatedLearningFlowTestV15 {
 
-    
+
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private com.feduwacomm.mapper.FederatedTasksMapper tasksMapper;
 
     @LocalServerPort
     private int port;
@@ -315,22 +318,45 @@ public class CompleteFederatedLearningFlowTestV15 {
     void test06_CreateFederatedTaskV15() {
         System.out.println("\n🚀 步骤6：创建联邦学习任务测试 (v1.5)");
 
-        // 🆕 硬编码替代前端任务创建表单
+        // 🆕 v1.3格式：硬编码替代前端任务创建表单
         Map<String, Object> createRequest = new HashMap<>();
         createRequest.put("taskName", "v1.5联邦学习任务-声学数据分析");
+        createRequest.put("taskType", "CLASSIFICATION"); // v1.3必需字段
         createRequest.put("description", "基于WebSocket v1.5协议的标准联邦学习任务");
-        createRequest.put("federatedAlgorithm", "FEDERATED_AVERAGING");
-        createRequest.put("totalRounds", 5);
-        createRequest.put("datasetId", originalDatasetId);  // 使用原始数据集ID
-        createRequest.put("participants", registeredVmIds);  // 所有注册的VM参与
-        createRequest.put("minParticipants", 3);
+        createRequest.put("algorithm", "FEDERATED_AVERAGING"); // v1.3字段名
 
-        Map<String, Object> trainingConfig = new HashMap<>();
-        trainingConfig.put("algorithm", "RandomForest");
-        trainingConfig.put("epochs", 3);
-        trainingConfig.put("batchSize", 32);
-        trainingConfig.put("learningRate", 0.01);
-        createRequest.put("trainingConfig", trainingConfig);
+        // v1.3必需：数据集配置
+        Map<String, Object> datasetConfig = new HashMap<>();
+        datasetConfig.put("datasetId", originalDatasetId);  // 使用原始数据集ID
+        datasetConfig.put("distributionStrategy", "BALANCED"); // 平衡分配策略
+        datasetConfig.put("validationSplit", 0.2);
+        datasetConfig.put("testSplit", 0.1);
+        createRequest.put("datasetConfig", datasetConfig);
+
+        // v1.3必需：参与者配置
+        Map<String, Object> participantConfig = new HashMap<>();
+        participantConfig.put("selectionMode", "MANUAL"); // 手动选择模式
+
+        // 构建参与者列表
+        List<Map<String, Object>> participants = new ArrayList<>();
+        for (String vmId : registeredVmIds) {
+            Map<String, Object> participant = new HashMap<>();
+            participant.put("vmId", vmId);
+            participant.put("role", "PARTICIPANT");
+            participant.put("dataRatio", 1.0 / registeredVmIds.size()); // 均分数据
+            participants.add(participant);
+        }
+        participantConfig.put("participants", participants);
+        createRequest.put("participantConfig", participantConfig);
+
+        // 超参数配置（可选）
+        Map<String, Object> hyperparameters = new HashMap<>();
+        hyperparameters.put("learningRate", 0.01);
+        hyperparameters.put("batchSize", 32);
+        hyperparameters.put("epochs", 3);
+        hyperparameters.put("rounds", 5); // 聚合轮数
+        hyperparameters.put("minParticipants", 3);
+        createRequest.put("hyperparameters", hyperparameters);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -442,6 +468,23 @@ public class CompleteFederatedLearningFlowTestV15 {
     void test09_TaskStartFlowV15() throws InterruptedException {
         System.out.println("\n🚀 步骤9：任务启动流程测试 (v1.5)");
 
+        // 调用启动任务API
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminAccessToken);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Result<TaskOperationVO>> startResponse = restTemplate.exchange(
+            baseUrl + "/api/federated/tasks/" + taskId + "/start",
+            HttpMethod.POST,
+            entity,
+            new ParameterizedTypeReference<Result<TaskOperationVO>>() {}
+        );
+
+        assertThat(startResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(startResponse.getBody()).isNotNull();
+        assertThat(startResponse.getBody().getCode()).isEqualTo(200);
+        System.out.println("✅ 任务已启动，状态变更为 RUNNING");
+
         // 等待后端发送任务启动确认
         Thread.sleep(2000);
 
@@ -525,6 +568,11 @@ public class CompleteFederatedLearningFlowTestV15 {
         }
 
         System.out.println("✅ 模型聚合验证完成 (v1.5)");
+
+        // 更新任务状态为已完成（模拟联邦学习完成后的状态更新）
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        tasksMapper.updateTaskStatus(taskId, "COMPLETED", now);
+        System.out.println("✅ 任务状态已更新为 COMPLETED");
     }
 
     /**
