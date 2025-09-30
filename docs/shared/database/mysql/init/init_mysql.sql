@@ -121,7 +121,11 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
                                                lifecycle_status ENUM('CREATED', 'RUNNING', 'STOPPED', 'RESUMED', 'DELETED') DEFAULT 'CREATED' COMMENT 'v1.4任务生命周期状态',
                                                supports_multi_task BOOLEAN DEFAULT TRUE COMMENT '是否支持多任务并发',
                                                resume_info JSON NULL COMMENT '恢复信息',
-                                               version BIGINT DEFAULT 1 COMMENT '乐观锁版本号'
+                                               version BIGINT DEFAULT 1 COMMENT '乐观锁版本号',
+    -- v1.3/v1.5.1新增字段：数据集分发配置
+                                               dataset_id VARCHAR(32) NULL COMMENT '关联数据集ID(32位UUID)',
+                                               distribution_strategy VARCHAR(50) NULL COMMENT '数据分发策略(IID/RATIO/NON_IID)',
+                                               INDEX idx_federated_tasks_dataset_id (dataset_id)
 );
 
 -- 4. 训练数据集元信息表 (training_dataset，原training_data)
@@ -661,7 +665,7 @@ CREATE TABLE IF NOT EXISTS task_participants (
 
     -- v1.3 扩展字段
                                                  participant_id VARCHAR(50) COMMENT '参与者标识',
-                                                 data_ratio DECIMAL(5,4) COMMENT '数据比例',
+                                                 data_ratio INT COMMENT 'v1.5.1.1数据分配千分比权重(1-1000整数，同任务所有参与者总和=1000，700表示占70%数据)',
                                                  capabilities JSON COMMENT '能力列表(JSON格式)',
                                                  max_cpu_usage INT COMMENT '最大CPU使用率',
                                                  max_memory_usage INT COMMENT '最大内存使用率',

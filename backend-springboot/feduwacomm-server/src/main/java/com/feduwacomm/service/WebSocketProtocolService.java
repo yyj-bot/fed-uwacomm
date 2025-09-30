@@ -5,6 +5,9 @@ import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.dto.ProtocolType;
 import com.feduwacomm.dto.DatasetSlice;
 import com.feduwacomm.dto.DatasetQueryResult;
+import com.feduwacomm.dto.SliceInfo;
+import com.feduwacomm.dto.SliceVerification;
+import com.feduwacomm.dto.VerificationResult;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
 import com.feduwacomm.enums.FederatedAlgorithm;
@@ -71,6 +74,8 @@ public class WebSocketProtocolService {
     private final VmAckTracker vmAckTracker;
     private final RoundLockManager roundLockManager;
     private final WebSocketMessageSender messageSender;
+    private final DataDistributionService dataDistributionService;  // v1.5.1: 数据分发服务
+    private final SliceVerificationService sliceVerificationService;  // v1.5.1: 切片验证服务
 
     // in-memory VM 最新状态缓存：vmId -> STATUS_RESPONSE.data（用于快速读，不作为数据源）
     private final ConcurrentHashMap<String, Map<String, Object>> statusCache = new ConcurrentHashMap<>();
@@ -93,7 +98,9 @@ public class WebSocketProtocolService {
                                     RoundStateManager roundStateManager,
                                     VmAckTracker vmAckTracker,
                                     RoundLockManager roundLockManager,
-                                    WebSocketMessageSender messageSender) {
+                                    WebSocketMessageSender messageSender,
+                                    DataDistributionService dataDistributionService,  // v1.5.1: 数据分发服务
+                                    SliceVerificationService sliceVerificationService) {  // v1.5.1: 切片验证服务
         this.messagingTemplate = messagingTemplate;
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
@@ -113,6 +120,8 @@ public class WebSocketProtocolService {
         this.vmAckTracker = vmAckTracker;
         this.roundLockManager = roundLockManager;
         this.messageSender = messageSender;
+        this.dataDistributionService = dataDistributionService;  // v1.5.1
+        this.sliceVerificationService = sliceVerificationService;  // v1.5.1
     }
 
     public ProtocolAck handle(ProtocolMessage msg) {
@@ -2029,8 +2038,12 @@ public class WebSocketProtocolService {
         Map<String, Object> finalStats = (Map<String, Object>) valueAsObject(data, "finalStats");
         String checksum = valueAsString(data, "checksum");
 
-        log.info("收到数据集完成通知: vmId={}, datasetId={}, checksum={}",
-                vmId, datasetId, checksum);
+        // 🆕 v1.5.1: 解析SliceVerification
+        @SuppressWarnings("unchecked")
+        Map<String, Object> verificationMap = (Map<String, Object>) valueAsObject(data, "sliceVerification");
+
+        log.info("收到数据集完成通知: vmId={}, datasetId={}, checksum={}, hasVerification={}",
+                vmId, datasetId, checksum, verificationMap != null);
 
         try {
             // 验证参数
@@ -2056,6 +2069,35 @@ public class WebSocketProtocolService {
                 ));
             }
 
+            // 🆕 v1.5.1: 验证数据完整性
+            VerificationResult verificationResult = null;
+            if (verificationMap != null) {
+                // 将Map转换为SliceVerification对象
+                SliceVerification verification = objectMapper.convertValue(verificationMap, SliceVerification.class);
+
+                // 从数据库或缓存获取expectedSliceInfo
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sliceInfoMap = (Map<String, Object>) datasetInfo.get("sliceInfo");
+                if (sliceInfoMap != null) {
+                    SliceInfo expectedSliceInfo = objectMapper.convertValue(sliceInfoMap, SliceInfo.class);
+
+                    // 调用SliceVerificationService进行验证
+                    verificationResult = sliceVerificationService.verifySliceVerification(
+                        vmId,
+                        verification,
+                        expectedSliceInfo
+                    );
+
+                    log.info("数据完整性验证完成: vmId={}, isValid={}, missingRate={}, decision={}",
+                        vmId, verificationResult.getIsValid(),
+                        String.format("%.2f%%", verificationResult.getMissingRate() * 100),
+                        verificationResult.getRecommendedDecision());
+
+                    // 保存验证结果到缓存
+                    datasetInfo.put("verificationResult", verificationResult);
+                }
+            }
+
             // 更新数据集状态为完成
             datasetInfo.put("status", "COMPLETED");
             datasetInfo.put("completeTime", Instant.now().toString());
@@ -2068,16 +2110,39 @@ public class WebSocketProtocolService {
             String datasetName = (String) datasetInfo.get("datasetName");
             String createTime = (String) datasetInfo.get("createTime");
 
-            log.info("数据集已完成: vmId={}, datasetId={}, totalRows={}", vmId, datasetId, totalRows);
+            log.info("数据集已完成: vmId={}, datasetId={}, totalRows={}, verified={}",
+                vmId, datasetId, totalRows, verificationResult != null);
 
-            return ackFor(msg, ProtocolType.DATASET_COMPLETE_ACK, mapOf(
-                "datasetId", datasetId,
-                "status", "SUCCESS",
-                "totalRows", totalRows,
-                "completeTime", Instant.now().toString(),
-                "checksum", checksum,
-                "message", "数据集完成确认"
-            ));
+            // 构建响应
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("datasetId", datasetId);
+            responseData.put("status", "SUCCESS");
+            responseData.put("totalRows", totalRows);
+            responseData.put("completeTime", Instant.now().toString());
+            responseData.put("checksum", checksum);
+            responseData.put("message", "数据集完成确认");
+
+            // 🆕 v1.5.1: 添加验证结果到响应
+            if (verificationResult != null) {
+                responseData.put("verificationPassed", verificationResult.getIsValid());
+                responseData.put("missingRate", verificationResult.getMissingRate());
+                responseData.put("recommendedDecision", verificationResult.getRecommendedDecision().getCode());
+
+                // 如果验证失败，添加详细信息
+                if (!Boolean.TRUE.equals(verificationResult.getIsValid())) {
+                    responseData.put("verificationMessage", verificationResult.getMessage());
+                    responseData.put("missingCount", verificationResult.getMissingCount());
+                    if (verificationResult.getMissingIndices() != null && !verificationResult.getMissingIndices().isEmpty()) {
+                        // 只返回前10个缺失索引示例
+                        List<Integer> sampleMissing = verificationResult.getMissingIndices().stream()
+                            .limit(10)
+                            .collect(Collectors.toList());
+                        responseData.put("sampleMissingIndices", sampleMissing);
+                    }
+                }
+            }
+
+            return ackFor(msg, ProtocolType.DATASET_COMPLETE_ACK, responseData);
 
         } catch (Exception e) {
             log.error("处理数据集完成失败: vmId={}, datasetId={}, error={}", vmId, datasetId, e.getMessage(), e);

@@ -45,6 +45,9 @@
         <result property="finalResults" column="final_results"/>
         <result property="modelInfo" column="model_info"/>
         <result property="version" column="version"/>
+        <!-- v1.3/v1.5.1 新增字段 -->
+        <result property="datasetId" column="dataset_id"/>
+        <result property="distributionStrategy" column="distribution_strategy"/>
     </resultMap>
 
     <resultMap id="ParticipantResultMap" type="com.feduwacomm.entity.TaskParticipant">
@@ -74,13 +77,13 @@
     <!-- Task CRUD operations -->
     <insert id="insertTask" parameterType="com.feduwacomm.entity.FederatedTask">
         INSERT INTO federated_tasks (
-            id, name, algorithm, status, total_rounds, current_round, 
-            batch_size, learning_rate, mu, created_at, updated_at, 
-            started_at, completed_at, config
+            id, name, algorithm, status, total_rounds, current_round,
+            batch_size, learning_rate, mu, created_at, updated_at,
+            started_at, completed_at, config, dataset_id, distribution_strategy
         ) VALUES (
             #{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound},
             #{batchSize}, #{learningRate}, #{learningRate}, #{createdAt}, #{updatedAt},
-            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON)
+            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON), #{datasetId}, #{distributionStrategy}
         )
     </insert>
 

@@ -78,6 +78,14 @@ public class MockVirtualMachine {
     // 🆕 v1.5新增字段：消息历史（用于测试验证）
     private final List<Map<String, Object>> v15ReceivedMessages = Collections.synchronizedList(new ArrayList<>());
 
+    // 🆕 v1.5.1新增字段：切片信息和验证
+    private final Map<String, Map<String, Object>> assignedDatasetSliceInfo = new ConcurrentHashMap<>();  // assignedDatasetId -> sliceInfo
+    private final Map<String, List<Integer>> assignedDatasetReceivedIndices = new ConcurrentHashMap<>();  // assignedDatasetId -> receivedIndices列表
+    private final Map<String, Integer> assignedDatasetExpectedSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 预期样本数
+    private final Map<String, Integer> assignedDatasetActualSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 实际接收样本数
+    private final Map<String, List<Map<String, Object>>> assignedDatasetBatchRanges = new ConcurrentHashMap<>();  // assignedDatasetId -> BatchRange列表
+    private String latestAssignedDatasetId;  // 最新的assignedDatasetId，用于测试
+
     // 协议违规和失败模拟相关字段
     private int protocolViolationCount = 0; // 协议违规计数
     private boolean simulateUploadFailure = false; // 是否模拟上传失败
@@ -3860,14 +3868,42 @@ public class MockVirtualMachine {
         String assignedDatasetId = (String) data.get("assignedDatasetId");
         String datasetType = (String) data.get("datasetType");
 
-        log.info("🤖 [{}] 处理数据集创建: assignedDatasetId={}, type={}",
-                vmData.getName(), assignedDatasetId, datasetType);
+        // 🆕 v1.5.1: 接收sliceInfo
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sliceInfo = (Map<String, Object>) data.get("sliceInfo");
+
+        log.info("🤖 [{}] 处理数据集创建: assignedDatasetId={}, type={}, hasSliceInfo={}",
+                vmData.getName(), assignedDatasetId, datasetType, sliceInfo != null);
 
         // 模拟数据集创建
         assignedDatasetStatusMap.put(assignedDatasetId, "CREATING");
         String localPath = "/data/assigned/" + assignedDatasetId;
         assignedDatasetLocalPaths.put(assignedDatasetId, localPath);
         backendAssignedDatasetIds.add(assignedDatasetId);
+
+        // 🆕 v1.5.1: 保存sliceInfo并初始化验证数据结构
+        if (sliceInfo != null) {
+            assignedDatasetSliceInfo.put(assignedDatasetId, sliceInfo);
+
+            // 提取预期样本数
+            Integer expectedSamples = (Integer) sliceInfo.get("sliceSamples");
+            if (expectedSamples != null) {
+                assignedDatasetExpectedSamples.put(assignedDatasetId, expectedSamples);
+            }
+
+            // 初始化接收索引列表和BatchRange列表
+            assignedDatasetReceivedIndices.put(assignedDatasetId, new ArrayList<>());
+            assignedDatasetActualSamples.put(assignedDatasetId, 0);
+            assignedDatasetBatchRanges.put(assignedDatasetId, new ArrayList<>());
+
+            // 更新最新的assignedDatasetId
+            this.latestAssignedDatasetId = assignedDatasetId;
+
+            Integer startIndex = (Integer) sliceInfo.get("startIndex");
+            Integer endIndex = (Integer) sliceInfo.get("endIndex");
+            log.info("🤖 [{}] SliceInfo已保存: assignedDatasetId={}, startIndex={}, endIndex={}, expectedSamples={}",
+                    vmData.getName(), assignedDatasetId, startIndex, endIndex, expectedSamples);
+        }
 
         // 发送创建确认
         sendDatasetCreateAckV15(assignedDatasetId, "SUCCESS");
@@ -3882,18 +3918,68 @@ public class MockVirtualMachine {
         String assignedDatasetId = (String) data.get("assignedDatasetId");
         Integer rowCount = (Integer) data.get("rowCount");
 
-        log.info("🤖 [{}] 处理数据集行追加: assignedDatasetId={}, rowCount={}",
-                vmData.getName(), assignedDatasetId, rowCount);
+        // 🆕 v1.5.1: 接收batchRange和rows
+        @SuppressWarnings("unchecked")
+        Map<String, Object> batchRange = (Map<String, Object>) data.get("batchRange");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) data.get("rows");
+
+        log.info("🤖 [{}] 处理数据集行追加: assignedDatasetId={}, rowCount={}, hasBatchRange={}, actualRows={}",
+                vmData.getName(), assignedDatasetId, rowCount, batchRange != null, rows != null ? rows.size() : 0);
 
         // 更新数据集状态为追加中
         assignedDatasetStatusMap.put(assignedDatasetId, "APPENDING");
+
+        // 🆕 v1.5.1: 记录接收的数据行索引
+        if (rows != null && !rows.isEmpty()) {
+            List<Integer> receivedIndices = assignedDatasetReceivedIndices.computeIfAbsent(
+                assignedDatasetId, k -> new ArrayList<>()
+            );
+
+            // 从每行数据中提取globalIndex
+            for (Map<String, Object> row : rows) {
+                Integer globalIndex = (Integer) row.get("globalIndex");
+                if (globalIndex != null) {
+                    receivedIndices.add(globalIndex);
+                }
+            }
+
+            // 更新实际接收样本数
+            int currentCount = assignedDatasetActualSamples.getOrDefault(assignedDatasetId, 0);
+            assignedDatasetActualSamples.put(assignedDatasetId, currentCount + rows.size());
+
+            log.debug("🤖 [{}] 记录接收索引: assignedDatasetId={}, 本批次={}, 累计={}",
+                    vmData.getName(), assignedDatasetId, rows.size(), currentCount + rows.size());
+        }
+
+        // 🆕 v1.5.1: 保存batchRange并验证
+        if (batchRange != null) {
+            // 保存batchRange到列表
+            List<Map<String, Object>> batchRanges = assignedDatasetBatchRanges.computeIfAbsent(
+                assignedDatasetId, k -> new ArrayList<>()
+            );
+            batchRanges.add(batchRange);
+
+            Integer startIndex = (Integer) batchRange.get("startIndex");
+            Integer endIndex = (Integer) batchRange.get("endIndex");
+            Integer batchSamples = (Integer) batchRange.get("batchSamples");
+
+            log.debug("🤖 [{}] BatchRange: startIndex={}, endIndex={}, batchSamples={}",
+                    vmData.getName(), startIndex, endIndex, batchSamples);
+
+            // 这里可以添加验证逻辑，检查接收的行数是否与batchSamples匹配
+            if (rows != null && batchSamples != null && rows.size() != batchSamples) {
+                log.warn("🤖 [{}] BatchRange样本数不匹配: 期望={}, 实际={}",
+                        vmData.getName(), batchSamples, rows.size());
+            }
+        }
 
         // 发送追加确认
         sendDatasetAppendRowsAckV15(assignedDatasetId, "SUCCESS");
     }
 
     /**
-     * 处理数据集完成协议 (DATASET_COMPLETE)
+     * 处理数据集完成协议 (DATASET_COMPLETE) - v1.5.1增强版
      */
     private void handleDatasetCompleteV15(Map<String, Object> messageData) throws Exception {
         @SuppressWarnings("unchecked")
@@ -3906,8 +3992,103 @@ public class MockVirtualMachine {
         // 更新数据集状态为已完成
         assignedDatasetStatusMap.put(assignedDatasetId, "READY");
 
-        // 发送完成确认
-        sendDatasetCompleteAckV15(assignedDatasetId, "SUCCESS");
+        // 🆕 v1.5.1: 生成SliceVerification
+        Map<String, Object> sliceVerification = generateSliceVerification(assignedDatasetId);
+
+        // 发送完成确认，包含SliceVerification
+        sendDatasetCompleteAckV15(assignedDatasetId, "SUCCESS", sliceVerification);
+    }
+
+    /**
+     * 🆕 v1.5.1: 生成SliceVerification
+     * 根据接收的数据计算完整性验证信息
+     */
+    private Map<String, Object> generateSliceVerification(String assignedDatasetId) {
+        Map<String, Object> verification = new HashMap<>();
+
+        // 获取sliceInfo
+        Map<String, Object> sliceInfo = assignedDatasetSliceInfo.get(assignedDatasetId);
+        if (sliceInfo == null) {
+            log.warn("🤖 [{}] 未找到sliceInfo: assignedDatasetId={}", vmData.getName(), assignedDatasetId);
+            return null;
+        }
+
+        Integer expectedStartIndex = (Integer) sliceInfo.get("startIndex");
+        Integer expectedEndIndex = (Integer) sliceInfo.get("endIndex");
+        Integer expectedSamples = (Integer) sliceInfo.get("sliceSamples");
+
+        // 获取实际接收的数据
+        List<Integer> receivedIndices = assignedDatasetReceivedIndices.getOrDefault(assignedDatasetId, new ArrayList<>());
+        Integer actualSamples = assignedDatasetActualSamples.getOrDefault(assignedDatasetId, 0);
+
+        // 计算缺失索引
+        List<Integer> missingIndices = new ArrayList<>();
+        if (expectedStartIndex != null && expectedEndIndex != null) {
+            Set<Integer> receivedSet = new HashSet<>(receivedIndices);
+            for (int i = expectedStartIndex; i <= expectedEndIndex; i++) {
+                if (!receivedSet.contains(i)) {
+                    missingIndices.add(i);
+                }
+            }
+        }
+
+        // 检查连续性
+        Map<String, Object> continuityCheck = checkContinuity(receivedIndices);
+
+        // 构建SliceVerification对象
+        verification.put("actualSamples", actualSamples);
+        verification.put("actualStartIndex", expectedStartIndex);
+        verification.put("actualEndIndex", expectedEndIndex);
+        verification.put("missingIndices", missingIndices);
+        verification.put("continuityCheck", continuityCheck);
+
+        log.info("🤖 [{}] SliceVerification已生成: assignedDatasetId={}, actualSamples={}, missingCount={}, hasContinuity={}",
+                vmData.getName(), assignedDatasetId, actualSamples, missingIndices.size(),
+                (Boolean) continuityCheck.get("isContinuous"));
+
+        return verification;
+    }
+
+    /**
+     * 🆕 v1.5.1: 检查数据连续性
+     */
+    private Map<String, Object> checkContinuity(List<Integer> receivedIndices) {
+        Map<String, Object> continuityCheck = new HashMap<>();
+
+        if (receivedIndices == null || receivedIndices.isEmpty()) {
+            continuityCheck.put("isContinuous", false);
+            continuityCheck.put("gapRanges", new ArrayList<>());
+            return continuityCheck;
+        }
+
+        // 排序索引
+        List<Integer> sorted = new ArrayList<>(receivedIndices);
+        Collections.sort(sorted);
+
+        // 检查间隙
+        List<Map<String, Object>> gapRanges = new ArrayList<>();
+        for (int i = 1; i < sorted.size(); i++) {
+            int prev = sorted.get(i - 1);
+            int curr = sorted.get(i);
+
+            if (curr - prev > 1) {
+                // 发现间隙
+                Map<String, Object> gap = new HashMap<>();
+                gap.put("startIndex", prev + 1);
+                gap.put("endIndex", curr - 1);
+                gapRanges.add(gap);
+            }
+        }
+
+        boolean isContinuous = gapRanges.isEmpty();
+        continuityCheck.put("isContinuous", isContinuous);
+        continuityCheck.put("gapRanges", gapRanges);
+
+        if (!isContinuous) {
+            log.debug("🤖 [{}] 检测到{}个数据间隙", vmData.getName(), gapRanges.size());
+        }
+
+        return continuityCheck;
     }
 
     /**
@@ -3977,7 +4158,7 @@ public class MockVirtualMachine {
                 vmData.getName(), assignedDatasetId, status);
     }
 
-    private void sendDatasetCompleteAckV15(String assignedDatasetId, String status) throws Exception {
+    private void sendDatasetCompleteAckV15(String assignedDatasetId, String status, Map<String, Object> sliceVerification) throws Exception {
         Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.DATASET_COMPLETE_ACK);
         Map<String, Object> data = new HashMap<>();
         data.put("vmId", vmData.getVmId());
@@ -3985,10 +4166,20 @@ public class MockVirtualMachine {
         data.put("status", status);
         data.put("completeTime", Instant.now().toString());
 
+        // 🆕 v1.5.1: 添加SliceVerification
+        if (sliceVerification != null) {
+            data.put("sliceVerification", sliceVerification);
+            log.info("🤖 [{}] 发送DATASET_COMPLETE_ACK包含SliceVerification: assignedDatasetId={}, status={}, actualSamples={}, missingCount={}",
+                    vmData.getName(), assignedDatasetId, status,
+                    sliceVerification.get("actualSamples"),
+                    ((List<?>) sliceVerification.get("missingIndices")).size());
+        } else {
+            log.info("🤖 [{}] 发送DATASET_COMPLETE_ACK: assignedDatasetId={}, status={}",
+                    vmData.getName(), assignedDatasetId, status);
+        }
+
         ackMessage.put("data", data);
         sendStompMessage(ackMessage);
-        log.info("🤖 [{}] 发送DATASET_COMPLETE_ACK: assignedDatasetId={}, status={}",
-                vmData.getName(), assignedDatasetId, status);
     }
 
     private void sendDatasetStatusResponseV15(String assignedDatasetId, String status) throws Exception {
@@ -4069,5 +4260,45 @@ public class MockVirtualMachine {
 
     public String getAccessToken() {
         return this.accessToken;
+    }
+
+    // 🆕 v1.5.1测试辅助方法：获取最新数据集的信息
+
+    /**
+     * 获取最新数据集的assignedDatasetId
+     */
+    public String getLatestAssignedDatasetId() {
+        return this.latestAssignedDatasetId;
+    }
+
+    /**
+     * 获取最新数据集的SliceInfo
+     */
+    public Map<String, Object> getSliceInfoForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return null;
+        }
+        return assignedDatasetSliceInfo.get(latestAssignedDatasetId);
+    }
+
+    /**
+     * 获取最新数据集的所有BatchRange
+     */
+    public List<Map<String, Object>> getBatchRangesForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> ranges = assignedDatasetBatchRanges.get(latestAssignedDatasetId);
+        return ranges != null ? ranges : Collections.emptyList();
+    }
+
+    /**
+     * 获取最新数据集的SliceVerification
+     */
+    public Map<String, Object> getSliceVerificationForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return null;
+        }
+        return generateSliceVerification(latestAssignedDatasetId);
     }
 }

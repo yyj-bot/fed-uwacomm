@@ -100,6 +100,12 @@ public class WebSocketProtocolServiceTest {
     @Mock
     private WebSocketMessageSender webSocketMessageSender;
 
+    @Mock
+    private DataDistributionService dataDistributionService;  // v1.5.1新增
+
+    @Mock
+    private SliceVerificationService sliceVerificationService;  // v1.5.1新增
+
     private WebSocketProtocolService protocolService;
 
     private ProtocolMessage sampleMessage;
@@ -110,7 +116,8 @@ public class WebSocketProtocolServiceTest {
         reset(messagingTemplate, trainingDatasetMapper, trainingDatasetRowMapper,
             federatedTasksMapper, vmRoundModelsMapper, vmInstancesMapper, taskParticipantsMapper,
             userMapper, objectMapper, eventPublisher, uuidUtil, messageBuilder, messageIdGenerator,
-            digitalSignatureService, metricsCacheService, roundStateManager, vmAckTracker, roundLockManager, webSocketMessageSender);
+            digitalSignatureService, metricsCacheService, roundStateManager, vmAckTracker, roundLockManager,
+            webSocketMessageSender, dataDistributionService, sliceVerificationService);  // v1.5.1: 添加新服务
 
         // 创建服务实例
         protocolService = new WebSocketProtocolService(
@@ -132,7 +139,9 @@ public class WebSocketProtocolServiceTest {
             roundStateManager,
             vmAckTracker,
             roundLockManager,
-            webSocketMessageSender
+            webSocketMessageSender,
+            dataDistributionService,      // v1.5.1: 数据分发服务
+            sliceVerificationService      // v1.5.1: 切片验证服务
         );
 
         // 准备测试数据

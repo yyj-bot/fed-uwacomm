@@ -94,7 +94,8 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     @EventListener
     @Transactional
     public void onTaskCreated(FederatedTaskCreatedEvent event) {
-        log.info("收到任务创建事件，开始自动启动工作流: taskId={}", event.getTaskId());
+        System.out.println("🔥🔥🔥 onTaskCreated被调用: taskId=" + event.getTaskId());
+        log.info("🔥🔥🔥 收到任务创建事件，开始自动启动工作流: taskId={}", event.getTaskId());
         
         try {
             // 创建工作流实例
@@ -135,7 +136,8 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     @Async
     @Transactional
     public void startWorkflowExecution(OrchestrationWorkflow workflow) {
-        log.info("开始执行工作流: workflowId={}, taskId={}", workflow.getId(), workflow.getTaskId());
+        System.out.println("🔥🔥🔥 startWorkflowExecution被调用: workflowId=" + workflow.getId() + ", taskId=" + workflow.getTaskId());
+        log.info("🔥🔥🔥 开始执行工作流: workflowId={}, taskId={}", workflow.getId(), workflow.getTaskId());
         
         // 更新工作流状态为执行中
         workflow.setStatus(OrchestrationWorkflow.WorkflowStatus.IN_PROGRESS);

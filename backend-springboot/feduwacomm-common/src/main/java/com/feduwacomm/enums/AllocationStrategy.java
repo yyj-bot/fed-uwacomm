@@ -74,7 +74,35 @@ public enum AllocationStrategy {
      * - VM4: 类别3数据[6000-7999]     (2000个样本，单一类别)
      * - VM5: 类别4数据[8000-9999]     (2000个样本，单一类别)
      */
-    NON_IID("NON_IID", "Non-Independent and Identically Distributed", "非独立同分布");
+    NON_IID("NON_IID", "Non-Independent and Identically Distributed", "非独立同分布"),
+
+    /**
+     * RATIO (Ratio-based Distribution) - 按比例分配
+     *
+     * <p>特点：
+     * <ul>
+     *   <li>根据预定义的比例分配数据</li>
+     *   <li>每个VM接收的数据样本数量按比例计算</li>
+     *   <li>支持自定义比例（如7:2:1）</li>
+     *   <li>适用于非均匀算力场景（不同VM配置不同）</li>
+     * </ul>
+     *
+     * <p>分配算法：
+     * <pre>
+     * ratios = [7, 2, 1]  // 比例配置
+     * ratioSum = 7 + 2 + 1 = 10
+     * VM1样本数 = totalSamples * 7/10
+     * VM2样本数 = totalSamples * 2/10
+     * VM3样本数 = totalSamples * 1/10
+     * </pre>
+     *
+     * <p>示例（7:2:1比例）：
+     * 10000样本分给3个VM：
+     * - VM1: [0-6999]      (7000个样本，70%)
+     * - VM2: [7000-8999]   (2000个样本，20%)
+     * - VM3: [9000-9999]   (1000个样本，10%)
+     */
+    RATIO("RATIO", "Ratio-based Distribution", "按比例分配");
 
     /**
      * 策略代码（用于协议传输）
@@ -138,6 +166,15 @@ public enum AllocationStrategy {
      */
     public boolean isNonIID() {
         return this == NON_IID;
+    }
+
+    /**
+     * 判断是否为RATIO策略
+     *
+     * @return true if 策略为RATIO
+     */
+    public boolean isRatio() {
+        return this == RATIO;
     }
 
     @Override

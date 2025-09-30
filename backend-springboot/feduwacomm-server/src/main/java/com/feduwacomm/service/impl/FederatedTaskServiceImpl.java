@@ -1473,6 +1473,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 构建v1.3任务实体
         FederatedTask task = buildSmartTaskFromCreateDTO(createDTO, taskId, createdBy, now);
+        System.out.println("🔥🔥🔥 准备插入任务: taskId=" + taskId + ", datasetId=" + task.getDatasetId() + ", strategy=" + task.getDistributionStrategy());
 
         // 插入任务记录
         int result = tasksMapper.insertTask(task);

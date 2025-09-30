@@ -46,13 +46,16 @@ public class IIDDataSlicingServiceImpl implements DataSlicingService {
     private final TrainingDatasetMapper trainingDatasetMapper;
     private final TrainingDatasetRowMapper trainingDatasetRowMapper;
     private final UuidUtil uuidUtil;
+    private final RatioDataSlicingServiceImpl ratioDataSlicingService;
 
     public IIDDataSlicingServiceImpl(TrainingDatasetMapper trainingDatasetMapper,
                                       TrainingDatasetRowMapper trainingDatasetRowMapper,
-                                      UuidUtil uuidUtil) {
+                                      UuidUtil uuidUtil,
+                                      RatioDataSlicingServiceImpl ratioDataSlicingService) {
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
         this.uuidUtil = uuidUtil;
+        this.ratioDataSlicingService = ratioDataSlicingService;
     }
 
     @Override
@@ -71,79 +74,22 @@ public class IIDDataSlicingServiceImpl implements DataSlicingService {
             throw new IllegalArgumentException("IIDDataSlicingService仅支持IID策略");
         }
 
-        log.info("开始IID数据切分: datasetId={}, vmCount={}, strategy={}",
+        log.info("开始IID数据切分(复用RATIO逻辑): datasetId={}, vmCount={}, strategy={}",
                 datasetId, vmIds.size(), strategy);
 
-        // 2. 获取数据集大小
-        int totalSamples = getDatasetSize(datasetId);
-        if (totalSamples == 0) {
-            throw new DataSlicingException("数据集为空，无法切分: datasetId=" + datasetId);
+        // 2. 生成均等比例（所有比例都是1）
+        List<Integer> equalRatios = new ArrayList<>();
+        for (int i = 0; i < vmIds.size(); i++) {
+            equalRatios.add(1);
         }
 
-        int vmCount = vmIds.size();
-        if (vmCount > totalSamples) {
-            log.warn("虚拟机数量({})大于样本数量({})，部分VM将不分配数据", vmCount, totalSamples);
-        }
+        // 3. 复用ratio分配逻辑
+        // IID策略本质上就是1:1:1:...的ratio分配
+        List<DataSliceResult> results = ratioDataSlicingService.sliceDatasetByRatio(
+                datasetId, vmIds, equalRatios, strategy);
 
-        // 3. 计算切分参数
-        int baseSize = totalSamples / vmCount;  // 基础切片大小
-        int remainder = totalSamples % vmCount; // 余数
-
-        log.debug("切分参数: totalSamples={}, baseSize={}, remainder={}",
-                totalSamples, baseSize, remainder);
-
-        // 4. 为每个VM生成切片
-        List<DataSliceResult> results = new ArrayList<>();
-        int currentIndex = 0;
-
-        for (int i = 0; i < vmCount; i++) {
-            String vmId = vmIds.get(i);
-
-            // 前remainder个VM多分配1个样本
-            int sliceSize = baseSize + (i < remainder ? 1 : 0);
-
-            // 处理VM数量 > 样本数量的情况
-            if (currentIndex >= totalSamples) {
-                log.warn("VM {} 未分配数据（样本已全部分配）", vmId);
-                continue;
-            }
-
-            int startIndex = currentIndex;
-            int endIndex = Math.min(currentIndex + sliceSize - 1, totalSamples - 1);
-            int actualSize = endIndex - startIndex + 1;
-
-            // 5. 生成SliceInfo
-            SliceInfo sliceInfo = generateSliceInfo(
-                    i + 1,          // sliceIndex (从1开始)
-                    startIndex,
-                    endIndex,
-                    totalSamples,
-                    vmCount,
-                    strategy
-            );
-
-            // 6. 生成assignedDatasetId
-            String assignedDatasetId = uuidUtil.generateUuid();
-
-            // 7. 创建切片结果
-            DataSliceResult result = DataSliceResult.builder()
-                    .vmId(vmId)
-                    .sliceInfo(sliceInfo)
-                    .assignedDatasetId(assignedDatasetId)
-                    .build();
-
-            results.add(result);
-
-            log.debug("VM {} 切片生成: [{}-{}], size={}, assignedDatasetId={}",
-                    vmId, startIndex, endIndex, actualSize, assignedDatasetId);
-
-            currentIndex += actualSize;
-        }
-
-        // 8. 验证切片完整性
-        validateSlicesCoverage(results, totalSamples);
-
-        log.info("IID数据切分完成: 总样本数={}, 切片数={}", totalSamples, results.size());
+        log.info("IID数据切分完成(复用RATIO): 总样本数={}, 切片数={}",
+                getDatasetSize(datasetId), results.size());
 
         return results;
     }
