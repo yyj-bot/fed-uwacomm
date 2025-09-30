@@ -38,10 +38,12 @@ from scipy import stats
 class ModelEvaluator:
     """增强版模型评估器，符合水声联邦学习系统要求"""
     
-    def __init__(self, models_dir: str = "models", results_dir: str = "results"):
+    def __init__(self, models_dir: str = "models", results_dir: str = "results", 
+                 enable_performance_monitoring: bool = True):
         self.models_dir = Path(models_dir)
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(parents=True, exist_ok=True)
+        self.enable_performance_monitoring = enable_performance_monitoring
         
         # 创建子目录
         self.reports_dir = self.results_dir / "reports"
@@ -59,6 +61,13 @@ class ModelEvaluator:
         self.evaluation_results = {}
         self.round_metrics = {}  # 联邦学习轮次指标
         
+        # 性能监控
+        self.performance_stats = {
+            'evaluation_count': 0,
+            'total_evaluation_time': 0,
+            'memory_usage_peak': 0
+        } if enable_performance_monitoring else None
+        
         # 水声通信任务的标准评估指标
         self.underwater_metrics = {
             'signal_quality': ['snr_improvement', 'ber_reduction', 'channel_estimation_accuracy'],
@@ -66,10 +75,64 @@ class ModelEvaluator:
             'environmental_adaptation': ['depth_variance_tolerance', 'salinity_adaptation', 'temperature_robustness']
         }
     
-    def evaluate_regression_comprehensive(self, y_true: np.ndarray, y_pred: np.ndarray, 
-                                        model_name: str = "model") -> Dict[str, float]:
+    def _validate_input_data(self, y_true: np.ndarray, y_pred: np.ndarray) -> bool:
+        """验证输入数据的有效性"""
+        if len(y_true) == 0 or len(y_pred) == 0:
+            self.logger.error("输入数据为空")
+            return False
+        
+        if len(y_true) != len(y_pred):
+            self.logger.error(f"真实值和预测值长度不匹配: {len(y_true)} vs {len(y_pred)}")
+            return False
+        
+        if np.any(np.isnan(y_true)) or np.any(np.isnan(y_pred)):
+            self.logger.warning("输入数据包含NaN值")
+            return False
+        
+        if np.any(np.isinf(y_true)) or np.any(np.isinf(y_pred)):
+            self.logger.warning("输入数据包含无穷值")
+            return False
+        
+        return True
+    
+    def _monitor_performance(self, func_name: str):
+        """性能监控装饰器"""
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                if not self.enable_performance_monitoring:
+                    return func(*args, **kwargs)
+                
+                import time
+                import psutil
+                import os
+                
+                start_time = time.time()
+                start_memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024  # MB
+                
+                result = func(*args, **kwargs)
+                
+                end_time = time.time()
+                end_memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024  # MB
+                
+                execution_time = end_time - start_time
+                memory_used = end_memory - start_memory
+                
+                self.performance_stats['evaluation_count'] += 1
+                self.performance_stats['total_evaluation_time'] += execution_time
+                self.performance_stats['memory_usage_peak'] = max(
+                    self.performance_stats['memory_usage_peak'], end_memory
+                )
+                
+                self.logger.info(f"{func_name} 执行时间: {execution_time:.2f}s, 内存使用: {memory_used:.1f}MB")
+                
+                return result
+            return wrapper
+        return decorator
+    
+    def evaluate_regression(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                           model_name: str = "model") -> Dict[str, float]:
         """
-        全面的回归模型评估，包含水声通信特定指标
+        回归模型评估，包含水声通信特定指标
         
         参数:
             y_true: 真实值
@@ -79,6 +142,20 @@ class ModelEvaluator:
         返回:
             包含所有评估指标的字典
         """
+        
+        # 输入数据验证
+        if not self._validate_input_data(y_true, y_pred):
+            return {'error': '输入数据验证失败'}
+        
+        # 应用性能监控
+        if self.enable_performance_monitoring:
+            return self._monitor_performance('回归评估')(self._evaluate_regression_core)(y_true, y_pred, model_name)
+        else:
+            return self._evaluate_regression_core(y_true, y_pred, model_name)
+    
+    def _evaluate_regression_core(self, y_true: np.ndarray, y_pred: np.ndarray, 
+                                 model_name: str = "model") -> Dict[str, float]:
+        """回归评估的核心逻辑"""
         
         # 基础回归指标
         metrics = {
@@ -90,10 +167,13 @@ class ModelEvaluator:
             'explained_variance': explained_variance_score(y_true, y_pred),
         }
         
-        # 防止除零错误的MAPE计算
+        # 改进的MAPE计算，更好的数值稳定性
         mape_mask = np.abs(y_true) > 1e-8
-        if np.any(mape_mask):
-            metrics['mape'] = np.mean(np.abs((y_true[mape_mask] - y_pred[mape_mask]) / y_true[mape_mask])) * 100
+        if np.any(mape_mask) and np.sum(mape_mask) > len(y_true) * 0.1:  # 至少10%的数据有效
+            mape_values = np.abs((y_true[mape_mask] - y_pred[mape_mask]) / y_true[mape_mask])
+            # 移除异常值
+            mape_values = mape_values[mape_values < 10]  # 移除超过1000%的异常值
+            metrics['mape'] = np.mean(mape_values) * 100 if len(mape_values) > 0 else float('inf')
         else:
             metrics['mape'] = float('inf')
         
@@ -107,17 +187,36 @@ class ModelEvaluator:
             'residual_kurtosis': stats.kurtosis(residuals)
         })
         
-        # 相关性分析
-        if len(y_true) > 1:
-            pearson_corr, pearson_p = pearsonr(y_true, y_pred)
-            spearman_corr, spearman_p = spearmanr(y_true, y_pred)
-            
-            metrics.update({
-                'pearson_correlation': pearson_corr,
-                'pearson_p_value': pearson_p,
-                'spearman_correlation': spearman_corr,
-                'spearman_p_value': spearman_p
-            })
+        # 相关性分析（增强的错误处理）
+        if len(y_true) > 2:  # 至少需要3个数据点
+            try:
+                # 检查数据变异性
+                if np.std(y_true) > 1e-10 and np.std(y_pred) > 1e-10:
+                    pearson_corr, pearson_p = pearsonr(y_true, y_pred)
+                    spearman_corr, spearman_p = spearmanr(y_true, y_pred)
+                    
+                    metrics.update({
+                        'pearson_correlation': pearson_corr if not np.isnan(pearson_corr) else 0,
+                        'pearson_p_value': pearson_p if not np.isnan(pearson_p) else 1,
+                        'spearman_correlation': spearman_corr if not np.isnan(spearman_corr) else 0,
+                        'spearman_p_value': spearman_p if not np.isnan(spearman_p) else 1
+                    })
+                else:
+                    # 数据无变异性
+                    metrics.update({
+                        'pearson_correlation': 0,
+                        'pearson_p_value': 1,
+                        'spearman_correlation': 0,
+                        'spearman_p_value': 1
+                    })
+            except Exception as e:
+                self.logger.warning(f"相关性计算失败: {e}")
+                metrics.update({
+                    'pearson_correlation': 0,
+                    'pearson_p_value': 1,
+                    'spearman_correlation': 0,
+                    'spearman_p_value': 1
+                })
         
         # 预测区间分析
         metrics.update({
@@ -136,12 +235,12 @@ class ModelEvaluator:
         
         return metrics
     
-    def evaluate_classification_comprehensive(self, y_true: np.ndarray, y_pred: np.ndarray,
-                                            y_prob: Optional[np.ndarray] = None,
-                                            class_names: Optional[List[str]] = None,
-                                            model_name: str = "model") -> Dict[str, Any]:
+    def evaluate_classification(self, y_true: np.ndarray, y_pred: np.ndarray,
+                               y_prob: Optional[np.ndarray] = None,
+                               class_names: Optional[List[str]] = None,
+                               model_name: str = "model") -> Dict[str, Any]:
         """
-        全面的分类模型评估
+        分类模型评估
         
         参数:
             y_true: 真实标签
@@ -153,6 +252,23 @@ class ModelEvaluator:
         返回:
             包含所有评估指标的字典
         """
+        
+        # 输入数据验证
+        if not self._validate_input_data(y_true, y_pred):
+            return {'error': '输入数据验证失败'}
+        
+        # 应用性能监控
+        if self.enable_performance_monitoring:
+            return self._monitor_performance('分类评估')(self._evaluate_classification_core)(
+                y_true, y_pred, y_prob, class_names, model_name)
+        else:
+            return self._evaluate_classification_core(y_true, y_pred, y_prob, class_names, model_name)
+    
+    def _evaluate_classification_core(self, y_true: np.ndarray, y_pred: np.ndarray,
+                                    y_prob: Optional[np.ndarray] = None,
+                                    class_names: Optional[List[str]] = None,
+                                    model_name: str = "model") -> Dict[str, Any]:
+        """分类评估的核心逻辑"""
         
         unique_labels = np.unique(np.concatenate([y_true, y_pred]))
         n_classes = len(unique_labels)
@@ -455,10 +571,10 @@ class ModelEvaluator:
         else:
             return "模型性能不稳定，建议调整超参数"
     
-    def generate_comprehensive_report(self, model_results: Dict[str, Any], 
-                                    model_name: str = "model",
-                                    include_federated: bool = False) -> str:
-        """生成全面的评估报告"""
+    def generate_report(self, model_results: Dict[str, Any], 
+                       model_name: str = "model",
+                       include_federated: bool = False) -> str:
+        """生成评估报告"""
         
         report = []
         report.append("=" * 80)
@@ -608,6 +724,78 @@ class ModelEvaluator:
         
         return suggestions
     
+    def generate_intelligent_insights(self, results: Dict[str, Any]) -> List[str]:
+        """基于评估结果生成智能洞察"""
+        insights = []
+        
+        # 回归模型洞察
+        if 'r2' in results:
+            r2 = results['r2']
+            rmse = results.get('rmse', 0)
+            
+            if r2 > 0.95:
+                insights.append("🎯 模型表现优秀，R²超过0.95，预测精度很高")
+            elif r2 > 0.8:
+                insights.append("✅ 模型表现良好，但仍有改进空间")
+            elif r2 < 0.5:
+                insights.append("⚠️ 模型表现较差，建议重新考虑特征工程或模型选择")
+            
+            # 残差分析洞察
+            if 'residual_skewness' in results:
+                skewness = abs(results['residual_skewness'])
+                if skewness > 1:
+                    insights.append("📊 残差分布存在偏斜，可能需要数据变换")
+                elif skewness < 0.5:
+                    insights.append("📊 残差分布接近正态，模型假设较好满足")
+        
+        # 分类模型洞察
+        if 'accuracy' in results:
+            acc = results['accuracy']
+            n_classes = results.get('n_classes', 2)
+            
+            if acc > 0.9:
+                insights.append("🎯 分类准确率优秀，模型性能很好")
+            elif acc < 1.0 / n_classes * 1.2:  # 仅比随机猜测好20%
+                insights.append("⚠️ 分类准确率接近随机水平，模型可能存在问题")
+            
+            # 类别平衡性分析
+            if 'per_class_metrics' in results:
+                class_f1s = [metrics['f1'] for metrics in results['per_class_metrics'].values()]
+                f1_std = np.std(class_f1s)
+                if f1_std > 0.2:
+                    insights.append("⚖️ 各类别性能差异较大，可能存在类别不平衡问题")
+        
+        # 水声通信特定洞察
+        if 'signal_fidelity' in results:
+            fidelity = results['signal_fidelity']
+            if fidelity > 0.9:
+                insights.append("🌊 信号保真度优秀，适合水声通信应用")
+            elif fidelity < 0.7:
+                insights.append("🌊 信号保真度较低，可能影响水声通信质量")
+        
+        # 联邦学习洞察
+        if self.round_metrics:
+            convergence = self.analyze_federated_convergence()
+            if convergence['convergence_assessment']['is_converged']:
+                insights.append("🤝 联邦学习已收敛，训练效果稳定")
+            else:
+                insights.append("🤝 联邦学习尚未收敛，建议继续训练或调整参数")
+        
+        return insights
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """获取性能监控摘要"""
+        if not self.enable_performance_monitoring or not self.performance_stats:
+            return {'message': '性能监控未启用'}
+        
+        stats = self.performance_stats
+        return {
+            'total_evaluations': stats['evaluation_count'],
+            'total_time': stats['total_evaluation_time'],
+            'average_time_per_evaluation': stats['total_evaluation_time'] / max(stats['evaluation_count'], 1),
+            'peak_memory_usage_mb': stats['memory_usage_peak']
+        }
+    
     def save_evaluation_artifacts(self, results: Dict[str, Any], 
                                 model_name: str = "model",
                                 include_plots: bool = True) -> Dict[str, str]:
@@ -624,7 +812,7 @@ class ModelEvaluator:
             saved_files['metrics'] = str(metrics_file)
             
             # 保存详细报告
-            report = self.generate_comprehensive_report(results, model_name, include_federated=True)
+            report = self.generate_report(results, model_name, include_federated=True)
             report_file = self.reports_dir / f"report_{model_name}_{timestamp}.txt"
             with open(report_file, 'w', encoding='utf-8') as f:
                 f.write(report)
@@ -645,8 +833,8 @@ class ModelEvaluator:
             self.logger.error(f"保存评估产物失败: {e}")
             return {}
     
-    def compare_models_comprehensive(self, model_results: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
-        """全面的模型比较"""
+    def compare_models(self, model_results: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
+        """模型比较"""
         
         comparison_data = []
         
@@ -707,7 +895,7 @@ class ModelEvaluator:
             y_pred = model.predict(X_test)
             
             # 计算评估指标
-            metrics = self.evaluate_regression_comprehensive(y_test, y_pred)
+            metrics = self.evaluate_regression(y_test, y_pred)
             
             self.logger.info(f"回归模型评估完成 - R²: {metrics['r2']:.4f}, RMSE: {metrics['rmse']:.4f}")
             
@@ -734,7 +922,7 @@ class ModelEvaluator:
             y_pred = model.predict(X_test)
             
             # 计算评估指标
-            metrics = self.evaluate_classification_comprehensive(y_test, y_pred)
+            metrics = self.evaluate_classification(y_test, y_pred)
             
             self.logger.info(f"分类模型评估完成 - 准确率: {metrics['accuracy']:.4f}")
             
@@ -838,9 +1026,9 @@ def create_evaluation_pipeline():
         
         # 执行评估
         if task_type == "regression":
-            results = evaluator.evaluate_regression_comprehensive(y_test, y_pred, model_name)
+            results = evaluator.evaluate_regression(y_test, y_pred, model_name)
         else:
-            results = evaluator.evaluate_classification_comprehensive(y_test, y_pred, y_prob, model_name=model_name)
+            results = evaluator.evaluate_classification(y_test, y_pred, y_prob, model_name=model_name)
         
         # 保存结果
         saved_files = evaluator.save_evaluation_artifacts(results, model_name)
@@ -861,7 +1049,7 @@ if __name__ == "__main__":
     y_true_reg = np.random.randn(n_samples) * 10 + 50
     y_pred_reg = y_true_reg + np.random.randn(n_samples) * 2
     
-    reg_metrics = evaluator.evaluate_regression_comprehensive(y_true_reg, y_pred_reg, "水声传播损失预测模型")
+    reg_metrics = evaluator.evaluate_regression(y_true_reg, y_pred_reg, "水声传播损失预测模型")
     
     # 分类示例
     y_true_cls = np.random.choice([0, 1, 2], n_samples, p=[0.4, 0.35, 0.25])
@@ -872,7 +1060,7 @@ if __name__ == "__main__":
     # 模拟概率预测
     y_prob_cls = np.random.dirichlet([2, 2, 2], n_samples)
     
-    cls_metrics = evaluator.evaluate_classification_comprehensive(
+    cls_metrics = evaluator.evaluate_classification(
         y_true_cls, y_pred_cls, y_prob_cls, 
         class_names=['稳定', '中等', '不稳定'],
         model_name="水声信道状态分类模型"
@@ -882,9 +1070,9 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("回归模型评估报告")
     print("="*60)
-    print(evaluator.generate_comprehensive_report(reg_metrics, "水声传播损失预测模型"))
+    print(evaluator.generate_report(reg_metrics, "水声传播损失预测模型"))
     
     print("\n" + "="*60)
     print("分类模型评估报告") 
     print("="*60)
-    print(evaluator.generate_comprehensive_report(cls_metrics, "水声信道状态分类模型"))
+    print(evaluator.generate_report(cls_metrics, "水声信道状态分类模型"))
