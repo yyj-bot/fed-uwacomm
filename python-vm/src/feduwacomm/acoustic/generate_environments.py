@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BELLHOP Environment File Generator
-Generate standard .env files for different ocean environments: ARR, SHD, RAY modes
+BELLHOP环境文件生成器
+为不同海洋环境生成标准.env文件：ARR、SHD、RAY模式
 """
 
 import os
@@ -25,9 +25,9 @@ class BellhopEnvGenerator:
         print(f"环境文件将生成在: {self.output_dir}")
     
     def generate_sound_speed_profile(self, profile_type="standard", variation_percent=5):
-        """Generate randomized sound speed profile data with variations"""
+        """生成带有变化的随机声速剖面数据"""
         
-        # Base profiles with randomization
+        # 带随机化的基础剖面
         profile_configs = {
             "deep_ocean": {
                 "max_depth": np.random.uniform(4500, 5500),
