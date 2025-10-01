@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BELLHOP Batch Processing Tool
-Automatically call BELLHOP model to process all environment files
+BELLHOP批处理工具
+自动调用BELLHOP模型处理所有环境文件
 """
 
 import os
