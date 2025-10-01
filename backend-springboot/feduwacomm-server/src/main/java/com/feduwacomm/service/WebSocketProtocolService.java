@@ -182,6 +182,8 @@ public class WebSocketProtocolService {
                 return onGlobalModelBroadcast(msg);
             case GLOBAL_MODEL_BROADCAST_ACK:
                 return onGlobalModelBroadcastAck(msg);
+            case MODEL_RECEIVE_ACK:
+                return onModelReceiveAck(msg);
             case ROUND_COMPLETE:
                 return onRoundComplete(msg);
             case ROUND_COMPLETE_ACK:
@@ -976,6 +978,24 @@ public class WebSocketProtocolService {
         }
     }
 
+    /**
+     * 处理MODEL_RECEIVE_ACK - VM确认已收到模型
+     * 这是v1.5协议中VM对GLOBAL_MODEL_BROADCAST的响应
+     */
+    private ProtocolAck onModelReceiveAck(ProtocolMessage msg) {
+        Map<String, Object> data = msg.getData();
+        String vmId = msg.getVmId();
+        String taskId = valueAsString(data, "taskId");
+        Integer round = numberAsInt(data, "round");
+        String status = valueAsString(data, "status");
+
+        log.info("收到模型接收确认(v1.5): vmId={}, taskId={}, round={}, status={}",
+                vmId, taskId, round, status);
+
+        // MODEL_RECEIVE_ACK是ACK消息，不需要再次回复
+        return null;
+    }
+
     // ================= v1.4 联邦学习增强协议 - 剩余处理器 =================
 
     /**
@@ -1125,6 +1145,7 @@ public class WebSocketProtocolService {
             case GRADIENT_UPLOAD:
             case GRADIENT_UPLOAD_ACK:
             case GLOBAL_MODEL_BROADCAST_ACK:
+            case MODEL_RECEIVE_ACK:
             case ROUND_START_ACK:
             case ROUND_COMPLETE_ACK:
             case FEDERATED_TASK_START_ACK:

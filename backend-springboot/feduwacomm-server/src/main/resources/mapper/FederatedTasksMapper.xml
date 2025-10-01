@@ -255,7 +255,10 @@
             data_size = #{dataSize},
             updated_at = #{updatedAt},
             left_at = #{leftAt},
-            parameters = CAST(#{parameters} AS JSON)
+            parameters = CAST(#{parameters} AS JSON),
+            assigned_dataset_id = #{assignedDatasetId},
+            dataset_status = #{datasetStatus},
+            dataset_created_at = #{datasetCreatedAt}
         WHERE id = #{id}
     </update>
 
@@ -273,6 +276,12 @@
 
     <select id="selectParticipantsByTaskId" resultMap="ParticipantResultMap">
         SELECT * FROM task_participants WHERE task_id = #{taskId} ORDER BY created_at
+    </select>
+
+    <select id="selectParticipant" resultMap="ParticipantResultMap">
+        SELECT * FROM task_participants
+        WHERE task_id = #{taskId} AND vm_id = #{vmId}
+        LIMIT 1
     </select>
 
     <!-- Task log management removed - using unified system_logs table via LogService instead -->

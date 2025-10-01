@@ -82,6 +82,9 @@ class DataDistributionServiceEnhancedTest {
     @Mock
     private com.feduwacomm.service.impl.RatioDataSlicingServiceImpl ratioDataSlicingService;
 
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     private DataDistributionService dataDistributionService;
 
     @BeforeEach
@@ -101,7 +104,8 @@ class DataDistributionServiceEnhancedTest {
                 messagingTemplate,
                 messageIdGenerator,
                 messageBuilder,
-                ratioDataSlicingService
+                ratioDataSlicingService,
+                transactionManager
         );
     }
 

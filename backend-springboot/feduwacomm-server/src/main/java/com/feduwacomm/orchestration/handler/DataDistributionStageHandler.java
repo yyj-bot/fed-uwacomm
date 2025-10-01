@@ -48,10 +48,21 @@ public class DataDistributionStageHandler extends AbstractStageHandler {
         if (createdBy == null || createdBy.trim().isEmpty()) {
             createdBy = "system-orchestration";
         }
-        
+
         log.info("执行数据分发阶段: orchestrationId={}, taskId={}", orchestrationId, taskId);
-        
+
         try {
+            // 🆕 v1.5.1: FederatedTaskEventListener已经自动创建并启动数据分发任务
+            // 这里不需要再创建，直接跳过此阶段
+            log.info("⏭️ 跳过数据分发阶段：数据分发由FederatedTaskEventListener自动处理 (v1.5.1) - taskId={}", taskId);
+
+            // 直接返回成功，让工作流继续
+            return StageResult.success()
+                    .addOutput("distributionSkipped", true)
+                    .addOutput("reason", "由FederatedTaskEventListener自动处理");
+
+            /* 原工作流分发逻辑已禁用（v1.5.1之前使用）
+            log.info("🔄 开始工作流数据分发: taskId={}, orchestrationId={}", taskId, orchestrationId);
             // 从上下文获取初始模型ID（如果需要）
             String initialModelId = (String) context.getVariable("initialModelId");
             log.info("关联的初始模型ID: {}", initialModelId);
@@ -104,7 +115,8 @@ public class DataDistributionStageHandler extends AbstractStageHandler {
                 .addOutput("successVmCount", startedTask.getSuccessVmCount())
                 .addOutput("progress", startedTask.getProgress())
                 .addOutput("status", startedTask.getStatus());
-                
+            */
+
         } catch (Exception e) {
             log.error("数据分发阶段执行失败: orchestrationId={}, taskId={}", orchestrationId, taskId, e);
             return StageResult.failure("数据分发异常: " + e.getMessage(), e);

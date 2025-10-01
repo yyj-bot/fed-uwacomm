@@ -331,11 +331,13 @@ class CompleteFederatedLearningFlowTestV151 {
         participantConfig.put("selectionMode", "MANUAL");
 
         List<Map<String, Object>> participants = new ArrayList<>();
+        // v1.5.1.1: dataRatio是千分比权重（1-1000），5个VM均等分配：每个200
+        int equalRatio = 1000 / registeredVmIds.size();
         for (String vmId : registeredVmIds) {
             Map<String, Object> participant = new HashMap<>();
             participant.put("vmId", vmId);
             participant.put("role", "PARTICIPANT");
-            participant.put("dataRatio", 1.0 / registeredVmIds.size());
+            participant.put("dataRatio", equalRatio);  // 200 (1000/5)
             participants.add(participant);
         }
         participantConfig.put("participants", participants);
@@ -454,21 +456,27 @@ class CompleteFederatedLearningFlowTestV151 {
             assertThat(batchRanges).isNotNull();
             assertThat(batchRanges).isNotEmpty();
 
-            // 验证每个BatchRange的结构
+            // 验证每个BatchRange的结构 - v1.5.1使用globalStartIndex/globalEndIndex
             for (Map<String, Object> batchRange : batchRanges) {
-                assertThat(batchRange).containsKeys("startIndex", "endIndex", "batchSamples");
+                assertThat(batchRange).containsKeys("globalStartIndex", "globalEndIndex", "localStartIndex", "localEndIndex");
 
-                Integer startIndex = (Integer) batchRange.get("startIndex");
-                Integer endIndex = (Integer) batchRange.get("endIndex");
-                Integer batchSamples = (Integer) batchRange.get("batchSamples");
+                Integer globalStartIndex = (Integer) batchRange.get("globalStartIndex");
+                Integer globalEndIndex = (Integer) batchRange.get("globalEndIndex");
+                Integer localStartIndex = (Integer) batchRange.get("localStartIndex");
+                Integer localEndIndex = (Integer) batchRange.get("localEndIndex");
 
-                assertThat(startIndex).isNotNull();
-                assertThat(endIndex).isNotNull();
-                assertThat(batchSamples).isNotNull();
-                assertThat(batchSamples).isEqualTo(endIndex - startIndex + 1);
+                assertThat(globalStartIndex).isNotNull();
+                assertThat(globalEndIndex).isNotNull();
+                assertThat(localStartIndex).isNotNull();
+                assertThat(localEndIndex).isNotNull();
 
-                System.out.println("   📦 BatchRange: startIndex=" + startIndex +
-                                 ", endIndex=" + endIndex +
+                int batchSamples = globalEndIndex - globalStartIndex + 1;
+                assertThat(batchSamples).isEqualTo(localEndIndex - localStartIndex + 1);
+
+                System.out.println("   📦 BatchRange: globalStartIndex=" + globalStartIndex +
+                                 ", globalEndIndex=" + globalEndIndex +
+                                 ", localStartIndex=" + localStartIndex +
+                                 ", localEndIndex=" + localEndIndex +
                                  ", batchSamples=" + batchSamples);
             }
 

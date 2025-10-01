@@ -38,6 +38,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
@@ -78,9 +82,10 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     private final MessageIdGenerator messageIdGenerator;  // v1.5.1: 消息ID生成
     private final MessageBuilder messageBuilder;  // v1.5.1: 消息构建器
     private final RatioDataSlicingServiceImpl ratioDataSlicingService;  // v1.5.1.1: 比例分配服务
+    private final PlatformTransactionManager transactionManager;  // 用于异步线程中的编程式事务
 
     private static final String DATA_STORAGE_PATH = "./data/distributed";
-    private static final int BATCH_SIZE = 500;  // v1.5.1: 数据传输批次大小
+    private static final int BATCH_SIZE = 50;  // v1.5.1: 数据传输批次大小（减小避免WebSocket断开）
 
     @Override
     @Transactional
@@ -136,12 +141,20 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                 distributionId, distribution.getTaskId(), distribution.getStrategy(), startedBy);
         eventPublisher.publishEvent(event);
 
-        // 异步执行分发
-        CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+        // 🔧 v1.5.1.1修复：直接同步执行分发，因为executeDistribution内部已使用TransactionTemplate管理事务
+        // 移除异步执行，避免测试环境中执行时序问题
+        log.info("✅ 事务已提交，开始执行数据分发: distributionId={}", distributionId);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("🔄 开始同步执行数据分发: distributionId={}", distributionId);
+                executeDistribution(distributionId);
+            }
+        });
 
         distribution.setStatus("IN_PROGRESS");
         distribution.setStartedAt(LocalDateTime.now());
-        
+
         List<DataDistributionDetail> details = getDistributionDetails(distributionId);
         return convertToTaskVO(distribution, details);
     }
@@ -183,12 +196,18 @@ public class DataDistributionServiceImpl implements DataDistributionService {
 
         dataDistributionMapper.updateStatus(distributionId, "IN_PROGRESS", LocalDateTime.now(), null);
 
-        // 继续执行分发
-        CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+        // 🔧 修复：在事务提交后再异步执行分发
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("✅ 事务已提交，恢复异步执行数据分发: distributionId={}", distributionId);
+                CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+            }
+        });
 
         distribution.setStatus("IN_PROGRESS");
         distribution.setStartedAt(LocalDateTime.now());
-        
+
         List<DataDistributionDetail> details = getDistributionDetails(distributionId);
         return convertToTaskVO(distribution, details);
     }
@@ -812,7 +831,9 @@ public class DataDistributionServiceImpl implements DataDistributionService {
 
             // 步骤4：更新整体状态
             String finalStatus = allSuccess ? "COMPLETED" : "FAILED";
-            dataDistributionMapper.updateStatus(distributionId, finalStatus, null, LocalDateTime.now());
+            // 🔧 保留原来的started_at，不要覆盖为null
+            LocalDateTime startedAt = distribution.getStartedAt();
+            dataDistributionMapper.updateStatus(distributionId, finalStatus, startedAt, LocalDateTime.now());
 
             // 发布完成事件
             DataDistributionCompletedEvent event = new DataDistributionCompletedEvent(
@@ -846,20 +867,60 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             // 生成assignedDatasetId
             String assignedDatasetId = uuidUtil.generateUuid();
 
-            // 更新TaskParticipant表，记录assignedDatasetId
-            TaskParticipant participant = taskParticipantsMapper.selectParticipant(taskId, vmId);
-            if (participant != null) {
-                participant.setAssignedDatasetId(assignedDatasetId);
-                participant.setDatasetStatus("CREATING");
-                taskParticipantsMapper.updateParticipant(participant);
-            }
+            // 🔧 在新事务中更新TaskParticipant（异步线程需要显式事务）
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            // 🔥 强制创建新事务，不加入外层事务
+            transactionTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            Integer updateResult = transactionTemplate.execute(status -> {
+                try {
+                    // 更新TaskParticipant表，记录assignedDatasetId
+                    TaskParticipant participant = taskParticipantsMapper.selectParticipant(taskId, vmId);
+                    System.out.println("🔍🔍🔍 查询participant: taskId=" + taskId + ", vmId=" + vmId +
+                            ", found=" + (participant != null) + ", id=" + (participant != null ? participant.getId() : "null"));
+                    log.info("🔍 查询到的participant: taskId={}, vmId={}, participant={}, id={}",
+                            taskId, vmId, participant != null ? "存在" : "null", participant != null ? participant.getId() : "null");
+
+                    if (participant != null) {
+                        System.out.println("🔧🔧🔧 更新前: id=" + participant.getId() + ", oldAssignedDatasetId=" + participant.getAssignedDatasetId());
+                        log.info("🔧 更新前状态: participant.id={}, oldAssignedDatasetId={}",
+                                participant.getId(), participant.getAssignedDatasetId());
+
+                        participant.setAssignedDatasetId(assignedDatasetId);
+                        participant.setDatasetStatus("CREATING");
+                        participant.setDatasetCreatedAt(LocalDateTime.now());
+                        participant.setUpdatedAt(LocalDateTime.now());
+
+                        int updated = taskParticipantsMapper.updateParticipant(participant);
+                        System.out.println("✅✅✅ 更新结果: vmId=" + vmId + ", assignedDatasetId=" + assignedDatasetId + ", updateCount=" + updated);
+                        log.info("✅ TaskParticipant更新执行: vmId={}, assignedDatasetId={}, updateCount={}",
+                                vmId, assignedDatasetId, updated);
+
+                        if (updated == 0) {
+                            System.out.println("❌❌❌ 更新失败: updateCount=0, participant.id=" + participant.getId());
+                            log.error("❌ TaskParticipant更新失败：updateCount=0，可能WHERE条件不匹配，participant.id={}", participant.getId());
+                        }
+                        return updated;
+                    } else {
+                        System.out.println("❌❌❌ 未找到participant: taskId=" + taskId + ", vmId=" + vmId);
+                        log.error("❌ 未找到TaskParticipant记录: taskId={}, vmId={}", taskId, vmId);
+                        return 0;
+                    }
+                } catch (Exception e) {
+                    log.error("❌ 事务中更新participant失败: vmId={}, error={}", vmId, e.getMessage(), e);
+                    status.setRollbackOnly();
+                    return 0;
+                }
+            });
+
+            log.info("🔄 事务提交完成: vmId={}, updateResult={}", vmId, updateResult);
 
             // 步骤1：发送DATASET_CREATE消息（包含SliceInfo）
             sendDatasetCreateV151(vmId, taskId, assignedDatasetId, originalDatasetId, sliceInfo);
             log.info("✅ DATASET_CREATE消息已发送: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
 
-            // 等待一小段时间，让VM创建数据集
-            Thread.sleep(500);
+            // 等待VM创建数据集并准备接收数据 - 增加等待时间避免消息发送过快
+            log.info("⏳ 等待VM创建数据集: vmId={}, 等待时间=2000ms", vmId);
+            Thread.sleep(2000);
 
             // 步骤2：分批发送DATASET_APPEND_ROWS消息
             int startIndex = sliceInfo.getStartIndex();
@@ -917,12 +978,27 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             // 更新传输大小
             dataDistributionDetailMapper.updateTransferredSize(detail.getId(), totalTransferredBytes);
 
-            // 更新TaskParticipant状态
-            if (participant != null) {
-                participant.setDatasetStatus("READY");
-                participant.setDatasetCreatedAt(LocalDateTime.now());
-                taskParticipantsMapper.updateParticipant(participant);
-            }
+            // 更新TaskParticipant状态为READY（数据传输完成）
+            TransactionTemplate finalUpdateTemplate = new TransactionTemplate(transactionManager);
+            // 🔥 强制创建新事务，不加入外层事务
+            finalUpdateTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            finalUpdateTemplate.execute(status -> {
+                try {
+                    TaskParticipant finalParticipant = taskParticipantsMapper.selectParticipant(taskId, vmId);
+                    if (finalParticipant != null) {
+                        finalParticipant.setDatasetStatus("READY");
+                        finalParticipant.setUpdatedAt(LocalDateTime.now());
+                        int updated = taskParticipantsMapper.updateParticipant(finalParticipant);
+                        log.info("✅ 数据集状态更新为READY: vmId={}, updateCount={}", vmId, updated);
+                        return updated;
+                    }
+                    return 0;
+                } catch (Exception e) {
+                    log.error("❌ 更新READY状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
+                    status.setRollbackOnly();
+                    return 0;
+                }
+            });
 
         } catch (Exception e) {
             log.error("❌ VM数据分发异常: vmId={}, error={}", vmId, e.getMessage(), e);
@@ -973,6 +1049,10 @@ public class DataDistributionServiceImpl implements DataDistributionService {
      */
     private void sendDatasetAppendRowsV151(String vmId, String assignedDatasetId,
                                           BatchRange batchRange, List<TrainingDataRow> dataRows) {
+        System.out.println("🔥🔥🔥 sendDatasetAppendRowsV151被调用: vmId=" + vmId + ", assignedDatasetId=" + assignedDatasetId + ", rowCount=" + dataRows.size());
+        log.info("🔥🔥🔥 发送DATASET_APPEND_ROWS消息: vmId={}, assignedDatasetId={}, rowCount={}, batchRange=[{}-{}]",
+                vmId, assignedDatasetId, dataRows.size(), batchRange.getGlobalStartIndex(), batchRange.getGlobalEndIndex());
+
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("assignedDatasetId", assignedDatasetId);
         messageData.put("rowCount", dataRows.size());
@@ -1007,7 +1087,11 @@ public class DataDistributionServiceImpl implements DataDistributionService {
         ProtocolMessage message = messageBuilder.buildServerMessage(
                 ProtocolType.DATASET_APPEND_ROWS, vmId, messageData);
 
-        messagingTemplate.convertAndSend("/topic/vm/" + vmId, message);
+        String destination = "/topic/vm/" + vmId;
+        messagingTemplate.convertAndSend(destination, message);
+
+        System.out.println("🔥🔥🔥 DATASET_APPEND_ROWS消息已发送: destination=" + destination + ", messageId=" + message.getId());
+        log.info("🔥🔥🔥 DATASET_APPEND_ROWS消息已发送到WebSocket: destination={}, messageId={}", destination, message.getId());
     }
 
     /**
@@ -1075,22 +1159,30 @@ public class DataDistributionServiceImpl implements DataDistributionService {
 
     /**
      * 创建均衡分发
+     *
+     * v1.5.1修改：为每个VM创建一个分发详情记录（使用相同的原始datasetId，后续会切片）
      */
     private List<DataDistributionDetail> createBalancedDistribution(DataDistributionDTO distributionDTO, String distributionId) {
         List<DataDistributionDetail> details = new ArrayList<>();
-        
+
         int vmCount = distributionDTO.getTargetVmIds().size();
         int datasetCount = distributionDTO.getDatasetIds().size();
-        
-        // 均匀分配数据集到虚拟机
-        for (int i = 0; i < datasetCount; i++) {
-            String datasetId = distributionDTO.getDatasetIds().get(i);
-            String vmId = distributionDTO.getTargetVmIds().get(i % vmCount);
-            
-            DataDistributionDetail detail = createDistributionDetail(distributionId, datasetId, vmId);
+
+        // 获取原始数据集ID（v1.5.1中应该只有一个）
+        String originalDatasetId = (datasetCount > 0) ? distributionDTO.getDatasetIds().get(0) : null;
+        if (originalDatasetId == null) {
+            log.error("❌ 无法创建分发详情：datasetIds为空");
+            return details;
+        }
+
+        // 🔧 v1.5.1修复：为每个VM创建一个分发详情记录
+        for (String vmId : distributionDTO.getTargetVmIds()) {
+            DataDistributionDetail detail = createDistributionDetail(distributionId, originalDatasetId, vmId);
             details.add(detail);
         }
-        
+
+        log.info("✅ 创建了{}个分发详情记录：datasetId={}, vmCount={}", details.size(), originalDatasetId, vmCount);
+
         return details;
     }
 

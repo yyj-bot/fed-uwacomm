@@ -148,15 +148,38 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .estimatedDuration(estimateTaskDuration(createDTO))
             .build();
 
-        // 发布任务创建事件，触发自动工作流
+        // 提取数据集配置信息
+        String datasetId = null;
+        String distributionStrategy = null;
+        if (createDTO.getDatasetConfig() != null) {
+            datasetId = createDTO.getDatasetConfig().getDatasetId();
+            distributionStrategy = createDTO.getDatasetConfig().getDistributionStrategy();
+        }
+
+        // 提取参与者VM ID列表
+        List<String> participantVmIds = new ArrayList<>();
+        if (createDTO.getParticipants() != null && !createDTO.getParticipants().isEmpty()) {
+            participantVmIds = createDTO.getParticipants().stream()
+                .map(TaskCreateDTO.ParticipantDTO::getVmId)
+                .collect(Collectors.toList());
+        }
+
+        // 发布任务创建事件，触发自动数据分发（v1.5.1）
+        System.out.println("🔥🔥🔥 准备发布FederatedTaskCreatedEvent: taskId=" + taskId + ", datasetId=" + datasetId);
         FederatedTaskCreatedEvent taskCreatedEvent = new FederatedTaskCreatedEvent(
-            taskId, 
-            createDTO.getTaskName(), 
-            createdBy
+            this,  // 事件源
+            taskId,
+            createDTO.getTaskName(),
+            createdBy,
+            datasetId,
+            participantVmIds,
+            distributionStrategy
         );
+        System.out.println("🔥🔥🔥 事件对象创建完成: " + taskCreatedEvent);
         eventPublisher.publishEvent(taskCreatedEvent);
-        
-        log.info("联邦学习任务创建完成，已发布事件触发工作流: taskId={}, participantCount={}", 
+        System.out.println("🔥🔥🔥 事件已发布");
+
+        log.info("联邦学习任务创建完成，已发布事件触发工作流: taskId={}, participantCount={}",
             taskId, createDTO.getParticipants().size());
 
         return response;
@@ -1504,11 +1527,28 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .estimatedDuration(estimateSmartTaskDuration(createDTO))
             .build();
 
-        // 发布任务创建事件
-        eventPublisher.publishEvent(new FederatedTaskCreatedEvent(taskId, createDTO.getTaskName(), "v1.3"));
+        // 提取数据集配置信息（v1.3格式）
+        String datasetId = createDTO.getDatasetConfig().getDatasetId();
+        String distributionStrategy = createDTO.getDatasetConfig().getDistributionStrategy();
 
-        log.info("智能任务创建成功: taskId={}, participantCount={}",
-            taskId, createDTO.getParticipantConfig().getParticipants().size());
+        // 提取参与者VM ID列表（v1.3格式）
+        List<String> participantVmIds = createDTO.getParticipantConfig().getParticipants().stream()
+                .map(TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO::getVmId)
+                .collect(Collectors.toList());
+
+        // 发布任务创建事件，触发自动数据分发（v1.5.1）
+        eventPublisher.publishEvent(new FederatedTaskCreatedEvent(
+                this,  // 事件源
+                taskId,
+                createDTO.getTaskName(),
+                createdBy,
+                datasetId,
+                participantVmIds,
+                distributionStrategy
+        ));
+
+        log.info("智能任务创建成功 (v1.3+v1.5.1数据分发): taskId={}, participantCount={}, datasetId={}",
+            taskId, createDTO.getParticipantConfig().getParticipants().size(), datasetId);
 
         return response;
     }
