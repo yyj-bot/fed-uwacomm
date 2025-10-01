@@ -60,7 +60,15 @@ public interface InitialModelMapper {
     int updateModelData(@Param("id") String id, @Param("modelData") String modelData,
                        @Param("status") String status);
 
-    
+    /**
+     * 更新模型JSON数据和大小
+     */
+    @Update("UPDATE initial_models SET model_data = #{modelData}, " +
+            "model_size = #{modelSize}, status = #{status}, updated_at = NOW() " +
+            "WHERE id = #{id}")
+    int updateModelDataAndSize(@Param("id") String id, @Param("modelData") String modelData,
+                               @Param("modelSize") Long modelSize, @Param("status") String status);
+
     /**
      * 根据状态查询初始模型列表
      */

@@ -263,15 +263,18 @@ public class InitialModelEventListener {
      */
     private void sendModelGenerationNotification(InitialModelGeneratedEvent event) {
         try {
+            // 防御性处理：为null的modelSize提供默认值
+            Long modelSize = event.getModelSize() != null ? event.getModelSize() : 0L;
+
             String title = "初始模型生成完成";
             String message = String.format("模型 %s 生成完成，类型: %s，大小: %d 字节",
-                    event.getModelId(), event.getModelType(), event.getModelSize());
+                    event.getModelId(), event.getModelType(), modelSize);
 
             Map<String, Object> details = Map.of(
                 "modelId", event.getModelId(),
                 "modelType", event.getModelType(),
                 "generationMethod", event.getGenerationMethod(),
-                "modelSize", event.getModelSize(),
+                "modelSize", modelSize,
                 "taskId", event.getTaskId(),
                 "orchestrationId", event.getOrchestrationId() != null ? event.getOrchestrationId() : ""
             );

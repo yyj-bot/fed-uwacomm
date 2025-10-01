@@ -404,18 +404,25 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
 
             String modelJsonStr = objectMapper.writeValueAsString(modelData);
 
-            // 直接更新数据库，不涉及文件操作
-            initialModelMapper.updateModelData(
+            // 计算模型大小（字节）
+            long modelSize = modelJsonStr.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
+            // 更新数据库，包括model_data、model_size和status
+            initialModelMapper.updateModelDataAndSize(
                     model.getId(),
                     modelJsonStr,
+                    modelSize,
                     InitialModelStatus.READY.getCode()
             );
+
+            // 更新内存中的model对象，确保发布事件时modelSize不为null
+            model.setModelSize(modelSize);
 
             // 发布模型生成完成事件
             publishModelGeneratedEvent(model, params);
 
             log.info("初始模型JSON数据生成完成: modelId={}, size={}KB",
-                    model.getId(), modelJsonStr.length() / 1024);
+                    model.getId(), modelSize / 1024);
 
         } catch (Exception e) {
             log.error("初始模型生成失败: modelId={}, error={}", model.getId(), e.getMessage(), e);
