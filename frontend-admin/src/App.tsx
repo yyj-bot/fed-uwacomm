@@ -42,11 +42,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   
   // 简化逻辑：只检查token存在，不验证有效性
   if (!token) {
-    console.log('❌ ProtectedRoute无token，重定向到login')
+    //console.log('❌ ProtectedRoute无token，重定向到login')
     return <Navigate to="/login" replace />
   }
   
-  console.log('✅ ProtectedRoute有token，允许访问')
+  //console.log('✅ ProtectedRoute有token，允许访问')
   return <>{children}</>
 }
 
@@ -55,7 +55,7 @@ const App: React.FC = () => {
   
   useEffect(() => {
     // 初始化应用
-    console.log('🚀 App应用初始化开始')
+    //console.log('🚀 App应用初始化开始')
     
     // 同步localStorage和store的认证状态
     const localToken = localStorage.getItem('access_token')
@@ -76,20 +76,20 @@ const App: React.FC = () => {
     
     // 如果localStorage有token，但store没有认证状态，同步到store
     if (localToken && (!storeToken || !storeIsAuthenticated)) {
-      console.log('✅ 检测到localStorage有token，同步到store')
+      //console.log('✅ 检测到localStorage有token，同步到store')
       authStore.initializeAuth()
     }
     // 如果localStorage没有token，但store认为已认证，清理store（但不调用API logout）
     else if (!localToken && storeIsAuthenticated) {
-      console.log('🧹 localStorage无token，直接清理store状态（不调用API）')
+      //console.log('🧹 localStorage无token，直接清理store状态（不调用API）')
       authStore.clearAuthState()
     }
     // 如果状态一致，无需操作
     else {
-      console.log('✅ 认证状态一致，无需操作')
+      //console.log('✅ 认证状态一致，无需操作')
     }
     
-    console.log('🎯 App初始化完成')
+    //console.log('🎯 App初始化完成')
   }, [])
   
   return (
