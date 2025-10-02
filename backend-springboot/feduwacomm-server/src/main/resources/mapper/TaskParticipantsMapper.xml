@@ -25,6 +25,12 @@
         <result property="capabilities" column="capabilities"/>
         <result property="maxCpuUsage" column="max_cpu_usage"/>
         <result property="maxMemoryUsage" column="max_memory_usage"/>
+        <!-- v1.5 新增字段 -->
+        <result property="assignedDatasetId" column="assigned_dataset_id"/>
+        <result property="datasetStatus" column="dataset_status"/>
+        <result property="localPath" column="local_path"/>
+        <result property="datasetCreatedAt" column="dataset_created_at"/>
+        <result property="datasetCompletedAt" column="dataset_completed_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="joinedAt" column="joined_at"/>
@@ -39,12 +45,14 @@
             current_epoch, loss, accuracy, last_heartbeat,
             final_accuracy, final_loss, training_time, data_size,
             participant_id, data_ratio, capabilities, max_cpu_usage, max_memory_usage,
+            assigned_dataset_id, dataset_status, local_path, dataset_created_at, dataset_completed_at,
             created_at, updated_at, joined_at, left_at, parameters
         ) VALUES (
             #{id}, #{taskId}, #{vmId}, #{role}, #{status}, #{dataSource},
             #{currentEpoch}, #{loss}, #{accuracy}, #{lastHeartbeat},
             #{finalAccuracy}, #{finalLoss}, #{trainingTime}, #{dataSize},
             #{participantId}, #{dataRatio}, #{capabilities}, #{maxCpuUsage}, #{maxMemoryUsage},
+            #{assignedDatasetId}, #{datasetStatus}, #{localPath}, #{datasetCreatedAt}, #{datasetCompletedAt},
             #{createdAt}, #{updatedAt}, #{joinedAt}, #{leftAt}, #{parameters}
         )
     </insert>
@@ -68,6 +76,11 @@
             capabilities = #{capabilities},
             max_cpu_usage = #{maxCpuUsage},
             max_memory_usage = #{maxMemoryUsage},
+            assigned_dataset_id = #{assignedDatasetId},
+            dataset_status = #{datasetStatus},
+            local_path = #{localPath},
+            dataset_created_at = #{datasetCreatedAt},
+            dataset_completed_at = #{datasetCompletedAt},
             updated_at = #{updatedAt},
             joined_at = #{joinedAt},
             left_at = #{leftAt},

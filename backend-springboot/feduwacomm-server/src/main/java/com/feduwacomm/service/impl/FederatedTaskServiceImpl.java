@@ -735,7 +735,25 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         for (TaskParticipant participant : participants) {
             try {
-                // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.4标准
+                // v1.5.1协议：获取assignedDatasetId和dataPath（必需字段）
+                String assignedDatasetId = participant.getAssignedDatasetId();
+                String dataPath = participant.getLocalPath();
+
+                // 如果assignedDatasetId为null，记录错误并跳过该参与者
+                if (assignedDatasetId == null || assignedDatasetId.trim().isEmpty()) {
+                    log.error("参与者缺少assignedDatasetId，跳过发送: vmId={}, taskId={}",
+                        participant.getVmId(), taskId);
+                    continue;
+                }
+
+                // 如果dataPath为null，生成默认路径
+                if (dataPath == null || dataPath.trim().isEmpty()) {
+                    dataPath = "/data/assigned/" + assignedDatasetId;
+                    log.warn("参与者dataPath为空，使用默认路径: vmId={}, dataPath={}",
+                        participant.getVmId(), dataPath);
+                }
+
+                // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.5.1标准
                 ProtocolMessage startMessage = MessageBuilder.buildTrainingStartMessage(
                     participant.getVmId(),
                     taskId,
@@ -743,15 +761,17 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     algorithmCode, // mlAlgorithm
                     MessageBuilder.buildHyperparameters(task), // hyperparameters对象
                     MessageBuilder.buildGlobalModel(taskId, 1), // globalModel对象
-                    "请开始本地ML训练任务" // message
+                    "请开始本地ML训练任务", // message
+                    assignedDatasetId, // v1.5.1新增
+                    dataPath // v1.5.1新增
                 );
 
                 // 发送到VM专用topic
                 String vmTopic = "/topic/vm/" + participant.getVmId();
                 messagingTemplate.convertAndSend(vmTopic, startMessage);
 
-                log.info("训练启动指令已发送: vmId={}, taskId={}, algorithm={}, topic={}",
-                    participant.getVmId(), taskId, algorithmCode, vmTopic);
+                log.info("训练启动指令已发送: vmId={}, taskId={}, algorithm={}, assignedDatasetId={}, dataPath={}, topic={}",
+                    participant.getVmId(), taskId, algorithmCode, assignedDatasetId, dataPath, vmTopic);
 
             } catch (Exception e) {
                 log.error("发送训练启动指令失败: vmId={}, taskId={}, 错误={}",

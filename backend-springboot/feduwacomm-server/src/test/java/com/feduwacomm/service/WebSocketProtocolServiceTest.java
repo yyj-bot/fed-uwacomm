@@ -1186,7 +1186,7 @@ public class WebSocketProtocolServiceTest {
      */
     @Test
     void testStandardTrainingStartMessage() {
-        // 使用MessageBuilder构建标准TRAINING_START消息
+        // 使用MessageBuilder构建标准TRAINING_START消息 (v1.5.1)
         ProtocolMessage message = MessageBuilder.buildTrainingStartMessage(
             "vm-test-001",
             "task-123",
@@ -1194,7 +1194,9 @@ public class WebSocketProtocolServiceTest {
             "FEDERATED_AVERAGING",
             Map.of("learningRate", 0.01, "batchSize", 32, "epochs", 100, "timeout", 300),
             Map.of("modelId", "global-1", "version", "v1.0", "downloadUrl", "/api/models/global-1"),
-            "请开始本地ML训练任务"
+            "请开始本地ML训练任务",
+            "dataset-test-123", // assignedDatasetId (v1.5.1)
+            "/data/assigned/dataset-test-123" // dataPath (v1.5.1)
         );
 
         // 验证消息结构符合协议标准
@@ -1335,7 +1337,9 @@ public class WebSocketProtocolServiceTest {
             "FEDERATED_PROXIMAL",
             Map.of("learningRate", 0.001),
             Map.of("modelId", "global-456"),
-            "开始训练"
+            "开始训练",
+            "dataset-456",                          // assignedDatasetId (v1.5.1)
+            "/data/assigned/dataset-456"           // dataPath (v1.5.1)
         );
 
         Map<String, Object> trainingData = trainingMessage.getData();
@@ -1386,7 +1390,9 @@ public class WebSocketProtocolServiceTest {
         // 测试TRAINING_START消息包含签名
         ProtocolMessage trainingMessage = MessageBuilder.buildTrainingStartMessage(
             "vm-001", "task-789", 1, "FEDERATED_AVERAGING",
-            Map.of("lr", 0.01), Map.of("id", "model-1"), "开始"
+            Map.of("lr", 0.01), Map.of("id", "model-1"), "开始",
+            "dataset-789",                          // assignedDatasetId (v1.5.1)
+            "/data/assigned/dataset-789"           // dataPath (v1.5.1)
         );
         assertNotNull(trainingMessage.getSignature(), "TRAINING_START消息应包含签名字段");
 

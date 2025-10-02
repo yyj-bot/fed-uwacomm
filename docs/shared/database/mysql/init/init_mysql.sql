@@ -687,6 +687,7 @@ CREATE TABLE IF NOT EXISTS task_participants (
     -- v1.5协议新增字段
                                                  assigned_dataset_id VARCHAR(32) NULL COMMENT 'v1.5后端分配的数据集ID(32位UUID)',
                                                  dataset_status ENUM('PENDING', 'CREATED', 'UPLOADING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT 'v1.5数据集状态',
+                                                 local_path VARCHAR(512) NULL COMMENT 'v1.5 VM本地数据集路径',
                                                  dataset_created_at TIMESTAMP NULL COMMENT 'v1.5数据集创建时间',
                                                  dataset_completed_at TIMESTAMP NULL COMMENT 'v1.5数据集完成时间',
 

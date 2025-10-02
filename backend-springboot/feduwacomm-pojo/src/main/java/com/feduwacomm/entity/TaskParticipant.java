@@ -65,6 +65,7 @@ public class TaskParticipant {
     private String datasetStatus; // 数据集状态: PENDING, CREATING, CREATED, FAILED
     private String localPath; // 数据集在VM上的本地路径
     private LocalDateTime datasetCreatedAt; // 数据集创建时间
+    private LocalDateTime datasetCompletedAt; // 数据集完成时间
 
     // 系统字段
     private LocalDateTime createdAt;
