@@ -3782,6 +3782,7 @@ public class MockVirtualMachine {
         Map<String, Object> data = (Map<String, Object>) messageData.get("data");
         String assignedDatasetId = (String) data.get("assignedDatasetId");
         String datasetType = (String) data.get("datasetType");
+        String taskId = (String) data.get("taskId");  // 🆕 提取taskId（uploadGradients需要）
 
         // 🆕 v1.5.1: 接收sliceInfo
         @SuppressWarnings("unchecked")
@@ -3795,6 +3796,13 @@ public class MockVirtualMachine {
         String localPath = "/data/assigned/" + assignedDatasetId;
         assignedDatasetLocalPaths.put(assignedDatasetId, localPath);
         backendAssignedDatasetIds.add(assignedDatasetId);
+
+        // 🆕 保存taskId到assignedDatasetId的映射（uploadGradients需要）
+        if (taskId != null && !taskId.trim().isEmpty()) {
+            taskAssignedDatasetMappings.put(taskId, assignedDatasetId);
+            log.info("🤖 [{}] 保存任务数据集映射: taskId={}, assignedDatasetId={}",
+                     vmData.getName(), taskId, assignedDatasetId);
+        }
 
         // 🆕 v1.5.1: 保存sliceInfo并初始化验证数据结构
         if (sliceInfo != null) {

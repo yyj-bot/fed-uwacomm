@@ -227,14 +227,14 @@
             id, task_id, vm_id, role, status, data_source,
             current_epoch, loss, accuracy, last_heartbeat,
             final_accuracy, final_loss, training_time, data_size,
-            participant_id, data_ratio, capabilities, max_cpu_usage, max_memory_usage,
+            data_ratio, capabilities, max_cpu_usage, max_memory_usage,
             assigned_dataset_id, dataset_status, dataset_created_at,
             created_at, updated_at, joined_at, left_at, parameters
         ) VALUES (
             #{id}, #{taskId}, #{vmId}, #{role,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{status,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{dataSource},
             #{currentEpoch}, #{loss}, #{accuracy}, #{lastHeartbeat},
             #{finalAccuracy}, #{finalLoss}, #{trainingTime}, #{dataSize},
-            #{participantId}, #{dataRatio}, CAST(#{capabilities} AS JSON), #{maxCpuUsage}, #{maxMemoryUsage},
+            #{dataRatio}, CAST(#{capabilities} AS JSON), #{maxCpuUsage}, #{maxMemoryUsage},
             #{assignedDatasetId}, #{datasetStatus}, #{datasetCreatedAt},
             #{createdAt}, #{updatedAt}, #{joinedAt}, #{leftAt}, CAST(#{parameters} AS JSON)
         )

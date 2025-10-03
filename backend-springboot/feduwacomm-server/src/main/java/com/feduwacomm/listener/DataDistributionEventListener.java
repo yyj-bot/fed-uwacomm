@@ -1,7 +1,9 @@
 package com.feduwacomm.listener;
 
+import com.feduwacomm.entity.OrchestrationWorkflow;
 import com.feduwacomm.event.DataDistributionCompletedEvent;
 import com.feduwacomm.event.DataDistributionStartedEvent;
+import com.feduwacomm.mapper.OrchestrationWorkflowMapper;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.service.NotificationService;
 import com.feduwacomm.service.PerformanceMonitorService;
@@ -32,6 +34,7 @@ public class DataDistributionEventListener {
     private final NotificationService notificationService;
     private final PerformanceMonitorService performanceMonitorService;
     private final FederatedOrchestrationService orchestrationService;
+    private final OrchestrationWorkflowMapper orchestrationMapper;
     
     /**
      * 处理数据分发开始事件
@@ -855,8 +858,13 @@ public class DataDistributionEventListener {
      */
     private String getOrchestrationId(String taskId) {
         try {
-            // 这里应该调用服务获取编排ID，简化实现
-            return "orchestration_" + taskId;
+            // 通过taskId查询工作流，获取真实的工作流ID
+            OrchestrationWorkflow workflow = orchestrationMapper.selectByTaskId(taskId);
+            if (workflow != null) {
+                return workflow.getId();
+            }
+            log.warn("未找到taskId对应的工作流: taskId={}", taskId);
+            return null;
         } catch (Exception e) {
             log.warn("获取工作流编排ID失败: taskId={}", taskId, e);
             return null;
