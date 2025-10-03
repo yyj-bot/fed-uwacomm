@@ -23,8 +23,9 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 完整的联邦学习流程端到端测试 (v1.5.1)
+ * 完整的联邦学习流程端到端测试 (v1.5.1修正版)
  * 🆕 v1.5.1新增测试：数据切片、BatchRange、SliceVerification
+ * 🔧 修正版：分离任务创建与启动的数据分发逻辑
  *
  * 测试流程：
  * 1. 管理员登录
@@ -32,11 +33,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 3. WebSocket连接建立 (v1.5.1协议)
  * 4. 训练数据上传
  * 5. 查询可用资源
- * 6. 创建联邦学习任务 (v1.5.1)
- * 7. 数据集分配验证 (v1.5.1新增：验证SliceInfo)
- * 8. 数据传输监控 (v1.5.1新增：验证BatchRange)
- * 9. 数据完整性验证 (v1.5.1新增：验证SliceVerification)
- * 10. 任务启动流程
+ * 6. 创建联邦学习任务（仅记录配置，不分发数据）
+ * 7. 启动任务（触发数据切片和分发）
+ * 8. 数据集分配验证 (v1.5.1：验证SliceInfo)
+ * 9. 数据传输监控 (v1.5.1：验证BatchRange)
+ * 10. 数据完整性验证 (v1.5.1：验证SliceVerification)
  * 11. 联邦学习执行
  * 12. 结果获取
  * 13. 清理连接
@@ -44,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author FedUWAComm Team
  * @version 1.5.1
  * @since 2025-09-30
+ * @updated 2025-10-03 修正任务创建与启动的数据分发时机
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -82,9 +84,10 @@ class CompleteFederatedLearningFlowTestV151 {
     @BeforeAll
     void setUp() {
         baseUrl = "http://localhost:" + port;
-        System.out.println("🚀 完整联邦学习流程测试 (v1.5.1) 开始");
+        System.out.println("🚀 完整联邦学习流程测试 (v1.5.1修正版) 开始");
         System.out.println("🌐 测试服务地址: " + baseUrl);
         System.out.println("🆕 v1.5.1新增测试：数据切片、BatchRange、SliceVerification验证");
+        System.out.println("🔧 修正版：任务创建与启动的数据分发逻辑分离");
 
         // 初始化5个测试虚拟机
         // VmTestData参数: vmId, name, ipAddress, port, cpuCores, memoryMb, gpuCount
@@ -304,13 +307,13 @@ class CompleteFederatedLearningFlowTestV151 {
     }
 
     /**
-     * 步骤6：创建联邦学习任务 (v1.5.1)
-     * 🆕 v1.5.1：任务创建将触发数据切片和分发
+     * 步骤6：创建联邦学习任务 (v1.5.1修正版)
+     * 🔧 仅创建任务记录，不触发数据分发
      */
     @Test
     @Order(6)
     void test06_CreateFederatedTaskV151() {
-        System.out.println("\n🚀 步骤6：创建联邦学习任务测试 (v1.5.1)");
+        System.out.println("\n🚀 步骤6：创建联邦学习任务测试 (v1.5.1修正版)");
 
         Map<String, Object> createRequest = new HashMap<>();
         createRequest.put("taskName", "v1.5.1联邦学习任务-数据切片验证");
@@ -376,6 +379,35 @@ class CompleteFederatedLearningFlowTestV151 {
 
         System.out.println("✅ v1.5.1联邦学习任务创建成功");
         System.out.println("📋 任务ID: " + taskId);
+        System.out.println("⚠️  任务状态: CREATED (数据尚未分发)");
+    }
+
+    /**
+     * 步骤7：任务启动流程 (v1.5.1修正版)
+     * 🔥 启动任务，触发数据切片和分发
+     */
+    @Test
+    @Order(7)
+    void test07_TaskStartFlowV151() throws InterruptedException {
+        System.out.println("\n🚀 步骤7：任务启动流程测试 (v1.5.1修正版)");
+        System.out.println("🎯 此步骤将触发数据切片和分发");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminAccessToken);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Result<TaskOperationVO>> startResponse = restTemplate.exchange(
+            baseUrl + "/api/federated/tasks/" + taskId + "/start",
+            HttpMethod.POST,
+            entity,
+            new ParameterizedTypeReference<Result<TaskOperationVO>>() {}
+        );
+
+        assertThat(startResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(startResponse.getBody()).isNotNull();
+        assertThat(startResponse.getBody().getCode()).isEqualTo(200);
+
+        System.out.println("✅ 任务已启动，状态变更为 RUNNING");
         System.out.println("🎯 等待数据切片和分发完成...");
 
         // 等待后端完成数据切片和分发
@@ -383,13 +415,13 @@ class CompleteFederatedLearningFlowTestV151 {
     }
 
     /**
-     * 步骤7：数据集分配验证 (v1.5.1新增)
+     * 步骤8：数据集分配验证 (v1.5.1)
      * 🆕 v1.5.1核心测试：验证DATASET_CREATE消息包含SliceInfo
      */
     @Test
-    @Order(7)
-    void test07_DatasetAllocationWithSliceInfoV151() throws InterruptedException {
-        System.out.println("\n📦 步骤7：数据集分配验证测试 (v1.5.1核心功能)");
+    @Order(8)
+    void test08_DatasetAllocationWithSliceInfoV151() throws InterruptedException {
+        System.out.println("\n📦 步骤8：数据集分配验证测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：DATASET_CREATE消息包含SliceInfo");
 
         Thread.sleep(3000);
@@ -435,13 +467,13 @@ class CompleteFederatedLearningFlowTestV151 {
     }
 
     /**
-     * 步骤8：数据传输监控 (v1.5.1新增)
+     * 步骤9：数据传输监控 (v1.5.1)
      * 🆕 v1.5.1核心测试：验证DATASET_APPEND_ROWS包含BatchRange和globalIndex
      */
     @Test
-    @Order(8)
-    void test08_DataTransmissionWithBatchRangeV151() throws InterruptedException {
-        System.out.println("\n📡 步骤8：数据传输监控测试 (v1.5.1核心功能)");
+    @Order(9)
+    void test09_DataTransmissionWithBatchRangeV151() throws InterruptedException {
+        System.out.println("\n📡 步骤9：数据传输监控测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：DATASET_APPEND_ROWS包含BatchRange和globalIndex");
 
         Thread.sleep(3000);
@@ -491,13 +523,13 @@ class CompleteFederatedLearningFlowTestV151 {
     }
 
     /**
-     * 步骤9：数据完整性验证 (v1.5.1新增)
+     * 步骤10：数据完整性验证 (v1.5.1)
      * 🆕 v1.5.1核心测试：验证DATASET_COMPLETE_ACK包含SliceVerification
      */
     @Test
-    @Order(9)
-    void test09_DataIntegrityVerificationV151() throws InterruptedException {
-        System.out.println("\n🔍 步骤9：数据完整性验证测试 (v1.5.1核心功能)");
+    @Order(10)
+    void test10_DataIntegrityVerificationV151() throws InterruptedException {
+        System.out.println("\n🔍 步骤10：数据完整性验证测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：VM生成SliceVerification并通过backend验证");
 
         Thread.sleep(3000);
@@ -567,33 +599,6 @@ class CompleteFederatedLearningFlowTestV151 {
         }
 
         System.out.println("✅ 数据完整性验证完成 (v1.5.1)");
-    }
-
-    /**
-     * 步骤10：任务启动流程
-     */
-    @Test
-    @Order(10)
-    void test10_TaskStartFlow() throws InterruptedException {
-        System.out.println("\n🚀 步骤10：任务启动流程测试");
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(adminAccessToken);
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<Result<TaskOperationVO>> startResponse = restTemplate.exchange(
-            baseUrl + "/api/federated/tasks/" + taskId + "/start",
-            HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<TaskOperationVO>>() {}
-        );
-
-        assertThat(startResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(startResponse.getBody()).isNotNull();
-        assertThat(startResponse.getBody().getCode()).isEqualTo(200);
-
-        System.out.println("✅ 任务已启动，状态变更为 RUNNING");
-        Thread.sleep(2000);
     }
 
     /**

@@ -886,7 +886,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                                 participant.getId(), participant.getAssignedDatasetId());
 
                         participant.setAssignedDatasetId(assignedDatasetId);
-                        participant.setDatasetStatus("CREATING");
+                        participant.setDatasetStatus("UPLOADING");
                         participant.setDatasetCreatedAt(LocalDateTime.now());
                         participant.setUpdatedAt(LocalDateTime.now());
 
@@ -986,15 +986,15 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                 try {
                     TaskParticipant finalParticipant = taskParticipantsMapper.selectParticipant(taskId, vmId);
                     if (finalParticipant != null) {
-                        finalParticipant.setDatasetStatus("READY");
+                        finalParticipant.setDatasetStatus("COMPLETED");
                         finalParticipant.setUpdatedAt(LocalDateTime.now());
                         int updated = taskParticipantsMapper.updateParticipant(finalParticipant);
-                        log.info("✅ 数据集状态更新为READY: vmId={}, updateCount={}", vmId, updated);
+                        log.info("✅ 数据集状态更新为COMPLETED: vmId={}, updateCount={}", vmId, updated);
                         return updated;
                     }
                     return 0;
                 } catch (Exception e) {
-                    log.error("❌ 更新READY状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
+                    log.error("❌ 更新COMPLETED状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
                     status.setRollbackOnly();
                     return 0;
                 }

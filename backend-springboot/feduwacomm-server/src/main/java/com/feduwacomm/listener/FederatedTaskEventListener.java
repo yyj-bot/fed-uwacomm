@@ -31,16 +31,16 @@ public class FederatedTaskEventListener {
     private final LogService logService;
 
     /**
-     * 处理联邦学习任务创建完成事件
-     * 自动触发数据切片和分发流程（v1.5.1）
+     * 处理联邦学习任务启动事件（v1.5.1修正版）
+     * 任务启动时触发数据切片和分发流程
      *
-     * @param event 任务创建事件
+     * @param event 任务启动事件
      */
     @EventListener
     // @Async  // 暂时禁用异步，用于调试
-    public void handleTaskCreated(FederatedTaskCreatedEvent event) {
-        System.out.println("🔥🔥🔥 FederatedTaskEventListener.handleTaskCreated() 被调用");
-        log.info("🎯 处理联邦学习任务创建完成事件 (v1.5.1): {}", event);
+    public void handleTaskStarted(com.feduwacomm.event.FederatedTaskStartedEvent event) {
+        System.out.println("🔥🔥🔥 FederatedTaskEventListener.handleTaskStarted() 被调用");
+        log.info("🎯 处理联邦学习任务启动事件 (v1.5.1修正版): {}", event);
         System.out.println("🔥🔥🔥 事件内容: taskId=" + event.getTaskId() + ", datasetId=" + event.getDatasetId());
 
         try {
@@ -72,7 +72,7 @@ public class FederatedTaskEventListener {
             logDetails.put("eventTime", event.getEventTime());
 
             logService.logTask(taskId, "INFO",
-                    String.format("任务创建完成，自动触发数据分发: 数据集=%s, 参与者数=%d, 策略=%s",
+                    String.format("任务启动，自动触发数据分发: 数据集=%s, 参与者数=%d, 策略=%s",
                             datasetId, participantVmIds.size(), distributionStrategy),
                     "FederatedTaskEventListener", null, logDetails);
 
@@ -94,7 +94,7 @@ public class FederatedTaskEventListener {
             // 创建数据分发任务
             log.info("📦 创建数据分发任务: taskId={}, datasetId={}", taskId, datasetId);
             DataDistributionTaskVO distributionTask = dataDistributionService.createDistributionTask(
-                    distributionDTO, event.getCreatedBy());
+                    distributionDTO, event.getStartedBy());
 
             if (distributionTask == null) {
                 log.error("❌ 创建数据分发任务失败: taskId={}, datasetId={}", taskId, datasetId);
@@ -109,7 +109,7 @@ public class FederatedTaskEventListener {
             // 启动数据分发
             log.info("🚀 启动数据分发任务: distributionId={}", distributionTask.getDistributionId());
             DataDistributionTaskVO startedTask = dataDistributionService.startDistribution(
-                    distributionTask.getDistributionId(), event.getCreatedBy());
+                    distributionTask.getDistributionId(), event.getStartedBy());
 
             if (startedTask != null) {
                 log.info("✅ 数据分发任务启动成功 (v1.5.1): taskId={}, distributionId={}, status={}",
@@ -130,12 +130,12 @@ public class FederatedTaskEventListener {
             }
 
         } catch (Exception e) {
-            log.error("❌ 处理任务创建事件失败，自动数据分发异常: taskId={}, error={}",
+            log.error("❌ 处理任务启动事件失败，自动数据分发异常: taskId={}, error={}",
                     event.getTaskId(), e.getMessage(), e);
 
             try {
                 logService.logTask(event.getTaskId(), "ERROR",
-                        "处理任务创建事件失败: " + e.getMessage(),
+                        "处理任务启动事件失败: " + e.getMessage(),
                         "FederatedTaskEventListener", null,
                         Map.of("errorMessage", e.getMessage(), "errorType", e.getClass().getSimpleName()));
             } catch (Exception logEx) {

@@ -3791,7 +3791,7 @@ public class MockVirtualMachine {
                 vmData.getName(), assignedDatasetId, datasetType, sliceInfo != null);
 
         // 模拟数据集创建
-        assignedDatasetStatusMap.put(assignedDatasetId, "CREATING");
+        assignedDatasetStatusMap.put(assignedDatasetId, "UPLOADING");
         String localPath = "/data/assigned/" + assignedDatasetId;
         assignedDatasetLocalPaths.put(assignedDatasetId, localPath);
         backendAssignedDatasetIds.add(assignedDatasetId);
@@ -3905,7 +3905,7 @@ public class MockVirtualMachine {
                 vmData.getName(), assignedDatasetId);
 
         // 更新数据集状态为已完成
-        assignedDatasetStatusMap.put(assignedDatasetId, "READY");
+        assignedDatasetStatusMap.put(assignedDatasetId, "COMPLETED");
 
         // 🆕 v1.5.1: 生成SliceVerification
         Map<String, Object> sliceVerification = generateSliceVerification(assignedDatasetId);
