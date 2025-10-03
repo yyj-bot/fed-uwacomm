@@ -663,8 +663,7 @@ CREATE TABLE IF NOT EXISTS task_participants (
                                                  training_time BIGINT COMMENT '训练时间(秒)',
                                                  data_size INT COMMENT '数据量大小',
 
-    -- v1.3 扩展字段
-                                                 participant_id VARCHAR(50) COMMENT '参与者标识',
+    -- v1.5.1.1 数据分配千分比权重
                                                  data_ratio INT COMMENT 'v1.5.1.1数据分配千分比权重(1-1000整数，同任务所有参与者总和=1000，700表示占70%数据)',
                                                  capabilities JSON COMMENT '能力列表(JSON格式)',
                                                  max_cpu_usage INT COMMENT '最大CPU使用率',

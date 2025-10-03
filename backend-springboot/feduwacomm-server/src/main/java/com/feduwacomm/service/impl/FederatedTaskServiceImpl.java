@@ -1611,9 +1611,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                                                         String taskId, LocalDateTime now) {
         TaskParticipant participant = new TaskParticipant();
         // 生成主键ID
-        String participantId = uuidUtil.generateUuid();
-        participant.setId(participantId);
-        participant.setParticipantId(participantId);
+        participant.setId(uuidUtil.generateUuid());
         participant.setTaskId(taskId);
         participant.setVmId(participantDTO.getVmId());
         participant.setRole(ParticipantRole.fromCode(participantDTO.getRole()));
@@ -2674,8 +2672,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
      * 发送联邦任务启动消息
      */
     private void sendFederatedTaskStart(String vmId, String taskId, String assignedDatasetId) {
-        // 发送FEDERATED_TASK_START消息
-        // TODO: 实现实际的WebSocket消息发送逻辑
         log.info("发送联邦任务启动消息: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+
+        // 🔧 v1.5.1修正：调用WebSocketProtocolService发送FEDERATED_TASK_START消息
+        webSocketProtocolService.sendFederatedTaskStart(vmId, taskId, assignedDatasetId);
     }
 }

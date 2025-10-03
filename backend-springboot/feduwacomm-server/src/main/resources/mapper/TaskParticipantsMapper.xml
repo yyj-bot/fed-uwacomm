@@ -20,7 +20,6 @@
         <result property="finalLoss" column="final_loss"/>
         <result property="trainingTime" column="training_time"/>
         <result property="dataSize" column="data_size"/>
-        <result property="participantId" column="participant_id"/>
         <result property="dataRatio" column="data_ratio"/>
         <result property="capabilities" column="capabilities"/>
         <result property="maxCpuUsage" column="max_cpu_usage"/>
@@ -44,14 +43,14 @@
             id, task_id, vm_id, role, status, data_source,
             current_epoch, loss, accuracy, last_heartbeat,
             final_accuracy, final_loss, training_time, data_size,
-            participant_id, data_ratio, capabilities, max_cpu_usage, max_memory_usage,
+            data_ratio, capabilities, max_cpu_usage, max_memory_usage,
             assigned_dataset_id, dataset_status, local_path, dataset_created_at, dataset_completed_at,
             created_at, updated_at, joined_at, left_at, parameters
         ) VALUES (
             #{id}, #{taskId}, #{vmId}, #{role}, #{status}, #{dataSource},
             #{currentEpoch}, #{loss}, #{accuracy}, #{lastHeartbeat},
             #{finalAccuracy}, #{finalLoss}, #{trainingTime}, #{dataSize},
-            #{participantId}, #{dataRatio}, #{capabilities}, #{maxCpuUsage}, #{maxMemoryUsage},
+            #{dataRatio}, #{capabilities}, #{maxCpuUsage}, #{maxMemoryUsage},
             #{assignedDatasetId}, #{datasetStatus}, #{localPath}, #{datasetCreatedAt}, #{datasetCompletedAt},
             #{createdAt}, #{updatedAt}, #{joinedAt}, #{leftAt}, #{parameters}
         )
@@ -71,7 +70,6 @@
             final_loss = #{finalLoss},
             training_time = #{trainingTime},
             data_size = #{dataSize},
-            participant_id = #{participantId},
             data_ratio = #{dataRatio},
             capabilities = #{capabilities},
             max_cpu_usage = #{maxCpuUsage},
@@ -126,7 +124,7 @@
             COALESCE(status, 'UNKNOWN') as status,
             COALESCE(last_heartbeat, '1970-01-01 00:00:00') as last_heartbeat,
             COALESCE(updated_at, '1970-01-01 00:00:00') as updated_at,
-            COALESCE(id, 'UNKNOWN') as participant_id
+            COALESCE(id, 'UNKNOWN') as id
         FROM task_participants
         WHERE task_id = #{taskId}
           AND id IS NOT NULL           -- 确保主键存在

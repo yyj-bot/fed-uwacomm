@@ -293,9 +293,9 @@ public class FederatedAggregationService {
                     for (int i = 0; i < participantDetails.size(); i++) {
                         Map<String, Object> participant = participantDetails.get(i);
                         // 由于已经预先过滤，这里的participant不应该为null
-                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, 参与者ID={}",
+                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, ID={}",
                                 i, participant.get("vm_id"), participant.get("current_epoch"),
-                                participant.get("status"), participant.get("updated_at"), participant.get("participant_id"));
+                                participant.get("status"), participant.get("updated_at"), participant.get("id"));
                     }
                 } else {
                     log.warn("⚠️ 参与者详情列表为空: 任务ID={}, 可能的原因: 1)任务无参与者 2)数据同步问题 3)查询条件过严", taskId);

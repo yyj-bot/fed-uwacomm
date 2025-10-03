@@ -37,8 +37,6 @@ public class TaskParticipant {
     private Long trainingTime; // 训练时间(秒)
     private Integer dataSize; // 数据量大小
 
-    // v1.3 新增字段
-    private String participantId;
     /**
      * v1.5.1.1 数据分配千分比权重
      *
