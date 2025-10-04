@@ -17,6 +17,41 @@
 - 分发初始模型到参与虚拟机
 - 初始模型版本管理
 
+### 1.3 支持的模型类型
+
+系统支持以下机器学习模型类型：
+
+#### 1.3.1 RANDOM_FOREST - 随机森林（推荐）
+- **描述**: 基于决策树的集成学习模型
+- **适用场景**: 水声信号分类、回归预测、特征重要性分析
+- **架构参数**:
+  ```json
+  {
+    "n_estimators": 100,      // 树的数量，范围：10-500，默认100
+    "n_features": 5,           // 特征数量，最小值：1，默认5
+    "task_type": "regression"  // 任务类型：classification（分类）或 regression（回归）
+  }
+  ```
+- **优势**: 训练速度快、抗过拟合能力强、无需特征归一化
+
+#### 1.3.2 NEURAL_NETWORK - 神经网络
+- **描述**: 深度学习神经网络模型
+- **适用场景**: 复杂特征学习、非线性关系建模
+- **架构参数**:
+  ```json
+  {
+    "inputSize": 128,                    // 输入层大小
+    "hiddenLayers": [64, 32, 16],       // 隐藏层配置
+    "outputSize": 10,                    // 输出层大小
+    "activationFunction": "relu",        // 激活函数
+    "optimizer": "adam",                 // 优化器
+    "learningRate": 0.001               // 学习率
+  }
+  ```
+- **优势**: 强大的表达能力、适合大规模数据
+
+> **注意**: 本文档中的示例主要使用 RANDOM_FOREST 作为演示，但所有接口均支持两种模型类型。
+
 ---
 
 ## 2. API 接口列表
@@ -33,19 +68,25 @@
 ```json
 {
   "taskId": "task_001",
-  "modelType": "neural_network",
+  "modelType": "RANDOM_FOREST",
   "architecture": {
-    "inputSize": 128,
-    "hiddenLayers": [64, 32, 16],
-    "outputSize": 10,
-    "activationFunction": "relu",
-    "optimizer": "adam",
-    "learningRate": 0.001
+    "n_estimators": 100,
+    "n_features": 5,
+    "task_type": "regression"
   },
   "randomSeed": 42,
   "description": "水声信号分类初始模型"
 }
 ```
+
+**参数说明**
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| taskId | string | 是 | 联邦学习任务ID |
+| modelType | string | 是 | 模型类型，可选值：RANDOM_FOREST, NEURAL_NETWORK |
+| architecture | object | 是 | 模型架构参数（不同模型类型参数不同，见1.3节） |
+| randomSeed | number | 否 | 随机种子，用于可重复性实验 |
+| description | string | 否 | 模型描述 |
 
 **响应示例**
 ```json
@@ -55,16 +96,13 @@
   "data": {
     "modelId": "initial_model_001",
     "taskId": "task_001",
-    "modelType": "neural_network",
-    "modelSize": 1048576,
-    "parametersCount": 12345,
+    "modelType": "RANDOM_FOREST",
+    "modelSize": 8192,
+    "parametersCount": 100,
     "architecture": {
-      "inputSize": 128,
-      "hiddenLayers": [64, 32, 16],
-      "outputSize": 10,
-      "activationFunction": "relu",
-      "optimizer": "adam",
-      "learningRate": 0.001
+      "n_estimators": 100,
+      "n_features": 5,
+      "task_type": "regression"
     },
     "generatedAt": "2024-09-10T10:00:00Z",
     "status": "READY",
@@ -85,15 +123,16 @@
 **请求参数**
 ```
 taskId: "task_001" (required)
-modelType: "neural_network" (required)
-description: "预训练的水声模型" (optional)
+modelType: "RANDOM_FOREST" (required)
+description: "预训练的随机森林模型" (optional)
 file: [binary file] (required)
 metadata: {
   "architecture": {
-    "inputSize": 128,
-    "outputSize": 10
+    "n_estimators": 100,
+    "n_features": 5,
+    "task_type": "regression"
   },
-  "framework": "pytorch",
+  "framework": "sklearn",
   "version": "1.0"
 } (optional, JSON string)
 ```
@@ -106,18 +145,19 @@ metadata: {
   "data": {
     "modelId": "initial_model_002",
     "taskId": "task_001",
-    "modelType": "neural_network",
-    "fileName": "initial_model.pth",
-    "modelSize": 2048576,
+    "modelType": "RANDOM_FOREST",
+    "fileName": "initial_model.pkl",
+    "modelSize": 10240,
     "uploadedAt": "2024-09-10T10:00:00Z",
     "status": "UPLOADED",
     "checksum": "sha256:efgh5678...",
     "metadata": {
       "architecture": {
-        "inputSize": 128,
-        "outputSize": 10
+        "n_estimators": 100,
+        "n_features": 5,
+        "task_type": "regression"
       },
-      "framework": "pytorch",
+      "framework": "sklearn",
       "version": "1.0"
     }
   }
@@ -147,17 +187,14 @@ metadata: {
   "data": {
     "modelId": "initial_model_001",
     "taskId": "task_001",
-    "modelType": "neural_network",
-    "modelSize": 1048576,
+    "modelType": "RANDOM_FOREST",
+    "modelSize": 8192,
     "createdAt": "2024-09-10T10:00:00Z",
     "status": "DISTRIBUTED",
     "architecture": {
-      "inputSize": 128,
-      "hiddenLayers": [64, 32, 16],
-      "outputSize": 10,
-      "activationFunction": "relu",
-      "optimizer": "adam",
-      "learningRate": 0.001
+      "n_estimators": 100,
+      "n_features": 5,
+      "task_type": "regression"
     },
     "distributionStatus": {
       "totalVms": 5,
@@ -334,12 +371,35 @@ metadata: {
 {
   "modelId": "string",           // 模型唯一标识
   "taskId": "string",            // 关联的任务ID
-  "modelType": "string",         // 模型类型
+  "modelType": "string",         // 模型类型（RANDOM_FOREST, NEURAL_NETWORK）
   "modelSize": "number",         // 模型大小(字节)
-  "architecture": "object",      // 模型架构参数
+  "architecture": "object",      // 模型架构参数（根据modelType不同而不同）
   "status": "string",           // 模型状态
   "createdAt": "string",        // 创建时间
   "checksum": "string"          // 模型校验和
+}
+```
+
+#### 架构参数详细定义
+
+**RANDOM_FOREST 架构参数**
+```json
+{
+  "n_estimators": "number",      // 树的数量，范围：10-500
+  "n_features": "number",        // 特征数量，最小值：1
+  "task_type": "string"          // 任务类型："classification" 或 "regression"
+}
+```
+
+**NEURAL_NETWORK 架构参数**
+```json
+{
+  "inputSize": "number",         // 输入层大小
+  "hiddenLayers": "array",       // 隐藏层配置，如 [64, 32, 16]
+  "outputSize": "number",        // 输出层大小
+  "activationFunction": "string", // 激活函数，如 "relu", "sigmoid"
+  "optimizer": "string",         // 优化器，如 "adam", "sgd"
+  "learningRate": "number"       // 学习率
 }
 ```
 
@@ -412,14 +472,11 @@ const generateResponse = await fetch('/api/model/initial/generate', {
   },
   body: JSON.stringify({
     taskId: 'task_001',
-    modelType: 'neural_network',
+    modelType: 'RANDOM_FOREST',
     architecture: {
-      inputSize: 128,
-      hiddenLayers: [64, 32, 16],
-      outputSize: 10,
-      activationFunction: 'relu',
-      optimizer: 'adam',
-      learningRate: 0.001
+      n_estimators: 100,
+      n_features: 5,
+      task_type: 'regression'
     }
   })
 });
@@ -463,12 +520,16 @@ const checkProgress = async (distributionId) => {
 const uploadCustomModel = async (taskId, modelFile) => {
   const formData = new FormData();
   formData.append('taskId', taskId);
-  formData.append('modelType', 'neural_network');
-  formData.append('description', '预训练的水声模型');
+  formData.append('modelType', 'RANDOM_FOREST');
+  formData.append('description', '预训练的随机森林模型');
   formData.append('file', modelFile);
   formData.append('metadata', JSON.stringify({
-    architecture: { inputSize: 128, outputSize: 10 },
-    framework: 'pytorch',
+    architecture: {
+      n_estimators: 100,
+      n_features: 5,
+      task_type: 'regression'
+    },
+    framework: 'sklearn',
     version: '1.0'
   }));
 

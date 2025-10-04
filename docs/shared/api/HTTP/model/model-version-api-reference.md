@@ -52,6 +52,165 @@
 - **Pickle**: `.pkl`, `.pickle`
 - **Joblib**: `.joblib`
 
+### 2.3 ModelVersionVO 数据结构详细说明
+
+本节详细说明模型版本VO对象的完整数据结构，适用于所有模型版本查询接口。
+
+#### 2.3.1 基础字段
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| modelId | String | 模型版本ID（32位UUID格式） |
+| taskId | String | 关联任务ID（32位UUID格式） |
+| roundNumber | Integer | 聚合轮次 |
+| status | String | 模型状态（见2.1节） |
+| description | String | 模型描述 |
+
+#### 2.3.2 核心评估指标（顶级字段）⭐
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| accuracy | BigDecimal | 准确率（顶级字段，不在metrics对象内） |
+| loss | BigDecimal | 损失值（顶级字段，不在metrics对象内） |
+
+**⚠️ 重要说明：**
+- `accuracy` 和 `loss` 是**顶级字段**，直接在VO对象中
+- **不要**在 `metrics` 对象中查找 accuracy 和 loss
+- `metrics` 对象仅包含其他评估指标（如precision、recall等）
+
+#### 2.3.3 聚合相关字段
+
+| 字段名 | 类型 | 说明 | 接口类型 |
+|--------|------|------|----------|
+| aggregationMethod | String | 聚合方式（如FEDAVG、FEDPROX） | 所有接口 |
+| clientCount | Integer | 参与客户端数量 | 所有接口 |
+| aggregatedAt | LocalDateTime | 聚合完成时间 | 详情接口 |
+
+#### 2.3.4 对象包裹字段 ⭐
+
+##### metrics 对象
+- **类型**: `Map<String, Object>`
+- **用途**: 包含除accuracy和loss之外的其他评估指标
+- **示例字段**:
+  - `precision`: 精确率
+  - `recall`: 召回率
+  - `f1_score`: F1分数
+  - 其他自定义评估指标
+
+**⚠️ 重要：** metrics 对象**不包含** accuracy 和 loss，它们是顶级字段。
+
+##### parameters 对象
+- **类型**: `Map<String, Object>`
+- **用途**: 模型扩展参数，包含训练配置和模型超参数
+- **示例字段**:
+  - `learning_rate`: 学习率
+  - `batch_size`: 批次大小
+  - `optimizer`: 优化器类型
+  - `epochs`: 训练轮数
+  - 其他模型相关参数
+
+**⚠️ 注意：** 不要使用 `modelJson` 字段，该字段是内部实现细节，不在VO中暴露。
+
+#### 2.3.5 文件相关字段
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| fileSize | Long | 文件大小（字节） |
+| fileFormat | String | 文件格式（pkl、h5、pth等） |
+
+#### 2.3.6 时间字段
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| createdAt | LocalDateTime | 创建时间 |
+| aggregatedAt | LocalDateTime | 聚合完成时间（仅详情接口） |
+
+#### 2.3.7 完整数据结构示例
+
+**列表接口返回的数据结构：**
+```json
+{
+  "modelId": "c3d4e5f6789012345678901234567890",
+  "taskId": "a1b2c3d4e5f678901234567890123456",
+  "roundNumber": 1,
+  "aggregationMethod": "FEDAVG",
+  "clientCount": 8,
+  "accuracy": 0.8500,              // ⭐ 顶级字段
+  "loss": 0.123456,                // ⭐ 顶级字段
+  "status": "UPLOADED",
+  "description": "第1轮模型",
+  "metrics": {                     // ⭐ 其他评估指标
+    "precision": 0.85,
+    "recall": 0.84,
+    "f1_score": 0.845
+  },
+  "parameters": {                  // ⭐ 扩展参数
+    "learning_rate": 0.001,
+    "batch_size": 32
+  },
+  "createdAt": "2024-01-01T10:00:00"
+}
+```
+
+**详情接口返回的数据结构：**
+```json
+{
+  "modelId": "c3d4e5f6789012345678901234567890",
+  "taskId": "a1b2c3d4e5f678901234567890123456",
+  "roundNumber": 10,
+  "aggregationMethod": "FEDAVG",
+  "clientCount": 8,
+  "accuracy": 0.89,                // ⭐ 顶级字段
+  "loss": 0.11,                    // ⭐ 顶级字段
+  "status": "UPLOADED",
+  "description": "第10轮聚合模型",
+  "fileSize": 10240,               // 详情接口特有
+  "fileFormat": "pkl",             // 详情接口特有
+  "metrics": {                     // ⭐ 其他评估指标
+    "precision": 0.88,
+    "recall": 0.90,
+    "f1_score": 0.89
+  },
+  "parameters": {                  // ⭐ 扩展参数
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "optimizer": "adam"
+  },
+  "createdAt": "2024-01-01T10:00:00",
+  "aggregatedAt": "2024-01-01T10:05:00"  // 详情接口特有
+}
+```
+
+#### 2.3.8 字段访问示例
+
+**✅ 正确的访问方式：**
+```javascript
+// 访问核心评估指标（顶级字段）
+const accuracy = modelVersion.accuracy;  // ✅
+const loss = modelVersion.loss;          // ✅
+
+// 访问其他评估指标
+const precision = modelVersion.metrics.precision;  // ✅
+const recall = modelVersion.metrics.recall;        // ✅
+
+// 访问扩展参数
+const learningRate = modelVersion.parameters.learning_rate;  // ✅
+const batchSize = modelVersion.parameters.batch_size;        // ✅
+
+// 访问描述和文件信息
+const description = modelVersion.description;  // ✅
+const fileSize = modelVersion.fileSize;        // ✅
+```
+
+**❌ 错误的访问方式：**
+```javascript
+// 错误：在metrics对象中查找accuracy/loss
+const accuracy = modelVersion.metrics.accuracy;  // ❌ undefined
+
+// 错误：使用modelJson字段
+const params = modelVersion.modelJson;  // ❌ 该字段不存在
+```
+
 ## 3. 模型上传接口
 
 ### 3.1 模型文件上传
@@ -179,10 +338,17 @@
         "modelId": "c3d4e5f6789012345678901234567890",
         "taskId": "a1b2c3d4e5f678901234567890123456",
         "roundNumber": 1,
+        "aggregationMethod": "FEDAVG",
+        "clientCount": 8,
         "accuracy": 0.8500,
         "loss": 0.123456,
         "status": "UPLOADED",
         "description": "第1轮模型",
+        "metrics": {
+          "precision": 0.85,
+          "recall": 0.84,
+          "f1_score": 0.845
+        },
         "parameters": {
           "learning_rate": 0.001,
           "batch_size": 32
@@ -212,14 +378,24 @@
     "roundNumber": 10,
     "aggregationMethod": "FEDAVG",
     "clientCount": 8,
-    "modelJson": { /* ... */ },
+    "accuracy": 0.89,
+    "loss": 0.11,
+    "status": "UPLOADED",
+    "description": "第10轮聚合模型",
+    "fileSize": 10240,
+    "fileFormat": "pkl",
     "metrics": {
-      "accuracy": 0.89,
-      "loss": 0.11
+      "precision": 0.88,
+      "recall": 0.90,
+      "f1_score": 0.89
+    },
+    "parameters": {
+      "learning_rate": 0.001,
+      "batch_size": 32,
+      "optimizer": "adam"
     },
     "createdAt": "2024-01-01T10:00:00",
-    "aggregatedAt": "2024-01-01T10:05:00",
-    "status": "UPLOADED"
+    "aggregatedAt": "2024-01-01T10:05:00"
   }
 }
 ```
@@ -252,6 +428,16 @@
         "accuracy": 0.8500,
         "loss": 0.123456,
         "status": "UPLOADED",
+        "description": "第1轮模型",
+        "metrics": {
+          "precision": 0.85,
+          "recall": 0.84,
+          "f1_score": 0.845
+        },
+        "parameters": {
+          "learning_rate": 0.001,
+          "batch_size": 32
+        },
         "createdAt": "2024-01-01T10:00:00"
       }
     ]
