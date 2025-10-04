@@ -28,7 +28,7 @@ public enum ModelType {
 
     public static ModelType fromCode(String code) {
         if (code == null) {
-            return NEURAL_NETWORK;
+            return RANDOM_FOREST;
         }
         for (ModelType type : values()) {
             if (type.code.equals(code)) {

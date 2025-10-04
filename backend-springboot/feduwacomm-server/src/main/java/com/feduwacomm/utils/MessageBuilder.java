@@ -269,7 +269,7 @@ public class MessageBuilder {
 
     /**
      * 构建标准FEDERATED_TASK_START消息
-     * 符合协议v1.4标准
+     * 符合协议v1.5.1标准
      *
      * @param vmId 虚拟机ID
      * @param taskId 任务ID
@@ -278,6 +278,8 @@ public class MessageBuilder {
      * @param hyperparameters 超参数对象
      * @param globalModel 全局模型对象
      * @param message 消息内容
+     * @param assignedDatasetId 分配给VM的数据集ID (v1.5.1必需)
+     * @param dataPath 数据集本地路径 (v1.5.1必需)
      * @return 标准FEDERATED_TASK_START消息
      */
     public static ProtocolMessage buildTrainingStartMessage(
@@ -287,7 +289,9 @@ public class MessageBuilder {
             String mlAlgorithm,
             Map<String, Object> hyperparameters,
             Map<String, Object> globalModel,
-            String message) {
+            String message,
+            String assignedDatasetId,
+            String dataPath) {
 
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
@@ -296,6 +300,12 @@ public class MessageBuilder {
         data.put("hyperparameters", hyperparameters);
         data.put("globalModel", globalModel);
         data.put("message", message);
+
+        // v1.5.1新增：dataConfig必需字段
+        Map<String, Object> dataConfig = new HashMap<>();
+        dataConfig.put("assignedDatasetId", assignedDatasetId);
+        dataConfig.put("dataPath", dataPath);
+        data.put("dataConfig", dataConfig);
 
         return ProtocolMessage.builder()
                 .type(ProtocolType.FEDERATED_TASK_START)
@@ -309,7 +319,7 @@ public class MessageBuilder {
 
     /**
      * 构建标准FEDERATED_TASK_START消息 (别名方法)
-     * 符合协议v1.4标准
+     * 符合协议v1.5.1标准
      *
      * @param vmId 虚拟机ID
      * @param taskId 任务ID
@@ -318,6 +328,8 @@ public class MessageBuilder {
      * @param hyperparameters 超参数对象
      * @param globalModel 全局模型对象
      * @param message 消息内容
+     * @param assignedDatasetId 分配给VM的数据集ID (v1.5.1必需)
+     * @param dataPath 数据集本地路径 (v1.5.1必需)
      * @return 标准FEDERATED_TASK_START消息
      */
     public static ProtocolMessage buildFederatedTaskStartMessage(
@@ -327,7 +339,9 @@ public class MessageBuilder {
             String mlAlgorithm,
             Map<String, Object> hyperparameters,
             Map<String, Object> globalModel,
-            String message) {
+            String message,
+            String assignedDatasetId,
+            String dataPath) {
 
         String messageId = generateStandardId("cmd");
 
@@ -339,6 +353,12 @@ public class MessageBuilder {
         data.put("globalModel", globalModel);
         data.put("message", message);
         data.put("timestamp", Instant.now().toString());
+
+        // v1.5.1新增：dataConfig必需字段
+        Map<String, Object> dataConfig = new HashMap<>();
+        dataConfig.put("assignedDatasetId", assignedDatasetId);
+        dataConfig.put("dataPath", dataPath);
+        data.put("dataConfig", dataConfig);
 
         return ProtocolMessage.builder()
                 .type(ProtocolType.FEDERATED_TASK_START)

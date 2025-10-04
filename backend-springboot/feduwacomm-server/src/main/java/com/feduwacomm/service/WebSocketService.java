@@ -59,4 +59,29 @@ public interface WebSocketService {
      * @return 在线用户数量
      */
     int getOnlineUserCount();
+
+    /**
+     * 向管理员用户发送消息
+     *
+     * @param message 消息内容
+     * @return 成功发送的管理员数量
+     */
+    int sendToAdmins(Map<String, Object> message);
+
+    /**
+     * 向任务订阅者发送消息
+     *
+     * @param taskId 任务ID
+     * @param message 消息内容
+     * @return 成功发送的订阅者数量
+     */
+    int sendToTaskSubscribers(String taskId, Map<String, Object> message);
+
+    /**
+     * 向所有在线用户发送消息
+     *
+     * @param message 消息内容
+     * @return 成功发送的用户数量
+     */
+    int sendToAllUsers(Map<String, Object> message);
 }

@@ -3,10 +3,12 @@ package com.feduwacomm.mapper;
 import com.feduwacomm.entity.TaskParticipant;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 联邦学习任务参与者数据访问层
@@ -100,4 +102,24 @@ public interface TaskParticipantsMapper {
      * 调试方法：获取参与者状态详情用于诊断
      */
     List<Map<String, Object>> getParticipantStatusDetails(@Param("taskId") String taskId);
+
+    /**
+     * 查询所有任务参与者（用于缓存预热）
+     */
+    @Select("""
+        SELECT task_id, vm_id, status, created_at, updated_at
+        FROM task_participants
+        ORDER BY task_id, vm_id
+    """)
+    List<TaskParticipant> selectAllTaskParticipants();
+
+    /**
+     * 根据任务ID查询所有VM ID集合
+     */
+    @Select("""
+        SELECT vm_id FROM task_participants
+        WHERE task_id = #{taskId}
+        ORDER BY vm_id
+    """)
+    Set<String> selectVmIdsByTaskId(@Param("taskId") String taskId);
 }

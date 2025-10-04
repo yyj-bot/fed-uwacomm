@@ -1,5 +1,7 @@
 package com.feduwacomm.config;
 
+import com.feduwacomm.enums.DataStatus;
+import com.feduwacomm.enums.DataType;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.annotation.MapperScan;
@@ -21,13 +23,14 @@ public class MyBatisConfig {
 
     /**
      * 配置SqlSessionFactory
-     * 
+     *
      * @param dataSource 数据源
+     * @param jsonTypeHandler Spring管理的JSON类型处理器
      * @return SqlSessionFactory
      * @throws Exception 异常
      */
     @Bean
-    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource, JsonTypeHandler jsonTypeHandler) throws Exception {
         SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
         sessionFactory.setDataSource(dataSource);
 
@@ -35,8 +38,8 @@ public class MyBatisConfig {
         org.apache.ibatis.session.Configuration configuration = new org.apache.ibatis.session.Configuration();
         configuration.setMapUnderscoreToCamelCase(true);
 
-        // 注册自定义类型处理器
-        configuration.getTypeHandlerRegistry().register(java.util.Map.class, com.feduwacomm.config.JsonTypeHandler.class);
+        // 注册Spring管理的类型处理器实例
+        configuration.getTypeHandlerRegistry().register(java.util.Map.class, jsonTypeHandler);
 
         sessionFactory.setConfiguration(configuration);
 

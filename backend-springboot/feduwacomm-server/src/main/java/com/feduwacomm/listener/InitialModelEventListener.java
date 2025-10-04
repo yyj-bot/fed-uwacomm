@@ -62,11 +62,15 @@ public class InitialModelEventListener {
 
                 // 触发工作流下一阶段（数据分发）
                 try {
+                    System.out.println("🔥🔥🔥 准备触发工作流下一阶段: orchestrationId=" + event.getOrchestrationId());
+
                     java.util.Map<String, Object> context = new java.util.HashMap<>();
                     context.put("initialModelId", event.getModelId());
                     context.put("modelType", event.getModelType());
                     context.put("generationMethod", event.getGenerationMethod());
                     context.put("modelSize", event.getModelSize());
+
+                    System.out.println("🔥🔥🔥 调用triggerNextStage: currentStage=INITIAL_MODEL_GENERATION");
 
                     boolean success = workflowStageTransitionService.triggerNextStage(
                         event.getOrchestrationId(),
@@ -74,12 +78,15 @@ public class InitialModelEventListener {
                         context
                     );
 
+                    System.out.println("🔥🔥🔥 triggerNextStage返回结果: success=" + success);
+
                     if (success) {
-                        log.info("成功触发工作流下一阶段: orchestrationId={}", event.getOrchestrationId());
+                        log.info("🔥🔥🔥 成功触发工作流下一阶段: orchestrationId={}", event.getOrchestrationId());
                     } else {
-                        log.error("触发工作流下一阶段失败: orchestrationId={}", event.getOrchestrationId());
+                        log.error("🔥🔥🔥 触发工作流下一阶段失败: orchestrationId={}", event.getOrchestrationId());
                     }
                 } catch (Exception e) {
+                    System.out.println("🔥🔥🔥 触发工作流下一阶段抛出异常: " + e.getMessage());
                     log.error("触发工作流下一阶段异常: orchestrationId={}", event.getOrchestrationId(), e);
                 }
             }
@@ -256,15 +263,18 @@ public class InitialModelEventListener {
      */
     private void sendModelGenerationNotification(InitialModelGeneratedEvent event) {
         try {
+            // 防御性处理：为null的modelSize提供默认值
+            Long modelSize = event.getModelSize() != null ? event.getModelSize() : 0L;
+
             String title = "初始模型生成完成";
             String message = String.format("模型 %s 生成完成，类型: %s，大小: %d 字节",
-                    event.getModelId(), event.getModelType(), event.getModelSize());
+                    event.getModelId(), event.getModelType(), modelSize);
 
             Map<String, Object> details = Map.of(
                 "modelId", event.getModelId(),
                 "modelType", event.getModelType(),
                 "generationMethod", event.getGenerationMethod(),
-                "modelSize", event.getModelSize(),
+                "modelSize", modelSize,
                 "taskId", event.getTaskId(),
                 "orchestrationId", event.getOrchestrationId() != null ? event.getOrchestrationId() : ""
             );

@@ -3,18 +3,20 @@ package com.feduwacomm.handler;
 import com.feduwacomm.common.Result;
 import com.feduwacomm.exception.ResourceNotFoundException;
 import com.feduwacomm.exception.UserException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,11 +39,11 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
-    public Result<String> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
+    public ResponseEntity<Result<String>> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
         String message = String.format("HTTP方法 '%s' 不被支持，支持的方法: %s",
             ex.getMethod(), String.join(", ", ex.getSupportedMethods()));
-        return Result.failure(405, "方法不被允许", message);
+        Result<String> result = Result.failure(405, "方法不被允许", message);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(result);
     }
 
     /**
@@ -51,11 +53,11 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-    public Result<String> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex) {
+    public ResponseEntity<Result<String>> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException ex) {
         String message = String.format("媒体类型 '%s' 不被支持，支持的类型: %s",
             ex.getContentType(), ex.getSupportedMediaTypes());
-        return Result.failure(415, "不支持的媒体类型", message);
+        Result<String> result = Result.failure(415, "不支持的媒体类型", message);
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(result);
     }
 
     /**
@@ -65,7 +67,7 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public Result<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Result<Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -73,7 +75,42 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        return Result.failure(400, "验证失败", errors);
+        Result<Map<String, String>> result = Result.failure(400, "验证失败", errors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
+
+    /**
+     * 处理缺少必需的multipart部分异常
+     *
+     * @param ex 缺少multipart部分异常
+     * @return 错误响应
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Result<String>> handleMissingServletRequestPartException(MissingServletRequestPartException ex) {
+        String message = String.format("缺少必需的multipart部分: %s", ex.getRequestPartName());
+        Result<String> result = Result.failure(400, "缺少必需参数", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
+
+    /**
+     * 处理multipart解析异常
+     *
+     * @param ex multipart解析异常
+     * @return 错误响应
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<String>> handleMultipartException(MultipartException ex) {
+        String message = "multipart请求解析失败: " + ex.getMessage();
+
+        // 记录详细异常日志用于调试
+        System.err.println("=== MultipartException详细信息 ===");
+        System.err.println("异常类型: " + ex.getClass().getName());
+        System.err.println("异常消息: " + ex.getMessage());
+        ex.printStackTrace();
+        System.err.println("=== MultipartException处理结束 ===");
+
+        Result<String> result = Result.failure(400, "请求格式错误", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
     }
 
     /**
@@ -143,9 +180,38 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(ResourceNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Result<String> handleResourceNotFoundException(ResourceNotFoundException ex) {
-        return Result.failure(404, "资源不存在", ex.getMessage());
+    public ResponseEntity<Result<String>> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        Result<String> result = Result.failure(404, "资源不存在", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
+    }
+
+    /**
+     * 处理HTTP消息转换异常（关键修复：multipart响应序列化问题）
+     *
+     * @param ex HTTP消息转换异常
+     * @param request HTTP请求
+     * @return 错误响应
+     */
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public ResponseEntity<Result<String>> handleHttpMessageNotWritableException(
+            HttpMessageNotWritableException ex,
+            HttpServletRequest request) {
+
+        System.err.println("=== HttpMessageNotWritableException 捕获 ===");
+        System.err.println("请求URI: " + request.getRequestURI());
+        System.err.println("异常消息: " + ex.getMessage());
+        System.err.println("Content-Type: " + request.getContentType());
+        ex.printStackTrace();
+        System.err.println("=== HttpMessageNotWritableException处理结束 ===");
+
+        // 🔧 关键修复：对于multipart请求的响应序列化问题，返回明确的JSON响应
+        Result<String> result = Result.failure(500, "响应序列化失败",
+                "无法将响应对象序列化为JSON，可能是枚举类型或复杂对象序列化配置问题");
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(result);
     }
 
     /**
@@ -155,11 +221,16 @@ public class GlobalExceptionHandler {
      * @return 错误响应
      */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Result<String> handleAllExceptions(Exception ex) {
+    public ResponseEntity<Result<String>> handleAllExceptions(Exception ex) {
         // 记录异常日志
-        System.err.println("全局异常处理器捕获异常: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
-        return Result.failure(500, "服务器内部错误", ex.getMessage());
+        System.err.println("=== 全局异常处理器捕获Exception ===");
+        System.err.println("异常类型: " + ex.getClass().getName());
+        System.err.println("异常消息: " + ex.getMessage());
+        ex.printStackTrace();
+        System.err.println("=== Exception处理结束 ===");
+
+        Result<String> result = Result.failure(500, "服务器内部错误", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
 }

@@ -132,14 +132,14 @@ public class FederatedTaskControllerTest {
             TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO.builder()
                 .vmId("vm1")
                 .role("PARTICIPANT")
-                .dataRatio(0.5)
+                .dataRatio(500) // v1.5.1.1千分比权重：50%数据
                 .build();
 
         TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO smartParticipant2 =
             TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO.builder()
                 .vmId("vm2")
                 .role("PARTICIPANT")
-                .dataRatio(0.5)
+                .dataRatio(500) // v1.5.1.1千分比权重：50%数据，总和=1000
                 .build();
 
         TaskCreateDTO.ParticipantConfigDTO participantConfig = TaskCreateDTO.ParticipantConfigDTO.builder()

@@ -35,9 +35,16 @@ public class WebSocketProtocolController {
 
             ProtocolAck ack = protocolService.handle(message);
 
+            // 某些消息类型（如ACK消息）不需要再次回复，直接返回
+            if (ack == null) {
+                logger.debug("消息处理完成，无需回复ACK - MessageType: {}, VmId: {}",
+                           message != null ? message.getType() : null,
+                           message != null ? message.getVmId() : null);
+                return;
+            }
+
             logger.info("消息处理完成，发送ACK - AckType: {}, AckId: {}, TargetVmId: {}",
-                       ack != null ? ack.getType() : null,
-                       ack != null ? ack.getId() : null,
+                       ack.getType(), ack.getId(),
                        message != null ? message.getVmId() : null);
 
             // 点对点回复给当前用户

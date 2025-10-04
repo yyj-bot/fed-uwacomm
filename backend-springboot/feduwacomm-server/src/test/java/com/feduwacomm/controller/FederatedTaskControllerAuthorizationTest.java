@@ -328,7 +328,7 @@ public class FederatedTaskControllerAuthorizationTest {
                 TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO.builder()
                 .vmId("vm1")
                 .role("PARTICIPANT")
-                .dataRatio(0.5)
+                .dataRatio(1000) // v1.5.1.1千分比权重：单VM占100%数据
                 .build();
 
         TaskCreateDTO.ParticipantConfigDTO participantConfig = TaskCreateDTO.ParticipantConfigDTO.builder()

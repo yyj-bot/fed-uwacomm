@@ -293,9 +293,9 @@ public class FederatedAggregationService {
                     for (int i = 0; i < participantDetails.size(); i++) {
                         Map<String, Object> participant = participantDetails.get(i);
                         // 由于已经预先过滤，这里的participant不应该为null
-                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, 参与者ID={}",
+                        log.debug("参与者状态[{}]: VM={}, 轮次={}, 状态={}, 更新时间={}, ID={}",
                                 i, participant.get("vm_id"), participant.get("current_epoch"),
-                                participant.get("status"), participant.get("updated_at"), participant.get("participant_id"));
+                                participant.get("status"), participant.get("updated_at"), participant.get("id"));
                     }
                 } else {
                     log.warn("⚠️ 参与者详情列表为空: 任务ID={}, 可能的原因: 1)任务无参与者 2)数据同步问题 3)查询条件过严", taskId);
@@ -412,8 +412,8 @@ public class FederatedAggregationService {
                 // 分发全局模型
                 distributeGlobalModel(task, roundNumber, result.getGlobalParameters());
 
-                // 更新任务进度
-                updateTaskProgress(taskId, roundNumber + 1);
+                // 更新任务进度 - 推进到刚完成的轮次号
+                updateTaskProgress(taskId, roundNumber);
 
                 // 发布成功事件 - 转换Map<String, Double>为Map<String, BigDecimal>
                 final Map<String, BigDecimal> metricsAsBigDecimal;
@@ -574,7 +574,7 @@ public class FederatedAggregationService {
                 // 验证参与者状态确实重置
                 List<Map<String, Object>> participantStatus = taskParticipantsMapper.getParticipantStatusDetails(taskId);
                 long trainingCount = participantStatus.stream()
-                    .filter(p -> "TRAINING".equals(p.get("status")))
+                    .filter(p -> p != null && "TRAINING".equals(p.get("status")))
                     .count();
 
                 log.info("✅ 轮次推进完成: 任务ID={}, 当前轮次={}, 重置参与者数量={}, 训练中参与者={}",

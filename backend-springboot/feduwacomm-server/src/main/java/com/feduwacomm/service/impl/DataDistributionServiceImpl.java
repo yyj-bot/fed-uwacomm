@@ -3,30 +3,52 @@ package com.feduwacomm.service.impl;
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.constants.SystemConstants;
 import com.feduwacomm.dto.DataDistributionDTO;
+import com.feduwacomm.dto.DatasetSlice;
+import com.feduwacomm.dto.DatasetAllocationValidation;
+import com.feduwacomm.dto.ProtocolType;
+import com.feduwacomm.dto.ProtocolMessage;
 import com.feduwacomm.entity.DataDistribution;
 import com.feduwacomm.entity.DataDistributionDetail;
+import com.feduwacomm.entity.TrainingDataRow;
 import com.feduwacomm.event.DataDistributionStartedEvent;
 import com.feduwacomm.event.DataDistributionCompletedEvent;
 import com.feduwacomm.mapper.DataDistributionMapper;
 import com.feduwacomm.mapper.DataDistributionDetailMapper;
 import com.feduwacomm.mapper.VmInstancesMapper;
 import com.feduwacomm.mapper.TrainingDatasetMapper;
+import com.feduwacomm.mapper.TrainingDatasetRowMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.common.exception.BusinessException;
 import com.feduwacomm.service.DataDistributionService;
+import com.feduwacomm.service.DataSlicingService;
 import com.feduwacomm.utils.UuidUtil;
+import com.feduwacomm.utils.MessageIdGenerator;
+import com.feduwacomm.utils.MessageBuilder;
+import com.feduwacomm.dto.DataSliceResult;
+import com.feduwacomm.dto.SliceInfo;
+import com.feduwacomm.dto.BatchRange;
+import com.feduwacomm.enums.AllocationStrategy;
 import com.feduwacomm.vo.DataDistributionTaskVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -49,11 +71,21 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     private final DataDistributionDetailMapper dataDistributionDetailMapper;
     private final VmInstancesMapper vmInstancesMapper;
     private final TrainingDatasetMapper trainingDatasetMapper;
+    private final TaskParticipantsMapper taskParticipantsMapper;
+    private final com.feduwacomm.mapper.FederatedTasksMapper federatedTasksMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
+    private final DataSlicingService dataSlicingService;
+    private final TrainingDatasetRowMapper trainingDatasetRowMapper;  // v1.5.1: 数据行查询
+    private final SimpMessagingTemplate messagingTemplate;  // v1.5.1: WebSocket消息发送
+    private final MessageIdGenerator messageIdGenerator;  // v1.5.1: 消息ID生成
+    private final MessageBuilder messageBuilder;  // v1.5.1: 消息构建器
+    private final RatioDataSlicingServiceImpl ratioDataSlicingService;  // v1.5.1.1: 比例分配服务
+    private final PlatformTransactionManager transactionManager;  // 用于异步线程中的编程式事务
 
     private static final String DATA_STORAGE_PATH = "./data/distributed";
+    private static final int BATCH_SIZE = 50;  // v1.5.1: 数据传输批次大小（减小避免WebSocket断开）
 
     @Override
     @Transactional
@@ -109,12 +141,20 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                 distributionId, distribution.getTaskId(), distribution.getStrategy(), startedBy);
         eventPublisher.publishEvent(event);
 
-        // 异步执行分发
-        CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+        // 🔧 v1.5.1.1修复：直接同步执行分发，因为executeDistribution内部已使用TransactionTemplate管理事务
+        // 移除异步执行，避免测试环境中执行时序问题
+        log.info("✅ 事务已提交，开始执行数据分发: distributionId={}", distributionId);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("🔄 开始同步执行数据分发: distributionId={}", distributionId);
+                executeDistribution(distributionId);
+            }
+        });
 
         distribution.setStatus("IN_PROGRESS");
         distribution.setStartedAt(LocalDateTime.now());
-        
+
         List<DataDistributionDetail> details = getDistributionDetails(distributionId);
         return convertToTaskVO(distribution, details);
     }
@@ -156,12 +196,18 @@ public class DataDistributionServiceImpl implements DataDistributionService {
 
         dataDistributionMapper.updateStatus(distributionId, "IN_PROGRESS", LocalDateTime.now(), null);
 
-        // 继续执行分发
-        CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+        // 🔧 修复：在事务提交后再异步执行分发
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("✅ 事务已提交，恢复异步执行数据分发: distributionId={}", distributionId);
+                CompletableFuture.runAsync(() -> executeDistribution(distributionId));
+            }
+        });
 
         distribution.setStatus("IN_PROGRESS");
         distribution.setStartedAt(LocalDateTime.now());
-        
+
         List<DataDistributionDetail> details = getDistributionDetails(distributionId);
         return convertToTaskVO(distribution, details);
     }
@@ -626,65 +672,462 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     /**
      * 执行数据分发
      */
+    /**
+     * 执行数据分发（v1.5.1真实WebSocket通信）
+     *
+     * 核心流程：
+     * 1. 获取任务的所有参与者VM
+     * 2. 执行数据切片（使用DataSlicingService）
+     * 3. 为每个VM执行：
+     *    a. 生成assignedDatasetId
+     *    b. 发送DATASET_CREATE消息（包含SliceInfo）
+     *    c. 分批发送DATASET_APPEND_ROWS消息（包含BatchRange和rows）
+     *    d. 发送DATASET_COMPLETE消息
+     * 4. 更新数据库状态
+     */
     private void executeDistribution(String distributionId) {
         try {
-            log.info("开始执行数据分发: distributionId={}", distributionId);
+            log.info("🔥🔥🔥 开始执行真实数据分发 (v1.5.1): distributionId={}", distributionId);
+            System.out.println("🔥🔥🔥 executeDistribution 被调用: distributionId=" + distributionId);
 
+            DataDistribution distribution = dataDistributionMapper.selectById(distributionId);
+            if (distribution == null) {
+                throw new BusinessException("分发任务不存在: " + distributionId);
+            }
+
+            String taskId = distribution.getTaskId();
             List<DataDistributionDetail> pendingDetails = dataDistributionDetailMapper
                     .selectByDistributionIdAndStatus(distributionId, "PENDING");
 
+            if (pendingDetails.isEmpty()) {
+                log.warn("⚠️ 没有待分发的任务: distributionId={}", distributionId);
+                dataDistributionMapper.updateStatus(distributionId, "COMPLETED", null, LocalDateTime.now());
+                return;
+            }
+
+            String originalDatasetId = pendingDetails.get(0).getDatasetId();
+
+            // 步骤1：从TaskParticipant读取每个VM的比例配置
+            // 查询所有参与者（包含dataRatio）
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+            if (participants.isEmpty()) {
+                throw new BusinessException("任务没有参与者: taskId=" + taskId);
+            }
+
+            // 构建VM ID列表和比例列表（按照participants顺序，保证映射关系）
+            List<String> vmIds = new ArrayList<>();
+            List<Integer> ratios = new ArrayList<>();
+            Map<String, Integer> vmRatioMap = new HashMap<>();
+
+            // 检查是否所有dataRatio都已配置
+            boolean allRatiosConfigured = participants.stream()
+                    .allMatch(p -> p.getDataRatio() != null && p.getDataRatio() > 0);
+
+            if (allRatiosConfigured) {
+                // 方案A：所有dataRatio已配置，验证总和=1000
+                int ratioSum = 0;
+                for (TaskParticipant participant : participants) {
+                    Integer dataRatio = participant.getDataRatio();
+                    vmIds.add(participant.getVmId());
+                    ratios.add(dataRatio);
+                    vmRatioMap.put(participant.getVmId(), dataRatio);
+                    ratioSum += dataRatio;
+                }
+
+                // 验证总和必须=1000
+                if (ratioSum != 1000) {
+                    throw new BusinessException(String.format(
+                            "数据分配权重总和必须等于1000，当前总和=%d，请调整各VM的dataRatio配置", ratioSum));
+                }
+
+                log.info("📊 使用配置的千分比权重: taskId={}, vmRatioMap={}, sum={}",
+                        taskId, vmRatioMap, ratioSum);
+            } else {
+                // 方案B：存在null或0的dataRatio，自动分配平均权重（总和=1000）
+                int vmCount = participants.size();
+                int baseRatio = 1000 / vmCount;  // 基础权重
+                int remainder = 1000 % vmCount;   // 余数
+
+                for (int i = 0; i < participants.size(); i++) {
+                    TaskParticipant participant = participants.get(i);
+                    // 前remainder个VM多分配1个权重单位
+                    int autoRatio = baseRatio + (i < remainder ? 1 : 0);
+                    vmIds.add(participant.getVmId());
+                    ratios.add(autoRatio);
+                    vmRatioMap.put(participant.getVmId(), autoRatio);
+                }
+
+                log.warn("⚠️ 存在未配置的dataRatio，已自动分配平均权重(总和=1000): taskId={}, vmRatioMap={}",
+                        taskId, vmRatioMap);
+            }
+
+            log.info("📊 分发配置: taskId={}, vmCount={}, datasetId={}, vmRatioMap={}",
+                    taskId, vmIds.size(), originalDatasetId, vmRatioMap);
+
+            // 步骤2：读取分配策略
+            com.feduwacomm.entity.FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+            String strategyStr = task != null ? task.getDistributionStrategy() : null;
+            AllocationStrategy strategy = parseStrategy(strategyStr);
+
+            // 判断是否所有比例都是1（均等分配）
+            boolean allRatiosEqual = ratios.stream().allMatch(r -> r == 1);
+
+            log.info("🔪 开始数据切片: datasetId={}, vmCount={}, strategy={}, ratios={}, allEqual={}",
+                    originalDatasetId, vmIds.size(), strategy, ratios, allRatiosEqual);
+
+            List<DataSliceResult> sliceResults;
+            if (strategy == AllocationStrategy.RATIO || !allRatiosEqual) {
+                // 使用比例分配（如果配置了RATIO策略，或者比例不全相等）
+                sliceResults = ratioDataSlicingService.sliceDatasetByRatio(
+                        originalDatasetId, vmIds, ratios,
+                        strategy != null ? strategy : AllocationStrategy.RATIO);
+            } else {
+                // 使用默认策略（IID平均分配）
+                sliceResults = dataSlicingService.sliceDataset(
+                        originalDatasetId, vmIds,
+                        strategy != null ? strategy : AllocationStrategy.IID);
+            }
+
+            // 验证切片完整性
+            int totalSamples = dataSlicingService.getDatasetSize(originalDatasetId);
+            dataSlicingService.validateSlicesCoverage(sliceResults, totalSamples);
+            log.info("✅ 数据切片完成并验证通过: totalSamples={}, sliceCount={}", totalSamples, sliceResults.size());
+
+            // 步骤3：为每个VM执行分发
             boolean allSuccess = true;
-            for (DataDistributionDetail detail : pendingDetails) {
+            for (DataSliceResult sliceResult : sliceResults) {
+                String vmId = sliceResult.getVmId();
+                SliceInfo sliceInfo = sliceResult.getSliceInfo();
+
+                // 查找对应的分发详情记录
+                DataDistributionDetail detail = pendingDetails.stream()
+                        .filter(d -> d.getVmId().equals(vmId))
+                        .findFirst()
+                        .orElse(null);
+
+                if (detail == null) {
+                    log.error("❌ 未找到VM的分发详情: vmId={}", vmId);
+                    allSuccess = false;
+                    continue;
+                }
+
                 try {
                     // 更新状态为处理中
                     dataDistributionDetailMapper.updateStatus(detail.getId(), "IN_PROGRESS", LocalDateTime.now(), null);
 
-                    // 模拟数据分发过程
-                    simulateDataDistribution(detail);
+                    // 执行WebSocket分发
+                    executeVmDataDistribution(taskId, vmId, originalDatasetId, sliceInfo, detail);
 
                     // 更新状态为完成
                     dataDistributionDetailMapper.updateStatus(detail.getId(), "COMPLETED", LocalDateTime.now(), null);
+                    log.info("✅ VM数据分发完成: vmId={}, sliceSamples={}", vmId, sliceInfo.getSliceSamples());
 
                 } catch (Exception e) {
-                    log.error("数据分发失败: detailId={}, error={}", detail.getId(), e.getMessage());
+                    log.error("❌ VM数据分发失败: vmId={}, error={}", vmId, e.getMessage(), e);
                     dataDistributionDetailMapper.updateStatus(detail.getId(), "FAILED", LocalDateTime.now(), e.getMessage());
                     allSuccess = false;
                 }
             }
 
-            // 更新整体状态
+            // 步骤4：更新整体状态
             String finalStatus = allSuccess ? "COMPLETED" : "FAILED";
-            dataDistributionMapper.updateStatus(distributionId, finalStatus, null, LocalDateTime.now());
+            // 🔧 保留原来的started_at，不要覆盖为null
+            LocalDateTime startedAt = distribution.getStartedAt();
+            dataDistributionMapper.updateStatus(distributionId, finalStatus, startedAt, LocalDateTime.now());
 
             // 发布完成事件
-            DataDistribution distribution = dataDistributionMapper.selectById(distributionId);
             DataDistributionCompletedEvent event = new DataDistributionCompletedEvent(
-                    distributionId, distribution.getTaskId(), "COMPLETED".equals(finalStatus), "system");
+                    distributionId, taskId, "COMPLETED".equals(finalStatus), "system");
             eventPublisher.publishEvent(event);
 
-            log.info("数据分发执行完成: distributionId={}, status={}", distributionId, finalStatus);
+            log.info("🎉 数据分发执行完成: distributionId={}, status={}", distributionId, finalStatus);
 
         } catch (Exception e) {
-            log.error("数据分发执行异常: distributionId={}, error={}", distributionId, e.getMessage(), e);
+            log.error("💥 数据分发执行异常: distributionId={}, error={}", distributionId, e.getMessage(), e);
             dataDistributionMapper.updateStatus(distributionId, "FAILED", null, LocalDateTime.now());
         }
     }
 
     /**
-     * 模拟数据分发过程
+     * 为单个VM执行数据分发（v1.5.1 WebSocket协议）
+     *
+     * @param taskId 任务ID
+     * @param vmId 虚拟机ID
+     * @param originalDatasetId 原始数据集ID
+     * @param sliceInfo 切片信息
+     * @param detail 分发详情记录
      */
-    private void simulateDataDistribution(DataDistributionDetail detail) throws InterruptedException {
-        // 模拟分发时间：根据数据大小计算
-        long baseTime = 1000; // 1秒基础时间
-        long sizeBasedTime = detail.getDataSize() != null ? detail.getDataSize() / 1024 / 1024 * 100 : 1000; // 每MB 100ms
-        long totalTime = baseTime + sizeBasedTime + ThreadLocalRandom.current().nextLong(500, 2000);
+    private void executeVmDataDistribution(String taskId, String vmId, String originalDatasetId,
+                                          SliceInfo sliceInfo, DataDistributionDetail detail) {
+        try {
+            System.out.println("🔥🔥🔥 executeVmDataDistribution被调用: vmId=" + vmId + ", taskId=" + taskId);
+            log.info("🔥🔥🔥 开始为VM分发数据: vmId={}, taskId={}, slice=[{}-{}], samples={}",
+                    vmId, taskId, sliceInfo.getStartIndex(), sliceInfo.getEndIndex(), sliceInfo.getSliceSamples());
 
-        Thread.sleep(Math.min(totalTime, 5000)); // 最多等待5秒
+            // 生成assignedDatasetId
+            String assignedDatasetId = uuidUtil.generateUuid();
 
-        // 更新传输大小
-        if (detail.getDataSize() != null) {
-            dataDistributionDetailMapper.updateTransferredSize(detail.getId(), detail.getDataSize());
+            // 🔧 在新事务中更新TaskParticipant（异步线程需要显式事务）
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            // 🔥 强制创建新事务，不加入外层事务
+            transactionTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            Integer updateResult = transactionTemplate.execute(status -> {
+                try {
+                    // 更新TaskParticipant表，记录assignedDatasetId
+                    TaskParticipant participant = taskParticipantsMapper.selectParticipant(taskId, vmId);
+                    System.out.println("🔍🔍🔍 查询participant: taskId=" + taskId + ", vmId=" + vmId +
+                            ", found=" + (participant != null) + ", id=" + (participant != null ? participant.getId() : "null"));
+                    log.info("🔍 查询到的participant: taskId={}, vmId={}, participant={}, id={}",
+                            taskId, vmId, participant != null ? "存在" : "null", participant != null ? participant.getId() : "null");
+
+                    if (participant != null) {
+                        System.out.println("🔧🔧🔧 更新前: id=" + participant.getId() + ", oldAssignedDatasetId=" + participant.getAssignedDatasetId());
+                        log.info("🔧 更新前状态: participant.id={}, oldAssignedDatasetId={}",
+                                participant.getId(), participant.getAssignedDatasetId());
+
+                        participant.setAssignedDatasetId(assignedDatasetId);
+                        participant.setDatasetStatus("UPLOADING");
+                        participant.setDatasetCreatedAt(LocalDateTime.now());
+                        participant.setUpdatedAt(LocalDateTime.now());
+
+                        int updated = taskParticipantsMapper.updateParticipant(participant);
+                        System.out.println("✅✅✅ 更新结果: vmId=" + vmId + ", assignedDatasetId=" + assignedDatasetId + ", updateCount=" + updated);
+                        log.info("✅ TaskParticipant更新执行: vmId={}, assignedDatasetId={}, updateCount={}",
+                                vmId, assignedDatasetId, updated);
+
+                        if (updated == 0) {
+                            System.out.println("❌❌❌ 更新失败: updateCount=0, participant.id=" + participant.getId());
+                            log.error("❌ TaskParticipant更新失败：updateCount=0，可能WHERE条件不匹配，participant.id={}", participant.getId());
+                        }
+                        return updated;
+                    } else {
+                        System.out.println("❌❌❌ 未找到participant: taskId=" + taskId + ", vmId=" + vmId);
+                        log.error("❌ 未找到TaskParticipant记录: taskId={}, vmId={}", taskId, vmId);
+                        return 0;
+                    }
+                } catch (Exception e) {
+                    log.error("❌ 事务中更新participant失败: vmId={}, error={}", vmId, e.getMessage(), e);
+                    status.setRollbackOnly();
+                    return 0;
+                }
+            });
+
+            log.info("🔄 事务提交完成: vmId={}, updateResult={}", vmId, updateResult);
+
+            // 步骤1：发送DATASET_CREATE消息（包含SliceInfo）
+            sendDatasetCreateV151(vmId, taskId, assignedDatasetId, originalDatasetId, sliceInfo);
+            log.info("✅ DATASET_CREATE消息已发送: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
+
+            // 等待VM创建数据集并准备接收数据 - 增加等待时间避免消息发送过快
+            log.info("⏳ 等待VM创建数据集: vmId={}, 等待时间=2000ms", vmId);
+            Thread.sleep(2000);
+
+            // 步骤2：分批发送DATASET_APPEND_ROWS消息
+            int startIndex = sliceInfo.getStartIndex();
+            int endIndex = sliceInfo.getEndIndex();
+            int totalRows = endIndex - startIndex + 1;
+
+            int offset = startIndex;
+            int batchCount = 0;
+            long totalTransferredBytes = 0;
+
+            while (offset <= endIndex) {
+                int remainingRows = endIndex - offset + 1;
+                int currentBatchSize = Math.min(BATCH_SIZE, remainingRows);
+
+                // 从数据库查询数据行
+                List<TrainingDataRow> rows = trainingDatasetRowMapper.selectByDatasetId(
+                        originalDatasetId, offset, currentBatchSize);
+
+                if (rows.isEmpty()) {
+                    log.warn("⚠️ 数据行查询为空: datasetId={}, offset={}, limit={}",
+                            originalDatasetId, offset, currentBatchSize);
+                    break;
+                }
+
+                // 构建BatchRange
+                int localStartIndex = offset - startIndex;
+                int localEndIndex = localStartIndex + rows.size() - 1;
+                BatchRange batchRange = BatchRange.builder()
+                        .localStartIndex(localStartIndex)
+                        .localEndIndex(localEndIndex)
+                        .globalStartIndex(offset)
+                        .globalEndIndex(offset + rows.size() - 1)
+                        .build();
+
+                // 发送DATASET_APPEND_ROWS消息
+                sendDatasetAppendRowsV151(vmId, assignedDatasetId, batchRange, rows);
+
+                batchCount++;
+                offset += rows.size();
+                totalTransferredBytes += estimateDataSize(rows);
+
+                log.debug("📦 批次{}已发送: vmId={}, batchSize={}, progress={}/{}",
+                        batchCount, vmId, rows.size(), offset - startIndex, totalRows);
+
+                // 避免发送过快，稍微等待
+                Thread.sleep(100);
+            }
+
+            log.info("✅ 数据行传输完成: vmId={}, totalBatches={}, totalRows={}", vmId, batchCount, offset - startIndex);
+
+            // 步骤3：发送DATASET_COMPLETE消息
+            sendDatasetCompleteV151(vmId, assignedDatasetId, offset - startIndex);
+            log.info("✅ DATASET_COMPLETE消息已发送: vmId={}, totalRows={}", vmId, offset - startIndex);
+
+            // 更新传输大小
+            dataDistributionDetailMapper.updateTransferredSize(detail.getId(), totalTransferredBytes);
+
+            // 更新TaskParticipant状态为READY（数据传输完成）
+            TransactionTemplate finalUpdateTemplate = new TransactionTemplate(transactionManager);
+            // 🔥 强制创建新事务，不加入外层事务
+            finalUpdateTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            finalUpdateTemplate.execute(status -> {
+                try {
+                    TaskParticipant finalParticipant = taskParticipantsMapper.selectParticipant(taskId, vmId);
+                    if (finalParticipant != null) {
+                        finalParticipant.setDatasetStatus("COMPLETED");
+                        finalParticipant.setUpdatedAt(LocalDateTime.now());
+                        int updated = taskParticipantsMapper.updateParticipant(finalParticipant);
+                        log.info("✅ 数据集状态更新为COMPLETED: vmId={}, updateCount={}", vmId, updated);
+                        return updated;
+                    }
+                    return 0;
+                } catch (Exception e) {
+                    log.error("❌ 更新COMPLETED状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
+                    status.setRollbackOnly();
+                    return 0;
+                }
+            });
+
+        } catch (Exception e) {
+            log.error("❌ VM数据分发异常: vmId={}, error={}", vmId, e.getMessage(), e);
+            throw new RuntimeException("VM数据分发失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 发送DATASET_CREATE消息（v1.5.1协议，包含SliceInfo）
+     */
+    private void sendDatasetCreateV151(String vmId, String taskId, String assignedDatasetId,
+                                      String originalDatasetId, SliceInfo sliceInfo) {
+        System.out.println("🔥🔥🔥 发送DATASET_CREATE消息: vmId=" + vmId + ", assignedDatasetId=" + assignedDatasetId);
+        log.info("🔥🔥🔥 发送DATASET_CREATE消息: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
+
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("taskId", taskId);
+        messageData.put("assignedDatasetId", assignedDatasetId);
+        messageData.put("originalDatasetId", originalDatasetId);
+        messageData.put("datasetType", "TRAINING");
+
+        // 🆕 v1.5.1: 添加SliceInfo
+        Map<String, Object> sliceInfoMap = new HashMap<>();
+        sliceInfoMap.put("startIndex", sliceInfo.getStartIndex());
+        sliceInfoMap.put("endIndex", sliceInfo.getEndIndex());
+        sliceInfoMap.put("sliceSamples", sliceInfo.getSliceSamples());
+        sliceInfoMap.put("totalSamples", sliceInfo.getTotalSamples());
+        sliceInfoMap.put("sliceIndex", sliceInfo.getSliceIndex());
+        sliceInfoMap.put("totalSlices", sliceInfo.getTotalSlices());
+        sliceInfoMap.put("allocationStrategy", sliceInfo.getAllocationStrategy());
+        messageData.put("sliceInfo", sliceInfoMap);
+
+        System.out.println("🔥🔥🔥 SliceInfo内容: startIndex=" + sliceInfo.getStartIndex() + ", endIndex=" + sliceInfo.getEndIndex() + ", sliceSamples=" + sliceInfo.getSliceSamples());
+
+        ProtocolMessage message = messageBuilder.buildServerMessage(
+                ProtocolType.DATASET_CREATE, vmId, messageData);
+
+        System.out.println("🔥🔥🔥 ProtocolMessage构建完成: type=" + message.getType() + ", vmId=" + message.getVmId());
+
+        messagingTemplate.convertAndSend("/topic/vm/" + vmId, message);
+
+        System.out.println("🔥🔥🔥 DATASET_CREATE消息已发送到WebSocket: /topic/vm/" + vmId);
+        log.info("🔥🔥🔥 DATASET_CREATE消息已发送到WebSocket: destination=/topic/vm/{}", vmId);
+    }
+
+    /**
+     * 发送DATASET_APPEND_ROWS消息（v1.5.1协议，包含BatchRange和rows）
+     */
+    private void sendDatasetAppendRowsV151(String vmId, String assignedDatasetId,
+                                          BatchRange batchRange, List<TrainingDataRow> dataRows) {
+        System.out.println("🔥🔥🔥 sendDatasetAppendRowsV151被调用: vmId=" + vmId + ", assignedDatasetId=" + assignedDatasetId + ", rowCount=" + dataRows.size());
+        log.info("🔥🔥🔥 发送DATASET_APPEND_ROWS消息: vmId={}, assignedDatasetId={}, rowCount={}, batchRange=[{}-{}]",
+                vmId, assignedDatasetId, dataRows.size(), batchRange.getGlobalStartIndex(), batchRange.getGlobalEndIndex());
+
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("assignedDatasetId", assignedDatasetId);
+        messageData.put("rowCount", dataRows.size());
+
+        // 🆕 v1.5.1: 添加BatchRange
+        Map<String, Object> batchRangeMap = new HashMap<>();
+        batchRangeMap.put("localStartIndex", batchRange.getLocalStartIndex());
+        batchRangeMap.put("localEndIndex", batchRange.getLocalEndIndex());
+        batchRangeMap.put("globalStartIndex", batchRange.getGlobalStartIndex());
+        batchRangeMap.put("globalEndIndex", batchRange.getGlobalEndIndex());
+        batchRangeMap.put("batchSamples", batchRange.getBatchSize());
+        messageData.put("batchRange", batchRangeMap);
+
+        // 转换数据行为Map列表（包含globalIndex）
+        int currentGlobalIndex = batchRange.getGlobalStartIndex();
+        List<Map<String, Object>> rows = dataRows.stream().map(row -> {
+            Map<String, Object> rowMap = new HashMap<>();
+            // rowData已经是Map类型，直接使用
+            if (row.getRowData() != null) {
+                rowMap.putAll(row.getRowData());
+            }
+            return rowMap;
+        }).collect(Collectors.toList());
+
+        // 🆕 v1.5.1: 为每行添加globalIndex
+        for (int i = 0; i < rows.size(); i++) {
+            rows.get(i).put("globalIndex", currentGlobalIndex + i);
+        }
+
+        messageData.put("rows", rows);
+
+        ProtocolMessage message = messageBuilder.buildServerMessage(
+                ProtocolType.DATASET_APPEND_ROWS, vmId, messageData);
+
+        String destination = "/topic/vm/" + vmId;
+        messagingTemplate.convertAndSend(destination, message);
+
+        System.out.println("🔥🔥🔥 DATASET_APPEND_ROWS消息已发送: destination=" + destination + ", messageId=" + message.getId());
+        log.info("🔥🔥🔥 DATASET_APPEND_ROWS消息已发送到WebSocket: destination={}, messageId={}", destination, message.getId());
+    }
+
+    /**
+     * 发送DATASET_COMPLETE消息（v1.5.1协议）
+     */
+    private void sendDatasetCompleteV151(String vmId, String assignedDatasetId, int totalRows) {
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("assignedDatasetId", assignedDatasetId);
+        messageData.put("totalRows", totalRows);
+        messageData.put("status", "COMPLETE");
+
+        ProtocolMessage message = messageBuilder.buildServerMessage(
+                ProtocolType.DATASET_COMPLETE, vmId, messageData);
+
+        messagingTemplate.convertAndSend("/topic/vm/" + vmId, message);
+    }
+
+    /**
+     * 估算数据大小（字节）
+     */
+    private long estimateDataSize(List<TrainingDataRow> rows) {
+        return rows.stream()
+                .mapToLong(row -> {
+                    if (row.getRowData() == null) {
+                        return 0;
+                    }
+                    try {
+                        // 将Map序列化为JSON字符串来估算大小
+                        String jsonString = objectMapper.writeValueAsString(row.getRowData());
+                        return jsonString.length();
+                    } catch (Exception e) {
+                        // 如果序列化失败，使用粗略估算
+                        return row.getRowData().size() * 50L; // 假设每个字段平均50字节
+                    }
+                })
+                .sum();
     }
 
     /**
@@ -716,22 +1159,30 @@ public class DataDistributionServiceImpl implements DataDistributionService {
 
     /**
      * 创建均衡分发
+     *
+     * v1.5.1修改：为每个VM创建一个分发详情记录（使用相同的原始datasetId，后续会切片）
      */
     private List<DataDistributionDetail> createBalancedDistribution(DataDistributionDTO distributionDTO, String distributionId) {
         List<DataDistributionDetail> details = new ArrayList<>();
-        
+
         int vmCount = distributionDTO.getTargetVmIds().size();
         int datasetCount = distributionDTO.getDatasetIds().size();
-        
-        // 均匀分配数据集到虚拟机
-        for (int i = 0; i < datasetCount; i++) {
-            String datasetId = distributionDTO.getDatasetIds().get(i);
-            String vmId = distributionDTO.getTargetVmIds().get(i % vmCount);
-            
-            DataDistributionDetail detail = createDistributionDetail(distributionId, datasetId, vmId);
+
+        // 获取原始数据集ID（v1.5.1中应该只有一个）
+        String originalDatasetId = (datasetCount > 0) ? distributionDTO.getDatasetIds().get(0) : null;
+        if (originalDatasetId == null) {
+            log.error("❌ 无法创建分发详情：datasetIds为空");
+            return details;
+        }
+
+        // 🔧 v1.5.1修复：为每个VM创建一个分发详情记录
+        for (String vmId : distributionDTO.getTargetVmIds()) {
+            DataDistributionDetail detail = createDistributionDetail(distributionId, originalDatasetId, vmId);
             details.add(detail);
         }
-        
+
+        log.info("✅ 创建了{}个分发详情记录：datasetId={}, vmCount={}", details.size(), originalDatasetId, vmCount);
+
         return details;
     }
 
@@ -982,5 +1433,351 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                 .checksum((String) map.get("checksum"))
                 .errorMessage((String) map.get("error_message"))
                 .build();
+    }
+
+    // ========== v1.5数据集分片和assignedDatasetId管理功能实现 ==========
+
+    @Override
+    public DatasetSlice generateDatasetSlice(String originalDatasetPath, String vmId) {
+        log.info("生成数据集分片 - 原始路径: {}, VM ID: {}", originalDatasetPath, vmId);
+
+        try {
+            // 生成唯一的分配数据集ID
+            String assignedDatasetId = uuidUtil.generateUuid();
+
+            // 获取数据集元信息
+            int totalSamples = analyzeDatasetSize(originalDatasetPath);
+            if (totalSamples <= 0) {
+                log.error("无法分析数据集大小: {}", originalDatasetPath);
+                throw new BusinessException("无效的数据集路径");
+            }
+
+            // 为该VM生成本地路径
+            String localPath = generateLocalPath(vmId, assignedDatasetId);
+
+            // 构建数据集分片
+            return DatasetSlice.builder()
+                    .assignedDatasetId(assignedDatasetId)
+                    .vmId(vmId)
+                    .localPath(localPath)
+                    .sampleCount(totalSamples)
+                    .startIndex(0)
+                    .endIndex(totalSamples)
+                    .createdAt(LocalDateTime.now())
+                    .dataType("federated_learning")
+                    .transferred(false)
+                    .transferStatus("PENDING")
+                    .metadata(String.format("{\"originalPath\":\"%s\",\"vmId\":\"%s\"}", originalDatasetPath, vmId))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("生成数据集分片失败: {}", e.getMessage(), e);
+            throw new BusinessException("数据集分片生成失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public DatasetSlice performIIDAllocation(String originalDatasetPath, int vmIndex, int totalVms) {
+        log.info("执行IID数据分配 - 路径: {}, VM索引: {}, 总VM数: {}", originalDatasetPath, vmIndex, totalVms);
+
+        if (vmIndex < 0 || vmIndex >= totalVms) {
+            throw new BusinessException("VM索引超出范围: " + vmIndex);
+        }
+
+        if (totalVms <= 0) {
+            throw new BusinessException("总VM数必须大于0");
+        }
+
+        try {
+            // 分析数据集总大小
+            int totalSamples = analyzeDatasetSize(originalDatasetPath);
+            if (totalSamples <= 0) {
+                throw new BusinessException("无效的数据集或数据集为空");
+            }
+
+            // IID分配：平均分配数据
+            int samplesPerVm = totalSamples / totalVms;
+            int remainder = totalSamples % totalVms;
+
+            // 计算当前VM的数据范围
+            int startIndex = vmIndex * samplesPerVm;
+            int endIndex = startIndex + samplesPerVm;
+
+            // 将余数分配给前面的VM
+            if (vmIndex < remainder) {
+                startIndex += vmIndex;
+                endIndex += vmIndex + 1;
+            } else {
+                startIndex += remainder;
+                endIndex += remainder;
+            }
+
+            int sampleCount = endIndex - startIndex;
+            String assignedDatasetId = uuidUtil.generateUuid();
+            String vmId = "vm_" + vmIndex; // 临时VM ID，实际使用时应传入真实VM ID
+            String localPath = generateLocalPath(vmId, assignedDatasetId);
+
+            log.info("IID分配结果 - VM{}: 样本{}到{}, 共{}个样本", vmIndex, startIndex, endIndex-1, sampleCount);
+
+            return DatasetSlice.builder()
+                    .assignedDatasetId(assignedDatasetId)
+                    .vmId(vmId)
+                    .localPath(localPath)
+                    .sampleCount(sampleCount)
+                    .startIndex(startIndex)
+                    .endIndex(endIndex)
+                    .createdAt(LocalDateTime.now())
+                    .dataType("federated_learning")
+                    .transferred(false)
+                    .transferStatus("ALLOCATED")
+                    .metadata(String.format("{\"originalPath\":\"%s\",\"vmIndex\":%d,\"totalVms\":%d,\"strategy\":\"IID\"}",
+                            originalDatasetPath, vmIndex, totalVms))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("IID数据分配失败: {}", e.getMessage(), e);
+            throw new BusinessException("IID数据分配失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public DatasetAllocationValidation validateAllocation(String taskId) {
+        log.info("验证任务数据集分配 - 任务ID: {}", taskId);
+
+        try {
+            // 获取任务的所有参与者
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+            if (participants == null || participants.isEmpty()) {
+                return new DatasetAllocationValidation(new HashMap<>(), 0,
+                        LocalDateTime.now(), false, "任务无参与者");
+            }
+
+            // 构建分配信息映射
+            Map<String, DatasetAllocationValidation.DatasetSliceInfo> allocationInfo = new HashMap<>();
+            int totalCalculatedSamples = 0;
+
+            for (TaskParticipant participant : participants) {
+                if (participant.getAssignedDatasetId() == null) {
+                    return new DatasetAllocationValidation(new HashMap<>(), 0,
+                            LocalDateTime.now(), false,
+                            "参与者 " + participant.getVmId() + " 未分配数据集");
+                }
+
+                // 解析数据集信息
+                DatasetAllocationValidation.DatasetSliceInfo sliceInfo =
+                        new DatasetAllocationValidation.DatasetSliceInfo();
+                sliceInfo.setAssignedDatasetId(participant.getAssignedDatasetId());
+                sliceInfo.setLocalPath(participant.getLocalPath());
+                sliceInfo.setStatus(participant.getDatasetStatus());
+
+                // 从参与者数据中获取样本数（这里简化处理，实际应从数据集元数据获取）
+                int sampleCount = participant.getDataSize() != null ? participant.getDataSize() : 0;
+                sliceInfo.setSampleCount(sampleCount);
+
+                allocationInfo.put(participant.getVmId(), sliceInfo);
+                totalCalculatedSamples += sampleCount;
+            }
+
+            // 验证分配完整性
+            DatasetAllocationValidation validation = new DatasetAllocationValidation(
+                    allocationInfo, totalCalculatedSamples);
+
+            log.info("任务{}的数据集分配验证结果: {}", taskId, validation.isValid() ? "通过" : "失败");
+            if (!validation.isValid()) {
+                log.warn("验证失败原因: {}", validation.getErrorMessage());
+            }
+
+            return validation;
+
+        } catch (Exception e) {
+            log.error("验证数据集分配失败: {}", e.getMessage(), e);
+            return new DatasetAllocationValidation(new HashMap<>(), 0,
+                    LocalDateTime.now(), false, "验证过程发生异常: " + e.getMessage());
+        }
+    }
+
+    // ========== v1.5辅助方法 ==========
+
+    /**
+     * 分析数据集大小
+     * TODO: 实现真实的数据集分析逻辑
+     */
+    private int analyzeDatasetSize(String datasetPath) {
+        // 临时实现：返回模拟的样本数
+        // 实际实现应该解析数据集文件，计算真实的样本数量
+        log.debug("分析数据集大小: {}", datasetPath);
+
+        if (datasetPath == null || datasetPath.trim().isEmpty()) {
+            return 0;
+        }
+
+        // 模拟不同数据集的样本数
+        if (datasetPath.contains("small")) {
+            return 1000;
+        } else if (datasetPath.contains("medium")) {
+            return 5000;
+        } else if (datasetPath.contains("large")) {
+            return 10000;
+        } else {
+            return 3000; // 默认样本数
+        }
+    }
+
+    /**
+     * 生成VM本地路径
+     */
+    private String generateLocalPath(String vmId, String assignedDatasetId) {
+        return String.format("/data/federated/%s/dataset_%s", vmId, assignedDatasetId);
+    }
+
+    // ========== v1.5.1数据集切片增强功能实现 ==========
+
+    @Override
+    public List<DataSliceResult> distributeDatasetWithSlice(String taskId, String datasetId,
+                                                             List<String> vmIds, AllocationStrategy strategy) {
+        log.info("使用切片信息分发数据集 (v1.5.1): taskId={}, datasetId={}, vmCount={}, strategy={}",
+                taskId, datasetId, vmIds.size(), strategy);
+
+        // 参数验证
+        if (taskId == null || taskId.isEmpty()) {
+            throw new IllegalArgumentException("taskId不能为空");
+        }
+        if (datasetId == null || datasetId.isEmpty()) {
+            throw new IllegalArgumentException("datasetId不能为空");
+        }
+        if (vmIds == null || vmIds.isEmpty()) {
+            throw new IllegalArgumentException("vmIds列表不能为空");
+        }
+        if (strategy == null) {
+            throw new IllegalArgumentException("strategy不能为空");
+        }
+
+        // 调用DataSlicingService进行数据切分
+        List<DataSliceResult> sliceResults = dataSlicingService.sliceDataset(datasetId, vmIds, strategy);
+
+        log.info("数据切分完成，生成{}个切片", sliceResults.size());
+
+        if (sliceResults.isEmpty()) {
+            throw new BusinessException("数据切分失败，未生成任何切片");
+        }
+
+        return sliceResults;
+    }
+
+    @Override
+    public BatchRange calculateBatchRange(SliceInfo sliceInfo, int batchIndex, int batchSize) {
+        log.debug("计算批次范围 (v1.5.1): sliceIndex={}, batchIndex={}, batchSize={}",
+                sliceInfo.getSliceIndex(), batchIndex, batchSize);
+
+        // 参数验证
+        if (sliceInfo == null) {
+            throw new IllegalArgumentException("sliceInfo不能为空");
+        }
+        if (!sliceInfo.isValid()) {
+            throw new IllegalArgumentException("sliceInfo无效: " + sliceInfo);
+        }
+        if (batchIndex < 0) {
+            throw new IllegalArgumentException("batchIndex不能为负数: " + batchIndex);
+        }
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize必须大于0: " + batchSize);
+        }
+
+        // 计算本地索引范围
+        int localStartIndex = batchIndex * batchSize;
+        int localEndIndex = Math.min(localStartIndex + batchSize - 1, sliceInfo.getSliceSamples() - 1);
+
+        // 检查是否超出切片范围
+        if (localStartIndex >= sliceInfo.getSliceSamples()) {
+            throw new IllegalArgumentException(
+                    String.format("批次索引超出范围: batchIndex=%d, batchSize=%d, sliceSamples=%d",
+                            batchIndex, batchSize, sliceInfo.getSliceSamples())
+            );
+        }
+
+        // 计算全局索引范围
+        int globalStartIndex = sliceInfo.getStartIndex() + localStartIndex;
+        int globalEndIndex = sliceInfo.getStartIndex() + localEndIndex;
+
+        BatchRange batchRange = BatchRange.builder()
+                .localStartIndex(localStartIndex)
+                .localEndIndex(localEndIndex)
+                .globalStartIndex(globalStartIndex)
+                .globalEndIndex(globalEndIndex)
+                .build();
+
+        // 验证BatchRange有效性
+        if (!batchRange.isValid()) {
+            throw new BusinessException("生成的BatchRange无效: " + batchRange);
+        }
+
+        // 验证索引关系
+        if (!batchRange.verifyIndexRelation(sliceInfo.getStartIndex())) {
+            throw new BusinessException(
+                    String.format("BatchRange索引关系验证失败: batchRange=%s, sliceStartIndex=%d",
+                            batchRange, sliceInfo.getStartIndex())
+            );
+        }
+
+        log.debug("批次范围计算完成: localRange=[{}-{}], globalRange=[{}-{}]",
+                localStartIndex, localEndIndex, globalStartIndex, globalEndIndex);
+
+        return batchRange;
+    }
+
+    @Override
+    public void addDualIndices(List<Map<String, Object>> rows, int batchStartIndex, SliceInfo sliceInfo) {
+        // 参数验证（必须在使用参数之前）
+        if (rows == null) {
+            throw new IllegalArgumentException("rows不能为空");
+        }
+        if (sliceInfo == null) {
+            throw new IllegalArgumentException("sliceInfo不能为空");
+        }
+        if (!sliceInfo.isValid()) {
+            throw new IllegalArgumentException("sliceInfo无效: " + sliceInfo);
+        }
+        if (batchStartIndex < 0) {
+            throw new IllegalArgumentException("batchStartIndex不能为负数: " + batchStartIndex);
+        }
+
+        log.debug("添加双重索引 (v1.5.1): rowCount={}, batchStartIndex={}, sliceStartIndex={}",
+                rows.size(), batchStartIndex, sliceInfo.getStartIndex());
+
+        // 为每一行添加双重索引
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+
+            int localIndex = batchStartIndex + i;
+            int globalIndex = sliceInfo.getStartIndex() + localIndex;
+
+            // 添加索引字段
+            row.put("localIndex", localIndex);
+            row.put("globalIndex", globalIndex);
+
+            // 验证索引关系
+            if (globalIndex != sliceInfo.toGlobalIndex(localIndex)) {
+                log.error("索引转换验证失败: localIndex={}, expectedGlobalIndex={}, actualGlobalIndex={}",
+                        localIndex, globalIndex, sliceInfo.toGlobalIndex(localIndex));
+                throw new BusinessException(
+                        String.format("索引转换验证失败: localIndex=%d, globalIndex=%d", localIndex, globalIndex)
+                );
+            }
+        }
+
+        log.debug("双重索引添加完成: 处理{}行数据", rows.size());
+    }
+
+    /**
+     * 解析分配策略字符串
+     *
+     * @param strategyStr 策略字符串（"IID", "RATIO", "NON_IID"）
+     * @return AllocationStrategy枚举，如果无法解析则返回null
+     */
+    private AllocationStrategy parseStrategy(String strategyStr) {
+        if (strategyStr == null || strategyStr.trim().isEmpty()) {
+            return null;
+        }
+        return AllocationStrategy.fromCode(strategyStr.trim());
     }
 }

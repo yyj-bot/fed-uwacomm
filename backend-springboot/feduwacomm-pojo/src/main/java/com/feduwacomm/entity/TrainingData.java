@@ -38,6 +38,8 @@ public class TrainingData {
 
     private String fileFormat;
 
+    private Integer rowCount;
+
     private List<String> tags;
 
     private Map<String, Object> metadata;

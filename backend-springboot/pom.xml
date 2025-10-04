@@ -34,7 +34,7 @@
         <!-- Added: Pin Lombok version for JDK 24 compatibility -->
         <lombok.version>1.18.38</lombok.version>
         <!-- MySQL版本统一管理 -->
-        <mysql.version>8.0.33</mysql.version>
+        <mysql.version>8.4.0</mysql.version>
     </properties>
 
     <dependencyManagement>

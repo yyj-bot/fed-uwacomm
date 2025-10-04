@@ -151,4 +151,20 @@ public class FederatedTask {
     public void setLifecycleStatus(String lifecycleStatus) {
         this.lifecycleStatus = lifecycleStatus;
     }
+
+    /**
+     * 设置任务ID（兼容性方法）
+     * @param taskId 任务ID
+     */
+    public void setTaskId(String taskId) {
+        this.id = taskId;
+    }
+
+    /**
+     * 设置联邦算法（兼容性方法）
+     * @param algorithm 联邦算法
+     */
+    public void setFederatedAlgorithm(String algorithm) {
+        this.algorithm = FederatedAlgorithm.valueOf(algorithm);
+    }
 }

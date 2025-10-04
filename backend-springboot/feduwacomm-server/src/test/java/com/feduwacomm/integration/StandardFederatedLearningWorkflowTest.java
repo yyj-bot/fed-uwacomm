@@ -754,8 +754,8 @@ class StandardFederatedLearningWorkflowTest {
                 // WebSocketConnectionDTO connectionTest = new WebSocketConnectionDTO();
                 // connectionTest.setVmId(vmId);
                 // connectionTest.setTaskId(federatedTaskId);
-                // connectionTest.setMessageType("STATUS_CHECK");
-                
+                // connectionTest.setAckType(VmAckTracking.AckType.TASK_START); // 使用ackType代替messageType
+
                 // boolean isConnected = webSocketProtocolService.testConnection(connectionTest);
                 boolean isConnected = true; // 模拟连接成功
                 

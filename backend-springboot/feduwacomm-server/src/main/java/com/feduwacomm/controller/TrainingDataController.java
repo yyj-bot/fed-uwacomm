@@ -1,5 +1,6 @@
 package com.feduwacomm.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.common.Result;
 import com.feduwacomm.dto.*;
@@ -12,7 +13,9 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,15 +36,23 @@ public class TrainingDataController {
     @Autowired
     private TrainingDataService trainingDataService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     /**
      * 3.1 文件上传接口
      * POST /api/training-data/upload
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<TrainingDataUploadVO> uploadFile(
-            @Valid TrainingDataUploadDTO uploadDTO,
-            @RequestParam("file") MultipartFile file,
-            HttpServletRequest request) {
+            @Valid @RequestPart("uploadDTO") TrainingDataUploadDTO uploadDTO,
+            @RequestPart("file") MultipartFile file,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        // 🔧 关键修复：明确设置响应的Content-Type为application/json
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
 
         String clientIp = IpUtil.getClientIpAddress(request);
         String userId = BaseContext.getCurrentId();
@@ -54,6 +65,21 @@ public class TrainingDataController {
         try {
             TrainingDataUploadVO result = trainingDataService.uploadFile(uploadDTO, file, userId);
             log.info("文件上传成功: datasetId={}, userId={}", result.getDatasetId(), userId);
+
+            // 🔧 调试：尝试序列化结果对象，捕获具体的序列化异常
+            try {
+                String jsonResult = objectMapper.writeValueAsString(result);
+                log.debug("响应JSON预览: {}", jsonResult.substring(0, Math.min(200, jsonResult.length())) + "...");
+            } catch (Exception serializationException) {
+                log.error("🚨 响应序列化异常: {} - 对象类型: {}", serializationException.getMessage(), result.getClass().getSimpleName());
+                log.error("🚨 异常堆栈:", serializationException);
+                // 如果序列化失败，返回一个简化的响应
+                TrainingDataUploadVO safeResult = new TrainingDataUploadVO();
+                safeResult.setDatasetId(result.getDatasetId());
+                safeResult.setStatus("COMPLETED");
+                return Result.success("文件上传成功", safeResult);
+            }
+
             return Result.success("文件上传成功", result);
         } catch (Exception e) {
             log.error("文件上传失败: userId={}, error={}", userId, e.getMessage(), e);

@@ -23,6 +23,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.Builder;
@@ -62,6 +63,28 @@ public class MockVirtualMachine {
     // v1.4新增字段：被动响应模式状态
     private volatile boolean isPassiveMode = true;
     private final ScheduledExecutorService passiveScheduler = Executors.newScheduledThreadPool(2);
+
+    // 🆕 v1.5新增字段：数据集管理
+    private final Map<String, String> taskAssignedDatasetMappings = new ConcurrentHashMap<>();  // taskId -> assignedDatasetId
+    private final Map<String, String> assignedDatasetStatusMap = new ConcurrentHashMap<>();    // assignedDatasetId -> status
+    private final Map<String, String> assignedDatasetLocalPaths = new ConcurrentHashMap<>();  // assignedDatasetId -> localPath
+    private final Set<String> backendAssignedDatasetIds = ConcurrentHashMap.newKeySet();         // 后端分配的数据集ID集合
+
+    // 🆕 v1.5新增字段：协议支持标志
+    private boolean v15ProtocolEnabled = false;
+    private boolean datasetManagementEnabled = false;
+    private boolean assignedDatasetIdEnabled = false;
+
+    // 🆕 v1.5新增字段：消息历史（用于测试验证）
+    private final List<Map<String, Object>> v15ReceivedMessages = Collections.synchronizedList(new ArrayList<>());
+
+    // 🆕 v1.5.1新增字段：切片信息和验证
+    private final Map<String, Map<String, Object>> assignedDatasetSliceInfo = new ConcurrentHashMap<>();  // assignedDatasetId -> sliceInfo
+    private final Map<String, List<Integer>> assignedDatasetReceivedIndices = new ConcurrentHashMap<>();  // assignedDatasetId -> receivedIndices列表
+    private final Map<String, Integer> assignedDatasetExpectedSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 预期样本数
+    private final Map<String, Integer> assignedDatasetActualSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 实际接收样本数
+    private final Map<String, List<Map<String, Object>>> assignedDatasetBatchRanges = new ConcurrentHashMap<>();  // assignedDatasetId -> BatchRange列表
+    private String latestAssignedDatasetId;  // 最新的assignedDatasetId，用于测试
 
     // 协议违规和失败模拟相关字段
     private int protocolViolationCount = 0; // 协议违规计数
@@ -171,8 +194,16 @@ public class MockVirtualMachine {
             // 认证信息通过STOMP CONNECT头部的Authorization Bearer传递
             StompSessionHandler sessionHandler = new MockStompSessionHandlerWithAuth(accessToken, vmData.getVmId());
 
-            // 使用标准的WebSocket URL，不使用原生端点
-            String wsUrl = websocketUrl;
+            // 🆕 v1.5协议: 将HTTP URL转换为WebSocket URL
+            String wsUrl;
+            if (websocketUrl.startsWith("http://")) {
+                wsUrl = websocketUrl.replace("http://", "ws://") + "/ws";
+            } else if (websocketUrl.startsWith("https://")) {
+                wsUrl = websocketUrl.replace("https://", "wss://") + "/ws";
+            } else {
+                // 如果已经是WebSocket URL，直接使用
+                wsUrl = websocketUrl;
+            }
             System.out.println("🔌 [" + vmData.getName() + "] 尝试WebSocket连接: " + wsUrl);
             System.out.println("🆔 [" + vmData.getName() + "] VM ID: " + vmData.getVmId());
             System.out.println("🔐 [" + vmData.getName() + "] Access Token: " + (accessToken != null && accessToken.length() > 20 ? accessToken.substring(0, 20) + "..." : accessToken));
@@ -238,6 +269,16 @@ public class MockVirtualMachine {
                 data.put("vmId", vmData.getVmId());
                 data.put("capabilities", vmData.getCapabilities());
                 data.put("supportedMLAlgorithms", Arrays.asList("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL"));
+
+                // 🆕 v1.5协议: 添加WebSocket协议v1.5要求的必需字段
+                data.put("version", "1.5.0");
+
+                // 使用VmTestData中已有的系统信息，并添加内存信息
+                Map<String, Object> systemInfo = new HashMap<>(vmData.getSystemInfo());
+                systemInfo.put("memory", vmData.getMemoryMb() + "MB");
+                systemInfo.put("cpu", "Intel CPU " + vmData.getCpuCores() + " cores");
+                data.put("systemInfo", systemInfo);
+
                 connectMessage.put("data", data);
 
                 stompSession.send("/app/protocol", connectMessage);
@@ -301,10 +342,17 @@ public class MockVirtualMachine {
             Map<String, Object> heartbeatMessage = createProtocolMessage(ProtocolType.HEARTBEAT);
             Map<String, Object> data = new HashMap<>();
             data.put("status", "ACTIVE");
-            data.put("cpuUsage", 20 + Math.random() * 50);
-            data.put("memoryUsage", 40 + Math.random() * 40);
-            data.put("gpuUsage", vmData.getGpuCount() > 0 ? 30 + Math.random() * 50 : 0);
             data.put("timestamp", System.currentTimeMillis());
+
+            // 🆕 v1.5协议: 添加必需的resourceUsage字段
+            Map<String, Object> resourceUsage = new HashMap<>();
+            resourceUsage.put("cpuUsage", 20 + Math.random() * 50);
+            resourceUsage.put("memoryUsage", 40 + Math.random() * 40);
+            resourceUsage.put("gpuUsage", vmData.getGpuCount() > 0 ? 30 + Math.random() * 50 : 0);
+            resourceUsage.put("diskUsage", 10 + Math.random() * 30);
+            resourceUsage.put("networkUsage", 5 + Math.random() * 20);
+            data.put("resourceUsage", resourceUsage);
+
             heartbeatMessage.put("data", data);
 
             // 使用增强的发送逻辑（支持模拟模式）
@@ -998,13 +1046,18 @@ public class MockVirtualMachine {
             prepareGradientUpload();
         }
 
+        // 🆕 v1.5: 获取分配的数据集ID
+        String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+        if (assignedDatasetId == null) {
+            throw new IllegalStateException("v1.5协议要求: 任务未关联assignedDatasetId，taskId=" + taskId);
+        }
+
         Map<String, Object> gradientMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
         Map<String, Object> data = new HashMap<>();
         data.put("vmId", vmData.getVmId());
         data.put("taskId", taskId);
-        data.put("roundNumber", round);  // 修复：按协议文档使用 roundNumber
-        data.put("modelType", currentModelType);
-        data.put("algorithm", currentAlgorithm);
+        data.put("roundNumber", round);
+        data.put("assignedDatasetId", assignedDatasetId);  // 🆕 v1.5必需字段
 
         // 根据模型类型生成不同的梯度数据
         Map<String, Object> gradientData = null;
@@ -1021,7 +1074,7 @@ public class MockVirtualMachine {
         }
 
         if (gradientData != null && !gradientData.isEmpty()) {
-            data.put("gradientData", gradientData);  // 修复：按协议文档使用 gradientData
+            data.put("gradientData", gradientData);
             System.out.println("🔢 [" + vmData.getName() + "] 梯度数据生成成功，参数数量: " + gradientData.size());
         } else {
             System.err.println("❌ [" + vmData.getName() + "] 梯度数据生成失败，使用默认数据");
@@ -1030,7 +1083,7 @@ public class MockVirtualMachine {
             defaultGradients.put("weights", generateRandomMatrix(5, 5));
             defaultGradients.put("biases", generateRandomVector(5));
             defaultGradients.put("learningRate", 0.01);
-            data.put("gradientData", defaultGradients);  // 修复：按协议文档使用 gradientData
+            data.put("gradientData", defaultGradients);
         }
 
         // 添加训练指标数据（按协议文档要求）
@@ -1042,7 +1095,7 @@ public class MockVirtualMachine {
 
         gradientMessage.put("data", data);
         sendStompMessage(gradientMessage);
-        System.out.println("📊 [" + vmData.getName() + "] 梯度上传完成: " + currentModelType + " / " + currentAlgorithm + " (协议兼容格式)");
+        System.out.println("📊 [" + vmData.getName() + "] v1.5梯度上传完成: assignedDatasetId=" + assignedDatasetId + ", round=" + round);
     }
 
     /**
@@ -1204,93 +1257,8 @@ public class MockVirtualMachine {
                     }
                 }
 
-                // 处理不同类型的消息 - 使用ProtocolType枚举比较 (v2.0增强版本)
-                if (isProtocolType(type, ProtocolType.CONNECT_ACK)) {
-                    System.out.println("✅ " + vmData.getName() + " 连接确认");
-                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_START)) {
-                    System.out.println("📨 " + vmData.getName() + " 收到训练开始指令");
-                    // 自动响应训练指令
-                    handleTrainingCommand(messageData);
-                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
-                    System.out.println("📨 [v1.4] " + vmData.getName() + " 收到全局模型广播");
-                    // v1.4协议：使用新的被动响应处理方法
-                    handleGlobalModelBroadcastV14(messageData);
-                } else if (isProtocolType(type, ProtocolType.ROUND_START)) {
-                    System.out.println("🏁 [v1.4] " + vmData.getName() + " 收到轮次开始指令");
-                    // v1.4协议：处理轮次开始
-                    handleRoundStart(messageData);
-                } else if (isProtocolType(type, ProtocolType.ROUND_COMPLETE)) {
-                    System.out.println("🏆 [v1.4] " + vmData.getName() + " 收到轮次完成通知");
-                    // v1.4协议：处理轮次完成
-                    handleRoundComplete(messageData);
-                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_START)) {
-                    System.out.println("📨 [v1.4] " + vmData.getName() + " 收到联邦任务启动指令");
-                    // v1.4协议：处理联邦任务启动（被动模式）
-                    handleFederatedTaskStart(messageData);
-                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_STOP)) {
-                    System.out.println("⏹️ [v1.4] " + vmData.getName() + " 收到联邦任务停止指令");
-                    // v1.4协议：处理任务停止
-                    handleFederatedTaskStop(messageData);
-                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_RESUME)) {
-                    System.out.println("▶️ [v1.4] " + vmData.getName() + " 收到联邦任务恢复指令");
-                    // v1.4协议：处理任务恢复
-                    handleFederatedTaskResume(messageData);
-                } else if (isProtocolType(type, ProtocolType.FEDERATED_TASK_DELETE)) {
-                    System.out.println("🗑️ [v1.4] " + vmData.getName() + " 收到联邦任务删除指令");
-                    // v1.4协议：处理任务删除
-                    handleFederatedTaskDelete(messageData);
-                // ========== v1.4协议消息类型处理 ==========
-                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
-                    System.out.println("📊 " + vmData.getName() + " 收到全局模型广播");
-                    handleGlobalModelBroadcast(messageData);
-                } else if (isProtocolType(type, ProtocolType.ROUND_START)) {
-                    System.out.println("🚀 " + vmData.getName() + " 收到轮次开始通知");
-                    handleRoundStart(messageData);
-                } else if (isProtocolType(type, ProtocolType.ROUND_COMPLETE)) {
-                    System.out.println("✅ " + vmData.getName() + " 收到轮次完成通知");
-                    handleRoundComplete(messageData);
-                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD)) {
-                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传请求");
-                    handleGradientUploadPrepare(messageData);
-                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
-                    System.out.println("📤 " + vmData.getName() + " 收到梯度上传确认");
-                    handleGradientUploadPrepareAck(messageData);
-                } else if (isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK)) {
-                    System.out.println("📊 " + vmData.getName() + " 收到梯度上传确认");
-                    handleGradientUploadAck(messageData);
-                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST)) {
-                    System.out.println("🔄 " + vmData.getName() + " 收到全局模型广播");
-                    handleAggregationNotification(messageData);
-                } else if (isProtocolType(type, ProtocolType.VM_STATUS_QUERY)) {
-                    System.out.println("🔀 " + vmData.getName() + " 收到状态查询");
-                    handleStrategySwitchNotification(messageData);
-                // ========== 原有消息类型继续处理 ==========
-                } else if (isProtocolType(type, ProtocolType.ERROR) ||
-                           isProtocolType(type, ProtocolType.CONNECTION_ERROR) ||
-                           isProtocolType(type, ProtocolType.MESSAGE_ERROR)) {
-                    System.err.println("❌ " + vmData.getName() + " 收到错误消息: " + type);
-                    handleErrorMessage(messageData);
-                } else if (isProtocolType(type, ProtocolType.GLOBAL_MODEL_BROADCAST_ACK) ||
-                           isProtocolType(type, ProtocolType.GRADIENT_UPLOAD_ACK) ||
-                           isProtocolType(type, ProtocolType.HEARTBEAT_ACK)) {
-                    System.out.println("✅ " + vmData.getName() + " 收到确认消息: " + type);
-                    // 对于ACK消息，只需要记录，不需要特殊处理
-                } else if ("GRADIENT_UPLOAD".equals(type)) {
-                    // 检查是否为ACK消息 - ACK消息通常包含status字段且数据结构不同
-                    if (isLikelyAckMessage(messageData)) {
-                        System.out.println("✅ " + vmData.getName() + " 收到疑似GRADIENT_UPLOAD_ACK确认消息");
-                    } else {
-                        // 根据协议文档，GRADIENT_UPLOAD(🔵)应该由虚拟机向服务端发送，服务端不应该发送此消息
-                        handleProtocolViolation(type, "GRADIENT_UPLOAD消息只能由虚拟机发送到服务端，服务端不应发送此消息");
-                    }
-                } else {
-                    System.out.println("📨 " + vmData.getName() + " 收到未知类型消息: " + type);
-                    // 对于未知消息，尝试作为通用训练指令处理
-                    if (messageData.containsKey("taskId")) {
-                        System.out.println("🤖 " + vmData.getName() + " 尝试作为训练指令处理");
-                        handleTrainingCommand(messageData);
-                    }
-                }
+                // 🔥 使用统一的v1.5消息处理器，支持所有v1.5.1协议消息
+                handleV15Message(type, messageData);
             } catch (Exception e) {
                 System.err.println("处理STOMP消息失败: " + e.getMessage());
                 e.printStackTrace();
@@ -2636,7 +2604,7 @@ public class MockVirtualMachine {
                 String status = (String) data.get("status");
                 String suggestion = (String) data.get("suggestion");
 
-                System.err.println("🚨 [" + vmData.getName() + "] 服务端错误消息:");
+                System.err.println("🚨 [CLIENT][" + vmData.getName() + "] 服务端错误消息:");
                 System.err.println("    错误类型: " + messageType);
                 System.err.println("    消息ID: " + messageId);
                 System.err.println("    时间戳: " + timestamp);
@@ -2654,7 +2622,7 @@ public class MockVirtualMachine {
                 handleSpecificError(messageType, errorCode, errorMessage, data);
             }
         } catch (Exception e) {
-            System.err.println("❌ " + vmData.getName() + " 处理错误消息失败: " + e.getMessage());
+            System.err.println("❌ [CLIENT][" + vmData.getName() + "] 处理错误消息失败: " + e.getMessage());
         }
     }
 
@@ -2709,7 +2677,7 @@ public class MockVirtualMachine {
                 System.err.println("📋 " + vmData.getName() + " VM ID列表无效");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知消息错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知消息错误码: " + errorCode);
         }
     }
 
@@ -2734,7 +2702,7 @@ public class MockVirtualMachine {
                 System.err.println("🚫 " + vmData.getName() + " 协议违规");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知连接错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知连接错误码: " + errorCode);
         }
     }
 
@@ -2766,7 +2734,7 @@ public class MockVirtualMachine {
                 System.err.println("📴 " + vmData.getName() + " 虚拟机离线");
                 break;
             default:
-                System.err.println("⚠️ " + vmData.getName() + " 未知状态查询错误码: " + errorCode);
+                System.err.println("⚠️ [CLIENT][" + vmData.getName() + "] 未知状态查询错误码: " + errorCode);
         }
     }
 
@@ -2808,7 +2776,7 @@ public class MockVirtualMachine {
         }
 
         // 输出错误统计
-        System.out.println("📈 [" + vmData.getName() + "] 错误统计: " +
+        System.out.println("📈 [CLIENT][" + vmData.getName() + "] 错误统计: " +
             "消息错误=" + messageErrorCount +
             ", 连接错误=" + connectionErrorCount +
             ", 状态错误=" + statusQueryErrorCount +
@@ -2885,6 +2853,7 @@ public class MockVirtualMachine {
         private Integer currentRound;
         private TaskStatus status;
         private Map<String, Object> localTrainingConfig;
+        private Map<String, Object> globalModelParameters;
         private Instant createdAt;
         private Instant lastUpdated;
 
@@ -2897,7 +2866,7 @@ public class MockVirtualMachine {
                     this.lastUpdated = Instant.now();
                 }
                 return new TaskExecutionContext(taskId, federatedAlgorithm, totalRounds,
-                    currentRound, status, localTrainingConfig, createdAt, lastUpdated);
+                    currentRound, status, localTrainingConfig, globalModelParameters, createdAt, lastUpdated);
             }
         }
     }
@@ -2922,6 +2891,7 @@ public class MockVirtualMachine {
     public enum TaskStatus {
         READY,                      // 准备就绪
         WAITING_FOR_INSTRUCTIONS,  // 等待指令
+        RUNNING,                    // 运行中
         TRAINING,                   // 训练中
         UPLOADING_GRADIENTS,       // 上传梯度中
         WAITING_FOR_MODEL,         // 等待新模型
@@ -2966,7 +2936,7 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 处理WebSocket消息 - v1.4协议专用
+     * 处理WebSocket消息 - v1.5协议专用
      * 用于集成测试的消息处理入口
      */
     public void handleMessage(String message) {
@@ -2974,46 +2944,77 @@ public class MockVirtualMachine {
             Map<String, Object> messageMap = objectMapper.readValue(message, Map.class);
             String messageType = (String) messageMap.get("type");
 
-            log.debug("Mock VM处理消息: vmId={}, messageType={}", vmData.getVmId(), messageType);
+            log.debug("Mock VM处理消息: vmId={}, messageType={}, protocol=v1.5",
+                     vmData.getVmId(), messageType);
 
-            // v1.4协议消息处理
-            switch (messageType) {
-                case "CONNECT":
-                    handleConnectV14(messageMap);
-                    break;
-                case "FEDERATED_TASK_START":
-                    handleFederatedTaskStartV14(messageMap);
-                    break;
-                case "FEDERATED_TASK_STOP":
-                    handleFederatedTaskStopV14(messageMap);
-                    break;
-                case "FEDERATED_TASK_RESUME":
-                    handleFederatedTaskResumeV14(messageMap);
-                    break;
-                case "FEDERATED_TASK_DELETE":
-                    handleFederatedTaskDeleteV14(messageMap);
-                    break;
-                case "ROUND_START":
-                    handleRoundStartV14(messageMap);
-                    break;
-                case "GLOBAL_MODEL_BROADCAST":
-                    handleGlobalModelBroadcastV14(messageMap);
-                    break;
-                case "ROUND_COMPLETE":
-                    handleRoundCompleteV14(messageMap);
-                    break;
-                case "ERROR":
-                    handleErrorV14(messageMap);
-                    break;
-                default:
-                    log.warn("Mock VM收到未知消息类型: vmId={}, messageType={}",
-                            vmData.getVmId(), messageType);
-            }
+            // 直接处理v1.5协议消息
+            handleV15Message(messageType, messageMap);
         } catch (Exception e) {
             log.error("Mock VM处理消息失败: vmId={}, error={}",
                      vmData.getVmId(), e.getMessage(), e);
         }
     }
+
+
+    /**
+     * 处理v1.5协议消息
+     */
+    private void handleV15Message(String messageType, Map<String, Object> messageMap) throws Exception {
+        switch (messageType) {
+            case "CONNECT":
+                handleConnectV15(messageMap);
+                break;
+            case "FEDERATED_TASK_START":
+                handleFederatedTaskStartV15(messageMap);
+                break;
+            case "FEDERATED_TASK_STOP":
+                handleFederatedTaskStopV15(messageMap);
+                break;
+            case "FEDERATED_TASK_RESUME":
+                handleFederatedTaskResumeV15(messageMap);
+                break;
+            case "FEDERATED_TASK_DELETE":
+                handleFederatedTaskDeleteV15(messageMap);
+                break;
+            case "ROUND_START":
+                handleRoundStartV15(messageMap);
+                break;
+            case "GLOBAL_MODEL_BROADCAST":
+                handleGlobalModelBroadcastV15(messageMap);
+                break;
+            case "ROUND_COMPLETE":
+                handleRoundCompleteV15(messageMap);
+                break;
+            case "DATASET_LIST_QUERY":
+                handleDatasetListQueryV15(messageMap);
+                break;
+            case "DATASET_CREATE":
+                handleDatasetCreateV15(messageMap);
+                break;
+            case "DATASET_APPEND_ROWS":
+                handleDatasetAppendRowsV15(messageMap);
+                break;
+            case "DATASET_COMPLETE":
+                handleDatasetCompleteV15(messageMap);
+                break;
+            case "DATASET_STATUS_QUERY":
+                handleDatasetStatusQueryV15(messageMap);
+                break;
+            case "DATASET_DELETE":
+                handleDatasetDeleteV15(messageMap);
+                break;
+            case "GRADIENT_UPLOAD":
+                validateAndHandleGradientUploadV15(messageMap);
+                break;
+            case "ERROR":
+                handleErrorV15(messageMap);
+                break;
+            default:
+                log.warn("Mock VM收到未知v1.5消息类型: vmId={}, messageType={}",
+                        vmData.getVmId(), messageType);
+        }
+    }
+
 
     /**
      * 模拟离线状态
@@ -3042,46 +3043,30 @@ public class MockVirtualMachine {
         }
     }
 
-    // ==================== v1.4协议消息处理器 ====================
+    // ==================== v1.5协议消息处理器 ====================
 
-    private void handleConnectV14(Map<String, Object> message) {
-        log.info("Mock VM处理CONNECT消息: vmId={}", vmData.getVmId());
-        this.connected = true;
-        // 发送CONNECT_ACK响应
-        sendConnectAckV14();
+    /**
+     * 处理v1.5 CONNECT消息
+     */
+    private void handleConnectV15(Map<String, Object> message) {
+        try {
+            log.info("Mock VM处理CONNECT消息(v1.5): vmId={}", vmData.getVmId());
+            this.connected = true;
+            // 发送CONNECT_ACK响应
+            sendConnectAckV15();
+        } catch (Exception e) {
+            log.error("处理CONNECT消息失败: {}", e.getMessage());
+        }
     }
 
-    private void handleFederatedTaskStartV14(Map<String, Object> message) {
-        Map<String, Object> data = (Map<String, Object>) message.get("data");
-        String taskId = (String) data.get("taskId");
-        String algorithm = (String) data.get("federatedAlgorithm");
-        Integer totalRounds = (Integer) data.get("totalRounds");
-
-        log.info("Mock VM处理任务启动: vmId={}, taskId={}, algorithm={}",
-                vmData.getVmId(), taskId, algorithm);
-
-        // 创建任务执行上下文
-        TaskExecutionContext context = TaskExecutionContext.builder()
-            .taskId(taskId)
-            .federatedAlgorithm(algorithm)
-            .totalRounds(totalRounds)
-            .currentRound(0)
-            .status(TaskStatus.READY)
-            .createdAt(Instant.now())
-            .lastUpdated(Instant.now())
-            .build();
-
-        activeTaskContexts.put(taskId, context);
-
-        // 发送任务启动确认
-        sendFederatedTaskStartAckV14(taskId, "SUCCESS");
-    }
-
-    private void handleFederatedTaskStopV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5 FEDERATED_TASK_STOP消息
+     */
+    private void handleFederatedTaskStopV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
 
-        log.info("Mock VM处理任务停止: vmId={}, taskId={}", vmData.getVmId(), taskId);
+        log.info("Mock VM处理任务停止(v1.5): vmId={}, taskId={}", vmData.getVmId(), taskId);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null) {
@@ -3089,151 +3074,1161 @@ public class MockVirtualMachine {
             context.setLastUpdated(Instant.now());
         }
 
-        sendFederatedTaskStopAckV14(taskId, "SUCCESS");
+        // 发送v1.5格式的任务停止确认
+        sendFederatedTaskStopAckV15(taskId);
     }
 
-    private void handleFederatedTaskResumeV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5 FEDERATED_TASK_RESUME消息
+     */
+    private void handleFederatedTaskResumeV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
 
-        log.info("Mock VM处理任务恢复: vmId={}, taskId={}", vmData.getVmId(), taskId);
+        log.info("Mock VM处理任务恢复(v1.5): vmId={}, taskId={}", vmData.getVmId(), taskId);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null) {
-            context.setStatus(TaskStatus.READY);
+            context.setStatus(TaskStatus.RUNNING);
             context.setLastUpdated(Instant.now());
         }
 
-        sendFederatedTaskResumeAckV14(taskId, "SUCCESS");
+        // 发送v1.5格式的任务恢复确认
+        sendFederatedTaskResumeAckV15(taskId);
     }
 
-    private void handleFederatedTaskDeleteV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5 FEDERATED_TASK_DELETE消息
+     */
+    private void handleFederatedTaskDeleteV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
 
-        log.info("Mock VM处理任务删除: vmId={}, taskId={}", vmData.getVmId(), taskId);
+        log.info("Mock VM处理任务删除(v1.5): vmId={}, taskId={}", vmData.getVmId(), taskId);
+
+        // 清理任务相关的数据集映射
+        cleanupTaskDatasetMappings(taskId);
 
         // 移除任务上下文
         activeTaskContexts.remove(taskId);
-        taskLocalModels.remove(taskId);
 
-        sendFederatedTaskDeleteAckV14(taskId, "SUCCESS");
+        // 发送v1.5格式的任务删除确认
+        sendFederatedTaskDeleteAckV15(taskId);
     }
 
-    private void handleRoundStartV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5 ROUND_START消息
+     */
+    private void handleRoundStartV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
-        Integer roundNumber = (Integer) data.get("roundNumber");
+        Integer round = (Integer) data.get("round");
 
-        log.info("Mock VM处理轮次开始: vmId={}, taskId={}, roundNumber={}",
-                vmData.getVmId(), taskId, roundNumber);
+        log.info("Mock VM处理轮次开始(v1.5): vmId={}, taskId={}, round={}",
+                vmData.getVmId(), taskId, round);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null) {
-            context.setCurrentRound(roundNumber);
+            context.setCurrentRound(round);
             context.setStatus(TaskStatus.TRAINING);
             context.setLastUpdated(Instant.now());
+
+            // 验证数据集分配
+            String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+            if (assignedDatasetId == null) {
+                log.warn("v1.5轮次开始但未找到assignedDatasetId: taskId={}", taskId);
+                sendErrorV15("DATASET_NOT_ASSIGNED", "No assigned dataset for task: " + taskId);
+                return;
+            }
         }
 
-        sendRoundStartAckV14(taskId, roundNumber, "SUCCESS");
-
-        // 异步执行训练
-        CompletableFuture.runAsync(() -> {
-            try {
-                Thread.sleep(1000); // 模拟训练时间
-                executeTrainingV14(taskId, roundNumber);
-            } catch (Exception e) {
-                log.error("Mock VM训练失败: vmId={}, taskId={}, error={}",
-                         vmData.getVmId(), taskId, e.getMessage());
-            }
-        });
+        // 发送v1.5格式的轮次开始确认
+        sendRoundStartAckV15(taskId, round);
     }
 
-
-    private void handleRoundCompleteV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5.1 GLOBAL_MODEL_BROADCAST消息（符合协议规范）
+     */
+    private void handleGlobalModelBroadcastV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
-        Integer roundNumber = (Integer) data.get("roundNumber");
+        Integer roundNumber = (Integer) data.get("roundNumber");  // 🔧 修改：round → roundNumber
 
-        log.info("Mock VM处理轮次完成: vmId={}, taskId={}, roundNumber={}",
+        // 🔧 修改：按照v1.5.1协议规范解析globalModel嵌套对象
+        @SuppressWarnings("unchecked")
+        Map<String, Object> globalModel = (Map<String, Object>) data.get("globalModel");
+        Map<String, Object> modelParameters = null;
+        if (globalModel != null) {
+            modelParameters = (Map<String, Object>) globalModel.get("parameters");
+        }
+
+        log.info("Mock VM处理全局模型广播(v1.5.1): vmId={}, taskId={}, round={}",
                 vmData.getVmId(), taskId, roundNumber);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
-        if (context != null) {
-            context.setStatus(TaskStatus.WAITING_FOR_INSTRUCTIONS);
+        if (context != null && modelParameters != null) {
+            // 更新本地模型参数
+            context.setGlobalModelParameters(modelParameters);
             context.setLastUpdated(Instant.now());
+
+            // 验证assignedDatasetId
+            String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+            if (assignedDatasetId != null) {
+                log.debug("使用assignedDatasetId进行本地训练: {}", assignedDatasetId);
+            }
+
+            // 异步执行本地训练并上传梯度
+            scheduleGradientUploadV15(taskId, roundNumber, assignedDatasetId);  // 🔧 使用roundNumber
         }
 
-        sendRoundCompleteAckV14(taskId, roundNumber, "SUCCESS");
+        // 发送v1.5.1格式的模型接收确认
+        sendModelReceiveAckV15(taskId, roundNumber);  // 🔧 使用roundNumber
     }
 
-    private void handleErrorV14(Map<String, Object> message) {
+    /**
+     * 处理v1.5 ROUND_COMPLETE消息
+     */
+    private void handleRoundCompleteV15(Map<String, Object> message) throws Exception {
+        Map<String, Object> data = (Map<String, Object>) message.get("data");
+        String taskId = (String) data.get("taskId");
+        Integer round = (Integer) data.get("round");
+
+        log.info("Mock VM处理轮次完成(v1.5): vmId={}, taskId={}, round={}",
+                vmData.getVmId(), taskId, round);
+
+        TaskExecutionContext context = activeTaskContexts.get(taskId);
+        if (context != null) {
+            context.setLastUpdated(Instant.now());
+
+            // 检查是否为最后一轮
+            if (round >= context.getTotalRounds()) {
+                context.setStatus(TaskStatus.COMPLETED);
+                log.info("任务完成: vmId={}, taskId={}", vmData.getVmId(), taskId);
+            }
+        }
+
+        // 发送v1.5格式的轮次完成确认
+        sendRoundCompleteAckV15(taskId, round);
+    }
+
+    /**
+     * 处理v1.5 ERROR消息
+     */
+    private void handleErrorV15(Map<String, Object> message) {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String errorCode = (String) data.get("errorCode");
         String errorMessage = (String) data.get("errorMessage");
 
-        log.info("Mock VM处理错误消息: vmId={}, errorCode={}, errorMessage={}",
-                vmData.getVmId(), errorCode, errorMessage);
+        log.error("Mock VM收到错误消息(v1.5): vmId={}, errorCode={}, message={}",
+                 vmData.getVmId(), errorCode, errorMessage);
     }
 
-    private void executeTrainingV14(String taskId, int roundNumber) {
-        log.info("Mock VM执行训练: vmId={}, taskId={}, roundNumber={}",
-                vmData.getVmId(), taskId, roundNumber);
-
-        TaskExecutionContext context = activeTaskContexts.get(taskId);
-        if (context != null && context.getStatus() != TaskStatus.FAILED) {
-            context.setStatus(TaskStatus.UPLOADING_GRADIENTS);
-            context.setLastUpdated(Instant.now());
-
-            // 模拟梯度上传
-            sendGradientUploadV14(taskId, roundNumber);
+    /**
+     * 清理任务相关的数据集映射
+     */
+    private void cleanupTaskDatasetMappings(String taskId) {
+        String assignedDatasetId = taskAssignedDatasetMappings.remove(taskId);
+        if (assignedDatasetId != null) {
+            assignedDatasetStatusMap.remove(assignedDatasetId);
+            assignedDatasetLocalPaths.remove(assignedDatasetId);
+            backendAssignedDatasetIds.remove(assignedDatasetId);
+            log.debug("清理任务数据集映射: taskId={}, assignedDatasetId={}", taskId, assignedDatasetId);
         }
     }
 
-    // ==================== v1.4协议消息发送器 ====================
+    /**
+     * 安排v1.5梯度上传
+     */
+    private void scheduleGradientUploadV15(String taskId, Integer round, String assignedDatasetId) {
+        if (!connected) return;
 
-    private void sendConnectAckV14() {
-        // 模拟发送CONNECT_ACK消息
-        log.debug("Mock VM发送CONNECT_ACK: vmId={}", vmData.getVmId());
+        messageExecutor.schedule(() -> {
+            try {
+                // 模拟本地训练延迟
+                Thread.sleep(simulateTrainingDelay());
+
+                // 生成并发送梯度（包含assignedDatasetId验证）
+                double[] gradientArray = generateMockGradients();
+                Map<String, Object> gradients = new HashMap<>();
+                gradients.put("values", gradientArray);
+                Map<String, Object> metricsV15 = createTrainingMetricsV15(taskId);
+
+                sendGradientUploadV15(taskId, round, gradients, metricsV15, assignedDatasetId);
+            } catch (Exception e) {
+                log.error("v1.5梯度上传失败: vmId={}, taskId={}, round={}, error={}",
+                         vmData.getVmId(), taskId, round, e.getMessage());
+            }
+        }, 1, TimeUnit.SECONDS);
     }
 
-    private void sendFederatedTaskStartAckV14(String taskId, String status) {
-        log.debug("Mock VM发送FEDERATED_TASK_START_ACK: vmId={}, taskId={}, status={}",
-                 vmData.getVmId(), taskId, status);
+
+    // ==================== 🆕 v1.5协议支持 ====================
+
+    /**
+     * 🆕 v1.5数据集状态枚举
+     */
+    public enum DatasetStatus {
+        PENDING, CREATED, UPLOADING, COMPLETED, FAILED
     }
 
-    private void sendFederatedTaskStopAckV14(String taskId, String status) {
-        log.debug("Mock VM发送FEDERATED_TASK_STOP_ACK: vmId={}, taskId={}, status={}",
-                 vmData.getVmId(), taskId, status);
+    /**
+     * 🆕 v1.5协议控制方法
+     */
+    public void enableV15Protocol(boolean enabled) {
+        this.v15ProtocolEnabled = enabled;
+        log.info("🤖 [{}] v1.5协议支持: {}", vmData.getName(), enabled ? "启用" : "禁用");
     }
 
-    private void sendFederatedTaskResumeAckV14(String taskId, String status) {
-        log.debug("Mock VM发送FEDERATED_TASK_RESUME_ACK: vmId={}, taskId={}, status={}",
-                 vmData.getVmId(), taskId, status);
+    public void enableDatasetManagement(boolean enabled) {
+        this.datasetManagementEnabled = enabled;
+        log.info("🤖 [{}] 数据集管理: {}", vmData.getName(), enabled ? "启用" : "禁用");
     }
 
-    private void sendFederatedTaskDeleteAckV14(String taskId, String status) {
-        log.debug("Mock VM发送FEDERATED_TASK_DELETE_ACK: vmId={}, taskId={}, status={}",
-                 vmData.getVmId(), taskId, status);
+    public void enableAssignedDatasetId(boolean enabled) {
+        this.assignedDatasetIdEnabled = enabled;
+        log.info("🤖 [{}] assignedDatasetId支持: {}", vmData.getName(), enabled ? "启用" : "禁用");
     }
 
-    private void sendRoundStartAckV14(String taskId, int roundNumber, String status) {
-        log.debug("Mock VM发送ROUND_START_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
-                 vmData.getVmId(), taskId, roundNumber, status);
+    public boolean supportsProtocolV15(ProtocolType protocolType) {
+        if (!v15ProtocolEnabled) {
+            return false;
+        }
+
+        // v1.5新增协议支持检查
+        if (protocolType == ProtocolType.DATASET_LIST_QUERY ||
+            protocolType == ProtocolType.DATASET_LIST_RESPONSE) {
+            return datasetManagementEnabled;
+        }
+        if (protocolType == ProtocolType.FEDERATED_TASK_START ||
+            protocolType == ProtocolType.GRADIENT_UPLOAD) {
+            return assignedDatasetIdEnabled;
+        }
+        return true;  // 其他协议默认支持
     }
 
-    private void sendGradientUploadV14(String taskId, int roundNumber) {
-        log.debug("Mock VM发送GRADIENT_UPLOAD: vmId={}, taskId={}, roundNumber={}",
-                 vmData.getVmId(), taskId, roundNumber);
+    /**
+     * 🆕 处理FEDERATED_TASK_START消息 (v1.5)
+     * 关键验证：assignedDatasetId位于dataConfig内部
+     */
+    public void handleFederatedTaskStartV15(Map<String, Object> messageData) throws Exception {
+        log.info("🤖 [{}] 收到FEDERATED_TASK_START消息 (v1.5)", vmData.getName());
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+            String taskId = (String) data.get("taskId");
+
+            // 🔑 关键验证：dataConfig结构和assignedDatasetId位置
+            if (!data.containsKey("dataConfig")) {
+                log.error("🤖 [{}] FEDERATED_TASK_START缺少dataConfig字段", vmData.getName());
+                sendErrorResponseV15(messageData, "缺少dataConfig字段");
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> dataConfig = (Map<String, Object>) data.get("dataConfig");
+
+            if (!dataConfig.containsKey("assignedDatasetId")) {
+                log.error("🤖 [{}] dataConfig缺少assignedDatasetId字段", vmData.getName());
+                sendErrorResponseV15(messageData, "dataConfig缺少assignedDatasetId字段");
+                return;
+            }
+
+            String assignedDatasetId = (String) dataConfig.get("assignedDatasetId");
+            String dataPath = (String) dataConfig.get("dataPath");
+
+            // 🆕 保存assignedDatasetId（完全依赖后端分配）
+            taskAssignedDatasetMappings.put(taskId, assignedDatasetId);
+            backendAssignedDatasetIds.add(assignedDatasetId);
+
+            // 🆕 设置本地路径
+            String localPath = "/data/assigned/" + assignedDatasetId;
+            assignedDatasetLocalPaths.put(assignedDatasetId, localPath);
+
+            // 🆕 调用数据集创建模拟器
+            simulateDatasetCreation(assignedDatasetId);
+
+            log.info("🤖 [{}] 任务数据配置完成: taskId={}, assignedDatasetId={}, localPath={}",
+                     vmData.getName(), taskId, assignedDatasetId, localPath);
+
+            // 发送任务启动确认
+            sendFederatedTaskStartAckV15(taskId, assignedDatasetId);
+
+        } catch (Exception e) {
+            log.error("🤖 [{}] 处理FEDERATED_TASK_START失败: {}", vmData.getName(), e.getMessage());
+            sendErrorResponseV15(messageData, "FEDERATED_TASK_START处理失败: " + e.getMessage());
+        }
     }
 
-    private void sendGlobalModelBroadcastAckV14(String taskId, int roundNumber, String status) {
-        log.debug("Mock VM发送GLOBAL_MODEL_BROADCAST_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
-                 vmData.getVmId(), taskId, roundNumber, status);
+    /**
+     * 🆕 处理DATASET_LIST_QUERY消息 (v1.5新增)
+     */
+    public void handleDatasetListQueryV15(Map<String, Object> messageData) throws Exception {
+        log.info("🤖 [{}] 收到DATASET_LIST_QUERY消息", vmData.getName());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String taskId = (String) data.get("taskId");
+        String queryType = (String) data.get("queryType");
+
+        if (!"ASSIGNED_DATASETS".equals(queryType)) {
+            log.warn("🤖 [{}] 不支持的查询类型: {}", vmData.getName(), queryType);
+            return;
+        }
+
+        // 🆕 构建数据集列表响应
+        List<Map<String, Object>> datasets = new ArrayList<>();
+
+        String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+        if (assignedDatasetId != null) {
+            Map<String, Object> dataset = new HashMap<>();
+            dataset.put("assignedDatasetId", assignedDatasetId);
+            dataset.put("status", assignedDatasetStatusMap.get(assignedDatasetId));
+            dataset.put("localPath", assignedDatasetLocalPaths.get(assignedDatasetId));
+            dataset.put("createdAt", Instant.now().toString());
+            datasets.add(dataset);
+        }
+
+        // 发送DATASET_LIST_RESPONSE
+        sendDatasetListResponseV15(taskId, datasets);
     }
 
-    private void sendRoundCompleteAckV14(String taskId, int roundNumber, String status) {
-        log.debug("Mock VM发送ROUND_COMPLETE_ACK: vmId={}, taskId={}, roundNumber={}, status={}",
-                 vmData.getVmId(), taskId, roundNumber, status);
+    /**
+     * 🆕 验证并处理梯度上传 (v1.5)
+     * 包含assignedDatasetId验证
+     */
+    public void validateAndHandleGradientUploadV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String taskId = (String) data.get("taskId");
+        String messageAssignedDatasetId = (String) data.get("assignedDatasetId");
+
+        // 🔑 验证assignedDatasetId
+        String expectedAssignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+        if (!Objects.equals(messageAssignedDatasetId, expectedAssignedDatasetId)) {
+            log.error("🤖 [{}] GRADIENT_UPLOAD中assignedDatasetId验证失败: expected={}, actual={}",
+                     vmData.getName(), expectedAssignedDatasetId, messageAssignedDatasetId);
+            sendErrorResponseV15(messageData, "assignedDatasetId验证失败");
+            return;
+        }
+
+        log.info("🤖 [{}] GRADIENT_UPLOAD验证成功: assignedDatasetId={}",
+                 vmData.getName(), messageAssignedDatasetId);
+
+        // 继续正常的梯度上传处理（使用v1.5升级后的方法）
+        try {
+            String taskIdParam = (String) data.get("taskId");
+            Integer roundNumber = (Integer) data.get("roundNumber");
+            if (roundNumber == null) roundNumber = 1;
+
+            uploadGradients(taskIdParam, roundNumber);
+        } catch (Exception e) {
+            log.error("🤖 [{}] 梯度上传失败: {}", vmData.getName(), e.getMessage());
+        }
+    }
+
+    // ==================== 🆕 v1.5响应发送方法 ====================
+
+    private void sendConnectAckV15() throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.CONNECT_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("status", "CONNECTED");
+        data.put("protocolVersion", "v1.5");
+        data.put("capabilities", Arrays.asList("DATASET_MANAGEMENT", "ASSIGNED_DATASET_ID"));
+        data.put("connectTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送CONNECT_ACK(v1.5)", vmData.getName());
+    }
+
+    private void sendFederatedTaskStopAckV15(String taskId) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_STOP_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("status", "STOPPED");
+        data.put("stopTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送FEDERATED_TASK_STOP_ACK(v1.5): taskId={}", vmData.getName(), taskId);
+    }
+
+    private void sendFederatedTaskResumeAckV15(String taskId) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_RESUME_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("status", "RESUMED");
+        data.put("resumeTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送FEDERATED_TASK_RESUME_ACK(v1.5): taskId={}", vmData.getName(), taskId);
+    }
+
+    private void sendFederatedTaskDeleteAckV15(String taskId) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_DELETE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("status", "DELETED");
+        data.put("deleteTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送FEDERATED_TASK_DELETE_ACK(v1.5): taskId={}", vmData.getName(), taskId);
+    }
+
+    private void sendRoundStartAckV15(String taskId, Integer round) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ROUND_START_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("round", round);
+        data.put("status", "ROUND_STARTED");
+        data.put("startTime", Instant.now().toString());
+
+        // v1.5: 包含数据集验证信息
+        String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+        if (assignedDatasetId != null) {
+            data.put("assignedDatasetId", assignedDatasetId);
+            data.put("datasetStatus", assignedDatasetStatusMap.get(assignedDatasetId));
+        }
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送ROUND_START_ACK(v1.5): taskId={}, round={}", vmData.getName(), taskId, round);
+    }
+
+    private void sendModelReceiveAckV15(String taskId, Integer round) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.MODEL_RECEIVE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("round", round);
+        data.put("status", "MODEL_RECEIVED");
+        data.put("receiveTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送MODEL_RECEIVE_ACK(v1.5): taskId={}, round={}", vmData.getName(), taskId, round);
+    }
+
+    private void sendRoundCompleteAckV15(String taskId, Integer round) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.ROUND_COMPLETE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("round", round);
+        data.put("status", "ROUND_COMPLETED");
+        data.put("completeTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送ROUND_COMPLETE_ACK(v1.5): taskId={}, round={}", vmData.getName(), taskId, round);
+    }
+
+    private void sendErrorV15(String errorCode, String errorMessage) throws Exception {
+        Map<String, Object> errorResponse = createProtocolMessage(ProtocolType.ERROR);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("errorCode", errorCode);
+        data.put("errorMessage", errorMessage);
+        data.put("timestamp", Instant.now().toString());
+
+        errorResponse.put("data", data);
+        sendStompMessage(errorResponse);
+        log.error("🤖 [{}] 发送ERROR(v1.5): code={}, message={}", vmData.getName(), errorCode, errorMessage);
+    }
+
+    private void sendFederatedTaskStartAckV15(String taskId, String assignedDatasetId) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("status", "READY");
+        data.put("assignedDatasetId", assignedDatasetId);  // v1.5: 包含确认的数据集ID
+        data.put("readyTime", Instant.now().toString());
+
+        // v1.5新增：数据集确认信息
+        Map<String, Object> datasetConfirmation = new HashMap<>();
+        datasetConfirmation.put("assignedDatasetId", assignedDatasetId);
+        datasetConfirmation.put("datasetStatus", "CREATED");
+        datasetConfirmation.put("estimatedSamples", 1000); // 模拟数据样本数
+        data.put("datasetConfirmation", datasetConfirmation);
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送FEDERATED_TASK_START_ACK: assignedDatasetId={}",
+                 vmData.getName(), assignedDatasetId);
+    }
+
+    private void sendGradientUploadV15(String taskId, Integer round, Map<String, Object> gradients,
+                                      Map<String, Object> metrics, String assignedDatasetId) throws Exception {
+        Map<String, Object> gradientMessage = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("round", round);
+        data.put("assignedDatasetId", assignedDatasetId); // 🆕 v1.5必需字段
+        data.put("gradientData", gradients);
+        data.put("trainingMetrics", metrics);
+        data.put("uploadTime", Instant.now().toString());
+
+        gradientMessage.put("data", data);
+        sendStompMessage(gradientMessage);
+        log.info("🤖 [{}] 发送GRADIENT_UPLOAD(v1.5): taskId={}, round={}, assignedDatasetId={}",
+                 vmData.getName(), taskId, round, assignedDatasetId);
+    }
+
+    private void sendDatasetListResponseV15(String taskId, List<Map<String, Object>> datasets) throws Exception {
+        Map<String, Object> responseMessage = createProtocolMessage(ProtocolType.DATASET_LIST_RESPONSE);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("taskId", taskId);
+        data.put("datasets", datasets);
+        data.put("totalCount", datasets.size());
+
+        responseMessage.put("data", data);
+        sendStompMessage(responseMessage);
+        log.info("🤖 [{}] 发送DATASET_LIST_RESPONSE: datasets={}",
+                 vmData.getName(), datasets.size());
+    }
+
+    private void sendErrorResponseV15(Map<String, Object> originalMessage, String errorMessage) throws Exception {
+        Map<String, Object> errorResponse = createProtocolMessage(ProtocolType.ERROR);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("errorCode", "PROTOCOL_ERROR");
+        data.put("errorMessage", errorMessage);
+        data.put("originalMessageId", originalMessage.get("id"));
+
+        errorResponse.put("data", data);
+        sendStompMessage(errorResponse);
+        log.error("🤖 [{}] 发送错误响应: {}", vmData.getName(), errorMessage);
+    }
+
+    // ==================== 🆕 v1.5数据集模拟器 ====================
+
+    /**
+     * 🆕 v1.5数据集创建模拟器
+     * 模拟虚拟机接收到assignedDatasetId后的数据集创建过程
+     */
+    private void simulateDatasetCreation(String assignedDatasetId) {
+        // 模拟数据集状态转换: PENDING -> CREATED
+        assignedDatasetStatusMap.put(assignedDatasetId, "PENDING");
+
+        log.info("🗂️ [{}] 开始模拟数据集创建: assignedDatasetId={}",
+                 vmData.getName(), assignedDatasetId);
+
+        // 模拟异步数据集创建过程
+        messageExecutor.schedule(() -> {
+            try {
+                // 5%概率模拟创建失败
+                if (Math.random() < 0.05) {
+                    assignedDatasetStatusMap.put(assignedDatasetId, "FAILED");
+                    log.warn("🗂️ [{}] 模拟数据集创建失败: assignedDatasetId={}",
+                             vmData.getName(), assignedDatasetId);
+                } else {
+                    assignedDatasetStatusMap.put(assignedDatasetId, "CREATED");
+                    log.info("🗂️ [{}] 模拟数据集创建完成: assignedDatasetId={}",
+                             vmData.getName(), assignedDatasetId);
+                }
+            } catch (Exception e) {
+                log.error("🗂️ [{}] 数据集创建模拟异常: assignedDatasetId={}, error={}",
+                          vmData.getName(), assignedDatasetId, e.getMessage());
+                assignedDatasetStatusMap.put(assignedDatasetId, "FAILED");
+            }
+        }, 500, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * 🆕 v1.5训练指标生成器 (关联assignedDatasetId)
+     */
+    private Map<String, Object> createTrainingMetricsV15(String taskId) {
+        String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("samplesCount", generateSampleCount(assignedDatasetId)); // 基于数据集ID生成样本数
+        metrics.put("localLoss", 0.15 + Math.random() * 0.10); // 模拟损失值
+        metrics.put("accuracy", 0.85 + Math.random() * 0.10); // 模拟准确率
+        metrics.put("assignedDatasetId", assignedDatasetId); // 🆕 v1.5: 数据集关联验证
+        metrics.put("trainingTime", 1500 + (int)(Math.random() * 1000)); // 模拟训练时间(ms)
+
+        return metrics;
+    }
+
+    /**
+     * 基于assignedDatasetId生成一致的样本数 (确保可重现性)
+     */
+    private int generateSampleCount(String assignedDatasetId) {
+        if (assignedDatasetId == null) {
+            return 1000; // 默认样本数
+        }
+        // 基于assignedDatasetId生成一致的样本数 (确保可重现性)
+        return 800 + Math.abs(assignedDatasetId.hashCode() % 400); // 800-1200范围
+    }
+
+    /**
+     * 🆕 v1.5数据集相关错误模拟
+     */
+    private void simulateDatasetErrors(String assignedDatasetId) throws Exception {
+        // 模拟assignedDatasetId不存在错误
+        if (Math.random() < 0.05) { // 5%概率
+            sendErrorV15("ASSIGNED_DATASET_NOT_FOUND",
+                        "AssignedDatasetId not found: " + assignedDatasetId);
+            return;
+        }
+
+        // 模拟数据集状态错误
+        if (Math.random() < 0.03) { // 3%概率
+            assignedDatasetStatusMap.put(assignedDatasetId, "FAILED");
+            sendErrorV15("DATASET_CREATION_FAILED",
+                        "Failed to create dataset: " + assignedDatasetId);
+        }
+    }
+
+    /**
+     * 🆕 创建数据集信息对象
+     */
+    private Map<String, Object> createDatasetInfoV15(String assignedDatasetId, String status) {
+        Map<String, Object> datasetInfo = new HashMap<>();
+        datasetInfo.put("assignedDatasetId", assignedDatasetId);
+        datasetInfo.put("status", status);
+        datasetInfo.put("localPath", "/data/assigned/" + assignedDatasetId);
+        datasetInfo.put("createdAt", Instant.now().toString());
+        datasetInfo.put("estimatedSamples", generateSampleCount(assignedDatasetId));
+        return datasetInfo;
+    }
+
+    // ==================== 🆕 v1.5测试辅助方法 ====================
+
+    public Optional<Map<String, Object>> getReceivedMessageV15(ProtocolType protocolType) {
+        return v15ReceivedMessages.stream()
+            .filter(msg -> protocolType.name().equals(msg.get("type")))
+            .reduce((first, second) -> second);  // 获取最后一个匹配的消息
+    }
+
+    public List<Map<String, Object>> getAllReceivedMessagesV15(ProtocolType protocolType) {
+        return v15ReceivedMessages.stream()
+            .filter(msg -> protocolType.name().equals(msg.get("type")))
+            .collect(Collectors.toList());
+    }
+
+    public String getAssignedDatasetId(String taskId) {
+        return taskAssignedDatasetMappings.get(taskId);
+    }
+
+    public String getDatasetStatus(String assignedDatasetId) {
+        return assignedDatasetStatusMap.get(assignedDatasetId);
+    }
+
+    public void clearV15MessageHistory() {
+        v15ReceivedMessages.clear();
+        log.info("🤖 [{}] v1.5消息历史已清空", vmData.getName());
+    }
+
+    /**
+     * 🆕 v1.5合规性验证方法
+     */
+    public boolean verifyV15Compliance() {
+        boolean compliant = true;
+        List<String> issues = new ArrayList<>();
+
+        // 验证1: 完全依赖后端分配的数据集ID
+        if (taskAssignedDatasetMappings.size() != backendAssignedDatasetIds.size()) {
+            issues.add("任务数据集映射与后端分配ID数量不匹配");
+            compliant = false;
+        }
+
+        // 验证2: 数据集状态一致性检查
+        for (String assignedDatasetId : backendAssignedDatasetIds) {
+            if (!assignedDatasetStatusMap.containsKey(assignedDatasetId)) {
+                issues.add("缺少数据集状态: " + assignedDatasetId);
+                compliant = false;
+            }
+            if (!assignedDatasetLocalPaths.containsKey(assignedDatasetId)) {
+                issues.add("缺少数据集本地路径: " + assignedDatasetId);
+                compliant = false;
+            }
+        }
+
+        // 验证3: 协议版本配置检查
+        if (!isV15Enabled()) {
+            issues.add("v1.5协议未启用");
+            compliant = false;
+        }
+
+        // 验证4: assignedDatasetId支持检查
+        if (!assignedDatasetIdEnabled) {
+            issues.add("assignedDatasetId支持未启用");
+            compliant = false;
+        }
+
+        // 输出验证结果
+        if (compliant) {
+            log.info("✅ [{}] v1.5合规性验证通过: 完全依赖后端分配的数据集ID ({}个任务)",
+                     vmData.getName(), taskAssignedDatasetMappings.size());
+        } else {
+            log.error("❌ [{}] v1.5合规性验证失败: {}", vmData.getName(), String.join(", ", issues));
+        }
+
+        return compliant;
+    }
+
+    // ==================== 🆕 v1.5数据集管理协议处理器 ====================
+
+    /**
+     * 处理数据集创建协议 (DATASET_CREATE)
+     */
+    private void handleDatasetCreateV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String assignedDatasetId = (String) data.get("assignedDatasetId");
+        String datasetType = (String) data.get("datasetType");
+        String taskId = (String) data.get("taskId");  // 🆕 提取taskId（uploadGradients需要）
+
+        // 🆕 v1.5.1: 接收sliceInfo
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sliceInfo = (Map<String, Object>) data.get("sliceInfo");
+
+        log.info("🤖 [{}] 处理数据集创建: assignedDatasetId={}, type={}, hasSliceInfo={}",
+                vmData.getName(), assignedDatasetId, datasetType, sliceInfo != null);
+
+        // 模拟数据集创建
+        assignedDatasetStatusMap.put(assignedDatasetId, "UPLOADING");
+        String localPath = "/data/assigned/" + assignedDatasetId;
+        assignedDatasetLocalPaths.put(assignedDatasetId, localPath);
+        backendAssignedDatasetIds.add(assignedDatasetId);
+
+        // 🆕 保存taskId到assignedDatasetId的映射（uploadGradients需要）
+        if (taskId != null && !taskId.trim().isEmpty()) {
+            taskAssignedDatasetMappings.put(taskId, assignedDatasetId);
+            log.info("🤖 [{}] 保存任务数据集映射: taskId={}, assignedDatasetId={}",
+                     vmData.getName(), taskId, assignedDatasetId);
+        }
+
+        // 🆕 v1.5.1: 保存sliceInfo并初始化验证数据结构
+        if (sliceInfo != null) {
+            assignedDatasetSliceInfo.put(assignedDatasetId, sliceInfo);
+
+            // 提取预期样本数
+            Integer expectedSamples = (Integer) sliceInfo.get("sliceSamples");
+            if (expectedSamples != null) {
+                assignedDatasetExpectedSamples.put(assignedDatasetId, expectedSamples);
+            }
+
+            // 初始化接收索引列表和BatchRange列表
+            assignedDatasetReceivedIndices.put(assignedDatasetId, new ArrayList<>());
+            assignedDatasetActualSamples.put(assignedDatasetId, 0);
+            assignedDatasetBatchRanges.put(assignedDatasetId, new ArrayList<>());
+
+            // 更新最新的assignedDatasetId
+            this.latestAssignedDatasetId = assignedDatasetId;
+
+            Integer startIndex = (Integer) sliceInfo.get("startIndex");
+            Integer endIndex = (Integer) sliceInfo.get("endIndex");
+            log.info("🤖 [{}] SliceInfo已保存: assignedDatasetId={}, startIndex={}, endIndex={}, expectedSamples={}",
+                    vmData.getName(), assignedDatasetId, startIndex, endIndex, expectedSamples);
+        }
+
+        // 发送创建确认
+        sendDatasetCreateAckV15(assignedDatasetId, "SUCCESS");
+    }
+
+    /**
+     * 处理数据集行追加协议 (DATASET_APPEND_ROWS)
+     */
+    private void handleDatasetAppendRowsV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String assignedDatasetId = (String) data.get("assignedDatasetId");
+        Integer rowCount = (Integer) data.get("rowCount");
+
+        // 🆕 v1.5.1: 接收batchRange和rows
+        @SuppressWarnings("unchecked")
+        Map<String, Object> batchRange = (Map<String, Object>) data.get("batchRange");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) data.get("rows");
+
+        log.info("🤖 [{}] 处理数据集行追加: assignedDatasetId={}, rowCount={}, hasBatchRange={}, actualRows={}",
+                vmData.getName(), assignedDatasetId, rowCount, batchRange != null, rows != null ? rows.size() : 0);
+
+        // 更新数据集状态为追加中
+        assignedDatasetStatusMap.put(assignedDatasetId, "APPENDING");
+
+        // 🆕 v1.5.1: 记录接收的数据行索引
+        if (rows != null && !rows.isEmpty()) {
+            List<Integer> receivedIndices = assignedDatasetReceivedIndices.computeIfAbsent(
+                assignedDatasetId, k -> new ArrayList<>()
+            );
+
+            // 从每行数据中提取globalIndex
+            for (Map<String, Object> row : rows) {
+                Integer globalIndex = (Integer) row.get("globalIndex");
+                if (globalIndex != null) {
+                    receivedIndices.add(globalIndex);
+                }
+            }
+
+            // 更新实际接收样本数
+            int currentCount = assignedDatasetActualSamples.getOrDefault(assignedDatasetId, 0);
+            assignedDatasetActualSamples.put(assignedDatasetId, currentCount + rows.size());
+
+            log.debug("🤖 [{}] 记录接收索引: assignedDatasetId={}, 本批次={}, 累计={}",
+                    vmData.getName(), assignedDatasetId, rows.size(), currentCount + rows.size());
+        }
+
+        // 🆕 v1.5.1: 保存batchRange并验证
+        if (batchRange != null) {
+            // 保存batchRange到列表
+            List<Map<String, Object>> batchRanges = assignedDatasetBatchRanges.computeIfAbsent(
+                assignedDatasetId, k -> new ArrayList<>()
+            );
+            batchRanges.add(batchRange);
+
+            Integer startIndex = (Integer) batchRange.get("startIndex");
+            Integer endIndex = (Integer) batchRange.get("endIndex");
+            Integer batchSamples = (Integer) batchRange.get("batchSamples");
+
+            log.debug("🤖 [{}] BatchRange: startIndex={}, endIndex={}, batchSamples={}",
+                    vmData.getName(), startIndex, endIndex, batchSamples);
+
+            // 这里可以添加验证逻辑，检查接收的行数是否与batchSamples匹配
+            if (rows != null && batchSamples != null && rows.size() != batchSamples) {
+                log.warn("🤖 [{}] BatchRange样本数不匹配: 期望={}, 实际={}",
+                        vmData.getName(), batchSamples, rows.size());
+            }
+        }
+
+        // 发送追加确认
+        sendDatasetAppendRowsAckV15(assignedDatasetId, "SUCCESS");
+    }
+
+    /**
+     * 处理数据集完成协议 (DATASET_COMPLETE) - v1.5.1增强版
+     */
+    private void handleDatasetCompleteV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String assignedDatasetId = (String) data.get("assignedDatasetId");
+
+        log.info("🤖 [{}] 处理数据集完成: assignedDatasetId={}",
+                vmData.getName(), assignedDatasetId);
+
+        // 更新数据集状态为已完成
+        assignedDatasetStatusMap.put(assignedDatasetId, "COMPLETED");
+
+        // 🆕 v1.5.1: 生成SliceVerification
+        Map<String, Object> sliceVerification = generateSliceVerification(assignedDatasetId);
+
+        // 发送完成确认，包含SliceVerification
+        sendDatasetCompleteAckV15(assignedDatasetId, "SUCCESS", sliceVerification);
+    }
+
+    /**
+     * 🆕 v1.5.1: 生成SliceVerification
+     * 根据接收的数据计算完整性验证信息
+     */
+    private Map<String, Object> generateSliceVerification(String assignedDatasetId) {
+        Map<String, Object> verification = new HashMap<>();
+
+        // 获取sliceInfo
+        Map<String, Object> sliceInfo = assignedDatasetSliceInfo.get(assignedDatasetId);
+        if (sliceInfo == null) {
+            log.warn("🤖 [{}] 未找到sliceInfo: assignedDatasetId={}", vmData.getName(), assignedDatasetId);
+            return null;
+        }
+
+        Integer expectedStartIndex = (Integer) sliceInfo.get("startIndex");
+        Integer expectedEndIndex = (Integer) sliceInfo.get("endIndex");
+        Integer expectedSamples = (Integer) sliceInfo.get("sliceSamples");
+
+        // 获取实际接收的数据
+        List<Integer> receivedIndices = assignedDatasetReceivedIndices.getOrDefault(assignedDatasetId, new ArrayList<>());
+        Integer actualSamples = assignedDatasetActualSamples.getOrDefault(assignedDatasetId, 0);
+
+        // 计算缺失索引
+        List<Integer> missingIndices = new ArrayList<>();
+        if (expectedStartIndex != null && expectedEndIndex != null) {
+            Set<Integer> receivedSet = new HashSet<>(receivedIndices);
+            for (int i = expectedStartIndex; i <= expectedEndIndex; i++) {
+                if (!receivedSet.contains(i)) {
+                    missingIndices.add(i);
+                }
+            }
+        }
+
+        // 检查连续性
+        Map<String, Object> continuityCheck = checkContinuity(receivedIndices);
+
+        // 构建SliceVerification对象
+        verification.put("actualSamples", actualSamples);
+        verification.put("actualStartIndex", expectedStartIndex);
+        verification.put("actualEndIndex", expectedEndIndex);
+        verification.put("missingIndices", missingIndices);
+        verification.put("continuityCheck", continuityCheck);
+
+        log.info("🤖 [{}] SliceVerification已生成: assignedDatasetId={}, actualSamples={}, missingCount={}, hasContinuity={}",
+                vmData.getName(), assignedDatasetId, actualSamples, missingIndices.size(),
+                (Boolean) continuityCheck.get("isContinuous"));
+
+        return verification;
+    }
+
+    /**
+     * 🆕 v1.5.1: 检查数据连续性
+     */
+    private Map<String, Object> checkContinuity(List<Integer> receivedIndices) {
+        Map<String, Object> continuityCheck = new HashMap<>();
+
+        if (receivedIndices == null || receivedIndices.isEmpty()) {
+            continuityCheck.put("isContinuous", false);
+            continuityCheck.put("gapRanges", new ArrayList<>());
+            return continuityCheck;
+        }
+
+        // 排序索引
+        List<Integer> sorted = new ArrayList<>(receivedIndices);
+        Collections.sort(sorted);
+
+        // 检查间隙
+        List<Map<String, Object>> gapRanges = new ArrayList<>();
+        for (int i = 1; i < sorted.size(); i++) {
+            int prev = sorted.get(i - 1);
+            int curr = sorted.get(i);
+
+            if (curr - prev > 1) {
+                // 发现间隙
+                Map<String, Object> gap = new HashMap<>();
+                gap.put("startIndex", prev + 1);
+                gap.put("endIndex", curr - 1);
+                gapRanges.add(gap);
+            }
+        }
+
+        boolean isContinuous = gapRanges.isEmpty();
+        continuityCheck.put("isContinuous", isContinuous);
+        continuityCheck.put("gapRanges", gapRanges);
+
+        if (!isContinuous) {
+            log.debug("🤖 [{}] 检测到{}个数据间隙", vmData.getName(), gapRanges.size());
+        }
+
+        return continuityCheck;
+    }
+
+    /**
+     * 处理数据集状态查询协议 (DATASET_STATUS_QUERY)
+     */
+    private void handleDatasetStatusQueryV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String assignedDatasetId = (String) data.get("assignedDatasetId");
+
+        log.info("🤖 [{}] 处理数据集状态查询: assignedDatasetId={}",
+                vmData.getName(), assignedDatasetId);
+
+        String status = assignedDatasetStatusMap.getOrDefault(assignedDatasetId, "NOT_FOUND");
+
+        // 发送状态响应
+        sendDatasetStatusResponseV15(assignedDatasetId, status);
+    }
+
+    /**
+     * 处理数据集删除协议 (DATASET_DELETE)
+     */
+    private void handleDatasetDeleteV15(Map<String, Object> messageData) throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) messageData.get("data");
+        String assignedDatasetId = (String) data.get("assignedDatasetId");
+
+        log.info("🤖 [{}] 处理数据集删除: assignedDatasetId={}",
+                vmData.getName(), assignedDatasetId);
+
+        // 清理数据集相关数据
+        assignedDatasetStatusMap.remove(assignedDatasetId);
+        assignedDatasetLocalPaths.remove(assignedDatasetId);
+        backendAssignedDatasetIds.remove(assignedDatasetId);
+
+        // 发送删除确认
+        sendDatasetDeleteAckV15(assignedDatasetId, "SUCCESS");
+    }
+
+    // ==================== 🆕 v1.5数据集管理响应发送器 ====================
+
+    private void sendDatasetCreateAckV15(String assignedDatasetId, String status) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.DATASET_CREATE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("assignedDatasetId", assignedDatasetId);
+        data.put("status", status);
+        data.put("createTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送DATASET_CREATE_ACK: assignedDatasetId={}, status={}",
+                vmData.getName(), assignedDatasetId, status);
+    }
+
+    private void sendDatasetAppendRowsAckV15(String assignedDatasetId, String status) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.DATASET_APPEND_ROWS_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("assignedDatasetId", assignedDatasetId);
+        data.put("status", status);
+        data.put("appendTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送DATASET_APPEND_ROWS_ACK: assignedDatasetId={}, status={}",
+                vmData.getName(), assignedDatasetId, status);
+    }
+
+    private void sendDatasetCompleteAckV15(String assignedDatasetId, String status, Map<String, Object> sliceVerification) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.DATASET_COMPLETE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("assignedDatasetId", assignedDatasetId);
+        data.put("status", status);
+        data.put("completeTime", Instant.now().toString());
+
+        // 🆕 v1.5.1: 添加SliceVerification
+        if (sliceVerification != null) {
+            data.put("sliceVerification", sliceVerification);
+            log.info("🤖 [{}] 发送DATASET_COMPLETE_ACK包含SliceVerification: assignedDatasetId={}, status={}, actualSamples={}, missingCount={}",
+                    vmData.getName(), assignedDatasetId, status,
+                    sliceVerification.get("actualSamples"),
+                    ((List<?>) sliceVerification.get("missingIndices")).size());
+        } else {
+            log.info("🤖 [{}] 发送DATASET_COMPLETE_ACK: assignedDatasetId={}, status={}",
+                    vmData.getName(), assignedDatasetId, status);
+        }
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+    }
+
+    private void sendDatasetStatusResponseV15(String assignedDatasetId, String status) throws Exception {
+        Map<String, Object> responseMessage = createProtocolMessage(ProtocolType.DATASET_STATUS_RESPONSE);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("assignedDatasetId", assignedDatasetId);
+        data.put("status", status);
+        data.put("queryTime", Instant.now().toString());
+
+        if ("READY".equals(status)) {
+            String localPath = assignedDatasetLocalPaths.get(assignedDatasetId);
+            if (localPath != null) {
+                data.put("localPath", localPath);
+            }
+        }
+
+        responseMessage.put("data", data);
+        sendStompMessage(responseMessage);
+        log.info("🤖 [{}] 发送DATASET_STATUS_RESPONSE: assignedDatasetId={}, status={}",
+                vmData.getName(), assignedDatasetId, status);
+    }
+
+    private void sendDatasetDeleteAckV15(String assignedDatasetId, String status) throws Exception {
+        Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.DATASET_DELETE_ACK);
+        Map<String, Object> data = new HashMap<>();
+        data.put("vmId", vmData.getVmId());
+        data.put("assignedDatasetId", assignedDatasetId);
+        data.put("status", status);
+        data.put("deleteTime", Instant.now().toString());
+
+        ackMessage.put("data", data);
+        sendStompMessage(ackMessage);
+        log.info("🤖 [{}] 发送DATASET_DELETE_ACK: assignedDatasetId={}, status={}",
+                vmData.getName(), assignedDatasetId, status);
+    }
+
+    /**
+     * 模拟训练延迟（毫秒）
+     */
+    private long simulateTrainingDelay() {
+        return 100 + new SecureRandom().nextInt(200); // 100-300ms随机延迟
+    }
+
+    /**
+     * 检查是否启用v1.5协议
+     */
+    public boolean isV15Enabled() {
+        return v15ProtocolEnabled;
+    }
+
+    /**
+     * 🆕 v1.5测试模式初始化
+     */
+    public void initializeForV15Testing() {
+        // v1.5测试模式：禁用随机错误
+        this.uploadFailureRate = 0.0;
+        this.protocolViolationCount = 0;
+
+        // v1.5测试模式：启用完整协议支持
+        this.isPassiveMode = true;
+        this.gradientUploadReady = true;
+        this.v15ProtocolEnabled = true;
+        this.datasetManagementEnabled = true;
+        this.assignedDatasetIdEnabled = true;
+
+        log.info("🧪 [{}] MockVirtualMachine初始化为v1.5测试模式", vmData.getName());
+    }
+
+    // 🆕 v1.5协议测试辅助方法
+    public void setVmId(String vmId) {
+        this.vmData.setVmId(vmId);
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getAccessToken() {
+        return this.accessToken;
+    }
+
+    // 🆕 v1.5.1测试辅助方法：获取最新数据集的信息
+
+    /**
+     * 获取最新数据集的assignedDatasetId
+     */
+    public String getLatestAssignedDatasetId() {
+        return this.latestAssignedDatasetId;
+    }
+
+    /**
+     * 获取最新数据集的SliceInfo
+     */
+    public Map<String, Object> getSliceInfoForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return null;
+        }
+        return assignedDatasetSliceInfo.get(latestAssignedDatasetId);
+    }
+
+    /**
+     * 获取最新数据集的所有BatchRange
+     */
+    public List<Map<String, Object>> getBatchRangesForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> ranges = assignedDatasetBatchRanges.get(latestAssignedDatasetId);
+        return ranges != null ? ranges : Collections.emptyList();
+    }
+
+    /**
+     * 获取最新数据集的SliceVerification
+     */
+    public Map<String, Object> getSliceVerificationForLatestDataset() {
+        if (latestAssignedDatasetId == null) {
+            return null;
+        }
+        return generateSliceVerification(latestAssignedDatasetId);
     }
 }
