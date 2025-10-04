@@ -842,6 +842,20 @@ public class WebSocketProtocolService {
                     parametersJson
                 );
 
+                // 更新参与者状态和轮次信息
+                taskParticipantsMapper.updateParticipantWithMetrics(
+                    taskId,
+                    vmId,
+                    "COMPLETED",  // 标记该VM在本轮次已完成
+                    round,        // 更新当前轮次
+                    accuracy,
+                    loss,
+                    LocalDateTime.now()
+                );
+
+                log.debug("参与者状态已更新: vmId={}, taskId={}, round={}, status=COMPLETED",
+                    vmId, taskId, round);
+
                 // 发布模型上传事件触发聚合检查
                 ModelUploadEvent uploadEvent = new ModelUploadEvent(
                     this,

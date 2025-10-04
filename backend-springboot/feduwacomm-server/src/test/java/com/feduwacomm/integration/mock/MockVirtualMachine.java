@@ -3147,16 +3147,23 @@ public class MockVirtualMachine {
     }
 
     /**
-     * 处理v1.5 GLOBAL_MODEL_BROADCAST消息
+     * 处理v1.5.1 GLOBAL_MODEL_BROADCAST消息（符合协议规范）
      */
     private void handleGlobalModelBroadcastV15(Map<String, Object> message) throws Exception {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
-        Integer round = (Integer) data.get("round");
-        Map<String, Object> modelParameters = (Map<String, Object>) data.get("modelParameters");
+        Integer roundNumber = (Integer) data.get("roundNumber");  // 🔧 修改：round → roundNumber
 
-        log.info("Mock VM处理全局模型广播(v1.5): vmId={}, taskId={}, round={}",
-                vmData.getVmId(), taskId, round);
+        // 🔧 修改：按照v1.5.1协议规范解析globalModel嵌套对象
+        @SuppressWarnings("unchecked")
+        Map<String, Object> globalModel = (Map<String, Object>) data.get("globalModel");
+        Map<String, Object> modelParameters = null;
+        if (globalModel != null) {
+            modelParameters = (Map<String, Object>) globalModel.get("parameters");
+        }
+
+        log.info("Mock VM处理全局模型广播(v1.5.1): vmId={}, taskId={}, round={}",
+                vmData.getVmId(), taskId, roundNumber);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null && modelParameters != null) {
@@ -3171,11 +3178,11 @@ public class MockVirtualMachine {
             }
 
             // 异步执行本地训练并上传梯度
-            scheduleGradientUploadV15(taskId, round, assignedDatasetId);
+            scheduleGradientUploadV15(taskId, roundNumber, assignedDatasetId);  // 🔧 使用roundNumber
         }
 
-        // 发送v1.5格式的模型接收确认
-        sendModelReceiveAckV15(taskId, round);
+        // 发送v1.5.1格式的模型接收确认
+        sendModelReceiveAckV15(taskId, roundNumber);  // 🔧 使用roundNumber
     }
 
     /**

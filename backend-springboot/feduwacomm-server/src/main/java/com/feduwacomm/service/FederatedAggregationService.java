@@ -412,8 +412,8 @@ public class FederatedAggregationService {
                 // 分发全局模型
                 distributeGlobalModel(task, roundNumber, result.getGlobalParameters());
 
-                // 更新任务进度
-                updateTaskProgress(taskId, roundNumber + 1);
+                // 更新任务进度 - 推进到刚完成的轮次号
+                updateTaskProgress(taskId, roundNumber);
 
                 // 发布成功事件 - 转换Map<String, Double>为Map<String, BigDecimal>
                 final Map<String, BigDecimal> metricsAsBigDecimal;
@@ -574,7 +574,7 @@ public class FederatedAggregationService {
                 // 验证参与者状态确实重置
                 List<Map<String, Object>> participantStatus = taskParticipantsMapper.getParticipantStatusDetails(taskId);
                 long trainingCount = participantStatus.stream()
-                    .filter(p -> "TRAINING".equals(p.get("status")))
+                    .filter(p -> p != null && "TRAINING".equals(p.get("status")))
                     .count();
 
                 log.info("✅ 轮次推进完成: 任务ID={}, 当前轮次={}, 重置参与者数量={}, 训练中参与者={}",

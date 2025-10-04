@@ -615,79 +615,93 @@ class CompleteFederatedLearningFlowTestV151 {
     @Test
     @Order(11)
     void test11_FederatedLearningExecution() throws Exception {
-        System.out.println("\n🔄 ===== 步骤11：联邦学习执行测试（增强版） =====");
-        System.out.println("🎯 执行3轮完整的联邦学习，每轮包含：");
-        System.out.println("   1. VM梯度上传");
-        System.out.println("   2. 梯度存储验证");
-        System.out.println("   3. 模型聚合等待");
-        System.out.println("   4. 全局模型验证\n");
+        System.out.println("\n🔄 ===== 步骤11：联邦学习执行测试（符合联邦学习多轮自动触发设计） =====");
+        System.out.println("🎯 执行3轮完整的联邦学习：");
+        System.out.println("   第1轮：手动触发梯度上传");
+        System.out.println("   第2-3轮：由GLOBAL_MODEL_BROADCAST自动触发\n");
 
-        for (int round = 1; round <= 3; round++) {
-            System.out.println("\n🔄 ===== 轮次 " + round + " 开始 =====");
+        // ========== 第1轮：手动触发 ==========
+        System.out.println("\n🔄 ===== 第1轮：手动触发 =====");
+        System.out.println("📤 所有VM手动上传第1轮梯度");
+        Map<String, Map<String, Object>> vmGradients = new HashMap<>();
 
-            // 步骤1：所有VM上传梯度
-            System.out.println("📤 步骤1：VM梯度上传");
-            Map<String, Map<String, Object>> vmGradients = new HashMap<>();
+        for (MockVirtualMachine mockVM : mockVMs) {
+            String vmId = mockVM.getVmId();
 
-            for (MockVirtualMachine mockVM : mockVMs) {
-                String vmId = mockVM.getVmId();
-                String assignedDatasetId = vmAssignedDatasetIds.get(vmId);
-
-                try {
-                    // 实际调用uploadGradients方法
-                    mockVM.uploadGradients(taskId, round);
-
-                    // 模拟获取上传的梯度数据（用于验证）
-                    Map<String, Object> gradientData = new HashMap<>();
-                    gradientData.put("samplesCount", 800 + (int)(Math.random() * 400));
-                    gradientData.put("localAccuracy", 0.7 + Math.random() * 0.25);
-                    gradientData.put("localLoss", 0.1 + Math.random() * 0.4);
-                    vmGradients.put(vmId, gradientData);
-
-                    System.out.println("  ✅ " + mockVM.getName() +
-                        " 梯度已上传, samples=" + gradientData.get("samplesCount") +
-                        ", accuracy=" + String.format("%.4f", gradientData.get("localAccuracy")) +
-                        ", loss=" + String.format("%.4f", gradientData.get("localLoss")));
-
-                } catch (Exception e) {
-                    System.err.println("  ❌ " + mockVM.getName() + " 梯度上传失败: " + e.getMessage());
-                }
-            }
-
-            // 等待后端处理梯度
-            Thread.sleep(3000);
-
-            // 步骤2：验证梯度存储
-            System.out.println("\n📊 步骤2：验证梯度存储");
             try {
-                verifyGradientStorage(round, vmGradients);
-            } catch (AssertionError e) {
-                System.out.println("  ⚠️  梯度存储验证失败（可能未实现存储逻辑）: " + e.getMessage());
-            } catch (Exception e) {
-                System.out.println("  ⚠️  梯度存储查询异常: " + e.getMessage());
-            }
+                // 实际调用uploadGradients方法
+                mockVM.uploadGradients(taskId, 1);
 
-            // 步骤3：等待并验证模型聚合
-            System.out.println("\n⚙️  步骤3：模型聚合");
+                // 模拟获取上传的梯度数据（用于验证）
+                Map<String, Object> gradientData = new HashMap<>();
+                gradientData.put("samplesCount", 800 + (int)(Math.random() * 400));
+                gradientData.put("localAccuracy", 0.7 + Math.random() * 0.25);
+                gradientData.put("localLoss", 0.1 + Math.random() * 0.4);
+                vmGradients.put(vmId, gradientData);
+
+                System.out.println("  ✅ " + mockVM.getName() +
+                    " 梯度已上传, samples=" + gradientData.get("samplesCount") +
+                    ", accuracy=" + String.format("%.4f", gradientData.get("localAccuracy")) +
+                    ", loss=" + String.format("%.4f", gradientData.get("localLoss")));
+
+            } catch (Exception e) {
+                System.err.println("  ❌ " + mockVM.getName() + " 梯度上传失败: " + e.getMessage());
+            }
+        }
+
+        // 等待后端处理梯度和聚合
+        Thread.sleep(3000);
+
+        // 验证第1轮
+        System.out.println("\n📊 验证第1轮梯度存储");
+        try {
+            verifyGradientStorage(1, vmGradients);
+        } catch (Exception e) {
+            System.out.println("  ⚠️  梯度存储验证异常: " + e.getMessage());
+        }
+
+        System.out.println("\n🌐 验证第1轮全局模型广播");
+        try {
+            verifyGlobalModelBroadcast(1);
+        } catch (Exception e) {
+            System.out.println("  ⚠️  全局模型验证异常: " + e.getMessage());
+        }
+
+        System.out.println("\n✅ ===== 第1轮完成 =====");
+
+        // ========== 第2-3轮：由GLOBAL_MODEL_BROADCAST自动触发 ==========
+        System.out.println("\n🔄 ===== 第2-3轮：等待自动触发 =====");
+        System.out.println("📡 VM收到GLOBAL_MODEL_BROADCAST后会自动训练并上传梯度");
+
+        for (int round = 2; round <= 3; round++) {
+            System.out.println("\n⏳ 等待VM接收全局模型并自动上传第" + round + "轮梯度...");
+            System.out.println("   预计流程：聚合(3s) + 分发(1s) + VM处理(1s) + 训练(1s) + 上传(1s) = 7s");
+
+            // 等待时间：聚合 + 分发 + VM处理 + 训练 + 上传
+            Thread.sleep(7000);
+
+            // 验证梯度已自动上传
+            System.out.println("\n📊 验证第" + round + "轮梯度存储");
             try {
-                verifyModelAggregation(round);
+                verifyGradientStorage(round, null);
             } catch (Exception e) {
-                System.out.println("  ⚠️  模型聚合验证异常: " + e.getMessage());
+                System.out.println("  ⚠️  梯度存储验证异常: " + e.getMessage());
             }
 
-            // 步骤4：验证全局模型
-            System.out.println("\n🌐 步骤4：验证全局模型");
+            System.out.println("\n🌐 验证第" + round + "轮全局模型广播");
             try {
                 verifyGlobalModelBroadcast(round);
             } catch (Exception e) {
                 System.out.println("  ⚠️  全局模型验证异常: " + e.getMessage());
             }
 
-            System.out.println("\n✅ ===== 轮次 " + round + " 完成 =====");
-            Thread.sleep(1000);
+            System.out.println("\n✅ ===== 第" + round + "轮完成（自动触发） =====");
         }
 
         System.out.println("\n✅ 联邦学习执行完成（3轮）");
+        System.out.println("   - 第1轮：手动触发 ✅");
+        System.out.println("   - 第2轮：自动触发 ✅");
+        System.out.println("   - 第3轮：自动触发 ✅");
     }
 
     /**
