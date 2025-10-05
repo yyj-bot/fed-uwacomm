@@ -1,0 +1,1394 @@
+/**
+ * 初始模型管理页面
+ * 覆盖initial-model-api-reference.md所有接口
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
+ */
+
+import React, { useState, useEffect } from 'react'
+import { 
+  Card, 
+  Button, 
+  Table, 
+  Space, 
+  Modal, 
+  Form, 
+  Input, 
+  Select, 
+  Upload, 
+  message, 
+  Tag, 
+  Progress, 
+  Descriptions, 
+  Statistic,
+  Row,
+  Col,
+  Tabs,
+  InputNumber,
+  Switch,
+  Tooltip,
+  Popconfirm,
+  Alert,
+  Spin,
+  Checkbox
+} from 'antd'
+import {
+  PlusOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+  DeleteOutlined,
+  SendOutlined,
+  ReloadOutlined,
+  FileTextOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  SyncOutlined,
+  SearchOutlined
+} from '@ant-design/icons'
+import type { ColumnsType } from 'antd/es/table'
+import { useModel } from '@/store/model-version/useModelVersionStore'
+import { federatedTaskService } from '@/services/federated-task'
+import type { 
+  InitialModelGenerationRequest,
+  InitialModelUploadRequest,
+  ModelDistributionRequest,
+  InitialModelInfo,
+  DistributionStatusDetail
+} from '@/services'
+import type { FederatedTask } from '@/types'
+
+const { TextArea } = Input
+const { Option } = Select
+
+const InitialModelPage: React.FC = () => {
+  const {
+    // 状态
+    initialModels,
+    initialModelLoading,
+    initialModelError,
+    generationLoading,
+    generationError,
+    initialUploadLoading,
+    initialUploadError,
+    distributions,
+    distributionLoading,
+    
+    // 操作方法
+    generateInitialModel,
+    uploadCustomInitialModel,
+    fetchTaskInitialModel,
+    distributeInitialModel,
+    fetchDistributionStatus,
+    downloadInitialModel,
+    deleteInitialModel,
+    
+    // 工具方法
+    getTaskInitialModel,
+    isTaskInitialModelLoading,
+    getDistributionStatus,
+    isDistributing,
+    canDistributeInitialModel,
+    canDeleteInitialModel
+  } = useModel()
+
+  const [generateModalVisible, setGenerateModalVisible] = useState(false)
+  const [uploadModalVisible, setUploadModalVisible] = useState(false)
+  const [distributeModalVisible, setDistributeModalVisible] = useState(false)
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [distributionDetailModalVisible, setDistributionDetailModalVisible] = useState(false)
+  
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('')
+  const [selectedDistributionId, setSelectedDistributionId] = useState<string>('')
+  const [fileList, setFileList] = useState<any[]>([])
+  const [queryTaskId, setQueryTaskId] = useState<string>('')
+  
+  // 联邦学习任务相关状态
+  const [federatedTasks, setFederatedTasks] = useState<FederatedTask[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
+  const [taskSelectModalVisible, setTaskSelectModalVisible] = useState(false)
+  
+  // 可用虚拟机列表
+  const [availableVms, setAvailableVms] = useState<any[]>([])
+  const [vmsLoading, setVmsLoading] = useState(false)
+  
+  const [generateForm] = Form.useForm()
+  const [uploadForm] = Form.useForm()
+  const [distributeForm] = Form.useForm()
+
+  // 模型列表数据 - 显示当前查询任务的初始模型（一个任务对应一个初始模型）
+  const modelListData = queryTaskId && initialModels[queryTaskId] ? 
+    [{
+      key: queryTaskId,
+      taskId: queryTaskId,
+      ...initialModels[queryTaskId]
+    }] : []
+
+  // 分发列表数据
+  const distributionListData = Object.entries(distributions).map(([id, dist]) => ({
+    key: id,
+    distributionId: id,
+    ...dist
+  }))
+
+  // 获取联邦学习任务列表
+  const loadFederatedTasks = async () => {
+    try {
+      setTasksLoading(true)
+      const result = await federatedTaskService.getTaskList({
+        page: 1,
+        size: 100 // 获取前100个任务
+      })
+      setFederatedTasks(result.tasks)
+    } catch (error) {
+      console.error('获取联邦学习任务列表失败:', error)
+      message.error('获取任务列表失败')
+    } finally {
+      setTasksLoading(false)
+    }
+  }
+
+  // 加载可用虚拟机列表
+  const loadAvailableVms = async () => {
+    setVmsLoading(true)
+    try {
+      console.log('🔄 开始加载虚拟机列表...')
+      const response = await federatedTaskService.getAvailableVMs({
+        status: 'RUNNING'
+      })
+      console.log('📋 虚拟机API响应:', response)
+      setAvailableVms(response.availableVms || [])
+      console.log('✅ 设置虚拟机列表:', response.availableVms || [])
+    } catch (error) {
+      console.error('❌ 获取可用虚拟机失败:', error)
+      setAvailableVms([])
+      message.error('获取可用虚拟机失败，请检查网络连接或联系管理员')
+    } finally {
+      setVmsLoading(false)
+    }
+  }
+
+  // 组件挂载时加载任务列表
+  useEffect(() => {
+    loadFederatedTasks()
+  }, [])
+
+  // 查询初始模型
+  const handleQueryModel = async () => {
+    if (!queryTaskId.trim()) {
+      message.warning('请输入任务ID')
+      return
+    }
+    await fetchTaskInitialModel(queryTaskId.trim())
+  }
+
+  // 从任务列表选择任务
+  const handleSelectFromTasks = () => {
+    setTaskSelectModalVisible(true)
+  }
+
+  // 选择任务并查询初始模型
+  const handleTaskSelected = async (taskId: string) => {
+    setQueryTaskId(taskId)
+    setTaskSelectModalVisible(false)
+    await fetchTaskInitialModel(taskId)
+  }
+
+  // 初始模型状态颜色
+  const getStatusColor = (status: string) => {
+    const colorMap: Record<string, string> = {
+      'GENERATING': 'processing',
+      'READY': 'success',
+      'UPLOADED': 'success',
+      'DISTRIBUTING': 'processing',
+      'DISTRIBUTED': 'success',
+      'FAILED': 'error',
+      'DELETED': 'default'
+    }
+    return colorMap[status] || 'default'
+  }
+
+  // 分发状态颜色
+  const getDistributionStatusColor = (status: string) => {
+    const colorMap: Record<string, string> = {
+      'PENDING': 'default',
+      'IN_PROGRESS': 'processing',
+      'COMPLETED': 'success',
+      'FAILED': 'error',
+      'CANCELLED': 'warning'
+    }
+    return colorMap[status] || 'default'
+  }
+
+  // 初始模型表格列定义
+  const modelColumns: ColumnsType<any> = [
+    {
+      title: '任务ID',
+      dataIndex: 'taskId',
+      key: 'taskId',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: '模型ID',
+      dataIndex: 'modelId',
+      key: 'modelId',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: '模型类型',
+      dataIndex: 'modelType',
+      key: 'modelType',
+      width: 120
+    },
+    {
+      title: '模型大小',
+      dataIndex: 'modelSize',
+      key: 'modelSize',
+      width: 120,
+      render: (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => (
+        <Tag color={getStatusColor(status)}>{status}</Tag>
+      )
+    },
+    {
+      title: '分发状态',
+      key: 'distribution',
+      width: 150,
+      render: (_, record) => (
+        <Space direction="vertical" size="small">
+          <div>总VM: {record.distributionStatus?.totalVms || 0}</div>
+          <div>已分发: {record.distributionStatus?.distributedVms || 0}</div>
+          <div>失败: {record.distributionStatus?.failedVms || 0}</div>
+        </Space>
+      )
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 180,
+      render: (time: string) => new Date(time).toLocaleString()
+    },
+    {
+      title: '操作',
+      key: 'action',
+      fixed: 'right',
+      width: 250,
+      render: (_, record) => (
+        <Space size="small" wrap>
+          <Button
+            type="link"
+            size="small"
+            icon={<FileTextOutlined />}
+            onClick={() => handleViewDetail(record.taskId)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SendOutlined />}
+            disabled={!canDistributeInitialModel(record.taskId)}
+            onClick={() => handleOpenDistribute(record.taskId)}
+          >
+            分发
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownload(record.taskId)}
+          >
+            下载
+          </Button>
+          <Popconfirm
+            title="确定要删除此初始模型吗？"
+            onConfirm={() => handleDelete(record.taskId)}
+            okText="确定"
+            cancelText="取消"
+            disabled={!canDeleteInitialModel(record.taskId)}
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              disabled={!canDeleteInitialModel(record.taskId)}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      )
+    }
+  ]
+
+  // 分发列表表格列定义
+  const distributionColumns: ColumnsType<any> = [
+    {
+      title: '分发ID',
+      dataIndex: 'distributionId',
+      key: 'distributionId',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: '任务ID',
+      dataIndex: 'taskId',
+      key: 'taskId',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: '模型ID',
+      dataIndex: 'modelId',
+      key: 'modelId',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status: string) => (
+        <Tag color={getDistributionStatusColor(status)}>{status}</Tag>
+      )
+    },
+    {
+      title: '进度',
+      dataIndex: 'progress',
+      key: 'progress',
+      width: 200,
+      render: (progress: any) => (
+        <div>
+          <Progress
+            percent={progress ? Math.round((progress.completed / progress.total) * 100) : 0}
+            size="small"
+            status={progress?.failed > 0 ? 'exception' : 'active'}
+          />
+          <div style={{ fontSize: '12px', marginTop: '4px' }}>
+            {progress?.completed || 0}/{progress?.total || 0}
+            {progress?.failed > 0 && ` (失败: ${progress.failed})`}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: '开始时间',
+      dataIndex: 'startedAt',
+      key: 'startedAt',
+      width: 180,
+      render: (time: string) => time ? new Date(time).toLocaleString() : '-'
+    },
+    {
+      title: '操作',
+      key: 'action',
+      fixed: 'right',
+      width: 150,
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<FileTextOutlined />}
+            onClick={() => handleViewDistributionDetail(record.distributionId)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={() => handleRefreshDistribution(record.distributionId)}
+          >
+            刷新
+          </Button>
+        </Space>
+      )
+    }
+  ]
+
+  // 处理生成初始模型
+  const handleGenerate = async () => {
+    try {
+      const values = await generateForm.validateFields()
+      
+      const requestData: InitialModelGenerationRequest = {
+        taskId: values.taskId,
+        modelType: values.modelType,
+        architecture: {
+          inputSize: values.inputSize,
+          hiddenLayers: values.hiddenLayers.split(',').map((n: string) => parseInt(n.trim())),
+          outputSize: values.outputSize,
+          activationFunction: values.activationFunction,
+          optimizer: values.optimizer,
+          learningRate: values.learningRate
+        },
+        randomSeed: values.randomSeed,
+        description: values.description
+      }
+
+      const result = await generateInitialModel(requestData)
+      
+      if (result.success) {
+        message.success('初始模型生成成功')
+        setGenerateModalVisible(false)
+        generateForm.resetFields()
+        // 刷新列表
+        if (values.taskId) {
+          await fetchTaskInitialModel(values.taskId)
+        }
+      } else {
+        message.error(result.error || '初始模型生成失败')
+      }
+    } catch (error) {
+      console.error('生成初始模型失败:', error)
+    }
+  }
+
+  // 处理上传自定义初始模型
+  const handleUpload = async () => {
+    try {
+      const values = await uploadForm.validateFields()
+      
+      if (fileList.length === 0) {
+        message.error('请选择模型文件')
+        return
+      }
+
+      const file = fileList[0].originFileObj
+
+      const requestData: InitialModelUploadRequest = {
+        taskId: values.taskId,
+        modelType: values.modelType,
+        description: values.description,
+        file: file,
+        metadata: values.metadata ? JSON.parse(values.metadata) : undefined
+      }
+
+      const result = await uploadCustomInitialModel(requestData)
+      
+      if (result.success) {
+        message.success('自定义初始模型上传成功')
+        setUploadModalVisible(false)
+        uploadForm.resetFields()
+        setFileList([])
+        // 刷新列表
+        if (values.taskId) {
+          await fetchTaskInitialModel(values.taskId)
+        }
+      } else {
+        message.error(result.error || '自定义初始模型上传失败')
+      }
+    } catch (error) {
+      console.error('上传自定义初始模型失败:', error)
+    }
+  }
+
+  // 处理分发初始模型
+  const handleDistribute = async () => {
+    try {
+      const values = await distributeForm.validateFields()
+      
+      // 调试信息
+      console.log('🔍 分发表单值:', values)
+      console.log('🔍 可用虚拟机列表:', availableVms)
+      
+      if (!values.vmIds || values.vmIds.length === 0) {
+        message.error('请选择至少一个虚拟机')
+        return
+      }
+      
+      const requestData: ModelDistributionRequest = {
+        vmIds: values.vmIds, // 现在直接使用数组，无需split
+        distributionMode: values.distributionMode,
+        timeout: values.timeout,
+        retryAttempts: values.retryAttempts,
+        verifyChecksum: values.verifyChecksum,
+        notifyOnCompletion: values.notifyOnCompletion
+      }
+
+      console.log('🚀 分发请求数据:', requestData)
+
+      const result = await distributeInitialModel(selectedTaskId, requestData)
+      
+      if (result.success) {
+        message.success('初始模型分发已启动')
+        setDistributeModalVisible(false)
+        distributeForm.resetFields()
+      } else {
+        message.error(result.error || '初始模型分发失败')
+      }
+    } catch (error) {
+      console.error('分发初始模型失败:', error)
+    }
+  }
+
+  // 打开分发对话框
+  const handleOpenDistribute = (taskId: string) => {
+    setSelectedTaskId(taskId)
+    setDistributeModalVisible(true)
+    // 加载可用虚拟机列表
+    loadAvailableVms()
+  }
+
+  // 查看详情
+  const handleViewDetail = async (taskId: string) => {
+    setSelectedTaskId(taskId)
+    setDetailModalVisible(true)
+    await fetchTaskInitialModel(taskId, { includeParameters: true })
+  }
+
+  // 查看分发详情
+  const handleViewDistributionDetail = (distributionId: string) => {
+    setSelectedDistributionId(distributionId)
+    setDistributionDetailModalVisible(true)
+  }
+
+  // 刷新分发状态
+  const handleRefreshDistribution = async (distributionId: string) => {
+    await fetchDistributionStatus(distributionId)
+    message.success('分发状态已刷新')
+  }
+
+  // 下载初始模型
+  const handleDownload = async (taskId: string, format: 'binary' | 'json' = 'binary') => {
+    try {
+      const result = await downloadInitialModel(taskId, { format })
+      if (result.success) {
+        message.success('初始模型下载成功')
+      } else {
+        message.error(result.error || '初始模型下载失败')
+      }
+    } catch (error) {
+      message.error('初始模型下载失败')
+    }
+  }
+
+  // 删除初始模型
+  const handleDelete = async (taskId: string) => {
+    try {
+      const result = await deleteInitialModel(taskId)
+      if (result.success) {
+        message.success('初始模型删除成功')
+      } else {
+        message.error(result.error || '初始模型删除失败')
+      }
+    } catch (error) {
+      message.error('初始模型删除失败')
+    }
+  }
+
+  const currentModel = selectedTaskId ? getTaskInitialModel(selectedTaskId) : null
+  const currentDistribution = selectedDistributionId ? getDistributionStatus(selectedDistributionId) : null
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <Card
+        title="初始模型管理"
+        extra={
+          <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setGenerateModalVisible(true)
+                // 确保联邦任务列表已加载
+                if (federatedTasks.length === 0) {
+                  loadFederatedTasks()
+                }
+              }}
+              loading={generationLoading}
+            >
+              生成初始模型
+            </Button>
+            <Button
+              icon={<UploadOutlined />}
+              onClick={() => {
+                setUploadModalVisible(true)
+                // 确保联邦任务列表已加载
+                if (federatedTasks.length === 0) {
+                  loadFederatedTasks()
+                }
+              }}
+              loading={initialUploadLoading}
+            >
+              上传自定义模型
+            </Button>
+          </Space>
+        }
+      >
+        {/* 查询区域 */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Alert
+            message="使用说明"
+            description="初始模型管理需要基于联邦学习任务。请先从任务列表中选择一个任务，或直接输入任务ID来查询对应的初始模型。"
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          <Space wrap>
+            <Input
+              placeholder="请输入任务ID查询初始模型"
+              value={queryTaskId}
+              onChange={(e) => setQueryTaskId(e.target.value)}
+              style={{ width: 300 }}
+              onPressEnter={handleQueryModel}
+              prefix={<SearchOutlined />}
+            />
+            <Button 
+              type="primary" 
+              onClick={handleQueryModel}
+              loading={Object.values(initialModelLoading).some(Boolean)}
+            >
+              查询
+            </Button>
+            <Button 
+              onClick={handleSelectFromTasks}
+              loading={tasksLoading}
+            >
+              从任务列表选择
+            </Button>
+            <Button onClick={() => {
+              setQueryTaskId('')
+              // 这里可以选择是否要清除已查询的模型数据
+              // 如果想要清除，可以调用store的清理方法
+            }}>
+              清空
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={loadFederatedTasks}
+              loading={tasksLoading}
+            >
+              刷新任务列表
+            </Button>
+          </Space>
+          {federatedTasks.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: '12px', color: '#666' }}>
+              💡 当前系统中有 <strong>{federatedTasks.length}</strong> 个联邦学习任务可供选择
+            </div>
+          )}
+        </Card>
+
+        <Tabs 
+          defaultActiveKey="models"
+          items={[
+            {
+              key: 'models',
+              label: `初始模型列表 ${modelListData.length > 0 ? `(${modelListData.length})` : ''}`,
+              children: (
+                <Table
+                  columns={modelColumns}
+                  dataSource={modelListData}
+                  loading={Object.values(initialModelLoading).some(Boolean)}
+                  scroll={{ x: 1400 }}
+                  pagination={{
+                    showSizeChanger: true,
+                    showTotal: (total) => `共 ${total} 条`,
+                    pageSize: 10
+                  }}
+                  locale={{
+                    emptyText: queryTaskId ? 
+                      `任务 ${queryTaskId} 暂无初始模型数据` : 
+                      '请先选择或输入任务ID进行查询'
+                  }}
+                />
+              )
+            },
+            {
+              key: 'distributions',
+              label: `分发记录 ${distributionListData.length > 0 ? `(${distributionListData.length})` : ''}`,
+              children: (
+                <Table
+                  columns={distributionColumns}
+                  dataSource={distributionListData}
+                  loading={Object.values(distributionLoading).some(Boolean)}
+                  scroll={{ x: 1200 }}
+                  pagination={{
+                    showSizeChanger: true,
+                    showTotal: (total) => `共 ${total} 条`,
+                    pageSize: 10
+                  }}
+                  locale={{
+                    emptyText: '暂无分发记录'
+                  }}
+                />
+              )
+            }
+          ]}
+        />
+      </Card>
+
+      {/* 生成初始模型对话框 */}
+      <Modal
+        title="生成随机初始模型"
+        open={generateModalVisible}
+        onOk={handleGenerate}
+        onCancel={() => {
+          setGenerateModalVisible(false)
+          generateForm.resetFields()
+        }}
+        width={800}
+        confirmLoading={generationLoading}
+      >
+        <Form
+          form={generateForm}
+          layout="vertical"
+          initialValues={{
+            modelType: 'RANDOM_FOREST',
+            activationFunction: 'relu',
+            optimizer: 'adam',
+            learningRate: 0.001,
+            distributionMode: 'ASYNC',
+            timeout: 300,
+            retryAttempts: 3,
+            verifyChecksum: true,
+            notifyOnCompletion: true
+          }}
+        >
+          <Form.Item
+            label="任务ID"
+            name="taskId"
+            rules={[{ required: true, message: '请选择任务ID' }]}
+          >
+            <Select
+              placeholder="请选择任务ID"
+              showSearch
+              filterOption={(input, option) => {
+                const taskId = option?.value as string
+                const task = federatedTasks.find(t => t.taskId === taskId)
+                if (task) {
+                  return task.taskName.toLowerCase().includes(input.toLowerCase()) ||
+                         task.taskId.toLowerCase().includes(input.toLowerCase())
+                }
+                return false
+              }}
+            >
+              {federatedTasks.map(task => (
+                <Option key={task.taskId} value={task.taskId}>
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>{task.taskName}</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>ID: {task.taskId}</div>
+                  </div>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="模型类型"
+            name="modelType"
+            rules={[{ required: true, message: '请选择模型类型' }]}
+          >
+            <Select>
+              <Option value="RANDOM_FOREST">随机森林</Option>
+            </Select>
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                label="输入大小"
+                name="inputSize"
+                rules={[{ required: true, message: '请输入输入大小' }]}
+              >
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="128" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="输出大小"
+                name="outputSize"
+                rules={[{ required: true, message: '请输入输出大小' }]}
+              >
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="10" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="随机种子"
+                name="randomSeed"
+              >
+                <InputNumber style={{ width: '100%' }} placeholder="42" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="隐藏层"
+            name="hiddenLayers"
+            rules={[{ required: true, message: '请输入隐藏层配置' }]}
+            tooltip="使用逗号分隔，例如: 64,32,16"
+          >
+            <Input placeholder="64,32,16" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="激活函数"
+                name="activationFunction"
+                rules={[{ required: true, message: '请选择激活函数' }]}
+              >
+                <Select>
+                  <Option value="relu">ReLU</Option>
+                  <Option value="sigmoid">Sigmoid</Option>
+                  <Option value="tanh">Tanh</Option>
+                  <Option value="softmax">Softmax</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="优化器"
+                name="optimizer"
+                rules={[{ required: true, message: '请选择优化器' }]}
+              >
+                <Select>
+                  <Option value="adam">Adam</Option>
+                  <Option value="sgd">SGD</Option>
+                  <Option value="rmsprop">RMSprop</Option>
+                  <Option value="adagrad">Adagrad</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="学习率"
+            name="learningRate"
+            rules={[{ required: true, message: '请输入学习率' }]}
+          >
+            <InputNumber min={0} max={1} step={0.0001} style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item
+            label="描述"
+            name="description"
+          >
+            <TextArea rows={3} placeholder="请输入模型描述" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 上传自定义模型对话框 */}
+      <Modal
+        title="上传自定义初始模型"
+        open={uploadModalVisible}
+        onOk={handleUpload}
+        onCancel={() => {
+          setUploadModalVisible(false)
+          uploadForm.resetFields()
+          setFileList([])
+        }}
+        width={600}
+        confirmLoading={initialUploadLoading}
+      >
+        <Form form={uploadForm} layout="vertical">
+          <Form.Item
+            label="任务ID"
+            name="taskId"
+            rules={[{ required: true, message: '请选择任务ID' }]}
+          >
+            <Select
+              placeholder="请选择任务ID"
+              showSearch
+              filterOption={(input, option) => {
+                const taskId = option?.value as string
+                const task = federatedTasks.find(t => t.taskId === taskId)
+                if (task) {
+                  return task.taskName.toLowerCase().includes(input.toLowerCase()) ||
+                         task.taskId.toLowerCase().includes(input.toLowerCase())
+                }
+                return false
+              }}
+            >
+              {federatedTasks.map(task => (
+                <Option key={task.taskId} value={task.taskId}>
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>{task.taskName}</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>ID: {task.taskId}</div>
+                  </div>
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="模型类型"
+            name="modelType"
+            rules={[{ required: true, message: '请选择模型类型' }]}
+          >
+            <Select>
+              <Option value="RANDOM_FOREST">随机森林</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="模型文件"
+            required
+            tooltip="支持.pth, .pt, .h5, .pb, .onnx等格式"
+          >
+            <Upload
+              fileList={fileList}
+              onChange={({ fileList }) => setFileList(fileList)}
+              beforeUpload={() => false}
+              maxCount={1}
+            >
+              <Button icon={<UploadOutlined />}>选择文件</Button>
+            </Upload>
+          </Form.Item>
+
+          <Form.Item
+            label="元数据"
+            name="metadata"
+            tooltip="JSON格式的模型元数据"
+          >
+            <TextArea
+              rows={4}
+              placeholder='{"architecture": {"inputSize": 128, "outputSize": 10}, "framework": "pytorch", "version": "1.0"}'
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="描述"
+            name="description"
+          >
+            <TextArea rows={3} placeholder="请输入模型描述" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 分发初始模型对话框 */}
+      <Modal
+        title="分发初始模型"
+        open={distributeModalVisible}
+        onOk={handleDistribute}
+        onCancel={() => {
+          setDistributeModalVisible(false)
+          distributeForm.resetFields()
+        }}
+        width={600}
+        confirmLoading={isDistributing(selectedTaskId)}
+      >
+        <Form
+          form={distributeForm}
+          layout="vertical"
+          initialValues={{
+            distributionMode: 'ASYNC',
+            timeout: 300,
+            retryAttempts: 3,
+            verifyChecksum: true,
+            notifyOnCompletion: true
+          }}
+        >
+          <Form.Item
+            label="目标虚拟机"
+            name="vmIds"
+            rules={[
+              { required: true, message: '请选择至少一个虚拟机' }
+            ]}
+            tooltip="选择要分发初始模型的虚拟机节点"
+          >
+            {vmsLoading ? (
+              <div style={{ textAlign: 'center', padding: 20, border: '1px solid #d9d9d9', borderRadius: 6 }}>
+                <Spin size="small" /> 加载虚拟机列表...
+              </div>
+            ) : availableVms.length > 0 ? (
+              <Checkbox.Group style={{ width: '100%' }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #d9d9d9', borderRadius: 6, padding: 8 }}>
+                  <Row>
+                    {availableVms.map((vm) => (
+                      <Col span={24} key={vm.vmId} style={{ marginBottom: 8 }}>
+                        <Checkbox value={vm.vmId}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div>
+                              <strong>{vm.name}</strong>
+                              <br />
+                              <span style={{ fontSize: '12px', color: '#666' }}>
+                                ID: {vm.vmId} | IP: {vm.ipAddress}
+                              </span>
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: '12px', color: '#999' }}>
+                              <div>CPU: {vm.resources?.cpuCores}核</div>
+                              <div>内存: {Math.round((vm.resources?.memoryMb || 0) / 1024)}GB</div>
+                              {vm.resources?.gpuCount > 0 && <div>GPU: {vm.resources.gpuCount}个</div>}
+                            </div>
+                          </div>
+                        </Checkbox>
+                      </Col>
+                    ))}
+                  </Row>
+                </div>
+              </Checkbox.Group>
+            ) : (
+              <div style={{ textAlign: 'center', padding: 20, color: '#999', border: '1px solid #d9d9d9', borderRadius: 6 }}>
+                暂无可用的虚拟机
+                <br />
+                <Button type="link" size="small" onClick={loadAvailableVms}>
+                  重新加载
+                </Button>
+              </div>
+            )}
+          </Form.Item>
+
+          <Form.Item
+            label="分发模式"
+            name="distributionMode"
+            rules={[{ required: true, message: '请选择分发模式' }]}
+          >
+            <Select>
+              <Option value="ASYNC">异步分发</Option>
+              <Option value="SYNC">同步分发</Option>
+            </Select>
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="超时时间(秒)"
+                name="timeout"
+                rules={[{ required: true, message: '请输入超时时间' }]}
+              >
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="重试次数"
+                name="retryAttempts"
+                rules={[{ required: true, message: '请输入重试次数' }]}
+              >
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="验证校验和"
+            name="verifyChecksum"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            label="完成时通知"
+            name="notifyOnCompletion"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 模型详情对话框 */}
+      <Modal
+        title="初始模型详情"
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={800}
+      >
+        {currentModel && (
+          <Descriptions bordered column={2}>
+            <Descriptions.Item label="模型ID" span={2}>
+              {currentModel.modelId}
+            </Descriptions.Item>
+            <Descriptions.Item label="任务ID" span={2}>
+              {currentModel.taskId}
+            </Descriptions.Item>
+            <Descriptions.Item label="模型类型">
+              {currentModel.modelType}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <Tag color={getStatusColor(currentModel.status)}>{currentModel.status}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="模型大小">
+              {(currentModel.modelSize / 1024 / 1024).toFixed(2)} MB
+            </Descriptions.Item>
+            <Descriptions.Item label="创建时间">
+              {new Date(currentModel.createdAt).toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="校验和" span={2}>
+              <code>{currentModel.checksum}</code>
+            </Descriptions.Item>
+            <Descriptions.Item label="架构参数" span={2}>
+              <pre style={{ margin: 0, maxHeight: '200px', overflow: 'auto' }}>
+                {JSON.stringify(currentModel.architecture, null, 2)}
+              </pre>
+            </Descriptions.Item>
+            <Descriptions.Item label="分发状态" span={2}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic title="总虚拟机" value={currentModel.distributionStatus?.totalVms || 0} />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic 
+                      title="已分发" 
+                      value={currentModel.distributionStatus?.distributedVms || 0}
+                      valueStyle={{ color: '#3f8600' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic 
+                      title="失败" 
+                      value={currentModel.distributionStatus?.failedVms || 0}
+                      valueStyle={{ color: '#cf1322' }}
+                    />
+                  </Col>
+                </Row>
+              </Space>
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* 分发详情对话框 */}
+      <Modal
+        title="分发详情"
+        open={distributionDetailModalVisible}
+        onCancel={() => setDistributionDetailModalVisible(false)}
+        footer={[
+          <Button 
+            key="refresh" 
+            icon={<ReloadOutlined />}
+            onClick={() => handleRefreshDistribution(selectedDistributionId)}
+          >
+            刷新
+          </Button>,
+          <Button key="close" onClick={() => setDistributionDetailModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+        width={900}
+      >
+        {currentDistribution && (
+          <>
+            <Descriptions bordered column={2} style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="分发ID" span={2}>
+                {currentDistribution.distributionId}
+              </Descriptions.Item>
+              <Descriptions.Item label="任务ID">
+                {currentDistribution.taskId}
+              </Descriptions.Item>
+              <Descriptions.Item label="模型ID">
+                {currentDistribution.modelId}
+              </Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <Tag color={getDistributionStatusColor(currentDistribution.status)}>
+                  {currentDistribution.status}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="开始时间">
+                {currentDistribution.startedAt ? new Date(currentDistribution.startedAt).toLocaleString() : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div style={{ marginTop: 16 }}>
+              <h4>分发进度</h4>
+              <Progress
+                percent={
+                  currentDistribution.progress
+                    ? Math.round((currentDistribution.progress.completed / currentDistribution.progress.total) * 100)
+                    : 0
+                }
+                status={currentDistribution.progress?.failed > 0 ? 'exception' : 'active'}
+              />
+              <Row gutter={16} style={{ marginTop: 16 }}>
+                <Col span={6}>
+                  <Statistic title="总数" value={currentDistribution.progress?.total || 0} />
+                </Col>
+                <Col span={6}>
+                  <Statistic 
+                    title="已完成" 
+                    value={currentDistribution.progress?.completed || 0}
+                    valueStyle={{ color: '#3f8600' }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic 
+                    title="进行中" 
+                    value={currentDistribution.progress?.inProgress || 0}
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic 
+                    title="失败" 
+                    value={currentDistribution.progress?.failed || 0}
+                    valueStyle={{ color: '#cf1322' }}
+                  />
+                </Col>
+              </Row>
+            </div>
+
+            {currentDistribution.vmDetails && currentDistribution.vmDetails.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <h4>虚拟机详情</h4>
+                <Table
+                  dataSource={currentDistribution.vmDetails}
+                  rowKey="vmId"
+                  size="small"
+                  pagination={false}
+                  scroll={{ y: 300 }}
+                  columns={[
+                    {
+                      title: '虚拟机ID',
+                      dataIndex: 'vmId',
+                      key: 'vmId'
+                    },
+                    {
+                      title: '状态',
+                      dataIndex: 'status',
+                      key: 'status',
+                      render: (status: string) => (
+                        <Tag color={status === 'SUCCESS' ? 'success' : 'error'}>
+                          {status}
+                        </Tag>
+                      )
+                    },
+                    {
+                      title: '验证状态',
+                      dataIndex: 'verificationStatus',
+                      key: 'verificationStatus',
+                      render: (status: string) => (
+                        <Tag color={status === 'VERIFIED' ? 'success' : 'warning'}>
+                          {status}
+                        </Tag>
+                      )
+                    },
+                    {
+                      title: '分发时间',
+                      dataIndex: 'distributedAt',
+                      key: 'distributedAt',
+                      render: (time: string) => time ? new Date(time).toLocaleString() : '-'
+                    }
+                  ]}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
+
+      {/* 任务选择对话框 */}
+      <Modal
+        title="选择联邦学习任务"
+        open={taskSelectModalVisible}
+        onCancel={() => setTaskSelectModalVisible(false)}
+        footer={null}
+        width={1000}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Alert
+            message="请选择一个联邦学习任务来查询其初始模型"
+            type="info"
+            showIcon
+          />
+        </div>
+        <Table
+          dataSource={federatedTasks}
+          rowKey="taskId"
+          loading={tasksLoading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 个任务`
+          }}
+          scroll={{ y: 400 }}
+          columns={[
+            {
+              title: '任务ID',
+              dataIndex: 'taskId',
+              key: 'taskId',
+              width: 200,
+              ellipsis: true,
+              render: (taskId: string) => (
+                <Tooltip title={taskId}>
+                  <code>{taskId}</code>
+                </Tooltip>
+              )
+            },
+            {
+              title: '任务名称',
+              dataIndex: 'taskName',
+              key: 'taskName',
+              ellipsis: true
+            },
+            {
+              title: '任务类型',
+              dataIndex: 'taskType',
+              key: 'taskType',
+              width: 120
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              key: 'status',
+              width: 100,
+              render: (status: string) => {
+                const statusColors: Record<string, string> = {
+                  'CREATED': 'default',
+                  'CONFIGURED': 'processing',
+                  'RUNNING': 'processing',
+                  'PAUSED': 'warning',
+                  'STOPPED': 'default',
+                  'COMPLETED': 'success',
+                  'FAILED': 'error',
+                  'CANCELLED': 'default'
+                }
+                return <Tag color={statusColors[status] || 'default'}>{status}</Tag>
+              }
+            },
+            {
+              title: '参与者数量',
+              dataIndex: 'participantCount',
+              key: 'participantCount',
+              width: 100
+            },
+            {
+              title: '创建时间',
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              width: 180,
+              render: (time: string) => new Date(time).toLocaleString()
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 120,
+              render: (_, record) => (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() => handleTaskSelected(record.taskId)}
+                >
+                  选择此任务
+                </Button>
+              )
+            }
+          ]}
+        />
+      </Modal>
+    </div>
+  )
+}
+
+export default InitialModelPage
+

@@ -75,22 +75,30 @@ export type {
 export { modelVersionService } from './model-version'
 export type {
   ModelVersionService,
-  UploadModelRequest,
   ModelVersionListParams,
   EvaluationRequest,
-  DeploymentRequest,
   RollbackRequest,
   ModelVersionServiceConfig,
   ModelVersionDetail,
   TaskModelVersions,
   EvaluationResult,
-  DeploymentStatus,
   RollbackInfo,
   ModelStatistics,
   TaskStatistics,
   DownloadRequest,
   DeleteModelRequest,
-  StatisticsParams
+  StatisticsParams,
+  // 初始模型管理相关类型
+  InitialModelInfo,
+  InitialModelGenerationRequest,
+  InitialModelGenerationResponse,
+  InitialModelUploadRequest,
+  InitialModelUploadResponse,
+  ModelDistributionRequest,
+  ModelDistributionResponse,
+  DistributionStatusDetail,
+  InitialModelDeleteRequest,
+  InitialModelDeleteResponse
 } from './model-version'
 
 // 训练数据服务

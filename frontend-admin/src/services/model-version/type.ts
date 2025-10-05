@@ -16,19 +16,36 @@ import type { PaginationParams, SortParams, DeepReadonly, PartialBy, RequiredBy,
 export type ModelStatus = 'UPLOADING' | 'UPLOADED' | 'VALIDATING' | 'VALIDATED' | 'DEPLOYED' | 'DEPRECATED' | 'FAILED'
 
 /**
- * 部署状态枚举
+ * 初始模型状态枚举
  */
-export type DeploymentStatusType = 'PENDING' | 'DEPLOYING' | 'RUNNING' | 'STOPPED' | 'FAILED'
+export type InitialModelStatus = 'GENERATING' | 'READY' | 'UPLOADED' | 'DISTRIBUTING' | 'DISTRIBUTED' | 'FAILED' | 'DELETED'
 
 /**
- * 回滚状态枚举
+ * 分发状态枚举
  */
-export type RollbackStatus = 'PENDING' | 'ROLLING_BACK' | 'COMPLETED' | 'FAILED'
+export type DistributionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+
+/**
+ * 模型类型枚举
+ */
+export type ModelType = 'neural_network' | 'random_forest' | 'svm' | 'linear_regression' | 'logistic_regression'
+
+/**
+ * 分发模式枚举
+ */
+export type DistributionMode = 'ASYNC' | 'SYNC'
+
+
 
 /**
  * 评估状态枚举
  */
 export type EvaluationStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+
+/**
+ * 回滚状态枚举
+ */
+export type RollbackStatus = 'PENDING' | 'ROLLING_BACK' | 'COMPLETED' | 'FAILED'
 
 /**
  * 下载格式枚举
@@ -40,74 +57,258 @@ export type DownloadFormat = 'original' | 'onnx'
  */
 export type TimeRange = '7d' | '30d' | '90d'
 
-// ==================== 上传相关类型 ====================
+// ==================== 初始模型管理相关类型 ====================
 
 /**
- * 模型上传请求（FormData格式）
+ * 初始模型生成请求
  */
-export interface UploadModelRequest {
+export interface InitialModelGenerationRequest {
   /** 关联任务ID */
   readonly taskId: string
-  /** 训练轮数 */
-  readonly roundNumber: number
+  /** 模型类型 */
+  readonly modelType: ModelType
+  /** 模型架构参数 */
+  readonly architecture: {
+    readonly inputSize: number
+    readonly hiddenLayers: number[]
+    readonly outputSize: number
+    readonly activationFunction: string
+    readonly optimizer: string
+    readonly learningRate: number
+  }
+  /** 随机种子 */
+  readonly randomSeed?: number
   /** 模型描述 */
   readonly description?: string
-  /** 模型参数 */
-  readonly parameters?: Record<string, unknown>
-  /** 模型文件 */
-  readonly file: File
 }
 
 /**
- * 模型上传响应
+ * 初始模型生成响应
  */
-export interface UploadModelResponse {
+export interface InitialModelGenerationResponse {
   /** 模型ID */
   readonly modelId: string
   /** 任务ID */
   readonly taskId: string
-  /** 训练轮数 */
-  readonly roundNumber: number
+  /** 模型类型 */
+  readonly modelType: string
+  /** 模型大小（字节） */
+  readonly modelSize: number
+  /** 参数数量 */
+  readonly parametersCount: number
+  /** 模型架构参数 */
+  readonly architecture: {
+    readonly inputSize: number
+    readonly hiddenLayers: number[]
+    readonly outputSize: number
+    readonly activationFunction: string
+    readonly optimizer: string
+    readonly learningRate: number
+  }
+  /** 生成时间 */
+  readonly generatedAt: string
   /** 状态 */
   readonly status: string
-  /** 模型描述 */
-  readonly description?: string
-  /** 模型参数 */
-  readonly parameters: Record<string, unknown>
-  /** 创建时间 */
-  readonly createdAt: string
+  /** 校验和 */
+  readonly checksum: string
 }
 
 /**
- * 批量上传请求
+ * 初始模型上传请求（FormData格式）
  */
-export interface BatchUploadRequest {
+export interface InitialModelUploadRequest {
   /** 关联任务ID */
   readonly taskId: string
-  /** 模型列表 */
-  readonly models: Array<{
-    readonly roundNumber: number
-    readonly description?: string
-    readonly parameters?: Record<string, unknown>
-    readonly file: File
+  /** 模型类型 */
+  readonly modelType: ModelType
+  /** 模型描述 */
+  readonly description?: string
+  /** 模型文件 */
+  readonly file: File
+  /** 元数据 */
+  readonly metadata?: {
+    readonly architecture?: {
+      readonly inputSize: number
+      readonly outputSize: number
+    }
+    readonly framework?: string
+    readonly version?: string
+  }
+}
+
+/**
+ * 初始模型上传响应
+ */
+export interface InitialModelUploadResponse {
+  /** 模型ID */
+  readonly modelId: string
+  /** 任务ID */
+  readonly taskId: string
+  /** 模型类型 */
+  readonly modelType: string
+  /** 文件名 */
+  readonly fileName: string
+  /** 模型大小（字节） */
+  readonly modelSize: number
+  /** 上传时间 */
+  readonly uploadedAt: string
+  /** 状态 */
+  readonly status: string
+  /** 校验和 */
+  readonly checksum: string
+  /** 元数据 */
+  readonly metadata?: {
+    readonly architecture?: {
+      readonly inputSize: number
+      readonly outputSize: number
+    }
+    readonly framework?: string
+    readonly version?: string
+  }
+}
+
+/**
+ * 初始模型信息
+ */
+export interface InitialModelInfo {
+  /** 模型ID */
+  readonly modelId: string
+  /** 任务ID */
+  readonly taskId: string
+  /** 模型类型 */
+  readonly modelType: string
+  /** 模型大小（字节） */
+  readonly modelSize: number
+  /** 创建时间 */
+  readonly createdAt: string
+  /** 状态 */
+  readonly status: InitialModelStatus
+  /** 模型架构参数 */
+  readonly architecture: {
+    readonly inputSize: number
+    readonly hiddenLayers: number[]
+    readonly outputSize: number
+    readonly activationFunction: string
+    readonly optimizer: string
+    readonly learningRate: number
+  }
+  /** 分发状态 */
+  readonly distributionStatus: {
+    readonly totalVms: number
+    readonly distributedVms: number
+    readonly failedVms: number
+    readonly distributedAt?: string
+  }
+  /** 校验和 */
+  readonly checksum: string
+}
+
+/**
+ * 模型分发请求
+ */
+export interface ModelDistributionRequest {
+  /** 目标虚拟机ID列表 */
+  readonly vmIds: string[]
+  /** 分发模式 */
+  readonly distributionMode: DistributionMode
+  /** 超时时间（秒） */
+  readonly timeout?: number
+  /** 重试次数 */
+  readonly retryAttempts?: number
+  /** 是否验证校验和 */
+  readonly verifyChecksum?: boolean
+  /** 完成时是否通知 */
+  readonly notifyOnCompletion?: boolean
+}
+
+/**
+ * 模型分发响应
+ */
+export interface ModelDistributionResponse {
+  /** 分发任务ID */
+  readonly distributionId: string
+  /** 任务ID */
+  readonly taskId: string
+  /** 模型ID */
+  readonly modelId: string
+  /** 目标虚拟机列表 */
+  readonly targetVms: string[]
+  /** 分发模式 */
+  readonly distributionMode: string
+  /** 状态 */
+  readonly status: string
+  /** 开始时间 */
+  readonly startedAt: string
+  /** 预计完成时间 */
+  readonly estimatedCompletion?: string
+  /** 进度信息 */
+  readonly progress: {
+    readonly total: number
+    readonly completed: number
+    readonly failed: number
+    readonly inProgress: number
+  }
+}
+
+/**
+ * 分发状态详情
+ */
+export interface DistributionStatusDetail {
+  /** 分发任务ID */
+  readonly distributionId: string
+  /** 任务ID */
+  readonly taskId: string
+  /** 模型ID */
+  readonly modelId: string
+  /** 状态 */
+  readonly status: DistributionStatus
+  /** 开始时间 */
+  readonly startedAt: string
+  /** 完成时间 */
+  readonly completedAt?: string
+  /** 进度信息 */
+  readonly progress: {
+    readonly total: number
+    readonly completed: number
+    readonly failed: number
+    readonly inProgress: number
+  }
+  /** 虚拟机详情 */
+  readonly vmDetails: Array<{
+    readonly vmId: string
+    readonly status: string
+    readonly distributedAt?: string
+    readonly verificationStatus: string
+    readonly checksum?: string
   }>
 }
 
 /**
- * 批量上传响应
+ * 初始模型删除请求
  */
-export interface BatchUploadResponse {
-  /** 成功数量 */
-  readonly successCount: number
-  /** 失败数量 */
-  readonly failedCount: number
-  /** 模型结果列表 */
-  readonly models: Array<{
-    readonly modelId: string
-    readonly status: string
-    readonly message: string
-  }>
+export interface InitialModelDeleteRequest {
+  /** 强制删除 */
+  readonly force?: boolean
 }
+
+/**
+ * 初始模型删除响应
+ */
+export interface InitialModelDeleteResponse {
+  /** 任务ID */
+  readonly taskId: string
+  /** 模型ID */
+  readonly modelId: string
+  /** 删除时间 */
+  readonly deletedAt: string
+  /** 清理状态 */
+  readonly cleanupStatus: {
+    readonly modelFileDeleted: boolean
+    readonly distributionRecordsCleared: boolean
+    readonly vmCachesCleared: number
+  }
+}
+
 
 // ==================== 查询相关类型 ====================
 
@@ -135,7 +336,7 @@ export interface ModelVersionListParams extends PaginationParams, SortParams {
 }
 
 /**
- * 模型版本详情
+ * 模型版本详情（严格按照接口文档定义）
  */
 export interface ModelVersionDetail {
   /** 模型ID */
@@ -256,94 +457,10 @@ export interface BatchEvaluationResponse {
   }>
 }
 
-// ==================== 部署相关类型 ====================
-
-/**
- * 部署配置类型
- */
-export interface DeploymentConfig {
-  replicas?: number
-  resources?: {
-    cpu?: string
-    memory?: string
-  }
-  environment?: Record<string, string>
-}
-
-/**
- * 模型部署请求
- */
-export interface DeploymentRequest {
-  /** 模型ID */
-  readonly modelId: string
-  /** 部署名称 */
-  readonly deploymentName: string
-  /** 目标虚拟机列表 */
-  readonly targetVms?: string[]
-  /** 部署配置 */
-  readonly deploymentConfig?: DeploymentConfig
-  /** 部署描述 */
-  readonly description?: string
-}
-
-/**
- * 模型部署响应
- */
-export interface DeploymentResponse {
-  /** 部署ID */
-  readonly deploymentId: string
-  /** 模型ID */
-  readonly modelId: string
-  /** 部署名称 */
-  readonly deploymentName: string
-  /** 目标虚拟机列表 */
-  readonly targetVms?: string[]
-  /** 状态 */
-  readonly status: string
-  /** 部署配置 */
-  readonly deploymentConfig?: DeploymentConfig
-  /** 服务端点列表 */
-  readonly endpoints?: string[]
-  /** 创建时间 */
-  readonly createdAt: string
-}
-
-/**
- * 部署状态信息
- */
-export interface DeploymentStatus {
-  /** 部署ID */
-  readonly deploymentId: string
-  /** 模型ID */
-  readonly modelId: string
-  /** 部署名称 */
-  readonly deploymentName: string
-  /** 状态 */
-  readonly status: string
-  /** 副本信息 */
-  readonly replicas?: {
-    readonly desired: number
-    readonly available: number
-    readonly ready: number
-  }
-  /** 服务端点列表 */
-  readonly endpoints?: string[]
-  /** 健康检查信息 */
-  readonly healthCheck?: {
-    readonly status: string
-    readonly lastCheck: string
-    readonly responseTime: number
-  }
-  /** 创建时间 */
-  readonly createdAt: string
-  /** 更新时间 */
-  readonly updatedAt: string
-}
-
 // ==================== 回滚相关类型 ====================
 
 /**
- * 模型回滚请求
+ * 回滚请求
  */
 export interface RollbackRequest {
   /** 部署ID */
@@ -352,28 +469,50 @@ export interface RollbackRequest {
   readonly targetModelId: string
   /** 回滚原因 */
   readonly rollbackReason?: string
-  /** 强制回滚 */
+  /** 是否强制回滚 */
   readonly force?: boolean
 }
 
 /**
- * 模型回滚响应
+ * 回滚响应
  */
 export interface RollbackResponse {
   /** 回滚ID */
   readonly rollbackId: string
   /** 部署ID */
   readonly deploymentId: string
-  /** 源模型ID */
+  /** 原模型ID */
   readonly fromModelId: string
   /** 目标模型ID */
   readonly toModelId: string
-  /** 状态 */
-  readonly status: string
+  /** 回滚状态 */
+  readonly status: RollbackStatus
   /** 回滚原因 */
   readonly rollbackReason?: string
-  /** 回滚时间（秒） */
+  /** 回滚时间（毫秒） */
   readonly rollbackTime: number
+  /** 创建时间 */
+  readonly createdAt: string
+}
+
+/**
+ * 回滚信息
+ */
+export interface RollbackInfo {
+  /** 回滚ID */
+  readonly rollbackId: string
+  /** 部署ID */
+  readonly deploymentId: string
+  /** 原模型ID */
+  readonly fromModelId: string
+  /** 目标模型ID */
+  readonly toModelId: string
+  /** 回滚状态 */
+  readonly status: RollbackStatus
+  /** 回滚原因 */
+  readonly rollbackReason?: string
+  /** 回滚时间（毫秒） */
+  readonly rollbackTime?: number
   /** 创建时间 */
   readonly createdAt: string
 }
@@ -825,11 +964,8 @@ export const TIME_RANGES = {
  * 模型操作常量
  */
 export const MODEL_OPERATIONS = {
-  UPLOAD: 'UPLOAD',
-  BATCH_UPLOAD: 'BATCH_UPLOAD',
   EVALUATE: 'EVALUATE',
   BATCH_EVALUATE: 'BATCH_EVALUATE',
-  DEPLOY: 'DEPLOY',
   ROLLBACK: 'ROLLBACK',
   DOWNLOAD: 'DOWNLOAD',
   BATCH_DOWNLOAD: 'BATCH_DOWNLOAD',
@@ -850,6 +986,49 @@ export const SUPPORTED_MODEL_FORMATS = {
   JOBLIB: ['.joblib']
 } as const
 
+/**
+ * 初始模型状态常量
+ */
+export const INITIAL_MODEL_STATUSES = {
+  GENERATING: 'GENERATING',
+  READY: 'READY',
+  UPLOADED: 'UPLOADED',
+  DISTRIBUTING: 'DISTRIBUTING',
+  DISTRIBUTED: 'DISTRIBUTED',
+  FAILED: 'FAILED',
+  DELETED: 'DELETED'
+} as const
+
+/**
+ * 分发状态常量
+ */
+export const DISTRIBUTION_STATUSES = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+/**
+ * 模型类型常量
+ */
+export const MODEL_TYPES = {
+  NEURAL_NETWORK: 'neural_network',
+  RANDOM_FOREST: 'random_forest',
+  SVM: 'svm',
+  LINEAR_REGRESSION: 'linear_regression',
+  LOGISTIC_REGRESSION: 'logistic_regression'
+} as const
+
+/**
+ * 分发模式常量
+ */
+export const DISTRIBUTION_MODES = {
+  ASYNC: 'ASYNC',
+  SYNC: 'SYNC'
+} as const
+
 // ==================== 其他需要的类型定义 ====================
 
 /**
@@ -866,19 +1045,6 @@ export interface EvaluationResult {
   createdAt: string
 }
 
-/**
- * 回滚信息类型
- */
-export interface RollbackInfo {
-  rollbackId: string
-  deploymentId: string
-  fromModelId: string
-  toModelId: string
-  status: string
-  rollbackReason?: string
-  rollbackTime?: number
-  createdAt: string
-}
 
 /**
  * 统计信息类型

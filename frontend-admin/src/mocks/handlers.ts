@@ -5,6 +5,7 @@
 
 import { http, HttpResponse } from 'msw'
 import { federatedTaskHandlers } from './handlers/federatedTaskHandlers'
+import { modelManagementHandlers } from './handlers/modelManagementHandlers'
 
 export const handlers = [
   // 用户登录 - 支持绝对路径和相对路径
@@ -205,5 +206,8 @@ export const handlers = [
   }),
 
   // ==================== 联邦学习任务管理 API ====================
-  ...federatedTaskHandlers
+  ...federatedTaskHandlers,
+
+  // ==================== 模型管理 API ====================
+  ...modelManagementHandlers
 ]

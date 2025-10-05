@@ -12,17 +12,25 @@ import type {
   ModelVersionDetail,
   TaskModelVersions,
   EvaluationResult,
-  DeploymentStatus,
   RollbackInfo,
+  RollbackRequest,
   ModelStatistics,
-  TaskStatistics
+  TaskStatistics,
+  // 初始模型管理相关类型
+  InitialModelInfo,
+  InitialModelGenerationRequest,
+  InitialModelGenerationResponse,
+  InitialModelUploadRequest,
+  InitialModelUploadResponse,
+  ModelDistributionRequest,
+  ModelDistributionResponse,
+  DistributionStatusDetail,
+  InitialModelDeleteRequest,
+  InitialModelDeleteResponse
 } from '@/services'
 import type { 
-  UploadModelRequest,
   ModelVersionListParams,
   EvaluationRequest,
-  DeploymentRequest,
-  RollbackRequest,
   DownloadRequest,
   DeleteModelRequest,
   StatisticsParams
@@ -46,21 +54,36 @@ interface ModelState {
   taskModels: Record<string, TaskModelVersions>
   taskModelsLoading: Record<string, boolean>
   
-  // 上传状态
-  uploadLoading: boolean
-  uploadError: string | null
-  uploadProgress: Record<string, number>
+  
+  // ==================== 初始模型管理状态 ====================
+  
+  // 初始模型信息
+  initialModels: Record<string, InitialModelInfo>
+  initialModelLoading: Record<string, boolean>
+  initialModelError: Record<string, string | null>
+  
+  // 初始模型生成状态
+  generationLoading: boolean
+  generationError: string | null
+  
+  // 初始模型上传状态
+  initialUploadLoading: boolean
+  initialUploadError: string | null
+  initialUploadProgress: Record<string, number>
+  
+  // 模型分发状态
+  distributions: Record<string, DistributionStatusDetail>
+  distributionLoading: Record<string, boolean>
+  distributionError: Record<string, string | null>
   
   // 评估结果
   evaluationResults: Record<string, EvaluationResult[]>
   evaluationLoading: Record<string, boolean>
   
-  // 部署状态
-  deployments: Record<string, DeploymentStatus>
-  deploymentLoading: Record<string, boolean>
-  
   // 回滚历史
-  rollbackHistory: Record<string, RollbackInfo[]>
+  rollbackHistory: RollbackInfo[]
+  rollbackLoading: boolean
+  
   
   // 统计数据
   modelStatistics: ModelStatistics | null
@@ -91,25 +114,38 @@ interface ModelActions {
   fetchModelDetail: (modelId: string) => Promise<void>
   setCurrentModel: (model: ModelVersionDetail | null) => void
   
-  // 模型上传操作
-  uploadModel: (formData: FormData) => Promise<string>
-  uploadModelBatch: (models: { file: File; roundNumber: number; description?: string }[], taskId: string) => Promise<void>
   
   // 任务模型版本
   fetchTaskModels: (taskId: string, params?: any) => Promise<void>
+  
+  // ==================== 初始模型管理操作 ====================
+  
+  // 初始模型生成操作
+  generateInitialModel: (generationData: InitialModelGenerationRequest) => Promise<string>
+  
+  // 初始模型上传操作
+  uploadCustomInitialModel: (uploadData: InitialModelUploadRequest) => Promise<string>
+  
+  // 初始模型查询操作
+  fetchTaskInitialModel: (taskId: string, params?: { includeParameters?: boolean; format?: 'json' | 'binary' }) => Promise<void>
+  
+  // 模型分发操作
+  distributeInitialModel: (taskId: string, distributionData: ModelDistributionRequest) => Promise<string>
+  fetchDistributionStatus: (distributionId: string) => Promise<void>
+  
+  // 初始模型下载操作
+  downloadInitialModel: (taskId: string, params?: { format?: 'binary' | 'json' }) => Promise<void>
+  
+  // 初始模型删除操作
+  deleteInitialModel: (taskId: string, deleteData?: InitialModelDeleteRequest) => Promise<void>
   
   // 模型评估操作
   evaluateModel: (modelId: string, request: EvaluationRequest) => Promise<void>
   fetchEvaluationResults: (modelId: string) => Promise<void>
   
-  // 模型部署操作
-  deployModel: (modelId: string, request: DeploymentRequest) => Promise<string>
-  fetchDeploymentStatus: (deploymentId: string) => Promise<void>
-  fetchDeploymentList: (params?: any) => Promise<void>
-  
   // 模型回滚操作
-  rollbackModel: (deploymentId: string, request: RollbackRequest) => Promise<void>
-  fetchRollbackHistory: (deploymentId: string) => Promise<void>
+  rollbackModel: (rollbackData: RollbackRequest) => Promise<void>
+  fetchRollbackHistory: (params?: { deploymentId?: string; page?: number; size?: number }) => Promise<void>
   
   // 模型下载操作
   downloadModel: (modelId: string, params?: DownloadRequest) => Promise<void>
@@ -155,18 +191,28 @@ const initialState: ModelState = {
   taskModels: {},
   taskModelsLoading: {},
   
-  uploadLoading: false,
-  uploadError: null,
-  uploadProgress: {},
+  // 初始模型管理状态
+  initialModels: {},
+  initialModelLoading: {},
+  initialModelError: {},
+  
+  generationLoading: false,
+  generationError: null,
+  
+  initialUploadLoading: false,
+  initialUploadError: null,
+  initialUploadProgress: {},
+  
+  distributions: {},
+  distributionLoading: {},
+  distributionError: {},
   
   evaluationResults: {},
   evaluationLoading: {},
   
-  deployments: {},
-  deploymentLoading: {},
-  
-  rollbackHistory: {},
-  
+  rollbackHistory: [],
+  rollbackLoading: false,
+
   modelStatistics: null,
   taskStatistics: {},
   statisticsLoading: false,
@@ -273,64 +319,6 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     set({ currentModel: model })
   },
 
-  // ==================== 模型上传操作 ====================
-  
-  /**
-   * 上传模型文件
-   */
-  uploadModel: async (formData: FormData) => {
-    set({ uploadLoading: true, uploadError: null })
-    
-    try {
-      const response = await modelVersionService.uploadModel(formData)
-      
-      set({
-        uploadLoading: false,
-        uploadError: null
-      })
-      
-      // 刷新模型列表
-      await get().refreshModelList()
-      
-      return response.modelId
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '模型上传失败'
-      set({
-        uploadLoading: false,
-        uploadError: errorMessage
-      })
-      throw error
-    }
-  },
-
-  /**
-   * 批量上传模型
-   */
-  uploadModelBatch: async (models: { file: File; roundNumber: number; description?: string }[], taskId: string) => {
-    set({ uploadLoading: true, uploadError: null })
-    
-    try {
-      const response = await modelVersionService.uploadModelBatch({
-        taskId,
-        models
-      })
-      
-      set({
-        uploadLoading: false,
-        uploadError: null
-      })
-      
-      // 刷新模型列表
-      await get().refreshModelList()
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '批量上传失败'
-      set({
-        uploadLoading: false,
-        uploadError: errorMessage
-      })
-      throw error
-    }
-  },
 
   // ==================== 任务模型版本 ====================
   
@@ -363,6 +351,299 @@ export const useModelStore = create<ModelStore>((set, get) => ({
         taskModelsLoading: {
           ...state.taskModelsLoading,
           [taskId]: false
+        }
+      }))
+      throw error
+    }
+  },
+
+  // ==================== 初始模型管理操作 ====================
+  
+  /**
+   * 生成随机初始模型
+   */
+  generateInitialModel: async (generationData: InitialModelGenerationRequest) => {
+    set({ generationLoading: true, generationError: null })
+    
+    try {
+      const response = await modelVersionService.generateInitialModel(generationData)
+      
+      // 更新初始模型状态
+      set((state) => ({
+        generationLoading: false,
+        generationError: null,
+        initialModels: {
+          ...state.initialModels,
+          [generationData.taskId]: {
+            modelId: response.modelId,
+            taskId: response.taskId,
+            modelType: response.modelType,
+            modelSize: response.modelSize,
+            createdAt: response.generatedAt,
+            status: response.status as any,
+            architecture: response.architecture,
+            distributionStatus: {
+              totalVms: 0,
+              distributedVms: 0,
+              failedVms: 0
+            },
+            checksum: response.checksum
+          }
+        }
+      }))
+      
+      return response.modelId
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '初始模型生成失败'
+      set({
+        generationLoading: false,
+        generationError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 上传自定义初始模型
+   */
+  uploadCustomInitialModel: async (uploadData: InitialModelUploadRequest) => {
+    set({ initialUploadLoading: true, initialUploadError: null })
+    
+    try {
+      const response = await modelVersionService.uploadCustomInitialModel(uploadData)
+      
+      // 更新初始模型状态
+      set((state) => ({
+        initialUploadLoading: false,
+        initialUploadError: null,
+        initialModels: {
+          ...state.initialModels,
+          [uploadData.taskId]: {
+            modelId: response.modelId,
+            taskId: response.taskId,
+            modelType: response.modelType,
+            modelSize: response.modelSize,
+            createdAt: response.uploadedAt,
+            status: response.status as any,
+            architecture: {
+              inputSize: response.metadata?.architecture?.inputSize || 0,
+              hiddenLayers: [],
+              outputSize: response.metadata?.architecture?.outputSize || 0,
+              activationFunction: '',
+              optimizer: '',
+              learningRate: 0
+            },
+            distributionStatus: {
+              totalVms: 0,
+              distributedVms: 0,
+              failedVms: 0
+            },
+            checksum: response.checksum
+          }
+        }
+      }))
+      
+      return response.modelId
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '自定义初始模型上传失败'
+      set({
+        initialUploadLoading: false,
+        initialUploadError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 获取任务初始模型
+   */
+  fetchTaskInitialModel: async (taskId: string, params?: { includeParameters?: boolean; format?: 'json' | 'binary' }) => {
+    set((state) => ({
+      initialModelLoading: {
+        ...state.initialModelLoading,
+        [taskId]: true
+      },
+      initialModelError: {
+        ...state.initialModelError,
+        [taskId]: null
+      }
+    }))
+    
+    try {
+      const initialModel = await modelVersionService.getTaskInitialModel(taskId, params)
+      
+      set((state) => ({
+        initialModelLoading: {
+          ...state.initialModelLoading,
+          [taskId]: false
+        },
+        initialModels: {
+          ...state.initialModels,
+          [taskId]: initialModel
+        }
+      }))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取初始模型失败'
+      set((state) => ({
+        initialModelLoading: {
+          ...state.initialModelLoading,
+          [taskId]: false
+        },
+        initialModelError: {
+          ...state.initialModelError,
+          [taskId]: errorMessage
+        }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * 分发初始模型
+   */
+  distributeInitialModel: async (taskId: string, distributionData: ModelDistributionRequest) => {
+    set((state) => ({
+      distributionLoading: {
+        ...state.distributionLoading,
+        [taskId]: true
+      },
+      distributionError: {
+        ...state.distributionError,
+        [taskId]: null
+      }
+    }))
+    
+    try {
+      const response = await modelVersionService.distributeInitialModel(taskId, distributionData)
+      
+      set((state) => ({
+        distributionLoading: {
+          ...state.distributionLoading,
+          [taskId]: false
+        },
+        distributions: {
+          ...state.distributions,
+          [response.distributionId]: {
+            distributionId: response.distributionId,
+            taskId: response.taskId,
+            modelId: response.modelId,
+            status: response.status as any,
+            startedAt: response.startedAt,
+            progress: response.progress,
+            vmDetails: []
+          }
+        }
+      }))
+      
+      return response.distributionId
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '模型分发失败'
+      set((state) => ({
+        distributionLoading: {
+          ...state.distributionLoading,
+          [taskId]: false
+        },
+        distributionError: {
+          ...state.distributionError,
+          [taskId]: errorMessage
+        }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * 获取分发状态
+   */
+  fetchDistributionStatus: async (distributionId: string) => {
+    try {
+      const status = await modelVersionService.getDistributionStatus(distributionId)
+      
+      set((state) => ({
+        distributions: {
+          ...state.distributions,
+          [distributionId]: status
+        }
+      }))
+    } catch (error) {
+      console.error(`获取分发状态失败 (${distributionId}):`, error)
+    }
+  },
+
+  /**
+   * 下载初始模型
+   */
+  downloadInitialModel: async (taskId: string, params?: { format?: 'binary' | 'json', modelId?: string }) => {
+    set((state) => ({
+      operationLoading: {
+        ...state.operationLoading,
+        [`download-initial-${taskId}`]: true
+      }
+    }))
+    
+    try {
+      const blob = await modelVersionService.downloadInitialModel(taskId, params)
+      
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = `initial-model-${taskId}.${params?.format === 'json' ? 'json' : 'bin'}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      set((state) => ({
+        operationLoading: {
+          ...state.operationLoading,
+          [`download-initial-${taskId}`]: false
+        }
+      }))
+    } catch (error) {
+      set((state) => ({
+        operationLoading: {
+          ...state.operationLoading,
+          [`download-initial-${taskId}`]: false
+        }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * 删除初始模型
+   */
+  deleteInitialModel: async (taskId: string, deleteData?: InitialModelDeleteRequest) => {
+    set((state) => ({
+      operationLoading: {
+        ...state.operationLoading,
+        [`delete-initial-${taskId}`]: true
+      }
+    }))
+    
+    try {
+      await modelVersionService.deleteInitialModel(taskId, deleteData)
+      
+      // 从状态中移除
+      set((state) => {
+        const newInitialModels = { ...state.initialModels }
+        delete newInitialModels[taskId]
+        
+        return {
+          initialModels: newInitialModels,
+          operationLoading: {
+            ...state.operationLoading,
+            [`delete-initial-${taskId}`]: false
+          }
+        }
+      })
+    } catch (error) {
+      set((state) => ({
+        operationLoading: {
+          ...state.operationLoading,
+          [`delete-initial-${taskId}`]: false
         }
       }))
       throw error
@@ -417,143 +698,72 @@ export const useModelStore = create<ModelStore>((set, get) => ({
   /**
    * 获取评估结果
    */
-  fetchEvaluationResults: async (modelId: string) => {
+  fetchEvaluationResults: async (modelId?: string) => {
     try {
-      const response = await modelVersionService.getEvaluationResults({ modelId })
+      const params = modelId ? { modelId } : { page: 1, size: 50 }
+      const response = await modelVersionService.getEvaluationResults(params)
       
-      set((state) => ({
-        evaluationResults: {
-          ...state.evaluationResults,
-          [modelId]: response.records
-        }
-      }))
-    } catch (error) {
-      console.error(`获取评估结果失败 (${modelId}):`, error)
-    }
-  },
-
-  // ==================== 模型部署操作 ====================
-  
-  /**
-   * 部署模型
-   */
-  deployModel: async (modelId: string, request: DeploymentRequest) => {
-    set((state) => ({
-      deploymentLoading: {
-        ...state.deploymentLoading,
-        [modelId]: true
-      },
-      operationError: {
-        ...state.operationError,
-        [`deploy-${modelId}`]: null
-      }
-    }))
-    
-    try {
-      const response = await modelVersionService.deployModel(request)
-      
-      set((state) => ({
-        deploymentLoading: {
-          ...state.deploymentLoading,
-          [modelId]: false
-        }
-      }))
-      
-      return response.deploymentId
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '模型部署失败'
-      set((state) => ({
-        deploymentLoading: {
-          ...state.deploymentLoading,
-          [modelId]: false
-        },
-        operationError: {
-          ...state.operationError,
-          [`deploy-${modelId}`]: errorMessage
-        }
-      }))
-      throw error
-    }
-  },
-
-  /**
-   * 获取部署状态
-   */
-  fetchDeploymentStatus: async (deploymentId: string) => {
-    try {
-      const status = await modelVersionService.getDeploymentStatus(deploymentId)
-      
-      set((state) => ({
-        deployments: {
-          ...state.deployments,
-          [deploymentId]: status
-        }
-      }))
-    } catch (error) {
-      console.error(`获取部署状态失败 (${deploymentId}):`, error)
-    }
-  },
-
-  /**
-   * 获取部署列表
-   */
-  fetchDeploymentList: async (params?: any) => {
-    try {
-      const response = await modelVersionService.getDeploymentList(params)
-      // 更新部署状态映射
-      response.records.forEach((deployment: any) => {
+      if (modelId) {
+        // 为特定模型存储评估结果
         set((state) => ({
-          deployments: {
-            ...state.deployments,
-            [deployment.deploymentId]: deployment
+          evaluationResults: {
+            ...state.evaluationResults,
+            [modelId]: response.records
           }
         }))
-      })
+      } else {
+        // 存储所有评估结果，按模型ID分组
+        const groupedResults: Record<string, EvaluationResult[]> = {}
+        response.records.forEach(result => {
+          if (!groupedResults[result.modelId]) {
+            groupedResults[result.modelId] = []
+          }
+          groupedResults[result.modelId].push(result)
+        })
+        
+        set((state) => ({
+          evaluationResults: {
+            ...state.evaluationResults,
+            ...groupedResults
+          }
+        }))
+      }
     } catch (error) {
-      console.error('获取部署列表失败:', error)
+      console.error(`获取评估结果失败 (${modelId || 'all'}):`, error)
     }
   },
+
 
   // ==================== 模型回滚操作 ====================
   
   /**
    * 回滚模型
    */
-  rollbackModel: async (deploymentId: string, request: RollbackRequest) => {
+  rollbackModel: async (rollbackData: RollbackRequest) => {
     set((state) => ({
-      operationLoading: {
-        ...state.operationLoading,
-        [`rollback-${deploymentId}`]: true
-      },
+      rollbackLoading: true,
       operationError: {
         ...state.operationError,
-        [`rollback-${deploymentId}`]: null
+        [`rollback-${rollbackData.deploymentId}`]: null
       }
     }))
     
     try {
-      await modelVersionService.rollbackModel(request)
+      await modelVersionService.rollbackModel(rollbackData)
       
       set((state) => ({
-        operationLoading: {
-          ...state.operationLoading,
-          [`rollback-${deploymentId}`]: false
-        }
+        rollbackLoading: false
       }))
       
-      // 刷新部署状态和回滚历史
-      await get().fetchDeploymentStatus(deploymentId)
-      await get().fetchRollbackHistory(deploymentId)
+      // 刷新回滚历史
+      await get().fetchRollbackHistory({ deploymentId: rollbackData.deploymentId })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '模型回滚失败'
       set((state) => ({
-        operationLoading: {
-          ...state.operationLoading,
-          [`rollback-${deploymentId}`]: false
-        },
+        rollbackLoading: false,
         operationError: {
           ...state.operationError,
-          [`rollback-${deploymentId}`]: errorMessage
+          [`rollback-${rollbackData.deploymentId}`]: errorMessage
         }
       }))
       throw error
@@ -563,18 +773,15 @@ export const useModelStore = create<ModelStore>((set, get) => ({
   /**
    * 获取回滚历史
    */
-  fetchRollbackHistory: async (deploymentId: string) => {
+  fetchRollbackHistory: async (params?: { deploymentId?: string; page?: number; size?: number }) => {
     try {
-      const response = await modelVersionService.getRollbackHistory({ deploymentId })
+      const response = await modelVersionService.getRollbackHistory(params)
       
       set((state) => ({
-        rollbackHistory: {
-          ...state.rollbackHistory,
-          [deploymentId]: response.records
-        }
+        rollbackHistory: response.records
       }))
     } catch (error) {
-      console.error(`获取回滚历史失败 (${deploymentId}):`, error)
+      console.error('获取回滚历史失败:', error)
     }
   },
 
@@ -814,7 +1021,6 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     set({
       modelListError: null,
       currentModelError: null,
-      uploadError: null,
       operationError: {}
     })
   },

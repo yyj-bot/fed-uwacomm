@@ -17,6 +17,7 @@ import {
   ExperimentOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  FolderOutlined,
   SettingOutlined,
   UserOutlined,
   LogoutOutlined,
@@ -107,10 +108,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       icon: <DatabaseOutlined />,
       label: '模型管理',
       children: [
+        { key: '/models/initial', label: '初始模型' },
         { key: '/models/versions', label: '版本管理' },
-        { key: '/models/training-data', label: '训练数据' },
-        { key: '/models/evaluation', label: '模型评估' }
+        { key: '/models/deployment', label: '部署运维' }
       ]
+    },
+    {
+      key: '/training-data',
+      icon: <FolderOutlined />,
+      label: '训练数据'
     },
     {
       key: '/underwater-optimization',

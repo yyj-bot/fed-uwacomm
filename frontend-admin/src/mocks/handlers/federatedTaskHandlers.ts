@@ -388,7 +388,7 @@ export const federatedTaskHandlers = [
   }),
 
   // 3.9 任务列表查询接口
-  http.get('/api/federated/tasks', async ({ request }) => {
+  http.get('http://localhost:5173/api/federated/tasks', async ({ request }) => {
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const size = parseInt(url.searchParams.get('size') || '20')

@@ -9,13 +9,19 @@ import {
   DashboardPage,
   SystemManagementPage,
   FederatedLearningPage,
-  ModelManagementPage,
   SystemLogsPage,
   UnderwaterOptimizationPage,
   EnvironmentAnalysisPage,
   UserProfilePage,
   AccountSettingsPage
 } from '@/modules'
+
+// 模型管理相关页面
+import {
+  InitialModelPage,
+  VersionManagementPage,
+  DeploymentPage
+} from '@/modules/model-management'
 
 // 联邦学习相关页面
 import TaskListPage from '@/modules/federated-learning/TaskListPage'
@@ -157,7 +163,12 @@ const App: React.FC = () => {
                       <Route path="/federated-learning/orchestrations/:orchestrationId/timeline" element={<OrchestrationTimelinePage />} />
                       <Route path="/federated-learning/orchestrations/:orchestrationId/analytics" element={<OrchestrationAnalyticsPage />} />
                       
-                      <Route path="/models" element={<ModelManagementPage />} />
+                      {/* 模型管理路由 */}
+                      <Route path="/models" element={<Navigate to="/models/initial" replace />} />
+                      <Route path="/models/initial" element={<InitialModelPage />} />
+                      <Route path="/models/versions" element={<VersionManagementPage />} />
+                      <Route path="/models/deployment" element={<DeploymentPage />} />
+                      
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />
                       <Route path="/environment-analysis" element={<EnvironmentAnalysisPage />} />
