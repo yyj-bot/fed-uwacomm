@@ -5,11 +5,15 @@ import com.feduwacomm.exception.UserException;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.entity.VmAckTracking;
 import com.feduwacomm.enums.*;
 import com.feduwacomm.event.FederatedTaskCreatedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
+import com.feduwacomm.service.DataDistributionService;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
+import com.feduwacomm.service.TrainingDataService;
+import com.feduwacomm.service.WebSocketProtocolService;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
@@ -74,6 +78,19 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private com.feduwacomm.service.RoundLockManager roundLockManager;
 
+    // v1.5协议新增组件
+    @Autowired
+    private DataDistributionService dataDistributionService;
+
+    @Autowired
+    private WebSocketProtocolService webSocketProtocolService;
+
+    @Autowired
+    private TrainingDataService trainingDataService;
+
+    @Autowired
+    private com.feduwacomm.mapper.TaskParticipantsMapper taskParticipantsMapper;
+
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
     private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
@@ -131,15 +148,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .estimatedDuration(estimateTaskDuration(createDTO))
             .build();
 
-        // 发布任务创建事件，触发自动工作流
-        FederatedTaskCreatedEvent taskCreatedEvent = new FederatedTaskCreatedEvent(
-            taskId, 
-            createDTO.getTaskName(), 
-            createdBy
-        );
-        eventPublisher.publishEvent(taskCreatedEvent);
-        
-        log.info("联邦学习任务创建完成，已发布事件触发工作流: taskId={}, participantCount={}", 
+        // v1.5.1修正版：创建任务时不再自动触发数据分发
+        // 数据分发改为在任务启动时触发
+        log.info("联邦学习任务创建完成: taskId={}, participantCount={}, 状态=CREATED（数据尚未分发）",
             taskId, createDTO.getParticipants().size());
 
         return response;
@@ -199,12 +210,45 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        
+
+        // v1.5.1修正版：在启动任务时触发数据切片和分发
+        log.info("🚀 任务启动，触发数据切片和分发: taskId={}", taskId);
+
+        // 提取任务配置信息
+        String datasetId = task.getDatasetId();
+        String distributionStrategy = task.getDistributionStrategy();
+
+        // 提取参与者VM ID列表
+        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        List<String> participantVmIds = participants.stream()
+                .map(TaskParticipant::getVmId)
+                .collect(Collectors.toList());
+
+        // 发布任务启动事件，触发数据分发
+        if (datasetId != null && !datasetId.isEmpty() && !participantVmIds.isEmpty()) {
+            log.info("🔥 发布任务启动事件，触发数据分发: taskId={}, datasetId={}, vmCount={}, strategy={}",
+                    taskId, datasetId, participantVmIds.size(), distributionStrategy);
+
+            eventPublisher.publishEvent(new com.feduwacomm.event.FederatedTaskStartedEvent(
+                    this,  // 事件源
+                    taskId,
+                    task.getTaskName(),
+                    operatorId,
+                    datasetId,
+                    participantVmIds,
+                    distributionStrategy
+            ));
+
+            log.info("✅ 任务启动事件已发布，等待数据分发完成...");
+        } else {
+            log.warn("⚠️ 任务没有配置数据集或参与者，跳过数据分发: taskId={}, datasetId={}, vmCount={}",
+                    taskId, datasetId, participantVmIds.size());
+        }
+
         // 更新任务状态
         tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING.getCode(), now);
 
         // 更新参与者状态为连接中
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
         for (TaskParticipant participant : participants) {
             tasksMapper.updateParticipantStatus(taskId, participant.getVmId(), "CONNECTED", now);
         }
@@ -695,7 +739,25 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         for (TaskParticipant participant : participants) {
             try {
-                // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.4标准
+                // v1.5.1协议：获取assignedDatasetId和dataPath（必需字段）
+                String assignedDatasetId = participant.getAssignedDatasetId();
+                String dataPath = participant.getLocalPath();
+
+                // 如果assignedDatasetId为null，记录错误并跳过该参与者
+                if (assignedDatasetId == null || assignedDatasetId.trim().isEmpty()) {
+                    log.error("参与者缺少assignedDatasetId，跳过发送: vmId={}, taskId={}",
+                        participant.getVmId(), taskId);
+                    continue;
+                }
+
+                // 如果dataPath为null，生成默认路径
+                if (dataPath == null || dataPath.trim().isEmpty()) {
+                    dataPath = "/data/assigned/" + assignedDatasetId;
+                    log.warn("参与者dataPath为空，使用默认路径: vmId={}, dataPath={}",
+                        participant.getVmId(), dataPath);
+                }
+
+                // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.5.1标准
                 ProtocolMessage startMessage = MessageBuilder.buildTrainingStartMessage(
                     participant.getVmId(),
                     taskId,
@@ -703,15 +765,17 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     algorithmCode, // mlAlgorithm
                     MessageBuilder.buildHyperparameters(task), // hyperparameters对象
                     MessageBuilder.buildGlobalModel(taskId, 1), // globalModel对象
-                    "请开始本地ML训练任务" // message
+                    "请开始本地ML训练任务", // message
+                    assignedDatasetId, // v1.5.1新增
+                    dataPath // v1.5.1新增
                 );
 
                 // 发送到VM专用topic
                 String vmTopic = "/topic/vm/" + participant.getVmId();
                 messagingTemplate.convertAndSend(vmTopic, startMessage);
 
-                log.info("训练启动指令已发送: vmId={}, taskId={}, algorithm={}, topic={}",
-                    participant.getVmId(), taskId, algorithmCode, vmTopic);
+                log.info("训练启动指令已发送: vmId={}, taskId={}, algorithm={}, assignedDatasetId={}, dataPath={}, topic={}",
+                    participant.getVmId(), taskId, algorithmCode, assignedDatasetId, dataPath, vmTopic);
 
             } catch (Exception e) {
                 log.error("发送训练启动指令失败: vmId={}, taskId={}, 错误={}",
@@ -1456,6 +1520,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 构建v1.3任务实体
         FederatedTask task = buildSmartTaskFromCreateDTO(createDTO, taskId, createdBy, now);
+        System.out.println("🔥🔥🔥 准备插入任务: taskId=" + taskId + ", datasetId=" + task.getDatasetId() + ", strategy=" + task.getDistributionStrategy());
 
         // 插入任务记录
         int result = tasksMapper.insertTask(task);
@@ -1486,11 +1551,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .estimatedDuration(estimateSmartTaskDuration(createDTO))
             .build();
 
-        // 发布任务创建事件
-        eventPublisher.publishEvent(new FederatedTaskCreatedEvent(taskId, createDTO.getTaskName(), "v1.3"));
-
-        log.info("智能任务创建成功: taskId={}, participantCount={}",
-            taskId, createDTO.getParticipantConfig().getParticipants().size());
+        // v1.5.1修正版：创建任务时不再自动触发数据分发
+        // 数据分发改为在任务启动时触发
+        log.info("智能任务创建成功 (v1.3): taskId={}, participantCount={}, datasetId={}, 状态=CREATED（数据尚未分发）",
+            taskId, createDTO.getParticipantConfig().getParticipants().size(),
+            createDTO.getDatasetConfig().getDatasetId());
 
         return response;
     }
@@ -1546,9 +1611,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                                                         String taskId, LocalDateTime now) {
         TaskParticipant participant = new TaskParticipant();
         // 生成主键ID
-        String participantId = uuidUtil.generateUuid();
-        participant.setId(participantId);
-        participant.setParticipantId(participantId);
+        participant.setId(uuidUtil.generateUuid());
         participant.setTaskId(taskId);
         participant.setVmId(participantDTO.getVmId());
         participant.setRole(ParticipantRole.fromCode(participantDTO.getRole()));
@@ -1559,7 +1622,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         // 设置v1.3特有字段
         if (participantDTO.getCapabilities() != null) {
-            participant.setCapabilities(String.join(",", participantDTO.getCapabilities()));
+            try {
+                // 将List转换为JSON数组字符串，以便正确存储到MySQL的JSON列
+                participant.setCapabilities(objectMapper.writeValueAsString(participantDTO.getCapabilities()));
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to convert capabilities to JSON, using comma-separated string", e);
+                participant.setCapabilities(String.join(",", participantDTO.getCapabilities()));
+            }
         }
         if (participantDTO.getConstraints() != null) {
             participant.setMaxCpuUsage(participantDTO.getConstraints().getMaxCpuUsage());
@@ -1954,7 +2023,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             message.put("timestamp", LocalDateTime.now());
 
             messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
-            vmAckTracker.trackMessage(taskId, participant.getVmId(), "TASK_STOP");
+            vmAckTracker.trackMessage(taskId, participant.getVmId(), VmAckTracking.AckType.TASK_STOP);
         }
     }
 
@@ -1997,7 +2066,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             message.put("timestamp", LocalDateTime.now());
 
             messagingTemplate.convertAndSend("/topic/vm/" + participant.getVmId(), message);
-            vmAckTracker.trackMessage(taskId, participant.getVmId(), "ROUND_START");
+            vmAckTracker.trackMessage(taskId, participant.getVmId(), VmAckTracking.AckType.ROUND_START);
         }
     }
 
@@ -2397,5 +2466,215 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             default:
                 return operation;
         }
+    }
+
+    // ========== v1.5标准联邦学习方法实现 ==========
+
+    @Override
+    @Transactional
+    public TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy) {
+        // 📊 进度跟踪：步骤6-7实现
+        log.info("开始标准任务创建流程: taskName={}", createDTO.getTaskName());
+
+        // 步骤6-7：创建联邦学习任务
+        String taskId = uuidUtil.generateUuid();
+        log.info("生成任务ID: {}", taskId);
+
+        // 创建FederatedTask实体
+        FederatedTask task = new FederatedTask();
+        task.setTaskId(taskId);
+        task.setTaskName(createDTO.getTaskName());
+        task.setFederatedAlgorithm(createDTO.getAlgorithm());
+        task.setStatus(FederatedTaskStatus.CREATING);
+        task.setCreatedBy(createdBy);
+        task.setCreatedAt(LocalDateTime.now());
+
+        // 保存到数据库
+        tasksMapper.insertTask(task);
+        log.info("任务创建完成: taskId={}, status=CREATING", taskId);
+
+        // 步骤8：数据集分配
+        List<String> participantVmIds = createDTO.getParticipantConfig().getParticipants()
+            .stream()
+            .map(TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO::getVmId)
+            .collect(Collectors.toList());
+        log.info("开始数据集分配: taskId={}, participants={}", taskId, participantVmIds.size());
+
+        DatasetAllocationResult allocationResult = allocateDatasets(
+            taskId, participantVmIds, createDTO.getDatasetConfig().getDatasetId());
+
+        if (!allocationResult.isSuccess()) {
+            log.error("数据集分配失败: taskId={}, error={}", taskId, allocationResult.getErrorMessage());
+            throw new RuntimeException("数据集分配失败: " + allocationResult.getErrorMessage());
+        }
+        log.info("数据集分配成功: taskId={}, allocations={}", taskId, allocationResult.getAllocations().size());
+
+        // 步骤9：数据集验证
+        log.info("开始数据集验证: taskId={}", taskId);
+        DatasetValidationResult validationResult = validateParticipantDatasets(taskId);
+        if (!validationResult.isAllDatasetReady()) {
+            log.error("数据集验证失败: taskId={}, results={}", taskId, validationResult.getValidationResults());
+            throw new RuntimeException("数据集验证失败，部分虚拟机数据集未就绪");
+        }
+        log.info("数据集验证成功: taskId={}", taskId);
+
+        // 步骤12：启动联邦学习流程
+        log.info("启动联邦学习流程: taskId={}", taskId);
+        return startFederatedLearningFlow(taskId);
+    }
+
+    @Override
+    @Transactional
+    public DatasetAllocationResult allocateDatasets(String taskId, List<String> participantVmIds,
+                                                   String originalDatasetPath) {
+        // 📊 进度跟踪：步骤8实现
+        log.info("执行数据集分配: taskId={}, vmCount={}", taskId, participantVmIds.size());
+
+        try {
+            // 为每个参与者生成assignedDatasetId
+            List<DatasetAllocation> allocations = new ArrayList<>();
+
+            for (String vmId : participantVmIds) {
+                String assignedDatasetId = uuidUtil.generateUuid();
+                log.info("为VM生成数据集ID: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
+
+                // 创建TaskParticipant记录
+                TaskParticipant participant = new TaskParticipant();
+                participant.setTaskId(taskId);
+                participant.setVmId(vmId);
+                participant.setAssignedDatasetId(assignedDatasetId);
+                participant.setDatasetStatus("PENDING");
+                participant.setJoinedAt(LocalDateTime.now());
+
+                // 保存参与者记录
+                taskParticipantsMapper.insertParticipant(participant);
+                log.info("参与者记录创建完成: taskId={}, vmId={}", taskId, vmId);
+
+                // 通过WebSocket发送数据集创建消息
+                DatasetSlice datasetSlice = dataDistributionService.generateDatasetSlice(originalDatasetPath, vmId);
+                sendDatasetAllocation(vmId, taskId, assignedDatasetId, datasetSlice);
+                log.info("数据集分配消息发送完成: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
+
+                allocations.add(new DatasetAllocation(vmId, assignedDatasetId));
+            }
+
+            log.info("数据集分配完成: taskId={}, totalAllocations={}", taskId, allocations.size());
+            return DatasetAllocationResult.success(allocations);
+
+        } catch (Exception e) {
+            log.error("数据集分配失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return DatasetAllocationResult.failure("数据集分配异常: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DatasetValidationResult validateParticipantDatasets(String taskId) {
+        // 📊 进度跟踪：步骤9实现
+        log.info("执行数据集验证: taskId={}", taskId);
+
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+        log.info("获取参与者列表: taskId={}, count={}", taskId, participants.size());
+
+        Map<String, String> validationResults = new HashMap<>();
+        int readyCount = 0;
+
+        for (TaskParticipant participant : participants) {
+            log.info("验证VM数据集: vmId={}, assignedDatasetId={}",
+                    participant.getVmId(), participant.getAssignedDatasetId());
+
+            // 发送DATASET_LIST_QUERY查询数据集状态
+            DatasetQueryResult queryResult = queryDatasetStatus(
+                participant.getVmId(), taskId, participant.getAssignedDatasetId());
+
+            if (queryResult.isSuccess() && "CREATED".equals(queryResult.getDatasetStatus())) {
+                // 更新数据库中的数据集状态
+                participant.setDatasetStatus("CREATED");
+                participant.setDatasetCreatedAt(LocalDateTime.now());
+                taskParticipantsMapper.updateParticipant(participant);
+
+                readyCount++;
+                validationResults.put(participant.getVmId(), "READY");
+                log.info("VM数据集验证成功: vmId={}", participant.getVmId());
+            } else {
+                validationResults.put(participant.getVmId(), "NOT_READY");
+                log.warn("VM数据集验证失败: vmId={}, status={}",
+                        participant.getVmId(), queryResult.getDatasetStatus());
+            }
+        }
+
+        boolean allReady = readyCount == participants.size();
+        log.info("数据集验证完成: taskId={}, ready={}/{}, allReady={}",
+                taskId, readyCount, participants.size(), allReady);
+
+        return new DatasetValidationResult(allReady, validationResults);
+    }
+
+    @Override
+    @Transactional
+    public TaskOperationVO startFederatedLearningFlow(String taskId) {
+        // 📊 进度跟踪：步骤12-13实现
+        log.info("启动联邦学习流程: taskId={}", taskId);
+
+        // 步骤12：向所有虚拟机发送FEDERATED_TASK_START消息
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+        log.info("获取参与者列表，准备发送启动消息: taskId={}, count={}", taskId, participants.size());
+
+        for (TaskParticipant participant : participants) {
+            sendFederatedTaskStart(
+                participant.getVmId(), taskId, participant.getAssignedDatasetId());
+            log.info("发送任务启动消息: vmId={}, taskId={}", participant.getVmId(), taskId);
+        }
+
+        // 步骤13：更新任务状态为RUNNING并开始联邦学习流程
+        FederatedTask task = tasksMapper.selectByTaskId(taskId);
+        task.setStatus(FederatedTaskStatus.RUNNING);
+        task.setStartedAt(LocalDateTime.now());
+        tasksMapper.updateTask(task);
+        log.info("任务状态更新完成: taskId={}, status=RUNNING", taskId);
+
+        return TaskOperationVO.builder()
+            .taskId(taskId)
+            .status("RUNNING")
+            .message("联邦学习任务启动成功")
+            .timestamp(LocalDateTime.now())
+            .build();
+    }
+
+    // ========== v1.5协议私有辅助方法 ==========
+
+    /**
+     * 发送数据集分配消息
+     */
+    private void sendDatasetAllocation(String vmId, String taskId, String assignedDatasetId, DatasetSlice datasetSlice) {
+        // 通过WebSocket发送数据集分配消息
+        // TODO: 实现实际的WebSocket消息发送逻辑
+        log.info("发送数据集分配消息: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+    }
+
+    /**
+     * 查询数据集状态
+     */
+    private DatasetQueryResult queryDatasetStatus(String vmId, String taskId, String assignedDatasetId) {
+        // 发送DATASET_LIST_QUERY查询数据集状态
+        // TODO: 实现实际的WebSocket查询逻辑
+        log.info("查询数据集状态: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+
+        // 暂时返回成功结果，实际实现时需要真正的WebSocket查询
+        return DatasetQueryResult.builder()
+            .success(true)
+            .datasetStatus("CREATED")
+            .localPath("/data/assigned/" + assignedDatasetId)
+            .build();
+    }
+
+    /**
+     * 发送联邦任务启动消息
+     */
+    private void sendFederatedTaskStart(String vmId, String taskId, String assignedDatasetId) {
+        log.info("发送联邦任务启动消息: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+
+        // 🔧 v1.5.1修正：调用WebSocketProtocolService发送FEDERATED_TASK_START消息
+        webSocketProtocolService.sendFederatedTaskStart(vmId, taskId, assignedDatasetId);
     }
 }

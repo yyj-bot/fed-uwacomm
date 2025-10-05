@@ -1920,7 +1920,8 @@ public class CompleteFederatedLearningFlowTest {
     private TaskCreateDTO createFederatedTaskRequest() {
         // 使用注册时生成的vmId构建参与者列表
         List<TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO> participants = new ArrayList<>();
-        double[] dataRatios = {0.20, 0.15, 0.15, 0.25, 0.25};
+        // v1.5.1.1千分比权重：总和=1000 (20%, 15%, 15%, 25%, 25%)
+        int[] dataRatios = {200, 150, 150, 250, 250};
 
         for (int i = 0; i < registeredVmIds.size(); i++) {
             TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO participant =

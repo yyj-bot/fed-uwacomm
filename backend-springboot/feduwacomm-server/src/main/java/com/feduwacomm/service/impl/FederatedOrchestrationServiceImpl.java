@@ -94,7 +94,8 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     @EventListener
     @Transactional
     public void onTaskCreated(FederatedTaskCreatedEvent event) {
-        log.info("收到任务创建事件，开始自动启动工作流: taskId={}", event.getTaskId());
+        System.out.println("🔥🔥🔥 onTaskCreated被调用: taskId=" + event.getTaskId());
+        log.info("🔥🔥🔥 收到任务创建事件，开始自动启动工作流: taskId={}", event.getTaskId());
         
         try {
             // 创建工作流实例
@@ -106,6 +107,36 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
         } catch (Exception e) {
             log.error("自动启动工作流失败: taskId={}", event.getTaskId(), e);
             // 可以发布失败事件，由其他服务处理
+        }
+    }
+
+    /**
+     * 监听任务启动事件，自动创建并启动工作流
+     * 在任务启动时（而非创建时）才开始工作流编排
+     */
+    @Async
+    @EventListener
+    @Transactional
+    public void onTaskStarted(com.feduwacomm.event.FederatedTaskStartedEvent event) {
+        log.info("🔥 收到任务启动事件，开始创建工作流: taskId={}", event.getTaskId());
+
+        try {
+            // 检查工作流是否已存在（避免重复创建）
+            OrchestrationWorkflow existing = orchestrationMapper.selectByTaskId(event.getTaskId());
+            if (existing != null) {
+                log.info("工作流已存在，跳过创建: taskId={}, workflowId={}",
+                    event.getTaskId(), existing.getId());
+                return;
+            }
+
+            // 创建工作流实例
+            OrchestrationWorkflow workflow = createWorkflow(event.getTaskId(), event.getStartedBy());
+
+            // 开始执行工作流
+            startWorkflowExecution(workflow);
+
+        } catch (Exception e) {
+            log.error("任务启动时创建工作流失败: taskId={}", event.getTaskId(), e);
         }
     }
 
@@ -135,7 +166,8 @@ public class FederatedOrchestrationServiceImpl implements FederatedOrchestration
     @Async
     @Transactional
     public void startWorkflowExecution(OrchestrationWorkflow workflow) {
-        log.info("开始执行工作流: workflowId={}, taskId={}", workflow.getId(), workflow.getTaskId());
+        System.out.println("🔥🔥🔥 startWorkflowExecution被调用: workflowId=" + workflow.getId() + ", taskId=" + workflow.getTaskId());
+        log.info("🔥🔥🔥 开始执行工作流: workflowId={}, taskId={}", workflow.getId(), workflow.getTaskId());
         
         // 更新工作流状态为执行中
         workflow.setStatus(OrchestrationWorkflow.WorkflowStatus.IN_PROGRESS);

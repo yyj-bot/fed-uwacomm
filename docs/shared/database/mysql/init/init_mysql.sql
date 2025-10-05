@@ -2,9 +2,10 @@
 -- 水声联邦学习系统 数据库初始化脚本
 -- =====================================================
 -- 作者: FedUWAComm Team
--- 版本: 1.0.0
--- 描述: 创建完整的数据库结构，包括所有表、索引、外键约束
+-- 版本: 1.5.0
+-- 描述: 创建完整的数据库结构，包括所有表、索引、外键约束，支持v1.5协议
 -- 使用说明: 直接执行此脚本即可完成数据库初始化
+-- v1.5更新: 新增数据集关联管理字段，支持assignedDatasetId和13步完整流程
 -- =====================================================
 
 -- 创建数据库
@@ -115,12 +116,16 @@ CREATE TABLE IF NOT EXISTS federated_tasks (
                                                started_at TIMESTAMP NULL COMMENT '开始时间',
                                                completed_at TIMESTAMP NULL COMMENT '完成时间',
                                                config JSON COMMENT '算法配置参数',
-    -- v1.4协议新增字段
-                                               protocol_version VARCHAR(10) DEFAULT 'v1.4' COMMENT '协议版本',
+    -- v1.4/v1.5协议新增字段
+                                               protocol_version VARCHAR(10) DEFAULT 'v1.5' COMMENT '协议版本',
                                                lifecycle_status ENUM('CREATED', 'RUNNING', 'STOPPED', 'RESUMED', 'DELETED') DEFAULT 'CREATED' COMMENT 'v1.4任务生命周期状态',
                                                supports_multi_task BOOLEAN DEFAULT TRUE COMMENT '是否支持多任务并发',
                                                resume_info JSON NULL COMMENT '恢复信息',
-                                               version BIGINT DEFAULT 1 COMMENT '乐观锁版本号'
+                                               version BIGINT DEFAULT 1 COMMENT '乐观锁版本号',
+    -- v1.3/v1.5.1新增字段：数据集分发配置
+                                               dataset_id VARCHAR(32) NULL COMMENT '关联数据集ID(32位UUID)',
+                                               distribution_strategy VARCHAR(50) NULL COMMENT '数据分发策略(IID/RATIO/NON_IID)',
+                                               INDEX idx_federated_tasks_dataset_id (dataset_id)
 );
 
 -- 4. 训练数据集元信息表 (training_dataset，原training_data)
@@ -658,9 +663,8 @@ CREATE TABLE IF NOT EXISTS task_participants (
                                                  training_time BIGINT COMMENT '训练时间(秒)',
                                                  data_size INT COMMENT '数据量大小',
 
-    -- v1.3 扩展字段
-                                                 participant_id VARCHAR(50) COMMENT '参与者标识',
-                                                 data_ratio DECIMAL(5,4) COMMENT '数据比例',
+    -- v1.5.1.1 数据分配千分比权重
+                                                 data_ratio INT COMMENT 'v1.5.1.1数据分配千分比权重(1-1000整数，同任务所有参与者总和=1000，700表示占70%数据)',
                                                  capabilities JSON COMMENT '能力列表(JSON格式)',
                                                  max_cpu_usage INT COMMENT '最大CPU使用率',
                                                  max_memory_usage INT COMMENT '最大内存使用率',
@@ -679,11 +683,20 @@ CREATE TABLE IF NOT EXISTS task_participants (
                                                  vm_capabilities JSON NULL COMMENT 'VM能力信息',
                                                  concurrent_task_count INT DEFAULT 0 COMMENT '并发任务数量',
 
+    -- v1.5协议新增字段
+                                                 assigned_dataset_id VARCHAR(32) NULL COMMENT 'v1.5后端分配的数据集ID(32位UUID)',
+                                                 dataset_status ENUM('PENDING', 'CREATED', 'UPLOADING', 'COMPLETED', 'FAILED') DEFAULT 'PENDING' COMMENT 'v1.5数据集状态',
+                                                 local_path VARCHAR(512) NULL COMMENT 'v1.5 VM本地数据集路径',
+                                                 dataset_created_at TIMESTAMP NULL COMMENT 'v1.5数据集创建时间',
+                                                 dataset_completed_at TIMESTAMP NULL COMMENT 'v1.5数据集完成时间',
+
     -- 索引
                                                  INDEX idx_task_participants_task_id (task_id),
                                                  INDEX idx_task_participants_vm_id (vm_id),
                                                  INDEX idx_task_participants_status (status),
                                                  INDEX idx_task_participants_role (role),
+                                                 INDEX idx_task_participants_assigned_dataset_id (assigned_dataset_id),
+                                                 INDEX idx_task_participants_dataset_status (dataset_status),
                                                  UNIQUE KEY uk_task_participants_task_vm (task_id, vm_id),
 
     -- 外键约束
@@ -757,11 +770,9 @@ CREATE TABLE IF NOT EXISTS vm_ack_tracking (
                                                task_id VARCHAR(64) NOT NULL,
                                                round_number INT NULL COMMENT 'NULL表示任务级别确认',
                                                vm_id VARCHAR(32) NOT NULL,
-                                               ack_type ENUM(
-                                                   'TASK_START', 'TASK_STOP', 'TASK_RESUME', 'TASK_DELETE',
-                                                   'ROUND_START', 'GRADIENT_UPLOAD', 'GLOBAL_MODEL_BROADCAST', 'ROUND_COMPLETE'
-                                                   ) NOT NULL COMMENT 'v1.4确认类型',
+                                               ack_type VARCHAR(50) NOT NULL COMMENT 'v1.4/v1.5确认类型',
                                                status ENUM('PENDING', 'SUCCESS', 'FAILED', 'TIMEOUT') NOT NULL DEFAULT 'PENDING' COMMENT '确认状态',
+                                               message_id VARCHAR(128) NULL COMMENT '消息ID，用于消息跟踪和去重',
                                                ack_data JSON NULL COMMENT '确认数据',
                                                error_message TEXT NULL COMMENT '错误信息',
                                                acknowledged_at TIMESTAMP NULL COMMENT '确认时间',
@@ -805,8 +816,15 @@ CREATE TABLE IF NOT EXISTS vm_ack_tracking (
 -- 20. round_states - v1.4轮次状态管理表（v1.4新增）
 -- 21. vm_ack_tracking - v1.4VM确认跟踪表（v1.4新增）
 --
--- v1.4协议扩展的现有表:
--- - federated_tasks: 新增协议版本、生命周期状态、多任务支持等字段
--- - task_participants: 新增任务执行上下文、VM能力信息、并发任务计数等字段
+-- v1.4/v1.5协议扩展的现有表:
+-- - federated_tasks: 新增协议版本(默认v1.5)、生命周期状态、多任务支持等字段
+-- - task_participants: 新增任务执行上下文、VM能力信息、并发任务计数等字段，v1.5新增assignedDatasetId数据集关联字段
 -- - global_models: 新增校验和、压缩类型、模型版本等字段
+-- - vm_ack_tracking: 新增v1.5数据集相关确认类型：DATASET_LIST_QUERY、DATASET_CREATE、DATASET_STATUS_QUERY
+--
+-- v1.5协议新增特性:
+-- - 13步完整联邦学习流程支持
+-- - 后端统一ID管理(使用UuidUtil生成)
+-- - assignedDatasetId精确数据集分发
+-- - 数据集状态跟踪和确认机制
 -- =====================================================

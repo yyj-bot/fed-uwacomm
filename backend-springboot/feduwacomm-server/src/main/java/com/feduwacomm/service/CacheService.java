@@ -1,7 +1,9 @@
 package com.feduwacomm.service;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -105,6 +107,68 @@ public interface CacheService {
      * @return 缓存统计信息
      */
     CacheStats getStats();
+
+    // ======================== ACK专用缓存操作 ========================
+
+    /**
+     * 获取匹配前缀的所有缓存键
+     *
+     * @param prefix 键前缀
+     * @return 匹配的键集合
+     */
+    Set<String> getKeysByPrefix(String prefix);
+
+    /**
+     * 批量获取缓存值
+     *
+     * @param keys 缓存键集合
+     * @param valueType 值类型
+     * @return 键值对映射
+     */
+    <T> Map<String, T> batchGet(Set<String> keys, Class<T> valueType);
+
+    /**
+     * 批量设置缓存值
+     *
+     * @param keyValueMap 键值对映射
+     * @param ttl 生存时间
+     */
+    void batchPut(Map<String, Object> keyValueMap, Duration ttl);
+
+    /**
+     * 批量设置缓存值（使用默认TTL）
+     *
+     * @param keyValueMap 键值对映射
+     */
+    void batchPut(Map<String, Object> keyValueMap);
+
+    /**
+     * 原子性增加数值
+     * 如果键不存在，则初始化为initialValue然后增加delta
+     *
+     * @param key 缓存键
+     * @param delta 增加值
+     * @param initialValue 初始值
+     * @return 增加后的值
+     */
+    long increment(String key, long delta, long initialValue);
+
+    /**
+     * 原子性增加数值（默认初始值为0）
+     *
+     * @param key 缓存键
+     * @param delta 增加值
+     * @return 增加后的值
+     */
+    long increment(String key, long delta);
+
+    /**
+     * 获取键的剩余TTL
+     *
+     * @param key 缓存键
+     * @return 剩余时间，如果键不存在或无TTL返回空
+     */
+    Optional<Duration> getTtl(String key);
 
     /**
      * 缓存统计信息

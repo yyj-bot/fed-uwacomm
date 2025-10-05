@@ -238,19 +238,25 @@ public class TrainingDataAnalysisServiceImpl implements TrainingDataAnalysisServ
                 new InputStreamReader(file.getInputStream(), encoding))) {
 
             String line;
+            long sampleBytes = 0; // 采样数据的字节数
+
+            // 先读取样本数据确定列数和平均行长度
             while ((line = reader.readLine()) != null && rowCount < SAMPLE_SIZE) {
                 if (rowCount == 0) {
                     // 第一行确定列数
                     columnCount = line.split(Pattern.quote(delimiter)).length;
                 }
                 rowCount++;
+                sampleBytes += line.getBytes(encoding).length + System.lineSeparator().getBytes(encoding).length;
             }
 
-            // 如果还有更多行，估算总行数
+            // 如果文件还有更多行，继续读取剩余行数进行精确统计
             if (rowCount == SAMPLE_SIZE) {
-                // 基于文件大小和平均行长度估算
-                double avgLineLength = (double) fileSize / rowCount;
-                rowCount = (long) (fileSize / avgLineLength);
+                // 继续读取剩余行数，确保完全准确的统计
+                while ((line = reader.readLine()) != null) {
+                    rowCount++;
+                }
+                log.debug("完整文件统计: 总行数={}", rowCount);
             }
 
         }

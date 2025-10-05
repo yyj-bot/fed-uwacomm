@@ -246,8 +246,8 @@ node_modules/
 *.sw?
 # OS specific
 
-# Task files
-tasks.json
-tasks/ 
-
 .taskmaster
+
+# Task files
+# tasks.json
+# tasks/ 
