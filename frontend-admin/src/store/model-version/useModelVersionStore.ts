@@ -8,6 +8,7 @@
 
 import { useCallback } from 'react'
 import { useModelStore } from './modelVersionStore'
+import useFederatedTaskStore from '../federated-task/useFederatedTaskStore'
 import type { 
   ModelVersionDetail,
   TaskModelVersions,
@@ -33,6 +34,9 @@ import type {
 // ==================== Hook 实现 ====================
 
 export const useModel = () => {
+  // 获取联邦学习任务相关状态和方法
+  const { taskList, fetchTaskDetail, currentTask } = useFederatedTaskStore()
+  
   // 获取状态
   const modelList = useModelStore((state) => state.modelList)
   const modelListTotal = useModelStore((state) => state.modelListTotal)
@@ -580,11 +584,28 @@ export const useModel = () => {
   }, [distributionError])
 
   /**
+   * 获取任务信息
+   */
+  const getTaskInfo = useCallback((taskId: string) => {
+    // 首先从任务列表中查找
+    const taskFromList = taskList.find(task => task.taskId === taskId)
+    if (taskFromList) return taskFromList
+    
+    // 如果当前任务匹配，返回当前任务
+    if (currentTask && currentTask.taskId === taskId) return currentTask
+    
+    return null
+  }, [taskList, currentTask])
+
+  /**
    * 检查初始模型是否可以分发
    */
   const canDistributeInitialModel = useCallback((taskId: string): boolean => {
     const initialModel = getTaskInitialModel(taskId)
     if (!initialModel) return false
+    
+    // 根据接口文档，只检查模型状态和分发状态
+    // 接口文档没有明确要求检查任务状态
     return initialModel.status === 'READY' && !isDistributing(taskId)
   }, [getTaskInitialModel, isDistributing])
 
@@ -594,7 +615,9 @@ export const useModel = () => {
   const canDeleteInitialModel = useCallback((taskId: string): boolean => {
     const initialModel = getTaskInitialModel(taskId)
     if (!initialModel) return false
-    return !['DISTRIBUTING', 'DISTRIBUTED'].includes(initialModel.status) && !isDistributing(taskId)
+    // 根据接口文档，所有状态都可以删除，DISTRIBUTING/DISTRIBUTED需要force=true
+    // 前端不再限制这些状态的删除，而是在删除时自动添加force参数
+    return !isDistributing(taskId) // 只检查是否有分发操作正在进行
   }, [getTaskInitialModel, isDistributing])
 
   /**
@@ -712,6 +735,7 @@ export const useModel = () => {
     getDistributionStatus,
     isDistributing,
     getDistributionError,
+    getTaskInfo,
     canDistributeInitialModel,
     canDeleteInitialModel,
     isGenerating,

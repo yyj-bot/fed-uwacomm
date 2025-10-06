@@ -91,6 +91,7 @@ const DeploymentPage: React.FC = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>('')
   const [selectedTaskId, setSelectedTaskId] = useState<string>('')
   const [selectedDeploymentId, setSelectedDeploymentId] = useState<string>('')
+  const [selectedEvaluationId, setSelectedEvaluationId] = useState<string>('')
   const [searchModelId, setSearchModelId] = useState<string>('')
   const [searchTaskId, setSearchTaskId] = useState<string>('')
   
@@ -142,8 +143,8 @@ const DeploymentPage: React.FC = () => {
   // 评估结果列表数据
   const evaluationListData = Object.entries(evaluationResults)
     .flatMap(([modelId, results]) =>
-      results.map(result => ({
-        key: result.evaluationId || modelId,
+      results.map((result, index) => ({
+        key: result.evaluationId || `${modelId}-${index}`,
         modelId,
         ...result
       }))
@@ -179,35 +180,35 @@ const DeploymentPage: React.FC = () => {
     },
     {
       title: '准确率',
-      dataIndex: ['metrics', 'accuracy'],
+      dataIndex: 'accuracy',  // ⭐ 修复：改为顶级字段访问
       key: 'accuracy',
       width: 100,
       render: (value: number) => value ? (value * 100).toFixed(2) + '%' : '-'
     },
     {
       title: '损失',
-      dataIndex: ['metrics', 'loss'],
+      dataIndex: 'loss',      // ⭐ 修复：改为顶级字段访问  
       key: 'loss',
       width: 100,
       render: (value: number) => value ? value.toFixed(6) : '-'
     },
     {
       title: '精确率',
-      dataIndex: ['metrics', 'precision'],
+      dataIndex: ['metrics', 'precision'],  // ⭐ 保持：precision在metrics对象内
       key: 'precision',
       width: 100,
       render: (value: number) => value ? (value * 100).toFixed(2) + '%' : '-'
     },
     {
       title: '召回率',
-      dataIndex: ['metrics', 'recall'],
+      dataIndex: ['metrics', 'recall'],     // ⭐ 保持：recall在metrics对象内
       key: 'recall',
       width: 100,
       render: (value: number) => value ? (value * 100).toFixed(2) + '%' : '-'
     },
     {
       title: 'F1分数',
-      dataIndex: ['metrics', 'f1'],
+      dataIndex: ['metrics', 'f1'],         // ⭐ 保持：f1在metrics对象内
       key: 'f1',
       width: 100,
       render: (value: number) => value ? value.toFixed(4) : '-'
@@ -336,6 +337,7 @@ const DeploymentPage: React.FC = () => {
   // 查看评估详情
   const handleViewEvaluationDetail = (modelId: string, evaluationId: string) => {
     setSelectedModelId(modelId)
+    setSelectedEvaluationId(evaluationId)
     setEvaluationDetailModalVisible(true)
   }
 
@@ -358,6 +360,11 @@ const DeploymentPage: React.FC = () => {
 
   const currentRollbackHistory = selectedDeploymentId ? getRollbackHistory(selectedDeploymentId) : []
   const currentEvaluationResults = selectedModelId ? getEvaluationResults(selectedModelId) : []
+  
+  // 获取当前选中的评估详情
+  const currentEvaluationDetail = selectedEvaluationId 
+    ? evaluationListData.find(item => item.evaluationId === selectedEvaluationId)
+    : null
 
   // 准确率趋势图配置
   const accuracyTrendConfig = {
@@ -739,6 +746,100 @@ const DeploymentPage: React.FC = () => {
         </Form>
       </Modal>
 
+
+      {/* 评估详情对话框 */}
+      <Modal
+        title="评估详情"
+        open={evaluationDetailModalVisible}
+        onCancel={() => {
+          setEvaluationDetailModalVisible(false)
+          setSelectedEvaluationId('')
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setEvaluationDetailModalVisible(false)
+            setSelectedEvaluationId('')
+          }}>
+            关闭
+          </Button>
+        ]}
+        width={700}
+      >
+        {currentEvaluationDetail && (
+          <div style={{ padding: '16px 0' }}>
+            <Descriptions column={2} bordered size="small">
+              <Descriptions.Item label="评估ID" span={2}>
+                {currentEvaluationDetail.evaluationId}
+              </Descriptions.Item>
+              <Descriptions.Item label="模型ID" span={2}>
+                {currentEvaluationDetail.modelId}
+              </Descriptions.Item>
+              <Descriptions.Item label="任务ID" span={2}>
+                {currentEvaluationDetail.taskId || '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="准确率" span={1}>
+                <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                  {(currentEvaluationDetail.accuracy * 100).toFixed(2)}%
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="损失" span={1}>
+                <span style={{ color: '#1890ff', fontWeight: 'bold' }}>
+                  {currentEvaluationDetail.loss.toFixed(6)}
+                </span>
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="精确率" span={1}>
+                {currentEvaluationDetail.metrics?.precision 
+                  ? (currentEvaluationDetail.metrics.precision * 100).toFixed(2) + '%' 
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="召回率" span={1}>
+                {currentEvaluationDetail.metrics?.recall 
+                  ? (currentEvaluationDetail.metrics.recall * 100).toFixed(2) + '%' 
+                  : '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="F1分数" span={2}>
+                {currentEvaluationDetail.metrics?.f1 
+                  ? currentEvaluationDetail.metrics.f1.toFixed(4) 
+                  : '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="评估状态" span={1}>
+                <Tag color={getEvaluationStatusColor(currentEvaluationDetail.status)}>
+                  {currentEvaluationDetail.status}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="评估时间" span={1}>
+                {currentEvaluationDetail.evaluationTime 
+                  ? `${currentEvaluationDetail.evaluationTime.toFixed(2)}秒` 
+                  : '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="测试样本数" span={1}>
+                {currentEvaluationDetail.testSamples?.toLocaleString() || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="批次大小" span={1}>
+                {currentEvaluationDetail.batchSize || '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="测试数据路径" span={2}>
+                {currentEvaluationDetail.testDataPath || '-'}
+              </Descriptions.Item>
+              
+              <Descriptions.Item label="计算设备" span={1}>
+                <Tag color="blue">{currentEvaluationDetail.device?.toUpperCase() || 'CPU'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间" span={1}>
+                {currentEvaluationDetail.createdAt 
+                  ? new Date(currentEvaluationDetail.createdAt).toLocaleString() 
+                  : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Modal>
 
       {/* 回滚历史对话框 */}
       <Modal

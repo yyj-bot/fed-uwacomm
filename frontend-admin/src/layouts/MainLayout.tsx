@@ -22,7 +22,8 @@ import {
   UserOutlined,
   LogoutOutlined,
   BellOutlined,
-  SearchOutlined
+  SearchOutlined,
+  DesktopOutlined
 } from '@ant-design/icons'
 
 import { useAuth, useWebSocket } from '@/store'
@@ -112,6 +113,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         { key: '/models/versions', label: '版本管理' },
         { key: '/models/deployment', label: '部署运维' }
       ]
+    },
+    {
+      key: '/vm-management',
+      icon: <DesktopOutlined />,
+      label: 'VM管理'
     },
     {
       key: '/training-data',

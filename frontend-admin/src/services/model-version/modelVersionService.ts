@@ -553,7 +553,7 @@ export class ModelVersionService {
       throw new Error('模型类型不能为空')
     }
     
-    const validModelTypes = ['neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
+    const validModelTypes = ['NEURAL_NETWORK', 'RANDOM_FOREST', 'neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
     if (!validModelTypes.includes(data.modelType)) {
       throw new Error('模型类型无效')
     }
@@ -563,34 +563,52 @@ export class ModelVersionService {
     }
     
     const { architecture } = data
-    if (!Number.isInteger(architecture.inputSize) || architecture.inputSize <= 0) {
-      throw new Error('输入层大小必须为正整数')
-    }
     
-    if (!Array.isArray(architecture.hiddenLayers) || architecture.hiddenLayers.length === 0) {
-      throw new Error('隐藏层配置不能为空')
-    }
-    
-    architecture.hiddenLayers.forEach((size, index) => {
-      if (!Number.isInteger(size) || size <= 0) {
-        throw new Error(`隐藏层${index + 1}大小必须为正整数`)
+    // 根据模型类型验证不同的架构参数
+    if (data.modelType === 'NEURAL_NETWORK' || data.modelType === 'neural_network') {
+      // 神经网络参数验证
+      if (!Number.isInteger(architecture.inputSize) || architecture.inputSize <= 0) {
+        throw new Error('输入层大小必须为正整数')
       }
-    })
-    
-    if (!Number.isInteger(architecture.outputSize) || architecture.outputSize <= 0) {
-      throw new Error('输出层大小必须为正整数')
-    }
-    
-    if (!architecture.activationFunction || typeof architecture.activationFunction !== 'string') {
-      throw new Error('激活函数不能为空')
-    }
-    
-    if (!architecture.optimizer || typeof architecture.optimizer !== 'string') {
-      throw new Error('优化器不能为空')
-    }
-    
-    if (typeof architecture.learningRate !== 'number' || architecture.learningRate <= 0) {
-      throw new Error('学习率必须为正数')
+      
+      if (!Array.isArray(architecture.hiddenLayers) || architecture.hiddenLayers.length === 0) {
+        throw new Error('隐藏层配置不能为空')
+      }
+      
+      architecture.hiddenLayers.forEach((size, index) => {
+        if (!Number.isInteger(size) || size <= 0) {
+          throw new Error(`隐藏层${index + 1}大小必须为正整数`)
+        }
+      })
+      
+      if (!Number.isInteger(architecture.outputSize) || architecture.outputSize <= 0) {
+        throw new Error('输出层大小必须为正整数')
+      }
+      
+      if (!architecture.activationFunction || typeof architecture.activationFunction !== 'string') {
+        throw new Error('激活函数不能为空')
+      }
+      
+      if (!architecture.optimizer || typeof architecture.optimizer !== 'string') {
+        throw new Error('优化器不能为空')
+      }
+      
+      if (typeof architecture.learningRate !== 'number' || architecture.learningRate <= 0) {
+        throw new Error('学习率必须为正数')
+      }
+    } else if (data.modelType === 'RANDOM_FOREST' || data.modelType === 'random_forest') {
+      // 随机森林参数验证
+      if (!Number.isInteger(architecture.n_estimators) || architecture.n_estimators < 10 || architecture.n_estimators > 500) {
+        throw new Error('树的数量必须为10-500之间的整数')
+      }
+      
+      if (!Number.isInteger(architecture.n_features) || architecture.n_features < 1) {
+        throw new Error('特征数量必须为大于等于1的整数')
+      }
+      
+      if (!architecture.task_type || !['classification', 'regression'].includes(architecture.task_type)) {
+        throw new Error('任务类型必须为classification或regression')
+      }
     }
     
     if (data.randomSeed !== undefined && (!Number.isInteger(data.randomSeed) || data.randomSeed < 0)) {
@@ -608,7 +626,7 @@ export class ModelVersionService {
       throw new Error('模型类型不能为空')
     }
     
-    const validModelTypes = ['neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
+    const validModelTypes = ['NEURAL_NETWORK', 'RANDOM_FOREST', 'neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
     if (!validModelTypes.includes(data.modelType)) {
       throw new Error('模型类型无效')
     }
@@ -1050,11 +1068,20 @@ export class ModelVersionService {
       roundNumber: detail.roundNumber,
       aggregationMethod: detail.aggregationMethod,
       clientCount: detail.clientCount,
-      modelJson: detail.modelJson,
+      // ⭐ 核心评估指标（顶级字段）
+      accuracy: detail.accuracy,
+      loss: detail.loss,
+      status: detail.status,
+      description: detail.description,
+      // 文件相关字段
+      fileSize: detail.fileSize,
+      fileFormat: detail.fileFormat,
+      // ⭐ 其他评估指标（不包含accuracy/loss）
       metrics: detail.metrics,
+      // ⭐ 扩展参数（替代modelJson）
+      parameters: detail.parameters,
       createdAt: detail.createdAt,
-      aggregatedAt: detail.aggregatedAt,
-      status: detail.status
+      aggregatedAt: detail.aggregatedAt
     }
   }
 

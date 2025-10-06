@@ -112,6 +112,43 @@ export const mockFederatedTasks = [
     totalRounds: 20,
     progress: undefined,
     finalAccuracy: undefined
+  },
+  {
+    taskId: 'a1b2c3d4e5f678901234567890123456',
+    taskName: '深海声学模式识别',
+    taskType: 'CLASSIFICATION' as const,
+    status: 'CREATED' as const,
+    createdAt: '2024-01-01T05:00:00.000Z',
+    participantCount: 3,
+    currentRound: undefined,
+    totalRounds: 10,
+    progress: undefined,
+    finalAccuracy: undefined
+  },
+  {
+    taskId: 'b2c3d4e5f67890123456789012345678',
+    taskName: '海底地形声学分析',
+    taskType: 'REGRESSION' as const,
+    status: 'FAILED' as const,
+    createdAt: '2024-01-01T04:00:00.000Z',
+    startedAt: '2024-01-01T04:30:00.000Z',
+    participantCount: 4,
+    currentRound: 2,
+    totalRounds: 15,
+    progress: 13.33,
+    finalAccuracy: undefined
+  },
+  {
+    taskId: 'c4d5e6f7890123456789012345678901',
+    taskName: '水声通信优化',
+    taskType: 'CLASSIFICATION' as const,
+    status: 'CONFIGURED' as const,
+    createdAt: '2024-01-01T03:00:00.000Z',
+    participantCount: 2,
+    currentRound: undefined,
+    totalRounds: 8,
+    progress: undefined,
+    finalAccuracy: undefined
   }
 ]
 
@@ -347,6 +384,67 @@ export const mockFederatedTaskDetails = [
     }
   },
   {
+    taskId: 'a1b2c3d4e5f678901234567890123456',
+    taskName: '深海声学模式识别',
+    taskType: 'CLASSIFICATION' as const,
+    status: 'CREATED' as const,
+    algorithm: 'FEDERATED_AVERAGING',
+    createdAt: '2024-01-01T05:00:00.000Z',
+    currentRound: 0,
+    totalRounds: 10,
+    progress: 0,
+    participantCount: 3,
+    participants: [
+      {
+        vmId: 'a1b2c3d4e5f678901234567890123456',
+        role: 'PARTICIPANT',
+        status: 'PENDING',
+        lastHeartbeat: generateTimestamp(0, -2),
+        currentEpoch: 0,
+        loss: 0,
+        accuracy: 0,
+        dataSize: 2500
+      },
+      {
+        vmId: 'b2c3d4e5f67890123456789012345678',
+        role: 'PARTICIPANT', 
+        status: 'PENDING',
+        lastHeartbeat: generateTimestamp(0, -2),
+        currentEpoch: 0,
+        loss: 0,
+        accuracy: 0,
+        dataSize: 2200
+      },
+      {
+        vmId: 'c3d4e5f6789012345678901234567890',
+        role: 'PARTICIPANT',
+        status: 'PENDING',
+        lastHeartbeat: generateTimestamp(0, -2),
+        currentEpoch: 0,
+        loss: 0,
+        accuracy: 0,
+        dataSize: 2800
+      }
+    ],
+    hyperparameters: {
+      learningRate: 0.001,
+      batchSize: 32,
+      epochs: 50,
+      rounds: 10,
+      minParticipants: 2,
+      aggregationMethod: 'WEIGHTED_AVERAGE'
+    },
+    datasetConfig: {
+      datasetId: 'f6789012345678901234567890123456',
+      distributionStrategy: 'BALANCED',
+      totalRows: 7500,
+      qualityMetrics: {
+        iidScore: 0.75,
+        balanceScore: 0.88
+      }
+    }
+  },
+  {
     taskId: 'f6789012345678901234567890123456',
     taskName: '海洋声学聚类分析',
     taskType: 'CLUSTERING' as const,
@@ -448,6 +546,123 @@ export const mockFederatedTaskDetails = [
       qualityMetrics: {
         iidScore: 0.72,
         balanceScore: 0.95
+      }
+    }
+  },
+  {
+    taskId: 'b2c3d4e5f67890123456789012345678',
+    taskName: '海底地形声学分析',
+    taskType: 'REGRESSION' as const,
+    status: 'FAILED' as const,
+    algorithm: 'FEDERATED_AVERAGING',
+    createdAt: '2024-01-01T04:00:00.000Z',
+    startedAt: '2024-01-01T04:30:00.000Z',
+    currentRound: 2,
+    totalRounds: 15,
+    progress: 13.33,
+    participantCount: 4,
+    participants: [
+      {
+        vmId: 'a1b2c3d4e5f678901234567890123456',
+        role: 'PARTICIPANT',
+        status: 'FAILED',
+        lastHeartbeat: generateTimestamp(0, -5),
+        currentEpoch: 2,
+        loss: 0.85,
+        accuracy: 0.42,
+        dataSize: 3200
+      },
+      {
+        vmId: 'b2c3d4e5f67890123456789012345678',
+        role: 'PARTICIPANT',
+        status: 'FAILED',
+        lastHeartbeat: generateTimestamp(0, -5),
+        currentEpoch: 2,
+        loss: 0.92,
+        accuracy: 0.38,
+        dataSize: 2800
+      }
+    ],
+    hyperparameters: {
+      learningRate: 0.01,
+      batchSize: 64,
+      epochs: 100,
+      rounds: 15,
+      minParticipants: 3,
+      aggregationMethod: 'WEIGHTED_AVERAGE'
+    },
+    metrics: {
+      globalLoss: 0.88,
+      globalAccuracy: 0.40,
+      communicationRounds: 2,
+      dataProcessed: 6000,
+      estimatedTimeRemaining: 0
+    },
+    datasetConfig: {
+      datasetId: 'b2c3d4e5f67890123456789012345678',
+      distributionStrategy: 'NON_IID',
+      totalRows: 6000,
+      qualityMetrics: {
+        iidScore: 0.35,
+        balanceScore: 0.62
+      }
+    }
+  },
+  {
+    taskId: 'c4d5e6f7890123456789012345678901',
+    taskName: '水声通信优化',
+    taskType: 'CLASSIFICATION' as const,
+    status: 'CONFIGURED' as const,
+    algorithm: 'FEDERATED_AVERAGING',
+    createdAt: '2024-01-01T03:00:00.000Z',
+    currentRound: 0,
+    totalRounds: 8,
+    progress: 0,
+    participantCount: 2,
+    participants: [
+      {
+        vmId: 'a1b2c3d4e5f678901234567890123456',
+        role: 'PARTICIPANT',
+        status: 'READY',
+        lastHeartbeat: generateTimestamp(0, -1),
+        currentEpoch: 0,
+        loss: 0,
+        accuracy: 0,
+        dataSize: 4000
+      },
+      {
+        vmId: 'b2c3d4e5f67890123456789012345678',
+        role: 'PARTICIPANT',
+        status: 'READY',
+        lastHeartbeat: generateTimestamp(0, -1),
+        currentEpoch: 0,
+        loss: 0,
+        accuracy: 0,
+        dataSize: 3500
+      }
+    ],
+    hyperparameters: {
+      learningRate: 0.005,
+      batchSize: 32,
+      epochs: 80,
+      rounds: 8,
+      minParticipants: 2,
+      aggregationMethod: 'SIMPLE_AVERAGE'
+    },
+    metrics: {
+      globalLoss: 0,
+      globalAccuracy: 0,
+      communicationRounds: 0,
+      dataProcessed: 0,
+      estimatedTimeRemaining: 2400
+    },
+    datasetConfig: {
+      datasetId: 'c4d5e6f7890123456789012345678901',
+      distributionStrategy: 'BALANCED',
+      totalRows: 7500,
+      qualityMetrics: {
+        iidScore: 0.85,
+        balanceScore: 0.92
       }
     }
   }

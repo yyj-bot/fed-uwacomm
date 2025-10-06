@@ -12,6 +12,7 @@ import {
   SystemLogsPage,
   UnderwaterOptimizationPage,
   EnvironmentAnalysisPage,
+  VMManagementPage,
   UserProfilePage,
   AccountSettingsPage
 } from '@/modules'
@@ -168,6 +169,9 @@ const App: React.FC = () => {
                       <Route path="/models/initial" element={<InitialModelPage />} />
                       <Route path="/models/versions" element={<VersionManagementPage />} />
                       <Route path="/models/deployment" element={<DeploymentPage />} />
+                      
+                      {/* VM管理路由 */}
+                      <Route path="/vm-management" element={<VMManagementPage />} />
                       
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />

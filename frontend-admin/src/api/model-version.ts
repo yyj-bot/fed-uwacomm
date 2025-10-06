@@ -47,14 +47,19 @@ export const initialModel = {
   
   async generateInitialModel(generationData: {
     taskId: string
-    modelType: string
+    modelType: 'NEURAL_NETWORK' | 'RANDOM_FOREST'
     architecture: {
-      inputSize: number
-      hiddenLayers: number[]
-      outputSize: number
-      activationFunction: string
-      optimizer: string
-      learningRate: number
+      // 神经网络参数
+      inputSize?: number
+      hiddenLayers?: number[]
+      outputSize?: number
+      activationFunction?: string
+      optimizer?: string
+      learningRate?: number
+      // 随机森林参数
+      n_estimators?: number
+      n_features?: number
+      task_type?: 'classification' | 'regression'
     }
     randomSeed?: number
     description?: string
@@ -65,16 +70,22 @@ export const initialModel = {
     modelSize: number
     parametersCount: number
     architecture: {
-      inputSize: number
-      hiddenLayers: number[]
-      outputSize: number
-      activationFunction: string
-      optimizer: string
-      learningRate: number
+      // 神经网络参数
+      inputSize?: number
+      hiddenLayers?: number[]
+      outputSize?: number
+      activationFunction?: string
+      optimizer?: string
+      learningRate?: number
+      // 随机森林参数
+      n_estimators?: number
+      n_features?: number
+      task_type?: string
     }
     generatedAt: string
     status: string
     checksum: string
+    description?: string
   }> {
     const response = await modelApiInstance.post<ApiResponse<{
       modelId: string
@@ -83,16 +94,22 @@ export const initialModel = {
       modelSize: number
       parametersCount: number
       architecture: {
-        inputSize: number
-        hiddenLayers: number[]
-        outputSize: number
-        activationFunction: string
-        optimizer: string
-        learningRate: number
+        // 神经网络参数
+        inputSize?: number
+        hiddenLayers?: number[]
+        outputSize?: number
+        activationFunction?: string
+        optimizer?: string
+        learningRate?: number
+        // 随机森林参数
+        n_estimators?: number
+        n_features?: number
+        task_type?: string
       }
       generatedAt: string
       status: string
       checksum: string
+      description?: string
     }>>('/initial/generate', generationData)
     return response.data.data
   },
@@ -348,14 +365,24 @@ export const model = {
     roundNumber: number
     aggregationMethod: string
     clientCount: number
-    modelJson: Record<string, unknown>
+    // ⭐ 核心评估指标（顶级字段）
+    accuracy: number
+    loss: number
+    status: string
+    description: string
+    // 文件相关字段
+    fileSize: number
+    fileFormat: string
+    // ⭐ 其他评估指标（不包含accuracy/loss）
     metrics: {
-      accuracy: number
-      loss: number
+      precision: number
+      recall: number
+      f1_score: number
     }
+    // ⭐ 扩展参数（替代modelJson）
+    parameters: Record<string, unknown>
     createdAt: string
     aggregatedAt: string
-    status: string
   }> {
     const response = await modelApiInstance.get<ApiResponse<{
       modelId: string
@@ -363,14 +390,24 @@ export const model = {
       roundNumber: number
       aggregationMethod: string
       clientCount: number
-      modelJson: Record<string, unknown>
+      // ⭐ 核心评估指标（顶级字段）
+      accuracy: number
+      loss: number
+      status: string
+      description: string
+      // 文件相关字段
+      fileSize: number
+      fileFormat: string
+      // ⭐ 其他评估指标（不包含accuracy/loss）
       metrics: {
-        accuracy: number
-        loss: number
+        precision: number
+        recall: number
+        f1_score: number
       }
+      // ⭐ 扩展参数（替代modelJson）
+      parameters: Record<string, unknown>
       createdAt: string
       aggregatedAt: string
-      status: string
     }>>(`/versions/${modelId}`)
     return response.data.data
   },

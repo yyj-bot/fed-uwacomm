@@ -8,12 +8,23 @@
 
 import { create } from 'zustand'
 import { vmService } from '@/services'
-import type { VirtualMachine, VMStatus } from '@/api/vm'
+import type { 
+  VirtualMachine, 
+  VMStatus,
+  VMRoundModel,
+  VMModelTrend,
+  VMModelBest
+} from '@/api/vm'
 import type { 
   VMListParams,
   VMUpdateRequest,
   VMStartRequest,
-  VMStopRequest
+  VMStopRequest,
+  VMRestartRequest,
+  VMRoundModelListParams,
+  VMModelTrendParams,
+  VMModelBestParams,
+  VMRoundModelPaginatedResponse
 } from '@/services'
 
 // ==================== 状态类型定义 ====================
@@ -46,6 +57,37 @@ interface VMState {
   
   // 查询参数
   queryParams: VMListParams
+  
+  // VM本地模型状态
+  vmRoundModels: VMRoundModel[]
+  vmRoundModelsTotal: number
+  vmRoundModelsLoading: boolean
+  vmRoundModelsError: string | null
+  
+  // 当前选中的VM本地模型
+  currentVMRoundModel: VMRoundModel | null
+  currentVMRoundModelLoading: boolean
+  currentVMRoundModelError: string | null
+  
+  // VM模型趋势数据
+  vmModelTrends: Record<string, VMModelTrend>
+  vmModelTrendsLoading: Record<string, boolean>
+  vmModelTrendsError: Record<string, string | null>
+  
+  // VM模型最佳/离群数据
+  vmModelBests: Record<string, VMModelBest>
+  vmModelBestsLoading: Record<string, boolean>
+  vmModelBestsError: Record<string, string | null>
+  
+  // VM本地模型分页参数
+  vmRoundModelsPagination: {
+    current: number
+    size: number
+    total: number
+  }
+  
+  // VM本地模型查询参数
+  vmRoundModelsQueryParams: VMRoundModelListParams
 }
 
 interface VMActions {
@@ -83,6 +125,30 @@ interface VMActions {
   
   // 状态重置
   resetState: () => void
+  
+  // VM本地模型操作
+  fetchVMRoundModels: (params?: VMRoundModelListParams) => Promise<void>
+  refreshVMRoundModels: () => Promise<void>
+  
+  // VM本地模型详情操作
+  fetchVMRoundModelDetail: (vmRoundModelId: string) => Promise<void>
+  setCurrentVMRoundModel: (model: VMRoundModel | null) => void
+  
+  // VM模型趋势操作
+  fetchVMModelTrend: (params: VMModelTrendParams) => Promise<void>
+  
+  // VM模型最佳/离群操作
+  fetchVMModelBest: (params: VMModelBestParams) => Promise<void>
+  
+  // VM本地模型分页操作
+  setVMRoundModelsPagination: (current: number, size?: number) => void
+  
+  // VM本地模型查询参数操作
+  setVMRoundModelsQueryParams: (params: VMRoundModelListParams) => void
+  resetVMRoundModelsQueryParams: () => void
+  
+  // VM本地模型错误处理
+  clearVMRoundModelsError: () => void
 }
 
 type VMStore = VMState & VMActions
@@ -110,7 +176,33 @@ const initialState: VMState = {
     total: 0
   },
   
-  queryParams: {}
+  queryParams: {},
+  
+  // VM本地模型初始状态
+  vmRoundModels: [],
+  vmRoundModelsTotal: 0,
+  vmRoundModelsLoading: false,
+  vmRoundModelsError: null,
+  
+  currentVMRoundModel: null,
+  currentVMRoundModelLoading: false,
+  currentVMRoundModelError: null,
+  
+  vmModelTrends: {},
+  vmModelTrendsLoading: {},
+  vmModelTrendsError: {},
+  
+  vmModelBests: {},
+  vmModelBestsLoading: {},
+  vmModelBestsError: {},
+  
+  vmRoundModelsPagination: {
+    current: 1,
+    size: 10,
+    total: 0
+  },
+  
+  vmRoundModelsQueryParams: {}
 }
 
 // ==================== Store 实现 ====================
@@ -536,6 +628,220 @@ export const useVMStore = create<VMStore>((set, get) => ({
    */
   resetState: () => {
     set(initialState)
+  },
+
+  // ==================== VM本地模型操作 ====================
+  
+  /**
+   * 获取VM本地模型列表
+   */
+  fetchVMRoundModels: async (params?: VMRoundModelListParams) => {
+    const { vmRoundModelsPagination, vmRoundModelsQueryParams } = get()
+    const finalParams = {
+      ...vmRoundModelsQueryParams,
+      ...params,
+      page: params?.page || vmRoundModelsPagination.current,
+      size: params?.size || vmRoundModelsPagination.size
+    }
+    
+    set({ vmRoundModelsLoading: true, vmRoundModelsError: null })
+    
+    try {
+      const response = await vmService.getVMRoundModels(finalParams)
+      
+      set({
+        vmRoundModels: response.records,
+        vmRoundModelsTotal: response.total,
+        vmRoundModelsLoading: false,
+        vmRoundModelsError: null,
+        vmRoundModelsPagination: {
+          current: response.current,
+          size: response.size,
+          total: response.total
+        }
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM本地模型列表失败'
+      set({
+        vmRoundModelsLoading: false,
+        vmRoundModelsError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 刷新VM本地模型列表
+   */
+  refreshVMRoundModels: async () => {
+    const { fetchVMRoundModels, vmRoundModelsQueryParams, vmRoundModelsPagination } = get()
+    await fetchVMRoundModels({
+      ...vmRoundModelsQueryParams,
+      page: vmRoundModelsPagination.current,
+      size: vmRoundModelsPagination.size
+    })
+  },
+
+  /**
+   * 获取VM本地模型详情
+   */
+  fetchVMRoundModelDetail: async (vmRoundModelId: string) => {
+    set({ currentVMRoundModelLoading: true, currentVMRoundModelError: null })
+    
+    try {
+      const model = await vmService.getVMRoundModelDetail(vmRoundModelId)
+      
+      set({
+        currentVMRoundModel: model,
+        currentVMRoundModelLoading: false,
+        currentVMRoundModelError: null
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM本地模型详情失败'
+      set({
+        currentVMRoundModelLoading: false,
+        currentVMRoundModelError: errorMessage
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 设置当前VM本地模型
+   */
+  setCurrentVMRoundModel: (model: VMRoundModel | null) => {
+    set({ currentVMRoundModel: model })
+  },
+
+  /**
+   * 获取VM模型训练指标趋势
+   */
+  fetchVMModelTrend: async (params: VMModelTrendParams) => {
+    const trendKey = `${params.taskId}-${params.vmId}-${params.metric}`
+    
+    set((state) => ({
+      vmModelTrendsLoading: {
+        ...state.vmModelTrendsLoading,
+        [trendKey]: true
+      },
+      vmModelTrendsError: {
+        ...state.vmModelTrendsError,
+        [trendKey]: null
+      }
+    }))
+    
+    try {
+      const trend = await vmService.getVMModelTrend(params)
+      
+      set((state) => ({
+        vmModelTrends: {
+          ...state.vmModelTrends,
+          [trendKey]: trend
+        },
+        vmModelTrendsLoading: {
+          ...state.vmModelTrendsLoading,
+          [trendKey]: false
+        }
+      }))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM模型训练指标趋势失败'
+      set((state) => ({
+        vmModelTrendsLoading: {
+          ...state.vmModelTrendsLoading,
+          [trendKey]: false
+        },
+        vmModelTrendsError: {
+          ...state.vmModelTrendsError,
+          [trendKey]: errorMessage
+        }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * 获取VM模型最佳/离群结果
+   */
+  fetchVMModelBest: async (params: VMModelBestParams) => {
+    const bestKey = `${params.taskId}-${params.metric}-${params.type}`
+    
+    set((state) => ({
+      vmModelBestsLoading: {
+        ...state.vmModelBestsLoading,
+        [bestKey]: true
+      },
+      vmModelBestsError: {
+        ...state.vmModelBestsError,
+        [bestKey]: null
+      }
+    }))
+    
+    try {
+      const best = await vmService.getVMModelBest(params)
+      
+      set((state) => ({
+        vmModelBests: {
+          ...state.vmModelBests,
+          [bestKey]: best
+        },
+        vmModelBestsLoading: {
+          ...state.vmModelBestsLoading,
+          [bestKey]: false
+        }
+      }))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM模型最佳/离群结果失败'
+      set((state) => ({
+        vmModelBestsLoading: {
+          ...state.vmModelBestsLoading,
+          [bestKey]: false
+        },
+        vmModelBestsError: {
+          ...state.vmModelBestsError,
+          [bestKey]: errorMessage
+        }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * 设置VM本地模型分页参数
+   */
+  setVMRoundModelsPagination: (current: number, size?: number) => {
+    set((state) => ({
+      vmRoundModelsPagination: {
+        ...state.vmRoundModelsPagination,
+        current,
+        size: size || state.vmRoundModelsPagination.size
+      }
+    }))
+  },
+
+  /**
+   * 设置VM本地模型查询参数
+   */
+  setVMRoundModelsQueryParams: (params: VMRoundModelListParams) => {
+    set({ vmRoundModelsQueryParams: params })
+  },
+
+  /**
+   * 重置VM本地模型查询参数
+   */
+  resetVMRoundModelsQueryParams: () => {
+    set({ vmRoundModelsQueryParams: {} })
+  },
+
+  /**
+   * 清除VM本地模型错误信息
+   */
+  clearVMRoundModelsError: () => {
+    set({
+      vmRoundModelsError: null,
+      currentVMRoundModelError: null,
+      vmModelTrendsError: {},
+      vmModelBestsError: {}
+    })
   }
 }))
 

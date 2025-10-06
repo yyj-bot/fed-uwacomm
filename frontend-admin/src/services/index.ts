@@ -52,9 +52,26 @@ export type {
   VMUpdateRequest,
   VMStartRequest,
   VMStopRequest,
+  VMRestartRequest,
+  VMListResponse,
+  VMUpdateResponse,
+  VMDeleteResponse,
+  VMStartResponse,
+  VMStopResponse,
+  VMRestartResponse,
   VMResourceUsage,
   VMNetworkInfo,
-  VMServiceConfig
+  VMServiceConfig,
+  // VM本地模型相关类型
+  VMRoundModel,
+  VMModelTrend,
+  VMModelBest,
+  VMRoundModelPaginatedResponse,
+  VMRoundModelListParams,
+  VMModelTrendParams,
+  VMModelBestParams,
+  MetricType,
+  QueryType
 } from './vm'
 
 // 联邦任务服务
@@ -150,15 +167,6 @@ export type {
   SystemLogOperationError
 } from './system-log'
 
-// VM轮次模型服务
-export { vmRoundModelsService } from './vm-round-models'
-export type {
-  VMRoundModelsService,
-  VMRoundModelListParams,
-  VMModelTrendParams,
-  VMModelBestParams,
-  VMRoundModel
-} from './vm-round-models'
 
 // ==================== WebSocket服务 ====================
 export { 
@@ -205,7 +213,6 @@ import { federatedTaskService } from './federated-task'
 import { modelVersionService } from './model-version'
 import { trainingDataService } from './training-data'
 import { systemLogService } from './system-log'
-import { vmRoundModelsService } from './vm-round-models'
 
 export const services = {
   // 业务服务
@@ -216,7 +223,6 @@ export const services = {
   modelVersion: modelVersionService,
   trainingData: trainingDataService,
   systemLog: systemLogService,
-  vmRoundModels: vmRoundModelsService,
   
   // WebSocket服务
   websocket: wsService,

@@ -54,24 +54,40 @@ export const modelManagementHandlers = [
     await new Promise(resolve => setTimeout(resolve, 100))
 
     const modelId = `initial_model_${Date.now()}`
-    const newModel = {
-      modelId,
-      taskId: body.taskId,
-      modelType: body.modelType,
-      modelSize: 1048576 + Math.floor(Math.random() * 9437184), // 1-10MB
-      parametersCount: 10000 + Math.floor(Math.random() * 90000),
-      architecture: body.architecture || {
+    const modelType = body.modelType || 'RANDOM_FOREST' // 默认使用随机森林
+    
+    // 根据模型类型生成对应的架构参数
+    let architecture
+    if (modelType === 'RANDOM_FOREST') {
+      architecture = body.architecture || {
+        n_estimators: 100,
+        n_features: 5,
+        task_type: 'regression'
+      }
+    } else {
+      architecture = body.architecture || {
         inputSize: 128,
         hiddenLayers: [64, 32, 16],
         outputSize: 10,
         activationFunction: 'relu',
         optimizer: 'adam',
         learningRate: 0.001
-      },
+      }
+    }
+    
+    const newModel = {
+      modelId,
+      taskId: body.taskId,
+      modelType,
+      modelSize: 1048576 + Math.floor(Math.random() * 9437184), // 1-10MB
+      parametersCount: modelType === 'RANDOM_FOREST' ? 
+        (architecture.n_estimators || 100) : 
+        10000 + Math.floor(Math.random() * 90000),
+      architecture,
       generatedAt: new Date().toISOString(),
       status: InitialModelStatus.READY,
       checksum: `sha256:${Math.random().toString(36).substring(2, 66)}`,
-      description: body.description || '随机生成的初始模型'
+      description: body.description || `${modelType}随机生成的初始模型`
     }
 
     return HttpResponse.json({
@@ -94,14 +110,19 @@ export const modelManagementHandlers = [
       data: {
         modelId,
         taskId: 'uploaded_task_id',
-        modelType: 'neural_network',
-        fileName: 'initial_model.pth',
+        modelType: 'RANDOM_FOREST', // 更新为随机森林
+        fileName: 'initial_model.pkl', // 更新文件扩展名
         modelSize: 2048576,
         uploadedAt: new Date().toISOString(),
         status: InitialModelStatus.UPLOADED,
         checksum: `sha256:${Math.random().toString(36).substring(2, 66)}`,
         metadata: {
-          framework: 'pytorch',
+          architecture: {
+            n_estimators: 100,
+            n_features: 5,
+            task_type: 'regression'
+          },
+          framework: 'sklearn', // 更新为sklearn
           version: '1.0'
         }
       }
@@ -345,8 +366,19 @@ export const modelManagementHandlers = [
   // 2.7 删除初始模型
   http.delete('/api/model/initial/:taskId', async ({ params, request }) => {
     const { taskId } = params
-    const url = new URL(request.url)
-    const force = url.searchParams.get('force') === 'true'
+    
+    // 根据接口文档，force参数在请求体中，不是查询参数
+    let body: { force?: boolean } = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (error) {
+      // 如果解析失败，使用默认值
+    }
+    
+    const force = body.force || false
 
     const model = mockInitialModels.find(m => m.taskId === taskId)
     
@@ -356,6 +388,15 @@ export const modelManagementHandlers = [
         message: '初始模型不存在',
         data: null
       }, { status: 404 })
+    }
+
+    // 根据接口文档，如果模型已分发且没有force=true，应该返回错误
+    if (['DISTRIBUTING', 'DISTRIBUTED'].includes(model.status) && !force) {
+      return HttpResponse.json({
+        code: 409,
+        message: '模型已分发，需要强制删除',
+        data: null
+      }, { status: 409 })
     }
 
     return HttpResponse.json({
@@ -420,7 +461,7 @@ export const modelManagementHandlers = [
   }),
 
   // 4.2 模型版本详情查询
-  http.get('http://localhost:5173/api/model/versions/:modelId', async ({ params }) => {
+  http.get('/api/model/versions/:modelId', async ({ params }) => {
     const { modelId } = params
     
     const version = mockModelVersions.find(v => v.modelId === modelId)
@@ -433,15 +474,22 @@ export const modelManagementHandlers = [
       }, { status: 404 })
     }
 
+    // 确保返回符合新数据结构的详情信息
+    const detailData = {
+      ...version,
+      // 确保包含详情接口特有的字段
+      aggregatedAt: version.aggregatedAt || new Date().toISOString()
+    }
+
     return HttpResponse.json({
       code: 200,
       message: '查询成功',
-      data: version
+      data: detailData
     })
   }),
 
   // 4.3 任务模型版本查询
-  http.get('http://localhost:5173/api/model/versions/task/:taskId', async ({ params, request }) => {
+  http.get('/api/model/versions/task/:taskId', async ({ params, request }) => {
     const { taskId } = params
     const url = new URL(request.url)
     const roundNumber = url.searchParams.get('roundNumber')
@@ -507,9 +555,11 @@ export const modelManagementHandlers = [
       data: {
         modelId: body.modelId,
         evaluationId,
+        // ⭐ 核心评估指标作为顶级字段
+        accuracy: 0.8500,
+        loss: 0.123456,
+        // ⭐ 其他评估指标在metrics对象内
         metrics: {
-          accuracy: 0.8500,
-          loss: 0.123456,
           precision: 0.8200,
           recall: 0.8300,
           f1: 0.8250
@@ -592,7 +642,7 @@ export const modelManagementHandlers = [
   // ==================== 模型下载接口 ====================
 
   // 8.1 模型文件下载
-  http.get('http://localhost:5173/api/model/download/:modelId', async ({ params, request }) => {
+  http.get('/api/model/download/:modelId', async ({ params, request }) => {
     const { modelId } = params
     const url = new URL(request.url)
     const format = url.searchParams.get('format') || 'original'
@@ -609,7 +659,7 @@ export const modelManagementHandlers = [
     }
 
     // 模拟文件下载
-    const fileSize = model.modelSize || 1048576
+    const fileSize = model.fileSize || 1048576
     return new Response(new ArrayBuffer(fileSize), {
       headers: {
         'Content-Type': 'application/octet-stream',
@@ -619,7 +669,7 @@ export const modelManagementHandlers = [
   }),
 
   // 8.2 批量模型下载
-  http.post('http://localhost:5173/api/model/download/batch', async ({ request }) => {
+  http.post('/api/model/download/batch', async ({ request }) => {
     const body = await request.json() as any
     
     if (!body.modelIds || body.modelIds.length === 0) {
@@ -642,7 +692,7 @@ export const modelManagementHandlers = [
   // ==================== 模型删除接口 ====================
 
   // 9.1 模型版本删除
-  http.delete('http://localhost:5173/api/model/versions/:modelId', async ({ params, request }) => {
+  http.delete('/api/model/versions/:modelId', async ({ params, request }) => {
     const { modelId } = params
     const body = await request.json() as any
 
@@ -667,7 +717,7 @@ export const modelManagementHandlers = [
   }),
 
   // 9.2 批量模型删除
-  http.delete('http://localhost:5173/api/model/versions/batch', async ({ request }) => {
+  http.delete('/api/model/versions/batch', async ({ request }) => {
     const body = await request.json() as any
     
     if (!body.modelIds || body.modelIds.length === 0) {
@@ -696,7 +746,7 @@ export const modelManagementHandlers = [
   // ==================== 模型回滚接口 ====================
 
   // 7.1 模型回滚
-  http.post('http://localhost:5173/api/model/rollback', async ({ request }) => {
+  http.post('/api/model/rollback', async ({ request }) => {
     const body = await request.json() as {
       deploymentId: string
       targetModelId: string
@@ -724,7 +774,7 @@ export const modelManagementHandlers = [
   }),
 
   // 7.2 回滚历史查询
-  http.get('http://localhost:5173/api/model/rollback/history', async ({ request }) => {
+  http.get('/api/model/rollback/history', async ({ request }) => {
     const url = new URL(request.url)
     const deploymentId = url.searchParams.get('deploymentId')
     const page = parseInt(url.searchParams.get('page') || '1')

@@ -88,6 +88,7 @@ const InitialModelPage: React.FC = () => {
     isTaskInitialModelLoading,
     getDistributionStatus,
     isDistributing,
+    getTaskInfo,
     canDistributeInitialModel,
     canDeleteInitialModel
   } = useModel()
@@ -102,6 +103,14 @@ const InitialModelPage: React.FC = () => {
   const [selectedDistributionId, setSelectedDistributionId] = useState<string>('')
   const [fileList, setFileList] = useState<any[]>([])
   const [queryTaskId, setQueryTaskId] = useState<string>('')
+  
+  // 新增：模型类型选择状态
+  const [selectedModelType, setSelectedModelType] = useState<string>('RANDOM_FOREST')
+  const [selectedUploadModelType, setSelectedUploadModelType] = useState<string>('RANDOM_FOREST')
+  
+  // JSON验证状态
+  const [jsonValidationStatus, setJsonValidationStatus] = useState<'success' | 'error' | ''>('')
+  const [jsonValidationMessage, setJsonValidationMessage] = useState<string>('')
   
   // 联邦学习任务相关状态
   const [federatedTasks, setFederatedTasks] = useState<FederatedTask[]>([])
@@ -292,15 +301,17 @@ const InitialModelPage: React.FC = () => {
           >
             详情
           </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<SendOutlined />}
-            disabled={!canDistributeInitialModel(record.taskId)}
-            onClick={() => handleOpenDistribute(record.taskId)}
-          >
-            分发
-          </Button>
+          <Tooltip title={getDistributeTooltip(record.taskId)}>
+            <Button
+              type="link"
+              size="small"
+              icon={<SendOutlined />}
+              disabled={!canDistributeInitialModel(record.taskId)}
+              onClick={() => handleOpenDistribute(record.taskId)}
+            >
+              分发
+            </Button>
+          </Tooltip>
           <Button
             type="link"
             size="small"
@@ -309,23 +320,37 @@ const InitialModelPage: React.FC = () => {
           >
             下载
           </Button>
-          <Popconfirm
-            title="确定要删除此初始模型吗？"
-            onConfirm={() => handleDelete(record.taskId)}
-            okText="确定"
-            cancelText="取消"
-            disabled={!canDeleteInitialModel(record.taskId)}
+          <Tooltip 
+            title={
+              !canDeleteInitialModel(record.taskId) 
+                ? '模型正在分发中，请稍后再试'
+                : (['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status) 
+                    ? '该模型已分发，删除时将强制执行' 
+                    : '删除此初始模型')
+            }
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
+            <Popconfirm
+              title={
+                ['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status)
+                  ? "该模型已分发，删除可能影响联邦学习任务，确定要删除吗？"
+                  : "确定要删除此初始模型吗？"
+              }
+              onConfirm={() => handleDelete(record.taskId)}
+              okText="确定"
+              cancelText="取消"
               disabled={!canDeleteInitialModel(record.taskId)}
             >
-              删除
-            </Button>
-          </Popconfirm>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                disabled={!canDeleteInitialModel(record.taskId)}
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </Tooltip>
         </Space>
       )
     }
@@ -422,17 +447,31 @@ const InitialModelPage: React.FC = () => {
     try {
       const values = await generateForm.validateFields()
       
-      const requestData: InitialModelGenerationRequest = {
-        taskId: values.taskId,
-        modelType: values.modelType,
-        architecture: {
+      let architecture: any
+      
+      if (selectedModelType === 'NEURAL_NETWORK') {
+        // 神经网络架构参数
+        architecture = {
           inputSize: values.inputSize,
           hiddenLayers: values.hiddenLayers.split(',').map((n: string) => parseInt(n.trim())),
           outputSize: values.outputSize,
           activationFunction: values.activationFunction,
           optimizer: values.optimizer,
           learningRate: values.learningRate
-        },
+        }
+      } else {
+        // 随机森林架构参数
+        architecture = {
+          n_estimators: values.n_estimators,
+          n_features: values.n_features,
+          task_type: values.task_type
+        }
+      }
+      
+      const requestData: InitialModelGenerationRequest = {
+        taskId: values.taskId,
+        modelType: selectedModelType as any,
+        architecture,
         randomSeed: values.randomSeed,
         description: values.description
       }
@@ -443,6 +482,7 @@ const InitialModelPage: React.FC = () => {
         message.success('初始模型生成成功')
         setGenerateModalVisible(false)
         generateForm.resetFields()
+        setSelectedModelType('RANDOM_FOREST') // 重置模型类型
         // 刷新列表
         if (values.taskId) {
           await fetchTaskInitialModel(values.taskId)
@@ -469,7 +509,7 @@ const InitialModelPage: React.FC = () => {
 
       const requestData: InitialModelUploadRequest = {
         taskId: values.taskId,
-        modelType: values.modelType,
+        modelType: selectedUploadModelType as any,
         description: values.description,
         file: file,
         metadata: values.metadata ? JSON.parse(values.metadata) : undefined
@@ -482,6 +522,7 @@ const InitialModelPage: React.FC = () => {
         setUploadModalVisible(false)
         uploadForm.resetFields()
         setFileList([])
+        setSelectedUploadModelType('RANDOM_FOREST') // 重置模型类型
         // 刷新列表
         if (values.taskId) {
           await fetchTaskInitialModel(values.taskId)
@@ -577,7 +618,38 @@ const InitialModelPage: React.FC = () => {
   // 删除初始模型
   const handleDelete = async (taskId: string) => {
     try {
-      const result = await deleteInitialModel(taskId)
+      const initialModel = getTaskInitialModel(taskId)
+      const needsForce = initialModel && ['DISTRIBUTING', 'DISTRIBUTED'].includes(initialModel.status)
+      
+      // 如果需要强制删除，显示确认对话框
+      if (needsForce) {
+        Modal.confirm({
+          title: '确认强制删除',
+          content: (
+            <div>
+              <p>该模型当前状态为 <Tag color="orange">{initialModel.status === 'DISTRIBUTING' ? '分发中' : '已分发'}</Tag></p>
+              <p>强制删除可能会影响正在进行的联邦学习任务，确定要继续吗？</p>
+            </div>
+          ),
+          okText: '确认删除',
+          cancelText: '取消',
+          okType: 'danger',
+          onOk: async () => {
+            await performDelete(taskId, true)
+          }
+        })
+      } else {
+        await performDelete(taskId, false)
+      }
+    } catch (error) {
+      message.error('初始模型删除失败')
+    }
+  }
+
+  // 执行删除操作
+  const performDelete = async (taskId: string, force: boolean) => {
+    try {
+      const result = await deleteInitialModel(taskId, { force })
       if (result.success) {
         message.success('初始模型删除成功')
       } else {
@@ -586,6 +658,25 @@ const InitialModelPage: React.FC = () => {
     } catch (error) {
       message.error('初始模型删除失败')
     }
+  }
+
+  // 获取分发按钮的提示信息
+  const getDistributeTooltip = (taskId: string) => {
+    const initialModel = getTaskInitialModel(taskId)
+    
+    if (!initialModel) {
+      return '初始模型不存在'
+    }
+    
+    if (initialModel.status !== 'READY') {
+      return `模型状态为${initialModel.status}，只有READY状态的模型可以分发`
+    }
+    
+    if (isDistributing(taskId)) {
+      return '模型正在分发中，请稍后再试'
+    }
+    
+    return '分发初始模型到各个节点'
   }
 
   const currentModel = selectedTaskId ? getTaskInitialModel(selectedTaskId) : null
@@ -737,6 +828,7 @@ const InitialModelPage: React.FC = () => {
         onCancel={() => {
           setGenerateModalVisible(false)
           generateForm.resetFields()
+          setSelectedModelType('RANDOM_FOREST')
         }}
         width={800}
         confirmLoading={generationLoading}
@@ -746,6 +838,11 @@ const InitialModelPage: React.FC = () => {
           layout="vertical"
           initialValues={{
             modelType: 'RANDOM_FOREST',
+            // 随机森林默认值
+            n_estimators: 100,
+            n_features: 5,
+            task_type: 'regression',
+            // 神经网络默认值
             activationFunction: 'relu',
             optimizer: 'adam',
             learningRate: 0.001,
@@ -790,87 +887,158 @@ const InitialModelPage: React.FC = () => {
             name="modelType"
             rules={[{ required: true, message: '请选择模型类型' }]}
           >
-            <Select>
-              <Option value="RANDOM_FOREST">随机森林</Option>
+            <Select
+              value={selectedModelType}
+              onChange={(value) => {
+                setSelectedModelType(value)
+                // 清空相关字段
+                generateForm.resetFields(['inputSize', 'outputSize', 'hiddenLayers', 'activationFunction', 'optimizer', 'learningRate', 'n_estimators', 'n_features', 'task_type'])
+              }}
+            >
+              <Option value="RANDOM_FOREST">随机森林（推荐）</Option>
+              <Option value="NEURAL_NETWORK">神经网络</Option>
             </Select>
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={8}>
+          {/* 随机森林参数 */}
+          {selectedModelType === 'RANDOM_FOREST' && (
+            <div style={{ border: '1px solid #e8e8e8', borderRadius: '6px', padding: '16px', backgroundColor: '#fafafa' }}>
+              <h4 style={{ marginBottom: '16px', color: '#1890ff' }}>🌲 随机森林参数</h4>
+              
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="树的数量"
+                    name="n_estimators"
+                    rules={[
+                      { required: true, message: '请输入树的数量' },
+                      { type: 'number', min: 10, max: 500, message: '树的数量必须在10-500之间' }
+                    ]}
+                    tooltip="决策树的数量，通常在10-500之间，数量越多模型越复杂"
+                  >
+                    <InputNumber min={10} max={500} style={{ width: '100%' }} placeholder="100" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="特征数量"
+                    name="n_features"
+                    rules={[
+                      { required: true, message: '请输入特征数量' },
+                      { type: 'number', min: 1, message: '特征数量必须大于等于1' }
+                    ]}
+                    tooltip="每次分割时考虑的特征数量"
+                  >
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="5" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
               <Form.Item
-                label="输入大小"
-                name="inputSize"
-                rules={[{ required: true, message: '请输入输入大小' }]}
+                label="任务类型"
+                name="task_type"
+                rules={[{ required: true, message: '请选择任务类型' }]}
+                tooltip="选择分类任务或回归任务"
               >
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="128" />
+                <Select placeholder="请选择任务类型">
+                  <Option value="classification">分类任务</Option>
+                  <Option value="regression">回归任务</Option>
+                </Select>
               </Form.Item>
-            </Col>
-            <Col span={8}>
+            </div>
+          )}
+
+          {/* 神经网络参数 */}
+          {selectedModelType === 'NEURAL_NETWORK' && (
+            <div style={{ border: '1px solid #e8e8e8', borderRadius: '6px', padding: '16px', backgroundColor: '#fafafa' }}>
+              <h4 style={{ marginBottom: '16px', color: '#722ed1' }}>🧠 神经网络参数</h4>
+              
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item
+                    label="输入大小"
+                    name="inputSize"
+                    rules={[{ required: true, message: '请输入输入大小' }]}
+                    tooltip="输入层神经元数量"
+                  >
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="128" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="输出大小"
+                    name="outputSize"
+                    rules={[{ required: true, message: '请输入输出大小' }]}
+                    tooltip="输出层神经元数量"
+                  >
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="10" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="学习率"
+                    name="learningRate"
+                    rules={[{ required: true, message: '请输入学习率' }]}
+                    tooltip="控制模型学习速度，通常在0.0001-0.1之间"
+                  >
+                    <InputNumber min={0} max={1} step={0.0001} style={{ width: '100%' }} placeholder="0.001" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
               <Form.Item
-                label="输出大小"
-                name="outputSize"
-                rules={[{ required: true, message: '请输入输出大小' }]}
+                label="隐藏层"
+                name="hiddenLayers"
+                rules={[{ required: true, message: '请输入隐藏层配置' }]}
+                tooltip="使用逗号分隔，例如: 64,32,16"
               >
-                <InputNumber min={1} style={{ width: '100%' }} placeholder="10" />
+                <Input placeholder="64,32,16" />
               </Form.Item>
-            </Col>
-            <Col span={8}>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="激活函数"
+                    name="activationFunction"
+                    rules={[{ required: true, message: '请选择激活函数' }]}
+                  >
+                    <Select>
+                      <Option value="relu">ReLU</Option>
+                      <Option value="sigmoid">Sigmoid</Option>
+                      <Option value="tanh">Tanh</Option>
+                      <Option value="softmax">Softmax</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="优化器"
+                    name="optimizer"
+                    rules={[{ required: true, message: '请选择优化器' }]}
+                  >
+                    <Select>
+                      <Option value="adam">Adam</Option>
+                      <Option value="sgd">SGD</Option>
+                      <Option value="rmsprop">RMSprop</Option>
+                      <Option value="adagrad">Adagrad</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+          )}
+
+          <Row gutter={16} style={{ marginTop: '16px' }}>
+            <Col span={12}>
               <Form.Item
                 label="随机种子"
                 name="randomSeed"
+                tooltip="用于确保结果可重现，可选参数"
               >
                 <InputNumber style={{ width: '100%' }} placeholder="42" />
               </Form.Item>
             </Col>
           </Row>
-
-          <Form.Item
-            label="隐藏层"
-            name="hiddenLayers"
-            rules={[{ required: true, message: '请输入隐藏层配置' }]}
-            tooltip="使用逗号分隔，例如: 64,32,16"
-          >
-            <Input placeholder="64,32,16" />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="激活函数"
-                name="activationFunction"
-                rules={[{ required: true, message: '请选择激活函数' }]}
-              >
-                <Select>
-                  <Option value="relu">ReLU</Option>
-                  <Option value="sigmoid">Sigmoid</Option>
-                  <Option value="tanh">Tanh</Option>
-                  <Option value="softmax">Softmax</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="优化器"
-                name="optimizer"
-                rules={[{ required: true, message: '请选择优化器' }]}
-              >
-                <Select>
-                  <Option value="adam">Adam</Option>
-                  <Option value="sgd">SGD</Option>
-                  <Option value="rmsprop">RMSprop</Option>
-                  <Option value="adagrad">Adagrad</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            label="学习率"
-            name="learningRate"
-            rules={[{ required: true, message: '请输入学习率' }]}
-          >
-            <InputNumber min={0} max={1} step={0.0001} style={{ width: '100%' }} />
-          </Form.Item>
 
           <Form.Item
             label="描述"
@@ -890,6 +1058,9 @@ const InitialModelPage: React.FC = () => {
           setUploadModalVisible(false)
           uploadForm.resetFields()
           setFileList([])
+          setSelectedUploadModelType('RANDOM_FOREST')
+          setJsonValidationStatus('')
+          setJsonValidationMessage('')
         }}
         width={600}
         confirmLoading={initialUploadLoading}
@@ -929,35 +1100,100 @@ const InitialModelPage: React.FC = () => {
             name="modelType"
             rules={[{ required: true, message: '请选择模型类型' }]}
           >
-            <Select>
-              <Option value="RANDOM_FOREST">随机森林</Option>
+            <Select
+              value={selectedUploadModelType}
+              onChange={(value) => setSelectedUploadModelType(value)}
+            >
+              <Option value="RANDOM_FOREST">随机森林（推荐）</Option>
+              <Option value="NEURAL_NETWORK">神经网络</Option>
             </Select>
           </Form.Item>
 
+          {/* 根据模型类型显示不同的文件格式提示 */}
           <Form.Item
             label="模型文件"
             required
-            tooltip="支持.pth, .pt, .h5, .pb, .onnx等格式"
+            tooltip={selectedUploadModelType === 'RANDOM_FOREST' 
+              ? "随机森林模型支持: .pkl, .pickle, .joblib 等格式" 
+              : "神经网络模型支持: .pth, .pt, .h5, .pb, .onnx 等格式"
+            }
           >
             <Upload
               fileList={fileList}
               onChange={({ fileList }) => setFileList(fileList)}
               beforeUpload={() => false}
               maxCount={1}
+              accept={selectedUploadModelType === 'RANDOM_FOREST' 
+                ? ".pkl,.pickle,.joblib" 
+                : ".pth,.pt,.h5,.pb,.onnx"
+              }
             >
               <Button icon={<UploadOutlined />}>选择文件</Button>
             </Upload>
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+              {selectedUploadModelType === 'RANDOM_FOREST' ? (
+                <span>🌲 随机森林：建议使用 .pkl 格式（sklearn序列化）</span>
+              ) : (
+                <span>🧠 神经网络：建议使用 .pth 格式（PyTorch）或 .h5 格式（Keras/TensorFlow）</span>
+              )}
+            </div>
           </Form.Item>
 
           <Form.Item
             label="元数据"
             name="metadata"
-            tooltip="JSON格式的模型元数据"
+            tooltip="JSON格式的模型元数据，可选字段"
+            validateStatus={jsonValidationStatus}
+            help={jsonValidationMessage}
+            rules={[
+              {
+                validator: (_, value) => {
+                  if (!value || value.trim() === '') {
+                    setJsonValidationStatus('')
+                    setJsonValidationMessage('')
+                    return Promise.resolve() // 允许为空
+                  }
+                  try {
+                    JSON.parse(value)
+                    setJsonValidationStatus('success')
+                    setJsonValidationMessage('JSON格式正确 ✓')
+                    return Promise.resolve()
+                  } catch (error) {
+                    setJsonValidationStatus('error')
+                    setJsonValidationMessage('JSON格式错误，请检查语法')
+                    return Promise.reject(new Error('请输入有效的JSON格式'))
+                  }
+                }
+              }
+            ]}
           >
             <TextArea
               rows={4}
-              placeholder='{"architecture": {"inputSize": 128, "outputSize": 10}, "framework": "pytorch", "version": "1.0"}'
+              placeholder={selectedUploadModelType === 'RANDOM_FOREST' 
+                ? '{"n_estimators": 100, "n_features": 5, "task_type": "regression", "framework": "sklearn", "version": "1.0"}' 
+                : '{"architecture": {"inputSize": 128, "outputSize": 10}, "framework": "pytorch", "version": "1.0"}'
+              }
+              onChange={(e) => {
+                const value = e.target.value.trim()
+                if (!value) {
+                  setJsonValidationStatus('')
+                  setJsonValidationMessage('')
+                  return
+                }
+                
+                try {
+                  JSON.parse(value)
+                  setJsonValidationStatus('success')
+                  setJsonValidationMessage('JSON格式正确 ✓')
+                } catch (error) {
+                  setJsonValidationStatus('error')
+                  setJsonValidationMessage(`JSON格式错误: ${(error as Error).message}`)
+                }
+              }}
             />
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+              💡 提示：元数据为可选字段，用于存储模型的额外信息（如框架版本、训练参数等）
+            </div>
           </Form.Item>
 
           <Form.Item

@@ -6,6 +6,7 @@
 import { http, HttpResponse } from 'msw'
 import { federatedTaskHandlers } from './handlers/federatedTaskHandlers'
 import { modelManagementHandlers } from './handlers/modelManagementHandlers'
+import { vmHandlers } from './handlers/vmHandlers'
 
 export const handlers = [
   // 用户登录 - 支持绝对路径和相对路径
@@ -204,6 +205,9 @@ export const handlers = [
       }
     })
   }),
+
+  // ==================== 虚拟机管理 API ====================
+  ...vmHandlers,
 
   // ==================== 联邦学习任务管理 API ====================
   ...federatedTaskHandlers,

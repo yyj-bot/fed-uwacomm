@@ -111,14 +111,54 @@ const VersionManagementPage: React.FC = () => {
       key: 'modelId',
       width: 200,
       ellipsis: true,
-      fixed: 'left'
+      fixed: 'left',
+      render: (modelId: string) => (
+        <Tooltip title={`完整模型ID: ${modelId} (点击复制)`} placement="topLeft">
+          <span 
+            style={{ 
+              cursor: 'pointer',
+              //color: '#1890ff',
+              //textDecoration: 'underline'
+            }}
+            onClick={() => {
+              navigator.clipboard.writeText(modelId).then(() => {
+                message.success('模型ID已复制到剪贴板')
+              }).catch(() => {
+                message.error('复制失败，请手动复制')
+              })
+            }}
+          >
+            {modelId}
+          </span>
+        </Tooltip>
+      )
     },
     {
       title: '任务ID',
       dataIndex: 'taskId',
       key: 'taskId',
       width: 200,
-      ellipsis: true
+      ellipsis: true,
+      render: (taskId: string) => (
+        <Tooltip title={`完整任务ID: ${taskId} (点击复制)`} placement="topLeft">
+          <span 
+            style={{ 
+              cursor: 'pointer',
+              //color: '#1890ff',
+              //textDecoration: 'underline'
+            }}
+            onClick={() => {
+              navigator.clipboard.writeText(taskId).then(() => {
+                message.success('任务ID已复制到剪贴板')
+              }).catch(() => {
+                message.error('复制失败，请手动复制')
+              })
+            }}
+          >
+            {taskId}
+          </span>
+        </Tooltip>
+      )
     },
     {
       title: '轮次',
@@ -132,14 +172,14 @@ const VersionManagementPage: React.FC = () => {
       dataIndex: 'accuracy',
       key: 'accuracy',
       width: 100,
-      render: (value: number) => value ? (value * 100).toFixed(2) + '%' : '-'
+      render: (value: number | undefined) => value !== undefined ? (value * 100).toFixed(2) + '%' : '-'
     },
     {
       title: '损失',
       dataIndex: 'loss',
       key: 'loss',
       width: 100,
-      render: (value: number) => value ? value.toFixed(6) : '-'
+      render: (value: number | undefined) => value !== undefined ? value.toFixed(6) : '-'
     },
     {
       title: '状态',
@@ -194,15 +234,25 @@ const VersionManagementPage: React.FC = () => {
             cancelText="取消"
             disabled={!canDeleteModel(record)}
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              disabled={!canDeleteModel(record)}
+            <Tooltip 
+              title={
+                !canDeleteModel(record) 
+                  ? (record.status === 'DEPLOYED' 
+                      ? '已部署的模型无法删除，请先取消部署' 
+                      : '模型正在操作中，请稍后再试')
+                  : '删除此模型版本'
+              }
             >
-              删除
-            </Button>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                disabled={!canDeleteModel(record)}
+              >
+                删除
+              </Button>
+            </Tooltip>
           </Popconfirm>
         </Space>
       )
@@ -379,7 +429,10 @@ const VersionManagementPage: React.FC = () => {
           onFinish={handleSearch}
         >
           <Form.Item name="taskId" label="任务ID">
-            <Input placeholder="任务ID" style={{ width: 200 }} />
+            <Input 
+              placeholder="任务ID (可点击表格中的ID复制)" 
+              style={{ width: 250 }} 
+            />
           </Form.Item>
           <Form.Item name="roundNumber" label="轮次">
             <InputNumber placeholder="轮次" style={{ width: 120 }} />
@@ -468,23 +521,66 @@ const VersionManagementPage: React.FC = () => {
             <Descriptions.Item label="状态">
               <Tag color={getStatusColor(currentModel.status)}>{currentModel.status}</Tag>
             </Descriptions.Item>
+            <Descriptions.Item label="聚合方式">
+              {(currentModel as any)?.aggregationMethod || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="客户端数量">
+              {(currentModel as any)?.clientCount || '-'}
+            </Descriptions.Item>
             <Descriptions.Item label="准确率">
-              {currentModel?.metrics?.accuracy ? (currentModel.metrics.accuracy * 100).toFixed(2) + '%' : '-'}
+              {(currentModel as any)?.accuracy !== undefined ? ((currentModel as any).accuracy * 100).toFixed(2) + '%' : '-'}
             </Descriptions.Item>
             <Descriptions.Item label="损失">
-              {currentModel?.metrics?.loss ? currentModel.metrics.loss.toFixed(6) : '-'}
+              {(currentModel as any)?.loss !== undefined ? (currentModel as any).loss.toFixed(6) : '-'}
             </Descriptions.Item>
+            {/* 文件相关信息 - 只在有文件时显示 */}
+            {(currentModel as any)?.fileSize && (
+              <>
+                <Descriptions.Item label="文件大小">
+                  {((currentModel as any).fileSize / 1024 / 1024).toFixed(2)} MB
+                </Descriptions.Item>
+                <Descriptions.Item label="文件格式">
+                  {(currentModel as any)?.fileFormat || '-'}
+                </Descriptions.Item>
+              </>
+            )}
+            {/* 其他评估指标 - 只在有metrics时显示 */}
+            {(currentModel as any)?.metrics && (
+              <>
+                <Descriptions.Item label="精确率">
+                  {(currentModel as any).metrics.precision ? ((currentModel as any).metrics.precision * 100).toFixed(2) + '%' : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="召回率">
+                  {(currentModel as any).metrics.recall ? ((currentModel as any).metrics.recall * 100).toFixed(2) + '%' : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="F1分数">
+                  {(currentModel as any).metrics.f1_score ? (currentModel as any).metrics.f1_score.toFixed(4) : '-'}
+                </Descriptions.Item>
+              </>
+            )}
             <Descriptions.Item label="创建时间" span={2}>
               {currentModel?.createdAt ? new Date(currentModel.createdAt).toLocaleString() : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="聚合完成时间" span={2}>
-              {currentModel?.aggregatedAt ? new Date(currentModel.aggregatedAt).toLocaleString() : '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="模型数据" span={2}>
-              <pre style={{ margin: 0, maxHeight: '300px', overflow: 'auto' }}>
-                {currentModel?.modelJson ? JSON.stringify(currentModel.modelJson, null, 2) : '-'}
-              </pre>
-            </Descriptions.Item>
+            {/* 聚合完成时间 - 只在已聚合的状态下显示 */}
+            {(currentModel as any)?.aggregatedAt && ['VALIDATED', 'DEPLOYED', 'DEPRECATED'].includes(currentModel.status) && (
+              <Descriptions.Item label="聚合完成时间" span={2}>
+                {new Date((currentModel as any).aggregatedAt).toLocaleString()}
+              </Descriptions.Item>
+            )}
+            {/* 模型描述 */}
+            {(currentModel as any)?.description && (
+              <Descriptions.Item label="模型描述" span={2}>
+                {(currentModel as any).description}
+              </Descriptions.Item>
+            )}
+            {/* 模型数据 - 只在有parameters时显示 */}
+            {(currentModel as any)?.parameters && (
+              <Descriptions.Item label="模型数据" span={2}>
+                <pre style={{ margin: 0, maxHeight: '300px', overflow: 'auto' }}>
+                  {JSON.stringify((currentModel as any).parameters, null, 2)}
+                </pre>
+              </Descriptions.Item>
+            )}
           </Descriptions>
         )}
       </Modal>
@@ -533,14 +629,14 @@ const VersionManagementPage: React.FC = () => {
                   dataIndex: 'accuracy',
                   key: 'accuracy',
                   width: 100,
-                  render: (value: number) => value ? (value * 100).toFixed(2) + '%' : '-'
+                  render: (value: number | undefined) => value !== undefined ? (value * 100).toFixed(2) + '%' : '-'
                 },
                 {
                   title: '损失',
                   dataIndex: 'loss',
                   key: 'loss',
                   width: 100,
-                  render: (value: number) => value ? value.toFixed(6) : '-'
+                  render: (value: number | undefined) => value !== undefined ? value.toFixed(6) : '-'
                 },
                 {
                   title: '状态',

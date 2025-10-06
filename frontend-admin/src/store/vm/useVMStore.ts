@@ -8,12 +8,22 @@
 
 import { useCallback } from 'react'
 import { useVMStore } from './vmStore'
-import type { VirtualMachine, VMStatus } from '@/api/vm'
+import type { 
+  VirtualMachine, 
+  VMStatus,
+  VMRoundModel,
+  VMModelTrend,
+  VMModelBest
+} from '@/api/vm'
 import type { 
   VMListParams,
   VMUpdateRequest,
   VMStartRequest,
-  VMStopRequest
+  VMStopRequest,
+  VMRestartRequest,
+  VMRoundModelListParams,
+  VMModelTrendParams,
+  VMModelBestParams
 } from '@/services'
 
 // ==================== Hook 实现 ====================
@@ -35,6 +45,27 @@ export const useVM = () => {
   
   const pagination = useVMStore((state) => state.pagination)
   const queryParams = useVMStore((state) => state.queryParams)
+  
+  // VM本地模型状态
+  const vmRoundModels = useVMStore((state) => state.vmRoundModels)
+  const vmRoundModelsTotal = useVMStore((state) => state.vmRoundModelsTotal)
+  const vmRoundModelsLoading = useVMStore((state) => state.vmRoundModelsLoading)
+  const vmRoundModelsError = useVMStore((state) => state.vmRoundModelsError)
+  
+  const currentVMRoundModel = useVMStore((state) => state.currentVMRoundModel)
+  const currentVMRoundModelLoading = useVMStore((state) => state.currentVMRoundModelLoading)
+  const currentVMRoundModelError = useVMStore((state) => state.currentVMRoundModelError)
+  
+  const vmModelTrends = useVMStore((state) => state.vmModelTrends)
+  const vmModelTrendsLoading = useVMStore((state) => state.vmModelTrendsLoading)
+  const vmModelTrendsError = useVMStore((state) => state.vmModelTrendsError)
+  
+  const vmModelBests = useVMStore((state) => state.vmModelBests)
+  const vmModelBestsLoading = useVMStore((state) => state.vmModelBestsLoading)
+  const vmModelBestsError = useVMStore((state) => state.vmModelBestsError)
+  
+  const vmRoundModelsPagination = useVMStore((state) => state.vmRoundModelsPagination)
+  const vmRoundModelsQueryParams = useVMStore((state) => state.vmRoundModelsQueryParams)
 
   // 获取操作方法
   const fetchVMListAction = useVMStore((state) => state.fetchVMList)
@@ -54,6 +85,18 @@ export const useVM = () => {
   const clearErrorAction = useVMStore((state) => state.clearError)
   const clearVMErrorAction = useVMStore((state) => state.clearVMError)
   const resetStateAction = useVMStore((state) => state.resetState)
+  
+  // VM本地模型操作方法
+  const fetchVMRoundModelsAction = useVMStore((state) => state.fetchVMRoundModels)
+  const refreshVMRoundModelsAction = useVMStore((state) => state.refreshVMRoundModels)
+  const fetchVMRoundModelDetailAction = useVMStore((state) => state.fetchVMRoundModelDetail)
+  const setCurrentVMRoundModelAction = useVMStore((state) => state.setCurrentVMRoundModel)
+  const fetchVMModelTrendAction = useVMStore((state) => state.fetchVMModelTrend)
+  const fetchVMModelBestAction = useVMStore((state) => state.fetchVMModelBest)
+  const setVMRoundModelsPaginationAction = useVMStore((state) => state.setVMRoundModelsPagination)
+  const setVMRoundModelsQueryParamsAction = useVMStore((state) => state.setVMRoundModelsQueryParams)
+  const resetVMRoundModelsQueryParamsAction = useVMStore((state) => state.resetVMRoundModelsQueryParams)
+  const clearVMRoundModelsErrorAction = useVMStore((state) => state.clearVMRoundModelsError)
 
   // ==================== 封装操作方法 ====================
 
@@ -322,10 +365,162 @@ export const useVM = () => {
     }).length
   }, [vmList, getVMStatus])
 
+  // ==================== VM本地模型操作方法 ====================
+
+  /**
+   * 获取VM本地模型列表
+   */
+  const fetchVMRoundModels = useCallback(async (params?: VMRoundModelListParams) => {
+    try {
+      await fetchVMRoundModelsAction(params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM本地模型列表失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchVMRoundModelsAction])
+
+  /**
+   * 刷新VM本地模型列表
+   */
+  const refreshVMRoundModels = useCallback(async () => {
+    try {
+      await refreshVMRoundModelsAction()
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '刷新VM本地模型列表失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [refreshVMRoundModelsAction])
+
+  /**
+   * 获取VM本地模型详情
+   */
+  const fetchVMRoundModelDetail = useCallback(async (vmRoundModelId: string) => {
+    try {
+      await fetchVMRoundModelDetailAction(vmRoundModelId)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM本地模型详情失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchVMRoundModelDetailAction])
+
+  /**
+   * 设置当前VM本地模型
+   */
+  const setCurrentVMRoundModel = useCallback((model: VMRoundModel | null) => {
+    setCurrentVMRoundModelAction(model)
+  }, [setCurrentVMRoundModelAction])
+
+  /**
+   * 获取VM模型训练指标趋势
+   */
+  const fetchVMModelTrend = useCallback(async (params: VMModelTrendParams) => {
+    try {
+      await fetchVMModelTrendAction(params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM模型训练指标趋势失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchVMModelTrendAction])
+
+  /**
+   * 获取VM模型最佳/离群结果
+   */
+  const fetchVMModelBest = useCallback(async (params: VMModelBestParams) => {
+    try {
+      await fetchVMModelBestAction(params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取VM模型最佳/离群结果失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchVMModelBestAction])
+
+  /**
+   * 设置VM本地模型分页参数
+   */
+  const setVMRoundModelsPagination = useCallback((current: number, size?: number) => {
+    setVMRoundModelsPaginationAction(current, size)
+  }, [setVMRoundModelsPaginationAction])
+
+  /**
+   * 设置VM本地模型查询参数
+   */
+  const setVMRoundModelsQueryParams = useCallback((params: VMRoundModelListParams) => {
+    setVMRoundModelsQueryParamsAction(params)
+  }, [setVMRoundModelsQueryParamsAction])
+
+  /**
+   * 重置VM本地模型查询参数
+   */
+  const resetVMRoundModelsQueryParams = useCallback(() => {
+    resetVMRoundModelsQueryParamsAction()
+  }, [resetVMRoundModelsQueryParamsAction])
+
+  /**
+   * 清除VM本地模型错误信息
+   */
+  const clearVMRoundModelsError = useCallback(() => {
+    clearVMRoundModelsErrorAction()
+  }, [clearVMRoundModelsErrorAction])
+
+  // ==================== VM本地模型计算属性 ====================
+
+  /**
+   * 获取VM模型趋势数据
+   */
+  const getVMModelTrend = useCallback((taskId: string, vmId: string, metric: string): VMModelTrend | null => {
+    const trendKey = `${taskId}-${vmId}-${metric}`
+    return vmModelTrends[trendKey] || null
+  }, [vmModelTrends])
+
+  /**
+   * 获取VM模型最佳/离群数据
+   */
+  const getVMModelBest = useCallback((taskId: string, metric: string, type: 'best' | 'outlier'): VMModelBest | null => {
+    const bestKey = `${taskId}-${metric}-${type}`
+    return vmModelBests[bestKey] || null
+  }, [vmModelBests])
+
+  /**
+   * 检查VM模型趋势是否正在加载
+   */
+  const isVMModelTrendLoading = useCallback((taskId: string, vmId: string, metric: string): boolean => {
+    const trendKey = `${taskId}-${vmId}-${metric}`
+    return !!vmModelTrendsLoading[trendKey]
+  }, [vmModelTrendsLoading])
+
+  /**
+   * 检查VM模型最佳/离群是否正在加载
+   */
+  const isVMModelBestLoading = useCallback((taskId: string, metric: string, type: 'best' | 'outlier'): boolean => {
+    const bestKey = `${taskId}-${metric}-${type}`
+    return !!vmModelBestsLoading[bestKey]
+  }, [vmModelBestsLoading])
+
+  /**
+   * 获取VM模型趋势错误
+   */
+  const getVMModelTrendError = useCallback((taskId: string, vmId: string, metric: string): string | null => {
+    const trendKey = `${taskId}-${vmId}-${metric}`
+    return vmModelTrendsError[trendKey] || null
+  }, [vmModelTrendsError])
+
+  /**
+   * 获取VM模型最佳/离群错误
+   */
+  const getVMModelBestError = useCallback((taskId: string, metric: string, type: 'best' | 'outlier'): string | null => {
+    const bestKey = `${taskId}-${metric}-${type}`
+    return vmModelBestsError[bestKey] || null
+  }, [vmModelBestsError])
+
   // ==================== 返回接口 ====================
 
   return {
-    // 状态
+    // 虚拟机状态
     vmList,
     vmListTotal,
     vmListLoading,
@@ -339,7 +534,24 @@ export const useVM = () => {
     pagination,
     queryParams,
     
-    // 操作方法
+    // VM本地模型状态
+    vmRoundModels,
+    vmRoundModelsTotal,
+    vmRoundModelsLoading,
+    vmRoundModelsError,
+    currentVMRoundModel,
+    currentVMRoundModelLoading,
+    currentVMRoundModelError,
+    vmModelTrends,
+    vmModelTrendsLoading,
+    vmModelTrendsError,
+    vmModelBests,
+    vmModelBestsLoading,
+    vmModelBestsError,
+    vmRoundModelsPagination,
+    vmRoundModelsQueryParams,
+    
+    // 虚拟机操作方法
     fetchVMList,
     refreshVMList,
     fetchVMDetail,
@@ -358,7 +570,19 @@ export const useVM = () => {
     clearVMError,
     resetState,
     
-    // 计算属性和工具方法
+    // VM本地模型操作方法
+    fetchVMRoundModels,
+    refreshVMRoundModels,
+    fetchVMRoundModelDetail,
+    setCurrentVMRoundModel,
+    fetchVMModelTrend,
+    fetchVMModelBest,
+    setVMRoundModelsPagination,
+    setVMRoundModelsQueryParams,
+    resetVMRoundModelsQueryParams,
+    clearVMRoundModelsError,
+    
+    // 虚拟机计算属性和工具方法
     getVMStatus,
     isVMOperating,
     getVMOperationError,
@@ -367,7 +591,15 @@ export const useVM = () => {
     canRestartVM,
     onlineVMCount,
     offlineVMCount,
-    errorVMCount
+    errorVMCount,
+    
+    // VM本地模型计算属性和工具方法
+    getVMModelTrend,
+    getVMModelBest,
+    isVMModelTrendLoading,
+    isVMModelBestLoading,
+    getVMModelTrendError,
+    getVMModelBestError
   }
 }
 

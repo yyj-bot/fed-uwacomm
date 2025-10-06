@@ -29,19 +29,21 @@ export const createMockDistributionId = (): string => {
 /**
  * 生成评估ID
  */
+let evaluationIdCounter = 0
 export const createMockEvaluationId = (): string => {
-  return `eval_${Array.from({ length: 10 }, () => 
-    Math.random().toString(36).charAt(0)
-  ).join('')}`
+  evaluationIdCounter++
+  const paddedCounter = String(evaluationIdCounter).padStart(10, '0')
+  return `eval_${paddedCounter}`
 }
 
 /**
  * 生成回滚ID
  */
+let rollbackIdCounter = 0
 export const createMockRollbackId = (): string => {
-  return `rollback_${Array.from({ length: 12 }, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('')}`
+  rollbackIdCounter++
+  const paddedCounter = String(rollbackIdCounter).padStart(12, '0')
+  return `rollback_${paddedCounter}`
 }
 
 
@@ -150,7 +152,15 @@ export const RollbackStatus = {
 
 // ============= 类型定义 =============
 
-export interface ModelArchitecture {
+// 随机森林架构参数
+export interface RandomForestArchitecture {
+  n_estimators: number      // 树的数量，范围：10-500
+  n_features: number        // 特征数量，最小值：1
+  task_type: string         // 任务类型：classification 或 regression
+}
+
+// 神经网络架构参数
+export interface NeuralNetworkArchitecture {
   inputSize: number
   hiddenLayers: number[]
   outputSize: number
@@ -158,6 +168,9 @@ export interface ModelArchitecture {
   optimizer: string
   learningRate: number
 }
+
+// 通用架构参数类型
+export type ModelArchitecture = RandomForestArchitecture | NeuralNetworkArchitecture
 
 export interface InitialModelInfo {
   modelId: string
@@ -220,23 +233,30 @@ export interface ModelVersionInfo {
   roundNumber: number
   aggregationMethod: string
   clientCount: number
-  modelJson: Record<string, any>
-  metrics: {
-    accuracy: number
-    loss: number
-  }
   status: string
+  description?: string
   createdAt: string
-  aggregatedAt: string
+  // ⭐ 核心评估指标（顶级字段，只有聚合完成后才有）
+  accuracy?: number
+  loss?: number
+  // 文件相关字段（上传完成后才有）
+  fileSize?: number
+  fileFormat?: string
+  // ⭐ 对象包裹字段
+  metrics?: Record<string, any>      // 其他评估指标（聚合完成后才有）
+  parameters?: Record<string, any>   // 扩展参数（上传完成后才有）
+  aggregatedAt?: string              // 聚合完成时间（聚合完成后才有）
 }
 
 export interface EvaluationResult {
   evaluationId: string
   modelId: string
   taskId?: string
+  // ⭐ 核心评估指标（顶级字段）
+  accuracy: number
+  loss: number
+  // ⭐ 其他评估指标（在metrics对象内）
   metrics: {
-    accuracy: number
-    loss: number
     precision?: number
     recall?: number
     f1?: number
@@ -295,11 +315,13 @@ export interface RollbackRecord {
 
 // 任务ID列表（与federatedTask共享）
 export const taskIds = [
-  'c3d4e5f6789012345678901234567890', // 水声传播特征分类任务
-  'd4e5f678901234567890123456789012', // 声学传播回归分析
-  'e5f67890123456789012345678901234', // 水下异常检测任务
-  'f6789012345678901234567890123456', // 水声信号聚类分析
-  'a1b2c3d4e5f678901234567890123456'  // 额外任务ID
+  'c3d4e5f6789012345678901234567890', // 水声传播特征分类任务 - RUNNING
+  'd4e5f678901234567890123456789012', // 声学传播回归分析 - COMPLETED
+  'e5f67890123456789012345678901234', // 水下异常检测任务 - PAUSED
+  'f6789012345678901234567890123456', // 水声信号聚类分析 - CONFIGURED
+  'a1b2c3d4e5f678901234567890123456', // 深海声学模式识别 - CREATED
+  'b2c3d4e5f67890123456789012345678', // 海底地形声学分析 - FAILED任务
+  'c4d5e6f7890123456789012345678901'  // 水声通信优化 - DELETED模型测试
 ]
 
 // VM ID列表 - 32位字符串格式（与federatedTask保持一致）
@@ -316,8 +338,8 @@ export const vmIds = [
   'd5e6f789012345678901234567890123'  // 水声联邦学习节点-010
 ]
 
-// 模型类型选项
-export const modelTypes = ['neural_network', 'cnn', 'rnn', 'transformer', 'resnet']
+// 模型类型选项（更新为文档规范的类型）
+export const modelTypes = ['RANDOM_FOREST', 'NEURAL_NETWORK']
 
 // 激活函数选项
 export const activationFunctions = ['relu', 'sigmoid', 'tanh', 'leaky_relu', 'softmax']
@@ -344,8 +366,15 @@ export const rollbackReasons = [
 
 // ============= Mock数据生成函数 =============
 
-// 生成模型架构
-const generateModelArchitecture = (): ModelArchitecture => ({
+// 生成随机森林架构参数
+const generateRandomForestArchitecture = (): RandomForestArchitecture => ({
+  n_estimators: 10 + Math.floor(Math.random() * 491), // 10-500
+  n_features: 1 + Math.floor(Math.random() * 20),     // 1-20
+  task_type: randomChoice(['classification', 'regression'])
+})
+
+// 生成神经网络架构参数
+const generateNeuralNetworkArchitecture = (): NeuralNetworkArchitecture => ({
   inputSize: 64 + Math.floor(Math.random() * 449), // 64-512
   hiddenLayers: [
     32 + Math.floor(Math.random() * 225), // 32-256
@@ -357,6 +386,15 @@ const generateModelArchitecture = (): ModelArchitecture => ({
   optimizer: randomChoice(optimizers),
   learningRate: generateRandomFloat(0.0001, 0.01, 4)
 })
+
+// 生成模型架构（根据模型类型）
+const generateModelArchitecture = (modelType: string): ModelArchitecture => {
+  if (modelType === 'RANDOM_FOREST') {
+    return generateRandomForestArchitecture()
+  } else {
+    return generateNeuralNetworkArchitecture()
+  }
+}
 
 // 生成VM分发详情
 const generateVmDistributionDetails = (vmList: string[]): VmDistributionDetail[] =>
@@ -378,45 +416,65 @@ export const generateInitialModels = (count: number = 20): InitialModelInfo[] =>
   taskIds.forEach((taskId, index) => {
     const modelId = `initial_model_${String(index + 1).padStart(3, '0')}`
     
-    // 优化状态分配：确保有足够的可操作状态用于测试
+    // 根据任务状态确定合理的模型状态，确保业务逻辑一致性
+    // 任务状态映射：
+    // taskIds[0]: 'c3d4e5f6789012345678901234567890' - RUNNING 任务
+    // taskIds[1]: 'd4e5f678901234567890123456789012' - COMPLETED 任务  
+    // taskIds[2]: 'e5f67890123456789012345678901234' - PAUSED 任务
+    // taskIds[3]: 'f6789012345678901234567890123456' - CONFIGURED 任务
+    // taskIds[4]: 'a1b2c3d4e5f678901234567890123456' - CREATED 任务
+    // taskIds[5]: 'b2c3d4e5f67890123456789012345678' - FAILED模型测试
+    // taskIds[6]: 'c4d5e6f7890123456789012345678901' - DELETED模型测试
+    
     let status: keyof typeof InitialModelStatus
+    
     if (index === 0) {
-      status = InitialModelStatus.READY  // 第一个设为READY，可测试分发
+      // RUNNING 任务 -> 模型必须已分发才能启动任务
+      status = InitialModelStatus.DISTRIBUTED
     } else if (index === 1) {
-      status = InitialModelStatus.UPLOADED  // 第二个设为UPLOADED，也可测试分发
+      // COMPLETED 任务 -> 模型必须已分发（任务完成但模型仍在节点）
+      status = InitialModelStatus.DISTRIBUTED
     } else if (index === 2) {
-      status = InitialModelStatus.DISTRIBUTING  // 第三个设为DISTRIBUTING，测试不可删除
+      // PAUSED 任务 -> 模型必须已分发（任务暂停但模型仍在节点）
+      status = InitialModelStatus.DISTRIBUTED
     } else if (index === 3) {
-      status = InitialModelStatus.DISTRIBUTED  // 第四个设为DISTRIBUTED，测试不可删除
+      // CONFIGURED 任务 -> 模型准备就绪，等待分发后启动任务
+      status = InitialModelStatus.READY
+    } else if (index === 4) {
+      // CREATED 任务 -> 任务刚创建，还没有初始模型（或正在生成）
+      status = InitialModelStatus.GENERATING
+    } else if (index === 5) {
+      // 专门用于测试FAILED状态的模型
+      status = InitialModelStatus.FAILED
+    } else if (index === 6) {
+      // 专门用于测试DELETED状态的模型
+      status = InitialModelStatus.DELETED
     } else {
-      // 其余的随机分配，但偏向可操作状态
-      const operableStatuses = [
-        InitialModelStatus.READY,
-        InitialModelStatus.UPLOADED,
-        InitialModelStatus.GENERATING,
-        InitialModelStatus.FAILED
+      // 其他任务 -> 提供多样化的测试场景
+      const testStatuses = [
+        InitialModelStatus.READY,        // 准备分发
+        InitialModelStatus.DISTRIBUTING, // 分发中
+        InitialModelStatus.UPLOADED      // 已上传
       ]
-      const allStatuses = Object.values(InitialModelStatus)
-      // 70%概率选择可操作状态，30%概率选择所有状态
-      status = Math.random() < 0.7 ? 
-        randomChoice(operableStatuses) : 
-        randomChoice(allStatuses)
+      status = randomChoice(testStatuses)
     }
     
     const isUploaded = status === InitialModelStatus.UPLOADED
+    // 默认使用随机森林，偶尔使用神经网络（90% vs 10%）
+    const modelType = Math.random() < 0.9 ? 'RANDOM_FOREST' : 'NEURAL_NETWORK'
     
     models.push({
       modelId,
       taskId,
-      modelType: randomChoice(modelTypes),
+      modelType,
       modelSize: 512000 + Math.floor(Math.random() * 9973760), // 0.5MB - 10MB
       parametersCount: 1000 + Math.floor(Math.random() * 99000),
-      architecture: generateModelArchitecture(),
+      architecture: generateModelArchitecture(modelType),
       ...(isUploaded ? {
         uploadedAt: generateTimestamp(7),
-        fileName: `${modelId}.pth`,
+        fileName: `${modelId}.${modelType === 'RANDOM_FOREST' ? 'pkl' : 'pth'}`,
         metadata: {
-          framework: randomChoice(frameworks),
+          framework: modelType === 'RANDOM_FOREST' ? 'sklearn' : randomChoice(frameworks),
           version: `${Math.floor(Math.random() * 3) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`
         }
       } : {
@@ -458,19 +516,21 @@ export const generateInitialModels = (count: number = 20): InitialModelInfo[] =>
       randomChoice(allStatuses)
       
     const isUploaded = status === InitialModelStatus.UPLOADED
+    // 默认使用随机森林，偶尔使用神经网络（90% vs 10%）
+    const modelType = Math.random() < 0.9 ? 'RANDOM_FOREST' : 'NEURAL_NETWORK'
     
     models.push({
       modelId,
       taskId,
-      modelType: randomChoice(modelTypes),
+      modelType,
       modelSize: 512000 + Math.floor(Math.random() * 9973760), // 0.5MB - 10MB
       parametersCount: 1000 + Math.floor(Math.random() * 99000),
-      architecture: generateModelArchitecture(),
+      architecture: generateModelArchitecture(modelType),
       ...(isUploaded ? {
         uploadedAt: generateTimestamp(7),
-        fileName: `${modelId}.pth`,
+        fileName: `${modelId}.${modelType === 'RANDOM_FOREST' ? 'pkl' : 'pth'}`,
         metadata: {
-          framework: randomChoice(frameworks),
+          framework: modelType === 'RANDOM_FOREST' ? 'sklearn' : randomChoice(frameworks),
           version: `${Math.floor(Math.random() * 3) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`
         }
       } : {
@@ -536,7 +596,7 @@ export const generateDistributionProgress = (count: number = 10): DistributionPr
 
 // ============= 模型版本Mock数据 =============
 
-// 生成模型版本信息（严格按照接口文档规范）
+// 生成模型版本信息（严格按照业务逻辑和状态规范）
 export const generateModelVersions = (count: number = 50): ModelVersionInfo[] =>
   Array.from({ length: count }, (_, index) => {
     const modelId = createMockModelId()
@@ -544,29 +604,96 @@ export const generateModelVersions = (count: number = 50): ModelVersionInfo[] =>
     const roundNumber = 1 + Math.floor(Math.random() * 100)
     const status = randomChoice(Object.values(ModelVersionStatus))
     
-    return {
+    // 基础字段（所有状态都有）
+    const baseData = {
       modelId,
       taskId,
       roundNumber,
       aggregationMethod: randomChoice(Object.values(AggregationMethod)),
       clientCount: 3 + Math.floor(Math.random() * 18),
-      modelJson: {
-        layers: 3 + Math.floor(Math.random() * 8),
-        parameters: 1000 + Math.floor(Math.random() * 99000),
-        weights: `compressed_weights_${modelId.slice(0, 8)}`,
-        architecture: {
-          inputSize: 64 + Math.floor(Math.random() * 449),
-          hiddenLayers: [128, 64, 32],
-          outputSize: 2 + Math.floor(Math.random() * 19)
-        }
-      },
-      metrics: {
-        accuracy: generateRandomFloat(0.6, 0.99, 4),
-        loss: generateRandomFloat(0.01, 0.5, 6)
-      },
       status,
-      createdAt: generateTimestamp(30),
-      aggregatedAt: generateTimestamp(30)
+      description: `第${roundNumber}轮模型`,
+      createdAt: generateTimestamp(30)
+    }
+    
+    // 根据状态决定包含哪些数据
+    switch (status) {
+      case ModelVersionStatus.UPLOADING:
+        // 上传中：只有基础信息
+        return baseData
+        
+      case ModelVersionStatus.UPLOADED:
+        // 已上传：有模型参数和文件信息，但无评估数据
+        return {
+          ...baseData,
+          fileSize: 512000 + Math.floor(Math.random() * 9973760),
+          fileFormat: randomChoice(['pkl', 'h5', 'pth', 'onnx']),
+          parameters: {
+            learning_rate: generateRandomFloat(0.0001, 0.01, 4),
+            batch_size: randomChoice([16, 32, 64, 128]),
+            optimizer: randomChoice(optimizers),
+            epochs: 10 + Math.floor(Math.random() * 91)
+          }
+        }
+        
+      case ModelVersionStatus.VALIDATING:
+        // 验证中：有模型参数和文件信息，但无评估数据
+        return {
+          ...baseData,
+          fileSize: 512000 + Math.floor(Math.random() * 9973760),
+          fileFormat: randomChoice(['pkl', 'h5', 'pth', 'onnx']),
+          parameters: {
+            learning_rate: generateRandomFloat(0.0001, 0.01, 4),
+            batch_size: randomChoice([16, 32, 64, 128]),
+            optimizer: randomChoice(optimizers),
+            epochs: 10 + Math.floor(Math.random() * 91)
+          }
+        }
+        
+      case ModelVersionStatus.VALIDATED:
+      case ModelVersionStatus.DEPLOYED:
+      case ModelVersionStatus.DEPRECATED:
+        // 已验证/已部署/已废弃：完整数据
+        return {
+          ...baseData,
+          // ⭐ 核心评估指标（顶级字段）
+          accuracy: generateRandomFloat(0.6, 0.99, 4),
+          loss: generateRandomFloat(0.01, 0.5, 6),
+          // 文件相关字段
+          fileSize: 512000 + Math.floor(Math.random() * 9973760),
+          fileFormat: randomChoice(['pkl', 'h5', 'pth', 'onnx']),
+          // ⭐ 其他评估指标
+          metrics: {
+            precision: generateRandomFloat(0.6, 0.99, 4),
+            recall: generateRandomFloat(0.6, 0.99, 4),
+            f1_score: generateRandomFloat(0.6, 0.99, 4)
+          },
+          // ⭐ 模型参数
+          parameters: {
+            learning_rate: generateRandomFloat(0.0001, 0.01, 4),
+            batch_size: randomChoice([16, 32, 64, 128]),
+            optimizer: randomChoice(optimizers),
+            epochs: 10 + Math.floor(Math.random() * 91)
+          },
+          aggregatedAt: generateTimestamp(30)
+        }
+        
+      case ModelVersionStatus.FAILED:
+        // 失败：可能有部分数据
+        const hasPartialData = Math.random() > 0.5
+        return hasPartialData ? {
+          ...baseData,
+          fileSize: 512000 + Math.floor(Math.random() * 9973760),
+          fileFormat: randomChoice(['pkl', 'h5', 'pth', 'onnx']),
+          parameters: {
+            learning_rate: generateRandomFloat(0.0001, 0.01, 4),
+            batch_size: randomChoice([16, 32, 64, 128]),
+            optimizer: randomChoice(optimizers)
+          }
+        } : baseData
+        
+      default:
+        return baseData
     }
   })
 
@@ -576,14 +703,18 @@ export const generateEvaluationResults = (count: number = 30): EvaluationResult[
     const evaluationId = createMockEvaluationId()
     const modelId = createMockModelId()
     const taskId = randomChoice(taskIds)
+    const accuracy = generateRandomFloat(0.6, 0.99, 4)
+    const loss = generateRandomFloat(0.01, 0.5, 6)
     
     return {
       evaluationId,
       modelId,
       taskId,
+      // ⭐ 核心评估指标作为顶级字段
+      accuracy,
+      loss,
       metrics: {
-        accuracy: generateRandomFloat(0.6, 0.99, 4),
-        loss: generateRandomFloat(0.01, 0.5, 6),
+        // ⭐ 其他评估指标在metrics对象内
         precision: generateRandomFloat(0.6, 0.99, 4),
         recall: generateRandomFloat(0.6, 0.99, 4),
         f1: generateRandomFloat(0.6, 0.99, 4)

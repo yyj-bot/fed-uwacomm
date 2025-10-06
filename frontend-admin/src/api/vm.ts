@@ -6,6 +6,8 @@ import type {
 
 // 创建虚拟机API实例
 const vmApiInstance = createApiInstance('VM')
+// 创建模型API实例（用于本地模型相关接口）
+const modelApiInstance = createApiInstance('MODEL')
 
 // ==================== 类型定义 ====================
 
@@ -83,6 +85,45 @@ interface VMStatus {
   }
   lastHeartbeat?: string
   wsSessionId?: string
+}
+
+// 本地模型结果类型
+interface VMRoundModel {
+  vmRoundModelId: string
+  taskId: string
+  roundNumber: number
+  vmId: string
+  modelJson?: Record<string, unknown>
+  metrics: {
+    accuracy: number
+    loss: number
+    [key: string]: number
+  }
+  createdAt: string
+}
+
+// 本地模型训练指标趋势类型
+interface VMModelTrend {
+  taskId: string
+  vmId: string
+  metric: string
+  trend: Array<{
+    roundNumber: number
+    value: number
+  }>
+}
+
+// 本地模型最佳/离群查询结果类型
+interface VMModelBest {
+  taskId: string
+  metric: string
+  type: 'best' | 'outlier'
+  result: {
+    vmRoundModelId: string
+    roundNumber: number
+    vmId: string
+    value: number
+  }
 }
 
 
@@ -256,6 +297,56 @@ export const vmApi = {
     const response = await vmApiInstance.get<ApiResponse<VMStatus>>(`/vm/${vmId}/status`)
     return response.data.data
   },
+
+  // ==================== 本地模型（VM Round Models）接口 ====================
+  
+  // ==================== 2.1 本地模型结果分页查询 ====================
+  async getVMRoundModels(params: PaginationParams & {
+    taskId?: string
+    roundNumber?: number
+    vmId?: string
+  } = {}): Promise<{
+    total: number
+    pages: number
+    current: number
+    size: number
+    records: VMRoundModel[]
+  }> {
+    const response = await modelApiInstance.get<ApiResponse<{
+      total: number
+      pages: number
+      current: number
+      size: number
+      records: VMRoundModel[]
+    }>>('/model/vm-round-models', { params })
+    return response.data.data
+  },
+
+  // ==================== 2.2 本地模型结果详情查询 ====================
+  async getVMRoundModelDetail(vmRoundModelId: string): Promise<VMRoundModel> {
+    const response = await modelApiInstance.get<ApiResponse<VMRoundModel>>(`/model/vm-round-models/${vmRoundModelId}`)
+    return response.data.data
+  },
+
+  // ==================== 2.3 本地模型训练指标趋势 ====================
+  async getVMModelTrend(params: {
+    taskId: string
+    vmId: string
+    metric: string
+  }): Promise<VMModelTrend> {
+    const response = await modelApiInstance.get<ApiResponse<VMModelTrend>>('/model/vm-round-models/metrics/trend', { params })
+    return response.data.data
+  },
+
+  // ==================== 2.4 本地模型最佳/离群查询 ====================
+  async getVMModelBest(params: {
+    taskId: string
+    metric: string
+    type: 'best' | 'outlier'
+  }): Promise<VMModelBest> {
+    const response = await modelApiInstance.get<ApiResponse<VMModelBest>>('/model/vm-round-models/metrics/best', { params })
+    return response.data.data
+  },
 } as const
 
 // 使用命名导出以保持一致性
@@ -263,5 +354,8 @@ export const vmApi = {
 // 导出类型定义
 export type {
   VirtualMachine,
-  VMStatus
+  VMStatus,
+  VMRoundModel,
+  VMModelTrend,
+  VMModelBest
 }

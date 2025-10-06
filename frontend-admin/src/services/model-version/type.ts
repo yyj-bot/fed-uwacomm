@@ -28,7 +28,7 @@ export type DistributionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAIL
 /**
  * 模型类型枚举
  */
-export type ModelType = 'neural_network' | 'random_forest' | 'svm' | 'linear_regression' | 'logistic_regression'
+export type ModelType = 'NEURAL_NETWORK' | 'RANDOM_FOREST' | 'neural_network' | 'random_forest' | 'svm' | 'linear_regression' | 'logistic_regression'
 
 /**
  * 分发模式枚举
@@ -69,12 +69,17 @@ export interface InitialModelGenerationRequest {
   readonly modelType: ModelType
   /** 模型架构参数 */
   readonly architecture: {
-    readonly inputSize: number
-    readonly hiddenLayers: number[]
-    readonly outputSize: number
-    readonly activationFunction: string
-    readonly optimizer: string
-    readonly learningRate: number
+    // 神经网络参数
+    readonly inputSize?: number
+    readonly hiddenLayers?: number[]
+    readonly outputSize?: number
+    readonly activationFunction?: string
+    readonly optimizer?: string
+    readonly learningRate?: number
+    // 随机森林参数
+    readonly n_estimators?: number
+    readonly n_features?: number
+    readonly task_type?: 'classification' | 'regression'
   }
   /** 随机种子 */
   readonly randomSeed?: number
@@ -349,19 +354,29 @@ export interface ModelVersionDetail {
   readonly aggregationMethod: string
   /** 客户端数量 */
   readonly clientCount: number
-  /** 模型JSON数据 */
-  readonly modelJson: Record<string, unknown>
-  /** 评估指标 */
-  readonly metrics: {
-    readonly accuracy: number
-    readonly loss: number
+  /** ⭐ 核心评估指标（顶级字段） */
+  readonly accuracy: number
+  readonly loss: number
+  /** 状态 */
+  readonly status: string
+  /** 模型描述 */
+  readonly description?: string
+  /** 文件相关字段 */
+  readonly fileSize?: number
+  readonly fileFormat?: string
+  /** ⭐ 其他评估指标（在metrics对象内） */
+  readonly metrics?: {
+    readonly precision?: number
+    readonly recall?: number
+    readonly f1_score?: number
+    readonly [key: string]: unknown
   }
+  /** ⭐ 扩展参数（替代modelJson） */
+  readonly parameters?: Record<string, unknown>
   /** 创建时间 */
   readonly createdAt: string
   /** 聚合完成时间 */
-  readonly aggregatedAt: string
-  /** 状态 */
-  readonly status: string
+  readonly aggregatedAt?: string
 }
 
 /**
@@ -1029,20 +1044,48 @@ export const DISTRIBUTION_MODES = {
   SYNC: 'SYNC'
 } as const
 
-// ==================== 其他需要的类型定义 ====================
+// ==================== 评估和统计相关类型定义 ====================
 
 /**
  * 评估结果类型
+ * 包含模型性能评估的完整信息
  */
 export interface EvaluationResult {
+  /** 评估ID */
   evaluationId: string
+  /** 模型ID */
   modelId: string
-  taskId: string
-  metrics: Record<string, number>
+  /** 任务ID (可选) */
+  taskId?: string
+  /** 准确率 - 核心评估指标（顶级字段）⭐ */
+  accuracy: number
+  /** 损失值 - 核心评估指标（顶级字段）⭐ */
+  loss: number
+  /** 其他评估指标 - 在metrics对象内 ⭐ */
+  metrics: {
+    /** 精确率 */
+    precision?: number
+    /** 召回率 */
+    recall?: number
+    /** F1分数 */
+    f1?: number
+    /** 其他自定义指标 */
+    [key: string]: number | undefined
+  }
+  /** 评估耗时（秒） */
   evaluationTime: number
+  /** 测试样本数 */
   testSamples: number
+  /** 评估状态 */
   status: string
+  /** 创建时间 */
   createdAt: string
+  /** 测试数据路径 (可选) */
+  testDataPath?: string
+  /** 批次大小 (可选) */
+  batchSize?: number
+  /** 计算设备 (可选) */
+  device?: string
 }
 
 
