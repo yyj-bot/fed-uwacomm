@@ -590,9 +590,11 @@ const InitialModelPage: React.FC = () => {
   }
 
   // 查看分发详情
-  const handleViewDistributionDetail = (distributionId: string) => {
+  const handleViewDistributionDetail = async (distributionId: string) => {
     setSelectedDistributionId(distributionId)
     setDistributionDetailModalVisible(true)
+    // 立即获取最新的分发详情数据
+    await fetchDistributionStatus(distributionId)
   }
 
   // 刷新分发状态
@@ -1001,12 +1003,11 @@ const InitialModelPage: React.FC = () => {
                     label="激活函数"
                     name="activationFunction"
                     rules={[{ required: true, message: '请选择激活函数' }]}
+                    tooltip="神经网络激活函数，根据后端支持的选项"
                   >
-                    <Select>
+                    <Select placeholder="请选择激活函数">
                       <Option value="relu">ReLU</Option>
                       <Option value="sigmoid">Sigmoid</Option>
-                      <Option value="tanh">Tanh</Option>
-                      <Option value="softmax">Softmax</Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1015,12 +1016,11 @@ const InitialModelPage: React.FC = () => {
                     label="优化器"
                     name="optimizer"
                     rules={[{ required: true, message: '请选择优化器' }]}
+                    tooltip="神经网络优化器，根据后端支持的选项"
                   >
-                    <Select>
+                    <Select placeholder="请选择优化器">
                       <Option value="adam">Adam</Option>
                       <Option value="sgd">SGD</Option>
-                      <Option value="rmsprop">RMSprop</Option>
-                      <Option value="adagrad">Adagrad</Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1282,10 +1282,10 @@ const InitialModelPage: React.FC = () => {
             label="分发模式"
             name="distributionMode"
             rules={[{ required: true, message: '请选择分发模式' }]}
+            tooltip="模型将异步分发到各个虚拟机节点"
           >
-            <Select>
+            <Select disabled>
               <Option value="ASYNC">异步分发</Option>
-              <Option value="SYNC">同步分发</Option>
             </Select>
           </Form.Item>
 

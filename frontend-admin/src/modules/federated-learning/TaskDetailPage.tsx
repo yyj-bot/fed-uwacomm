@@ -211,16 +211,16 @@ const TaskDetailPage: React.FC = () => {
 
   // 获取训练轮次数据
   const getTrainingRoundsData = useCallback(() => {
-    // 由于类型定义中没有trainingHistory，暂时返回模拟数据
     if (!currentTask) return []
     
-    return [
-      { round: 1, accuracy: 0.65, loss: 0.8 },
-      { round: 2, accuracy: 0.72, loss: 0.6 },
-      { round: 3, accuracy: 0.78, loss: 0.5 },
-      { round: 4, accuracy: 0.82, loss: 0.4 },
-      { round: 5, accuracy: 0.85, loss: 0.35 }
-    ]
+    // 从任务状态中获取真实的训练轮次数据
+    // 如果任务对象包含 trainingHistory 或类似字段，从中提取数据
+    // 否则返回空数组，等待后端返回真实数据
+    if ('trainingHistory' in currentTask && Array.isArray((currentTask as any).trainingHistory)) {
+      return (currentTask as any).trainingHistory
+    }
+    
+    return []
   }, [currentTask])
 
   // 参与者表格列定义

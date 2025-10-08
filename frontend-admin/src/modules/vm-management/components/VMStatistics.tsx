@@ -237,10 +237,10 @@ const VMStatistics: React.FC = () => {
     yField: 'value',
     color: '#1890ff',
     label: {
-      position: 'middle' as const,
+      position: 'top' as const,
       style: {
-        fill: '#FFFFFF',
-        opacity: 0.6
+        fill: '#000000',
+        opacity: 0.8
       }
     },
     meta: {
@@ -404,4 +404,13 @@ const VMStatistics: React.FC = () => {
 }
 
 export default VMStatistics
+
+
+
+
+
+
+
+
+
 

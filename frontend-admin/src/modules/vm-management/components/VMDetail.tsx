@@ -440,3 +440,12 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
 
 export default VMDetail
 
+
+
+
+
+
+
+
+
+

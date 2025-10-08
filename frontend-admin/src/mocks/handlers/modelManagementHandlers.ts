@@ -691,34 +691,19 @@ export const modelManagementHandlers = [
 
   // ==================== 模型删除接口 ====================
 
-  // 9.1 模型版本删除
-  http.delete('/api/model/versions/:modelId', async ({ params, request }) => {
-    const { modelId } = params
-    const body = await request.json() as any
-
-    const model = mockModelVersions.find(v => v.modelId === modelId)
-    
-    if (!model) {
-      return HttpResponse.json({
-        code: 404,
-        message: '模型不存在',
-        data: null
-      }, { status: 404 })
-    }
-
-    return HttpResponse.json({
-      code: 200,
-      message: '删除成功',
-      data: {
-        modelId,
-        deletedAt: new Date().toISOString()
-      }
-    })
-  }),
-
-  // 9.2 批量模型删除
+  // 9.2 批量模型删除 (必须在 :modelId 之前，避免路由冲突)
   http.delete('/api/model/versions/batch', async ({ request }) => {
-    const body = await request.json() as any
+    let body: any
+    try {
+      const text = await request.text()
+      body = text ? JSON.parse(text) : {}
+    } catch (error) {
+      return HttpResponse.json({
+        code: 400,
+        message: '请求体解析失败',
+        data: null
+      }, { status: 400 })
+    }
     
     if (!body.modelIds || body.modelIds.length === 0) {
       return HttpResponse.json({
@@ -739,6 +724,37 @@ export const modelManagementHandlers = [
           status: 'DELETED',
           message: '删除成功'
         }))
+      }
+    })
+  }),
+
+  // 9.1 模型版本删除 (放在batch之后，避免路由冲突)
+  http.delete('/api/model/versions/:modelId', async ({ params, request }) => {
+    const { modelId } = params
+    let body: any
+    try {
+      const text = await request.text()
+      body = text ? JSON.parse(text) : {}
+    } catch (error) {
+      body = {}
+    }
+
+    const model = mockModelVersions.find(v => v.modelId === modelId)
+    
+    if (!model) {
+      return HttpResponse.json({
+        code: 404,
+        message: '模型不存在',
+        data: null
+      }, { status: 404 })
+    }
+
+    return HttpResponse.json({
+      code: 200,
+      message: '删除成功',
+      data: {
+        modelId,
+        deletedAt: new Date().toISOString()
       }
     })
   }),
@@ -804,10 +820,66 @@ export const modelManagementHandlers = [
     const taskId = url.searchParams.get('taskId')
     const timeRange = url.searchParams.get('timeRange') || '7d'
 
+    // 根据timeRange确定天数和时间范围
+    let days = 7
+    if (timeRange === '30d') days = 30
+    else if (timeRange === '90d') days = 90
+    
+    // 计算时间范围的起始时间
+    const startTime = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    
+    // 筛选模型：1. 按任务ID筛选（可选） 2. 按时间范围筛选
+    let filteredModels = mockModelVersions.filter(m => {
+      // 如果指定了taskId，必须匹配
+      if (taskId && m.taskId !== taskId) return false
+      
+      // 按时间范围筛选：只统计timeRange天数内创建的模型
+      const modelCreateTime = new Date(m.createdAt)
+      return modelCreateTime >= startTime
+    })
+    
+    // 计算统计数据
+    const totalModels = filteredModels.length
+    const avgAccuracy = filteredModels.reduce((sum, m) => sum + (m.accuracy || 0), 0) / (totalModels || 1)
+    const avgLoss = filteredModels.reduce((sum, m) => sum + (m.loss || 0), 0) / (totalModels || 1)
+    
+    // 生成上传趋势数据（按天统计）
+    const uploadTrendMap = new Map<string, number>()
+    filteredModels.forEach(m => {
+      const dateStr = m.createdAt.split('T')[0]
+      uploadTrendMap.set(dateStr, (uploadTrendMap.get(dateStr) || 0) + 1)
+    })
+    
+    // 生成准确率趋势（按轮次统计）
+    const accuracyByRound = filteredModels
+      .filter(m => m.accuracy !== undefined)
+      .sort((a, b) => a.roundNumber - b.roundNumber)
+      .slice(0, 20) // 最多显示20个轮次
+    
+    // 生成动态统计数据
+    const statistics = {
+      totalModels,
+      averageAccuracy: avgAccuracy || 0,
+      averageLoss: avgLoss || 0,
+      uploadTrend: Array.from({ length: days }, (_, i) => {
+        const date = new Date(Date.now() - (days - i - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        return {
+          date,
+          count: uploadTrendMap.get(date) || 0
+        }
+      }),
+      accuracyTrend: accuracyByRound.length > 0 
+        ? accuracyByRound.map(m => ({
+            roundNumber: m.roundNumber,
+            accuracy: m.accuracy || 0
+          }))
+        : [] // 没有数据时返回空数组，不要生成假数据
+    }
+
     return HttpResponse.json({
       code: 200,
       message: '查询成功',
-      data: mockModelStatistics
+      data: statistics
     })
   }),
 

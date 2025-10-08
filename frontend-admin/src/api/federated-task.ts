@@ -130,34 +130,12 @@ interface AvailableVM {
   name: string
   ipAddress: string
   status: 'RUNNING' | 'STOPPED' | 'PAUSED' | 'ERROR'
-  connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
-  osType: string
   resources: {
     cpuCores: number
     memoryMb: number
-    diskGb: number
     gpuCount: number
-    gpuMemoryMb: number
   }
-  capabilities: string[]
-  supportedAlgorithms: string[]
-  currentUsage: {
-    cpuUsage: number
-    memoryUsage: number
-    networkUsage: number
-  }
-  networkInfo: {
-    bandwidth: number
-    latency: number
-    uploadSpeed: number
-    downloadSpeed: number
-  }
-  lastHeartbeat: string
-  reliability: {
-    uptime: number
-    avgResponseTime: number
-    taskSuccessRate: number
-  }
+  capabilities: string[]  // 例如: ["GPU", "HIGH_MEMORY"]
 }
 
 // 数据集类型

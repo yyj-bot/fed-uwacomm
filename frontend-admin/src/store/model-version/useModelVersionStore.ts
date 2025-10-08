@@ -18,6 +18,7 @@ import type {
   TaskStatistics,
   ModelVersionListParams,
   EvaluationRequest,
+  BatchEvaluationRequest,
   RollbackRequest,
   DownloadRequest,
   DeleteModelRequest,
@@ -53,6 +54,7 @@ export const useModel = () => {
   
   const evaluationResults = useModelStore((state) => state.evaluationResults)
   const evaluationLoading = useModelStore((state) => state.evaluationLoading)
+  const evaluationResultsLoading = useModelStore((state) => state.evaluationResultsLoading)
   
   const rollbackHistory = useModelStore((state) => state.rollbackHistory)
   const rollbackLoading = useModelStore((state) => state.rollbackLoading)
@@ -91,6 +93,7 @@ export const useModel = () => {
   const setCurrentModelAction = useModelStore((state) => state.setCurrentModel)
   const fetchTaskModelsAction = useModelStore((state) => state.fetchTaskModels)
   const evaluateModelAction = useModelStore((state) => state.evaluateModel)
+  const batchEvaluateModelsAction = useModelStore((state) => state.batchEvaluateModels)
   const fetchEvaluationResultsAction = useModelStore((state) => state.fetchEvaluationResults)
   const rollbackModelAction = useModelStore((state) => state.rollbackModel)
   const fetchRollbackHistoryAction = useModelStore((state) => state.fetchRollbackHistory)
@@ -191,6 +194,19 @@ export const useModel = () => {
       return { success: false, error: errorMessage }
     }
   }, [evaluateModelAction])
+
+  /**
+   * 批量评估模型
+   */
+  const batchEvaluateModels = useCallback(async (request: BatchEvaluationRequest) => {
+    try {
+      await batchEvaluateModelsAction(request)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '批量评估失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [batchEvaluateModelsAction])
 
   /**
    * 获取评估结果
@@ -659,6 +675,7 @@ export const useModel = () => {
     taskModelsLoading,
     evaluationResults,
     evaluationLoading,
+    evaluationResultsLoading,
     rollbackHistory,
     rollbackLoading,
     modelStatistics,
@@ -689,6 +706,7 @@ export const useModel = () => {
     setCurrentModel,
     fetchTaskModels,
     evaluateModel,
+    batchEvaluateModels,
     fetchEvaluationResults,
     rollbackModel,
     fetchRollbackHistory,

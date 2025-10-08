@@ -210,89 +210,36 @@ const TaskCreatePage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      // 🔧 修复：使用真实API获取VM列表，而不是模拟数据
-      const { vmApi } = await import('@/api/vm')
-      console.log('🔄 开始获取VM列表...')
+      // ✅ 修复：使用联邦学习专用接口获取可用VM列表
+      const { federatedTask } = await import('@/api/federated-task')
+      console.log('🔄 开始获取联邦学习可用VM列表...')
       
-      let vmListResponse = await vmApi.getVMList({ 
-        page: 1, 
-        size: 100,  // 获取所有可用的VM
+      const vmListResponse = await federatedTask.getAvailableVMs({ 
         status: 'RUNNING'  // 只获取运行中的VM
       })
       
-      console.log('📋 VM API原始响应:', vmListResponse)
-      console.log('📋 响应数据类型:', typeof vmListResponse)
-      console.log('📋 list字段:', vmListResponse?.list)
-      console.log('📋 list是否为数组:', Array.isArray(vmListResponse?.list))
+      console.log('📋 联邦学习VM API原始响应:', vmListResponse)
+      console.log('📋 响应数据:', vmListResponse?.availableVms)
+      console.log('📋 VM总数:', vmListResponse?.total)
       
       // 检查返回数据格式
-      if (!vmListResponse || !vmListResponse.list || !Array.isArray(vmListResponse.list)) {
-        console.warn('⚠️ VM API返回数据格式错误，尝试直接使用响应数据')
-        
-        // 如果vmListResponse本身就是数组，直接使用
-        if (Array.isArray(vmListResponse)) {
-          console.log('📋 检测到vmListResponse本身是数组，直接使用')
-          vmListResponse = { 
-            total: vmListResponse.length,
-            page: 1,
-            size: vmListResponse.length,
-            pages: 1,
-            list: vmListResponse 
-          }
-        } else {
-          throw new Error(`VM API返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
-        }
+      if (!vmListResponse || !Array.isArray(vmListResponse.availableVms)) {
+        throw new Error(`联邦学习VM API返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
       }
       
       // 检查是否有VM数据
-      if (vmListResponse.list.length === 0) {
-        console.warn('⚠️ 后端VM表为空，没有可用的虚拟机')
-        throw new Error('后端没有可用的虚拟机数据，请先添加虚拟机')
+      if (vmListResponse.availableVms.length === 0) {
+        console.warn('⚠️ 没有可用于联邦学习的虚拟机')
+        throw new Error('没有可用于联邦学习的虚拟机，请先添加并启动虚拟机')
       }
       
-      // 转换API数据格式为前端需要的格式
-      const convertedVMs: AvailableVM[] = vmListResponse.list.map(vm => ({
-        vmId: vm.vmId,  // 🎯 使用真实的VM ID（32位UUID格式）
-        name: vm.name,
-        ipAddress: vm.ipAddress,
-        status: vm.status === 'STARTING' || vm.status === 'STOPPING' || vm.status === 'OFFLINE' ? 'STOPPED' : vm.status as 'RUNNING' | 'STOPPED' | 'ERROR' | 'PAUSED',
-        connectionStatus: vm.connectionStatus,
-        osType: vm.osType,
-        supportedAlgorithms: vm.capabilities?.supportedAlgorithms || ['FEDERATED_AVERAGING'],
-        currentUsage: { 
-          cpuUsage: Math.random() * 50 + 10,  // 模拟当前使用率
-          memoryUsage: Math.random() * 60 + 20, 
-          networkUsage: Math.random() * 30 + 10 
-        },
-        resources: { 
-          cpuCores: vm.cpuCores, 
-          memoryMb: vm.memoryMb, 
-          diskGb: vm.diskGb, 
-          gpuCount: vm.capabilities?.gpuMemory ? 1 : 0,
-          gpuMemoryMb: vm.capabilities?.gpuMemory || 0
-        },
-        capabilities: vm.capabilities?.gpuMemory ? ['GPU'] : ['CPU_ONLY'],
-        networkInfo: { 
-          bandwidth: vm.networkConfig?.bandwidth || 1000,
-          latency: vm.networkConfig?.latency || 10,
-          uploadSpeed: vm.networkConfig?.uploadSpeed || 800,
-          downloadSpeed: vm.networkConfig?.downloadSpeed || 1000
-        },
-        reliability: { 
-          uptime: 99.0 + Math.random() * 1,  // 模拟可靠性数据
-          avgResponseTime: 100 + Math.random() * 100,
-          taskSuccessRate: 95 + Math.random() * 5
-        },
-        lastHeartbeat: vm.lastHeartbeat || new Date().toISOString()
-      }))
+      // 直接使用后端返回的数据（已经是 AvailableVM 格式）
+      setAvailableVMs(vmListResponse.availableVms)
       
-      setAvailableVMs(convertedVMs)
+      console.log('✅ 成功加载联邦学习可用VM数据:', vmListResponse.availableVms.length, '个VM')
+      console.log('VM IDs:', vmListResponse.availableVms.map(vm => vm.vmId))
       
-      console.log('✅ 成功加载真实VM数据:', convertedVMs.length, '个VM')
-      console.log('VM IDs:', convertedVMs.map(vm => vm.vmId))
-      
-      // 🔧 修复：使用真实API获取数据集列表，而不是模拟数据
-      const { federatedTask } = await import('@/api/federated-task')
+      // ✅ 使用联邦学习API获取数据集列表
       console.log('🔄 开始获取数据集列表...')
       
       let datasetsResponse = await federatedTask.getAvailableDatasets({
@@ -368,119 +315,20 @@ const TaskCreatePage: React.FC = () => {
       }
       
     } catch (error) {
-      console.error('❌ 加载数据失败，使用备用模拟数据:', error)
+      console.error('❌ 加载数据失败:', error)
       console.error('❌ 错误详情:', {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         errorType: typeof error
       })
       
-      // 🚨 备用方案：如果API失败，使用模拟数据（包含多台虚拟机以支持联邦学习）
-      console.warn('⚠️ 无法获取真实VM数据，使用备用模拟数据。请检查后端VM API接口。')
+      // API失败时显示空列表
+      console.warn('⚠️ 无法获取数据，请检查后端API接口或网络连接')
+      setAvailableVMs([])
+      setAvailableDatasets([])
+      setAlgorithmTemplates([])
       
-      setAvailableVMs([
-        {
-          vmId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',  // 32位UUID格式
-          name: '备用水声联邦学习节点-001',
-          ipAddress: '192.168.1.100',
-          status: 'RUNNING' as const,
-          connectionStatus: 'CONNECTED',
-          osType: 'Ubuntu 20.04',
-          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_PROXIMAL'],
-          currentUsage: { cpuUsage: 25.5, memoryUsage: 42.3, networkUsage: 15.8 },
-          resources: { cpuCores: 8, memoryMb: 16384, diskGb: 500, gpuCount: 1, gpuMemoryMb: 8192 },
-          capabilities: ['GPU'],
-          networkInfo: { bandwidth: 1000, latency: 5, uploadSpeed: 800, downloadSpeed: 1000 },
-          reliability: { uptime: 99.9, avgResponseTime: 120, taskSuccessRate: 98.5 },
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          vmId: 'b2c3d4e5-f6g7-8901-bcde-f23456789012',
-          name: '备用水声联邦学习节点-002',
-          ipAddress: '192.168.1.101',
-          status: 'RUNNING' as const,
-          connectionStatus: 'CONNECTED',
-          osType: 'Ubuntu 22.04',
-          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_NOVA'],
-          currentUsage: { cpuUsage: 32.1, memoryUsage: 38.7, networkUsage: 22.3 },
-          resources: { cpuCores: 6, memoryMb: 12288, diskGb: 300, gpuCount: 0, gpuMemoryMb: 0 },
-          capabilities: ['CPU_ONLY'],
-          networkInfo: { bandwidth: 1000, latency: 8, uploadSpeed: 750, downloadSpeed: 950 },
-          reliability: { uptime: 98.7, avgResponseTime: 150, taskSuccessRate: 96.2 },
-          lastHeartbeat: new Date().toISOString()
-        },
-        {
-          vmId: 'c3d4e5f6-g7h8-9012-cdef-345678901234',
-          name: '备用水声联邦学习节点-003',
-          ipAddress: '192.168.1.102',
-          status: 'RUNNING' as const,
-          connectionStatus: 'CONNECTED',
-          osType: 'CentOS 7',
-          supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_SCAFFOLD'],
-          currentUsage: { cpuUsage: 18.9, memoryUsage: 55.2, networkUsage: 12.1 },
-          resources: { cpuCores: 4, memoryMb: 8192, diskGb: 200, gpuCount: 1, gpuMemoryMb: 4096 },
-          capabilities: ['GPU'],
-          networkInfo: { bandwidth: 500, latency: 12, uploadSpeed: 400, downloadSpeed: 480 },
-          reliability: { uptime: 99.2, avgResponseTime: 180, taskSuccessRate: 94.8 },
-          lastHeartbeat: new Date().toISOString()
-        }
-      ])
-      
-      // 备用数据集数据
-      console.warn('⚠️ 无法获取真实数据集数据，使用备用模拟数据。请检查后端数据集API接口。')
-      
-      setAvailableDatasets([
-        {
-          datasetId: 'backup-dataset-001',
-          name: '备用水声数据集',
-          description: '备用数据集，用于API失败时的降级处理',
-          dataType: 'ACOUSTIC',
-          features: { 
-            featureColumns: ['depth', 'temperature', 'salinity'], 
-            targetColumn: 'transmission_loss',
-            numericFeatures: 3,
-            categoricalFeatures: 0
-          },
-          quality: { 
-            completeness: 0.90, 
-            consistency: 0.85, 
-            accuracy: 0.80,
-            missingValues: 0.10,
-            duplicates: 0.05,
-            outliers: 0.05
-          },
-          status: 'READY',
-          statistics: { totalRows: 1000, totalColumns: 10, fileSize: 1048576, fileSizeFormatted: '1MB' },
-          metadata: { source: 'Backup', version: 'v1.0', sampleRate: 44100, frequency: '1-5kHz', environment: 'Test' },
-          uploadTime: new Date().toISOString(),
-          uploadedBy: 'system',
-          tags: ['backup', 'test']
-        }
-      ])
-      
-      // 备用算法模板
-      console.warn('⚠️ 无法获取真实算法模板，使用备用模拟数据。请检查后端算法模板API接口。')
-      
-      setAlgorithmTemplates([
-        {
-          algorithm: 'FEDERATED_AVERAGING',
-          name: '联邦平均算法（备用）',
-          description: '备用算法模板',
-          applicableTaskTypes: ['CLASSIFICATION', 'REGRESSION'],
-          parameterRanges: {
-            learningRate: { min: 0.001, max: 0.1, recommended: [0.01] },
-            batchSize: { min: 8, max: 128, recommended: [32] }
-          },
-          defaultHyperparameters: {
-            learningRate: 0.01,
-            batchSize: 32,
-            epochs: 10,
-            rounds: 20,
-            minParticipants: 2,
-            aggregationMethod: 'WEIGHTED_AVERAGE'
-          }
-        }
-      ])
+      message.error('加载初始数据失败，请检查网络连接或联系管理员')
     }
   }
 
@@ -976,11 +824,11 @@ const TaskCreatePage: React.FC = () => {
       dataIndex: 'capabilities',
       key: 'capabilities',
       render: (capabilities: string[]) => (
-                        <Space wrap>
-                          {capabilities.map(cap => (
-                            <Tag key={cap}>{cap}</Tag>
-                          ))}
-                        </Space>
+        <Space wrap>
+          {capabilities.map(cap => (
+            <Tag key={cap}>{cap}</Tag>
+          ))}
+        </Space>
       )
     }
   ]
@@ -1257,7 +1105,7 @@ const TaskCreatePage: React.FC = () => {
                               <div>
                                 <div style={{ fontWeight: 'bold' }}>{vm?.name || vmId}</div>
                                 <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                                  {vm?.resources.cpuCores}核 | {vm?.resources.memoryMb}MB | {vm?.capabilities?.join(', ')}
+                                  {vm?.resources.cpuCores}核 | {vm?.resources.memoryMb}MB | {vm?.capabilities.join(', ')}
                                 </div>
                               </div>
                               <Form.Item

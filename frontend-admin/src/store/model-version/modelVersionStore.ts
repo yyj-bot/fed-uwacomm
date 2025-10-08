@@ -31,6 +31,7 @@ import type {
 import type { 
   ModelVersionListParams,
   EvaluationRequest,
+  BatchEvaluationRequest,
   DownloadRequest,
   DeleteModelRequest,
   StatisticsParams
@@ -79,6 +80,7 @@ interface ModelState {
   // 评估结果
   evaluationResults: Record<string, EvaluationResult[]>
   evaluationLoading: Record<string, boolean>
+  evaluationResultsLoading: boolean
   
   // 回滚历史
   rollbackHistory: RollbackInfo[]
@@ -141,7 +143,8 @@ interface ModelActions {
   
   // 模型评估操作
   evaluateModel: (modelId: string, request: EvaluationRequest) => Promise<void>
-  fetchEvaluationResults: (modelId: string) => Promise<void>
+  batchEvaluateModels: (request: BatchEvaluationRequest) => Promise<any>
+  fetchEvaluationResults: (modelId?: string) => Promise<void>
   
   // 模型回滚操作
   rollbackModel: (rollbackData: RollbackRequest) => Promise<void>
@@ -209,6 +212,7 @@ const initialState: ModelState = {
   
   evaluationResults: {},
   evaluationLoading: {},
+  evaluationResultsLoading: false,
   
   rollbackHistory: [],
   rollbackLoading: false,
@@ -699,6 +703,8 @@ export const useModelStore = create<ModelStore>((set, get) => ({
    * 获取评估结果
    */
   fetchEvaluationResults: async (modelId?: string) => {
+    set({ evaluationResultsLoading: true })
+    
     try {
       const params = modelId ? { modelId } : { page: 1, size: 50 }
       const response = await modelVersionService.getEvaluationResults(params)
@@ -709,7 +715,8 @@ export const useModelStore = create<ModelStore>((set, get) => ({
           evaluationResults: {
             ...state.evaluationResults,
             [modelId]: response.records
-          }
+          },
+          evaluationResultsLoading: false
         }))
       } else {
         // 存储所有评估结果，按模型ID分组
@@ -725,11 +732,58 @@ export const useModelStore = create<ModelStore>((set, get) => ({
           evaluationResults: {
             ...state.evaluationResults,
             ...groupedResults
-          }
+          },
+          evaluationResultsLoading: false
         }))
       }
     } catch (error) {
       console.error(`获取评估结果失败 (${modelId || 'all'}):`, error)
+      set({ evaluationResultsLoading: false })
+    }
+  },
+
+  /**
+   * 批量评估模型
+   */
+  batchEvaluateModels: async (request: BatchEvaluationRequest) => {
+    set((state) => ({
+      evaluationLoading: {
+        ...state.evaluationLoading,
+        [`batch-${request.taskId}`]: true
+      },
+      operationError: {
+        ...state.operationError,
+        [`batch-evaluate-${request.taskId}`]: null
+      }
+    }))
+    
+    try {
+      const response = await modelVersionService.evaluateModelBatch(request)
+      
+      set((state) => ({
+        evaluationLoading: {
+          ...state.evaluationLoading,
+          [`batch-${request.taskId}`]: false
+        }
+      }))
+      
+      // 批量评估完成后，刷新评估结果
+      await get().fetchEvaluationResults()
+      
+      return response
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '批量评估失败'
+      set((state) => ({
+        evaluationLoading: {
+          ...state.evaluationLoading,
+          [`batch-${request.taskId}`]: false
+        },
+        operationError: {
+          ...state.operationError,
+          [`batch-evaluate-${request.taskId}`]: errorMessage
+        }
+      }))
+      throw error
     }
   },
 

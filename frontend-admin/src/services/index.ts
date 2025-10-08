@@ -94,6 +94,7 @@ export type {
   ModelVersionService,
   ModelVersionListParams,
   EvaluationRequest,
+  BatchEvaluationRequest,
   RollbackRequest,
   ModelVersionServiceConfig,
   ModelVersionDetail,

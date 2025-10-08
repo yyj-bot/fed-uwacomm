@@ -20,8 +20,7 @@ import {
 // 模型管理相关页面
 import {
   InitialModelPage,
-  VersionManagementPage,
-  DeploymentPage
+  VersionManagementPage
 } from '@/modules/model-management'
 
 // 联邦学习相关页面
@@ -168,7 +167,7 @@ const App: React.FC = () => {
                       <Route path="/models" element={<Navigate to="/models/initial" replace />} />
                       <Route path="/models/initial" element={<InitialModelPage />} />
                       <Route path="/models/versions" element={<VersionManagementPage />} />
-                      <Route path="/models/deployment" element={<DeploymentPage />} />
+                      {/* 部署运维功能已合并到版本管理页面 */}
                       
                       {/* VM管理路由 */}
                       <Route path="/vm-management" element={<VMManagementPage />} />

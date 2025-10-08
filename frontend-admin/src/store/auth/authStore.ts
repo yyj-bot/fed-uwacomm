@@ -7,6 +7,7 @@
  */
 
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { userService } from '@/services'
 import type { 
   User, 
@@ -90,30 +91,32 @@ const initializeState = (): Pick<AuthState, 'isAuthenticated' | 'token' | 'refre
   return { isAuthenticated, token, refreshToken }
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => {
-  const initialState = initializeState()
-  
-  return {
-    // ==================== 初始状态 ====================
-    isAuthenticated: initialState.isAuthenticated,
-    isLoading: false,
-    error: null,
-    user: null,
-    token: initialState.token,
-    refreshToken: initialState.refreshToken,
-    loginStatus: 'idle',
-    registerStatus: 'idle',
-    updateProfileStatus: 'idle',
-    changePasswordStatus: 'idle',
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => {
+      const initialState = initializeState()
+      
+      return {
+        // ==================== 初始状态 ====================
+        isAuthenticated: initialState.isAuthenticated,
+        isLoading: false,
+        error: null,
+        user: null,
+        token: initialState.token,
+        refreshToken: initialState.refreshToken,
+        loginStatus: 'idle',
+        registerStatus: 'idle',
+        updateProfileStatus: 'idle',
+        changePasswordStatus: 'idle',
 
-    // ==================== 登录相关操作 ====================
-    
-    /**
-     * 用户登录
-     */
-    login: async (loginData: LoginRequest) => {
-      console.log('🔐 开始登录流程:', loginData.loginIdentifier)
-      set({ isLoading: true, loginStatus: 'logging', error: null })
+        // ==================== 登录相关操作 ====================
+        
+        /**
+         * 用户登录
+         */
+        login: async (loginData: LoginRequest) => {
+          console.log('🔐 开始登录流程:', loginData.loginIdentifier)
+          set({ isLoading: true, loginStatus: 'logging', error: null })
       
       try {
         console.log('📡 调用userService.login')
@@ -484,8 +487,20 @@ export const useAuthStore = create<AuthStore>((set, get) => {
         })
       }
     }
-  }
-})
+      }
+    },
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+        token: state.token,
+        refreshToken: state.refreshToken,
+      }),
+    }
+  )
+)
 
 // ==================== 导出类型 ====================
 export type { AuthState, AuthActions, AuthStore }

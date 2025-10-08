@@ -110,14 +110,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: '模型管理',
       children: [
         { key: '/models/initial', label: '初始模型' },
-        { key: '/models/versions', label: '版本管理' },
-        { key: '/models/deployment', label: '部署运维' }
+        { key: '/models/versions', label: '版本管理' }
       ]
     },
     {
       key: '/vm-management',
       icon: <DesktopOutlined />,
-      label: 'VM管理'
+      label: '虚拟机管理'
     },
     {
       key: '/training-data',

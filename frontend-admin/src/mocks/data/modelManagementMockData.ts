@@ -604,6 +604,10 @@ export const generateModelVersions = (count: number = 50): ModelVersionInfo[] =>
     const roundNumber = 1 + Math.floor(Math.random() * 100)
     const status = randomChoice(Object.values(ModelVersionStatus))
     
+    // 随机分散创建时间：在过去90天内随机分布
+    const randomDaysAgo = Math.floor(Math.random() * 90)
+    const randomHoursOffset = Math.floor(Math.random() * 24) - 12 // -12到+12小时
+    
     // 基础字段（所有状态都有）
     const baseData = {
       modelId,
@@ -613,7 +617,7 @@ export const generateModelVersions = (count: number = 50): ModelVersionInfo[] =>
       clientCount: 3 + Math.floor(Math.random() * 18),
       status,
       description: `第${roundNumber}轮模型`,
-      createdAt: generateTimestamp(30)
+      createdAt: generateTimestamp(randomDaysAgo, randomHoursOffset)
     }
     
     // 根据状态决定包含哪些数据
@@ -675,7 +679,7 @@ export const generateModelVersions = (count: number = 50): ModelVersionInfo[] =>
             optimizer: randomChoice(optimizers),
             epochs: 10 + Math.floor(Math.random() * 91)
           },
-          aggregatedAt: generateTimestamp(30)
+          aggregatedAt: generateTimestamp(randomDaysAgo, randomHoursOffset + 1) // 聚合时间稍晚于创建时间
         }
         
       case ModelVersionStatus.FAILED:

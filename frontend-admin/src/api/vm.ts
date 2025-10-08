@@ -318,13 +318,13 @@ export const vmApi = {
       current: number
       size: number
       records: VMRoundModel[]
-    }>>('/model/vm-round-models', { params })
+    }>>('/vm-round-models', { params })
     return response.data.data
   },
 
   // ==================== 2.2 本地模型结果详情查询 ====================
   async getVMRoundModelDetail(vmRoundModelId: string): Promise<VMRoundModel> {
-    const response = await modelApiInstance.get<ApiResponse<VMRoundModel>>(`/model/vm-round-models/${vmRoundModelId}`)
+    const response = await modelApiInstance.get<ApiResponse<VMRoundModel>>(`/vm-round-models/${vmRoundModelId}`)
     return response.data.data
   },
 
@@ -334,7 +334,7 @@ export const vmApi = {
     vmId: string
     metric: string
   }): Promise<VMModelTrend> {
-    const response = await modelApiInstance.get<ApiResponse<VMModelTrend>>('/model/vm-round-models/metrics/trend', { params })
+    const response = await modelApiInstance.get<ApiResponse<VMModelTrend>>('/vm-round-models/metrics/trend', { params })
     return response.data.data
   },
 
@@ -344,7 +344,7 @@ export const vmApi = {
     metric: string
     type: 'best' | 'outlier'
   }): Promise<VMModelBest> {
-    const response = await modelApiInstance.get<ApiResponse<VMModelBest>>('/model/vm-round-models/metrics/best', { params })
+    const response = await modelApiInstance.get<ApiResponse<VMModelBest>>('/vm-round-models/metrics/best', { params })
     return response.data.data
   },
 } as const
