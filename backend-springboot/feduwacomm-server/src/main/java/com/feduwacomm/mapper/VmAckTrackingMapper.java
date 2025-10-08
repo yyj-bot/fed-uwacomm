@@ -21,10 +21,10 @@ public interface VmAckTrackingMapper {
      */
     @Insert("""
         INSERT INTO vm_ack_tracking (
-            task_id, round_number, vm_id, ack_type, status, message_type, message_id,
+            task_id, round_number, vm_id, ack_type, status, message_id,
             ack_data, error_message, acknowledged_at, timeout_at
         ) VALUES (
-            #{taskId}, #{roundNumber}, #{vmId}, #{ackType}, #{status}, #{messageType}, #{messageId},
+            #{taskId}, #{roundNumber}, #{vmId}, #{ackType}, #{status}, #{messageId},
             #{ackData}, #{errorMessage}, #{acknowledgedAt}, #{timeoutAt}
         )
     """)
@@ -170,14 +170,33 @@ public interface VmAckTrackingMapper {
     int deleteByVmId(@Param("vmId") String vmId);
 
     /**
-     * 根据任务ID和消息类型查询ACK记录
+     * 根据任务ID和确认类型查询ACK记录
      */
     @Select("""
         SELECT * FROM vm_ack_tracking
         WHERE task_id = #{taskId}
-        AND message_type = #{messageType}
+        AND ack_type = #{ackType}
         ORDER BY created_at DESC
     """)
-    List<VmAckTracking> findByTaskIdAndMessageType(@Param("taskId") String taskId,
-                                                   @Param("messageType") String messageType);
+    List<VmAckTracking> findByTaskIdAndAckType(@Param("taskId") String taskId,
+                                              @Param("ackType") String ackType);
+
+    /**
+     * 根据任务ID查询所有ACK记录
+     */
+    @Select("""
+        SELECT * FROM vm_ack_tracking
+        WHERE task_id = #{taskId}
+        ORDER BY created_at DESC
+    """)
+    List<VmAckTracking> findByTaskId(@Param("taskId") String taskId);
+
+    /**
+     * 查询所有ACK跟踪记录（用于缓存预热）
+     */
+    @Select("""
+        SELECT * FROM vm_ack_tracking
+        ORDER BY task_id, ack_type, created_at DESC
+    """)
+    List<VmAckTracking> selectAllAckTrackings();
 }

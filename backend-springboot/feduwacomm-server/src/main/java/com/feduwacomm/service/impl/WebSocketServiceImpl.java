@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -138,5 +139,69 @@ public class WebSocketServiceImpl implements WebSocketService {
         int previousCount = onlineUsers.size();
         onlineUsers.clear();
         log.info("清空所有在线用户: 之前在线数={}", previousCount);
+    }
+
+    @Override
+    public int sendToAdmins(Map<String, Object> message) {
+        try {
+            if (message == null) {
+                log.warn("向管理员发送消息失败：消息为空");
+                return 0;
+            }
+
+            // 发送到管理员专用通道
+            messagingTemplate.convertAndSend("/topic/admin", message);
+
+            // 简化实现：假设所有在线用户都可能是管理员
+            // 实际项目中应该维护管理员列表
+            int adminCount = Math.min(onlineUsers.size(), 5); // 假设最多5个管理员在线
+            log.debug("向管理员发送消息成功: 预估管理员数={}", adminCount);
+            return adminCount;
+        } catch (Exception e) {
+            log.error("向管理员发送消息失败: error={}", e.getMessage(), e);
+            return 0;
+        }
+    }
+
+    @Override
+    public int sendToTaskSubscribers(String taskId, Map<String, Object> message) {
+        try {
+            if (taskId == null || message == null) {
+                log.warn("向任务订阅者发送消息失败：任务ID或消息为空");
+                return 0;
+            }
+
+            // 发送到任务订阅者专用通道
+            String destination = "/topic/task/" + taskId;
+            messagingTemplate.convertAndSend(destination, message);
+
+            // 简化实现：假设每个任务有少量订阅者
+            int subscriberCount = Math.min(onlineUsers.size(), 3); // 假设每个任务最多3个订阅者
+            log.debug("向任务订阅者发送消息成功: taskId={}, 预估订阅者数={}", taskId, subscriberCount);
+            return subscriberCount;
+        } catch (Exception e) {
+            log.error("向任务订阅者发送消息失败: taskId={}, error={}", taskId, e.getMessage(), e);
+            return 0;
+        }
+    }
+
+    @Override
+    public int sendToAllUsers(Map<String, Object> message) {
+        try {
+            if (message == null) {
+                log.warn("向所有用户发送消息失败：消息为空");
+                return 0;
+            }
+
+            // 发送到所有用户通道
+            messagingTemplate.convertAndSend("/topic/all", message);
+
+            int userCount = onlineUsers.size();
+            log.debug("向所有用户发送消息成功: 在线用户数={}", userCount);
+            return userCount;
+        } catch (Exception e) {
+            log.error("向所有用户发送消息失败: error={}", e.getMessage(), e);
+            return 0;
+        }
     }
 }

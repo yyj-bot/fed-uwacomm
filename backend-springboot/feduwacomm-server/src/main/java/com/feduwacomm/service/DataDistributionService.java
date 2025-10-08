@@ -2,6 +2,8 @@ package com.feduwacomm.service;
 
 import com.feduwacomm.common.PageResult;
 import com.feduwacomm.dto.DataDistributionDTO;
+import com.feduwacomm.dto.DatasetSlice;
+import com.feduwacomm.dto.DatasetAllocationValidation;
 import com.feduwacomm.vo.DataDistributionTaskVO;
 
 import java.util.List;
@@ -229,4 +231,81 @@ public interface DataDistributionService {
      * @return 实时性能指标
      */
     DataDistributionTaskVO.DistributionStatistics getDistributionPerformanceMetrics(String distributionId);
+
+    // ========== v1.5数据集分片和assignedDatasetId管理功能 ==========
+
+    /**
+     * 生成数据集分片 (v1.5)
+     * 🎯 实现目标：根据参与者数量和数据分布策略分配数据集
+     *
+     * @param originalDatasetPath 原始数据集路径
+     * @param vmId 虚拟机ID
+     * @return 数据集分片信息
+     */
+    DatasetSlice generateDatasetSlice(String originalDatasetPath, String vmId);
+
+    /**
+     * IID数据分配策略 (v1.5)
+     * 使用独立同分布算法分配数据
+     *
+     * @param originalDatasetPath 原始数据集路径
+     * @param vmIndex 虚拟机索引
+     * @param totalVms 总虚拟机数量
+     * @return 分配的数据集分片
+     */
+    DatasetSlice performIIDAllocation(String originalDatasetPath, int vmIndex, int totalVms);
+
+    /**
+     * 验证数据集分配结果 (v1.5)
+     * 检查所有分配是否正确和完整
+     *
+     * @param taskId 任务ID
+     * @return 验证结果
+     */
+    DatasetAllocationValidation validateAllocation(String taskId);
+
+    // ========== v1.5.1数据集切片增强功能 ==========
+
+    /**
+     * 使用切片信息分发数据集 (v1.5.1)
+     * 集成DataSlicingService，为每个VM生成包含SliceInfo的数据分发配置
+     *
+     * @param taskId 任务ID
+     * @param datasetId 原始数据集ID
+     * @param vmIds 虚拟机ID列表
+     * @param strategy 分配策略（IID/NON_IID）
+     * @return 数据切片结果列表（包含vmId, assignedDatasetId, sliceInfo）
+     */
+    java.util.List<com.feduwacomm.dto.DataSliceResult> distributeDatasetWithSlice(
+            String taskId,
+            String datasetId,
+            java.util.List<String> vmIds,
+            com.feduwacomm.enums.AllocationStrategy strategy);
+
+    /**
+     * 计算批次范围 (v1.5.1)
+     * 根据SliceInfo和批次信息计算双重索引范围
+     *
+     * @param sliceInfo 切片信息
+     * @param batchIndex 批次索引（从0开始）
+     * @param batchSize 批次大小
+     * @return 批次范围（包含localStartIndex, localEndIndex, globalStartIndex, globalEndIndex）
+     */
+    com.feduwacomm.dto.BatchRange calculateBatchRange(
+            com.feduwacomm.dto.SliceInfo sliceInfo,
+            int batchIndex,
+            int batchSize);
+
+    /**
+     * 为数据行添加双重索引 (v1.5.1)
+     * 为批次中的每一行添加localIndex和globalIndex字段
+     *
+     * @param rows 数据行列表（Map格式）
+     * @param batchStartIndex 批次起始索引（本地索引）
+     * @param sliceInfo 切片信息（用于计算globalIndex）
+     */
+    void addDualIndices(
+            java.util.List<java.util.Map<String, Object>> rows,
+            int batchStartIndex,
+            com.feduwacomm.dto.SliceInfo sliceInfo);
 }

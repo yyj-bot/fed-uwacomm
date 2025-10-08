@@ -43,7 +43,7 @@ public class InitialModelGenerationStageHandler extends AbstractStageHandler {
             // 获取模型配置参数（如果有的话）
             String modelType = (String) context.getVariable("modelType");
             if (modelType == null) {
-                modelType = "NEURAL_NETWORK";
+                modelType = "RANDOM_FOREST";
             }
             String generationMethod = (String) context.getVariable("generationMethod");
             if (generationMethod == null) {
@@ -126,6 +126,13 @@ public class InitialModelGenerationStageHandler extends AbstractStageHandler {
         
         // 根据模型类型设置默认参数
         switch (modelType.toUpperCase()) {
+            case "RANDOM_FOREST":
+                params.putIfAbsent("n_estimators", 100);
+                params.putIfAbsent("max_depth", 10);
+                params.putIfAbsent("min_samples_split", 2);
+                params.putIfAbsent("min_samples_leaf", 1);
+                params.putIfAbsent("random_state", 42);
+                break;
             case "NEURAL_NETWORK":
                 params.putIfAbsent("layers", 3);
                 params.putIfAbsent("filters", 32);

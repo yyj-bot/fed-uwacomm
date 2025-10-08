@@ -20,6 +20,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -106,7 +107,9 @@ class FederatedOrchestrationServiceTest {
     @DisplayName("成功处理任务创建事件")
     void testOnTaskCreated_Success() {
         // Given
-        FederatedTaskCreatedEvent event = new FederatedTaskCreatedEvent(testTaskId, "测试任务", testCreatedBy);
+        FederatedTaskCreatedEvent event = new FederatedTaskCreatedEvent(
+                this, testTaskId, "测试任务", testCreatedBy,
+                "test-dataset-id", List.of("vm1", "vm2"), "BALANCED");
 
         lenient().when(orchestrationMapper.insert(any(OrchestrationWorkflow.class))).thenReturn(1);
         lenient().when(orchestrationMapper.update(any(OrchestrationWorkflow.class))).thenReturn(1);

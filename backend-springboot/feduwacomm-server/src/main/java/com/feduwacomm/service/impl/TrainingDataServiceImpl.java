@@ -1050,4 +1050,237 @@ public class TrainingDataServiceImpl implements TrainingDataService {
 
         return content.toString();
     }
+
+    // ========== v1.5数据集上传和预处理增强 ==========
+
+    @Override
+    public DatasetUploadResult uploadAndPreprocessDataset(MultipartFile file, String uploadedBy) {
+        log.info("开始v1.5数据集上传: filename={}, size={}, uploadedBy={}",
+                file.getOriginalFilename(), file.getSize(), uploadedBy);
+
+        try {
+            // 生成原始数据集ID
+            String originalDatasetId = uuidUtil.generateUuid();
+            String filePath = saveUploadedFile(file, originalDatasetId);
+            log.info("文件保存完成: originalDatasetId={}, filePath={}", originalDatasetId, filePath);
+
+            // 解析数据集格式和结构
+            DatasetUploadResult.DatasetMetadata metadata = parseDatasetMetadata(filePath);
+            log.info("数据集元信息解析完成: columns={}, rows={}",
+                    metadata.getColumnCount(), metadata.getRowCount());
+
+            // 验证数据完整性
+            DatasetValidation validation = validateDatasetIntegrity(filePath, metadata);
+            if (!validation.isValid()) {
+                log.error("数据集验证失败: {}", validation.getErrorMessage());
+                return DatasetUploadResult.failure("数据集验证失败: " + validation.getErrorMessage());
+            }
+            log.info("数据集验证通过: originalDatasetId={}", originalDatasetId);
+
+            // 保存数据集信息到数据库
+            TrainingData dataset = new TrainingData();
+            dataset.setId(originalDatasetId);
+            dataset.setName(file.getOriginalFilename());
+            dataset.setDataType(determineDataType(file.getOriginalFilename()));
+            dataset.setStatus(DataStatus.READY);
+            dataset.setDescription("v1.5标准数据集: " + file.getOriginalFilename());
+            dataset.setRowCount(metadata.getRowCount());
+            dataset.setUploadedBy(uploadedBy);
+            dataset.setUploadTime(LocalDateTime.now());
+
+            trainingDatasetMapper.insertTrainingData(dataset);
+            log.info("数据集信息保存完成: originalDatasetId={}", originalDatasetId);
+
+            return DatasetUploadResult.success(originalDatasetId, filePath, metadata);
+
+        } catch (Exception e) {
+            log.error("数据集上传失败: filename={}, error={}", file.getOriginalFilename(), e.getMessage(), e);
+            return DatasetUploadResult.failure("数据集上传失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public DatasetAllocationPreparation prepareDatasetForAllocation(String originalDatasetId,
+                                                                   java.util.List<String> participantVmIds) {
+        log.info("准备数据集分配: originalDatasetId={}, participantCount={}",
+                originalDatasetId, participantVmIds.size());
+
+        try {
+            // 加载原始数据集
+            TrainingData originalDataset = trainingDatasetMapper.selectByIdEntity(originalDatasetId);
+            if (originalDataset == null) {
+                log.error("数据集不存在: {}", originalDatasetId);
+                return DatasetAllocationPreparation.failure("数据集不存在: " + originalDatasetId);
+            }
+
+            // 为每个参与者预分配assignedDatasetId
+            java.util.List<DatasetAllocationPreparation.DatasetAllocationPlan> allocationPlans = new java.util.ArrayList<>();
+
+            for (String vmId : participantVmIds) {
+                String assignedDatasetId = uuidUtil.generateUuid();
+
+                DatasetAllocationPreparation.DatasetAllocationPlan plan =
+                    DatasetAllocationPreparation.DatasetAllocationPlan.builder()
+                        .vmId(vmId)
+                        .assignedDatasetId(assignedDatasetId)
+                        .originalDatasetId(originalDatasetId)
+                        .allocationStrategy("IID")
+                        .allocationRatio(1.0 / participantVmIds.size())
+                        .expectedDataSize(originalDataset.getRowCount() / participantVmIds.size())
+                        .build();
+
+                allocationPlans.add(plan);
+                log.info("生成分配计划: vmId={}, assignedDatasetId={}", vmId, assignedDatasetId);
+            }
+
+            // 创建简化的数据集信息
+            DatasetAllocationPreparation.TrainingDataset datasetInfo =
+                DatasetAllocationPreparation.TrainingDataset.builder()
+                    .datasetId(originalDataset.getId())
+                    .name(originalDataset.getName())
+                    .description(originalDataset.getDescription())
+                    .dataType(originalDataset.getDataType().name())
+                    .rowCount(originalDataset.getRowCount())
+                    .uploadTime(originalDataset.getUploadTime())
+                    .uploadedBy(originalDataset.getUploadedBy())
+                    .build();
+
+            log.info("数据集分配准备完成: totalPlans={}", allocationPlans.size());
+            return DatasetAllocationPreparation.success(datasetInfo, allocationPlans);
+
+        } catch (Exception e) {
+            log.error("数据集分配准备失败: originalDatasetId={}, error={}", originalDatasetId, e.getMessage(), e);
+            return DatasetAllocationPreparation.failure("数据集分配准备失败: " + e.getMessage());
+        }
+    }
+
+    // ========== v1.5辅助方法 ==========
+
+    /**
+     * 保存上传的文件
+     */
+    private String saveUploadedFile(MultipartFile file, String datasetId) throws Exception {
+        String uploadDir = "/data/uploads/datasets/";
+        java.io.File dir = new java.io.File(uploadDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
+        String filename = datasetId + "_" + file.getOriginalFilename();
+        String filePath = uploadDir + filename;
+
+        file.transferTo(new java.io.File(filePath));
+        return filePath;
+    }
+
+    /**
+     * 解析数据集元信息
+     */
+    private DatasetUploadResult.DatasetMetadata parseDatasetMetadata(String filePath) throws Exception {
+        java.io.File file = new java.io.File(filePath);
+        if (!file.exists()) {
+            throw new RuntimeException("文件不存在: " + filePath);
+        }
+
+        // 简化的CSV解析逻辑
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String headerLine = reader.readLine();
+            if (headerLine == null) {
+                throw new RuntimeException("文件为空");
+            }
+
+            String[] headers = headerLine.split(",");
+            int columnCount = headers.length;
+
+            int rowCount = 0;
+            while (reader.readLine() != null) {
+                rowCount++;
+            }
+
+            java.util.List<String> featureColumns = java.util.Arrays.asList(headers);
+            String labelColumn = headers.length > 0 ? headers[headers.length - 1] : "";
+
+            return DatasetUploadResult.DatasetMetadata.builder()
+                .columnCount(columnCount)
+                .rowCount(rowCount)
+                .fileSize(file.length())
+                .fileFormat("CSV")
+                .dataType("ACOUSTIC")
+                .featureColumns(featureColumns)
+                .labelColumn(labelColumn)
+                .sampleDistribution(java.util.Map.of("total", rowCount))
+                .build();
+        }
+    }
+
+    /**
+     * 验证数据集完整性
+     */
+    private DatasetValidation validateDatasetIntegrity(String filePath, DatasetUploadResult.DatasetMetadata metadata) {
+        try {
+            // 基本验证：文件存在且大小合理
+            java.io.File file = new java.io.File(filePath);
+            if (!file.exists()) {
+                return new DatasetValidation(false, "文件不存在");
+            }
+
+            if (file.length() == 0) {
+                return new DatasetValidation(false, "文件为空");
+            }
+
+            if (metadata.getRowCount() == 0) {
+                return new DatasetValidation(false, "数据集无有效数据行");
+            }
+
+            if (metadata.getColumnCount() == 0) {
+                return new DatasetValidation(false, "数据集无有效列");
+            }
+
+            return new DatasetValidation(true, "验证通过");
+
+        } catch (Exception e) {
+            return new DatasetValidation(false, "验证过程中发生错误: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 根据文件名确定数据类型
+     */
+    private DataType determineDataType(String filename) {
+        if (filename == null) {
+            return DataType.OTHER;
+        }
+
+        String lowerName = filename.toLowerCase();
+        if (lowerName.contains("acoustic") || lowerName.contains("sound") || lowerName.contains("audio")) {
+            return DataType.ACOUSTIC;
+        } else if (lowerName.contains("environment") || lowerName.contains("env")) {
+            return DataType.ENVIRONMENT;
+        } else if (lowerName.contains("model")) {
+            return DataType.MODEL;
+        } else {
+            return DataType.OTHER;
+        }
+    }
+
+    /**
+     * 数据集验证结果类
+     */
+    private static class DatasetValidation {
+        private final boolean valid;
+        private final String errorMessage;
+
+        public DatasetValidation(boolean valid, String errorMessage) {
+            this.valid = valid;
+            this.errorMessage = errorMessage;
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+    }
 }

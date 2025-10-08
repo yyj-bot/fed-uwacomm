@@ -1,8 +1,12 @@
 package com.feduwacomm.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum TaskStatus {
     PENDING("PENDING", "等待处理"),
     PROCESSING("PROCESSING", "处理中"),
+    RUNNING("RUNNING", "运行中"),
     COMPLETED("COMPLETED", "已完成"),
     FAILED("FAILED", "处理失败"),
     CANCELLED("CANCELLED", "已取消");
@@ -15,6 +19,7 @@ public enum TaskStatus {
         this.description = description;
     }
 
+    @JsonValue
     public String getCode() {
         return code;
     }
@@ -23,6 +28,7 @@ public enum TaskStatus {
         return description;
     }
 
+    @JsonCreator
     public static TaskStatus fromCode(String code) {
         if (code == null) {
             return PENDING;

@@ -60,6 +60,10 @@ public class TaskOperationVO {
     private LocalDateTime updatedAt;
     private String configVersion;
 
+    // 通用响应字段
+    private String message;
+    private LocalDateTime timestamp;
+
     @Data
     @Builder
     @NoArgsConstructor

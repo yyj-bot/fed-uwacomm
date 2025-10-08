@@ -52,11 +52,6 @@ public class VmAckTracking {
     private AckStatus status;
 
     /**
-     * 消息类型
-     */
-    private String messageType;
-
-    /**
      * 消息ID
      */
     private String messageId;
@@ -116,7 +111,11 @@ public class VmAckTracking {
         GRADIENT_UPLOAD("梯度上传"),
         GRADIENT_READY("梯度就绪"),
         GLOBAL_MODEL_BROADCAST("全局模型广播"),
-        ROUND_COMPLETE("轮次完成");
+        ROUND_COMPLETE("轮次完成"),
+        // v1.5 新增数据集相关确认类型
+        DATASET_LIST_QUERY("数据集列表查询"),
+        DATASET_CREATE("数据集创建"),
+        DATASET_STATUS_QUERY("数据集状态查询");
 
         private final String description;
 

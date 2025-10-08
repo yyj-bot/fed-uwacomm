@@ -43,7 +43,16 @@ public interface FederatedTasksMapper {
     int deleteTask(@Param("id") String id);
     
     FederatedTask selectTaskById(@Param("id") String id);
-    
+
+    /**
+     * 根据任务ID查询任务（兼容性方法）
+     * @param taskId 任务ID
+     * @return 联邦学习任务
+     */
+    default FederatedTask selectByTaskId(@Param("taskId") String taskId) {
+        return selectTaskById(taskId);
+    }
+
     List<FederatedTask> selectTasksByQuery(TaskQueryDTO queryDTO);
     
     int countTasksByQuery(TaskQueryDTO queryDTO);

@@ -45,6 +45,9 @@
         <result property="finalResults" column="final_results"/>
         <result property="modelInfo" column="model_info"/>
         <result property="version" column="version"/>
+        <!-- v1.3/v1.5.1 新增字段 -->
+        <result property="datasetId" column="dataset_id"/>
+        <result property="distributionStrategy" column="distribution_strategy"/>
     </resultMap>
 
     <resultMap id="ParticipantResultMap" type="com.feduwacomm.entity.TaskParticipant">
@@ -74,13 +77,13 @@
     <!-- Task CRUD operations -->
     <insert id="insertTask" parameterType="com.feduwacomm.entity.FederatedTask">
         INSERT INTO federated_tasks (
-            id, name, algorithm, status, total_rounds, current_round, 
-            batch_size, learning_rate, mu, created_at, updated_at, 
-            started_at, completed_at, config
+            id, name, algorithm, status, total_rounds, current_round,
+            batch_size, learning_rate, mu, created_at, updated_at,
+            started_at, completed_at, config, dataset_id, distribution_strategy
         ) VALUES (
             #{id}, #{taskName}, #{algorithm}, #{status}, #{totalRounds}, #{currentRound},
             #{batchSize}, #{learningRate}, #{learningRate}, #{createdAt}, #{updatedAt},
-            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON)
+            #{startedAt}, #{completedAt}, CAST(#{config} AS JSON), #{datasetId}, #{distributionStrategy}
         )
     </insert>
 
@@ -224,11 +227,15 @@
             id, task_id, vm_id, role, status, data_source,
             current_epoch, loss, accuracy, last_heartbeat,
             final_accuracy, final_loss, training_time, data_size,
+            data_ratio, capabilities, max_cpu_usage, max_memory_usage,
+            assigned_dataset_id, dataset_status, dataset_created_at,
             created_at, updated_at, joined_at, left_at, parameters
         ) VALUES (
-            #{id}, #{taskId}, #{vmId}, #{role}, #{status}, #{dataSource},
+            #{id}, #{taskId}, #{vmId}, #{role,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{status,typeHandler=org.apache.ibatis.type.EnumTypeHandler}, #{dataSource},
             #{currentEpoch}, #{loss}, #{accuracy}, #{lastHeartbeat},
             #{finalAccuracy}, #{finalLoss}, #{trainingTime}, #{dataSize},
+            #{dataRatio}, CAST(#{capabilities} AS JSON), #{maxCpuUsage}, #{maxMemoryUsage},
+            #{assignedDatasetId}, #{datasetStatus}, #{datasetCreatedAt},
             #{createdAt}, #{updatedAt}, #{joinedAt}, #{leftAt}, CAST(#{parameters} AS JSON)
         )
     </insert>
@@ -248,7 +255,10 @@
             data_size = #{dataSize},
             updated_at = #{updatedAt},
             left_at = #{leftAt},
-            parameters = CAST(#{parameters} AS JSON)
+            parameters = CAST(#{parameters} AS JSON),
+            assigned_dataset_id = #{assignedDatasetId},
+            dataset_status = #{datasetStatus},
+            dataset_created_at = #{datasetCreatedAt}
         WHERE id = #{id}
     </update>
 
@@ -266,6 +276,12 @@
 
     <select id="selectParticipantsByTaskId" resultMap="ParticipantResultMap">
         SELECT * FROM task_participants WHERE task_id = #{taskId} ORDER BY created_at
+    </select>
+
+    <select id="selectParticipant" resultMap="ParticipantResultMap">
+        SELECT * FROM task_participants
+        WHERE task_id = #{taskId} AND vm_id = #{vmId}
+        LIMIT 1
     </select>
 
     <!-- Task log management removed - using unified system_logs table via LogService instead -->

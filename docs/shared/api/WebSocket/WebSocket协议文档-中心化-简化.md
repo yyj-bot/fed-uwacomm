@@ -1,11 +1,24 @@
-# 水声联邦学习系统 WebSocket 通信协议 - 中心化简化版
+# 水声联邦学习系统 WebSocket 通信协议 - 中心化简化版 v1.5.1
 
 ## 0. 概述
 
-本文档定义了水声联邦学习系统的简化WebSocket通信协议，专注于联邦学习的核心流程，移除了冗余和非必要的协议消息。
+本文档定义了水声联邦学习系统的简化WebSocket通信协议v1.5.1版本，专注于联邦学习的核心流程，并包含完整的数据集切片分发和验证机制。
+
+### v1.5.1版本主要新增特性（基于v1.5）
+- **🆕 数据切片服务**: 基于IID策略的智能数据切分，支持均衡分配
+- **🆕 批次范围跟踪**: 双重索引系统（本地索引+全局索引）精确跟踪每个批次
+- **🆕 完整性验证**: VM端生成SliceVerification，后端进行完整性验证
+- **🆕 智能决策机制**: 基于缺失率的自动决策（重传/排除VM/中止任务）
+- **🆕 连续性检测**: 自动检测数据间隙，确保数据连续性
+
+### v1.5版本基础特性
+- **数据集预查询机制**: 任务创建前主动查询虚拟机可用数据集
+- **完整数据集关联流程**: 建立前端-后端-虚拟机的完整数据集分发链路
+- **统一ID管理**: 所有数据集ID由后端UuidUtil统一生成，确保ID一致性
+- **智能数据集分配**: 后端实现数据集分配算法，支持多种分配策略
 
 ### 0.1 设计原则
-- **完整性**: 34个核心协议覆盖完整的联邦学习生态系统
+- **完整性**: 36个核心协议覆盖完整的联邦学习生态系统，包含数据集预查询机制
 - **实时性**: 通过WebSocket直接分发模型和数据，确保同步
 - **分层清晰**: 连接层、任务层、轮次层、监控层、控制层、数据层职责明确
 - **原子性**: 任务配置和初始模型分发在同一消息中完成
@@ -13,11 +26,13 @@
 - **多任务并发**: 通过taskId字段实现精确的任务级别控制，支持单VM运行多任务
 - **协议简洁**: 移除冗余功能，统一状态监控机制
 - **完整生命周期**: 支持任务的创建、执行、停止、删除完整生命周期管理
+- **数据集关联**: 建立完整的前端-后端-虚拟机数据集关联机制，支持智能分配
+- **ID统一管理**: 所有关键ID由后端UuidUtil生成，确保全局唯一性和一致性
 
 ### 0.2 基础信息
 - **WebSocket URL**: `ws://localhost:8080/ws` (开发环境)
 - **WebSocket Secure URL**: `wss://your-domain.com/ws` (生产环境)
-- **协议版本**: v1.4
+- **协议版本**: v1.5.1 🆕
 - **认证方式**: JWT Token（必需）
 - **数据格式**: JSON
 - **编码**: UTF-8
@@ -27,6 +42,8 @@
 ```
 连接管理层: CONNECT, HEARTBEAT (4个协议)
      ↓
+数据集预查询层: DATASET_LIST_QUERY, DATASET_LIST_RESPONSE (2个协议) 🆕 v1.5新增
+     ↓
 任务管理层: FEDERATED_TASK_START/STOP/RESUME/DELETE + FEDERATED_TASK_STATUS_QUERY (10个协议)
      ↓
 轮次管理层: ROUND_START/ABORT → GRADIENT_UPLOAD → GLOBAL_MODEL_BROADCAST → ROUND_COMPLETE (9个协议)
@@ -35,7 +52,7 @@
      ↓
 虚拟机控制层: VM_START, VM_STOP (4个协议)
      ↓
-数据集管理层: DATASET_CREATE, DATASET_APPEND_ROWS, DATASET_COMPLETE, DATASET_STATUS_QUERY, DATASET_DELETE (4个协议)
+数据集管理层: DATASET_CREATE, DATASET_APPEND_ROWS, DATASET_COMPLETE, DATASET_STATUS_QUERY, DATASET_DELETE (6个协议)
 ```
 
 ### 任务生命周期管理
@@ -228,6 +245,7 @@ VM-001 同时执行:
 - 包含完整的任务初始化信息
 - **支持多任务并发**: 通过taskId字段实现精确的任务级别控制
 - **支持多种联邦算法**: FEDERATED_AVERAGING, FEDERATED_PROXIMAL, FEDERATED_NOVA, SCAFFOLD
+- **🆕 v1.5新增数据集关联**: 通过assignedDatasetId字段指定虚拟机使用的数据集
 
 ```json
 {
@@ -279,7 +297,7 @@ VM-001 同时执行:
       }
     },
     "dataConfig": {
-      "dataPath": "/data/training",
+      "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID，替换原datasetId
       "validationSplit": 0.2,
       "shuffle": true
     }
@@ -643,6 +661,7 @@ VM-001 同时执行:
   "data": {
     "taskId": "fedtask-123456",
     "roundNumber": 6,
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：关联的数据集ID，用于验证数据溯源
     "gradientData": {
       "weights": {
         "layer1": [0.001, -0.002, 0.003],
@@ -1049,7 +1068,94 @@ VM-001 同时执行:
 
 ## 6. 数据集管理协议
 
-### 6.1 创建数据集 (DATASET_CREATE) 🔵
+### 6.1 数据集列表查询 (DATASET_LIST_QUERY) 🟢 🆕 v1.5新增
+
+**消息作用**: 后端向虚拟机查询可用数据集列表，用于任务创建前的数据集发现和选择。
+
+**使用场景**:
+- 联邦学习任务创建前查询虚拟机可用数据集
+- 数据集分配算法的数据源发现
+- 前端界面展示可用数据集列表
+- 数据集状态健康检查
+
+**消息格式**:
+```json
+{
+  "type": "DATASET_LIST_QUERY",
+  "id": "server-1704067200000-300001",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "includePreview": true,
+    "maxPreviewRows": 10,
+    "includeStatistics": true,
+    "datasetTypes": ["ACOUSTIC", "ENVIRONMENTAL", "ALL"]
+  }
+}
+```
+
+**字段说明**:
+- `includePreview`: 是否包含数据集预览样本
+- `maxPreviewRows`: 预览数据最大行数
+- `includeStatistics`: 是否包含数据集统计信息
+- `datasetTypes`: 查询的数据集类型过滤器
+
+### 6.2 数据集列表响应 (DATASET_LIST_RESPONSE) 🔵 🆕 v1.5新增
+
+**消息作用**: 虚拟机响应数据集列表查询，返回可用数据集的详细信息。
+
+**响应格式**:
+```json
+{
+  "type": "DATASET_LIST_RESPONSE",
+  "id": "client-1704067200000-300001",
+  "timestamp": "2024-01-01T00:00:00.100Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "totalDatasets": 3,
+    "datasets": [
+      {
+        "localDatasetId": "local-dataset-001",
+        "name": "acoustic_features_v1",
+        "description": "水声传播特征数据集",
+        "datasetType": "ACOUSTIC",
+        "rowCount": 10000,
+        "sizeBytes": 2048576,
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "lastModified": "2024-01-01T12:00:00.000Z",
+        "status": "READY",
+        "preview": [
+          {
+            "frequency": 1000,
+            "amplitude": 0.85,
+            "phase": 1.57,
+            "snr": 25.4
+          }
+        ],
+        "statistics": {
+          "featureCount": 4,
+          "labelCount": 2,
+          "missingValues": 0,
+          "dataQuality": "HIGH"
+        }
+      }
+    ]
+  }
+}
+```
+
+**关键字段说明**:
+- `localDatasetId`: 虚拟机本地数据集标识符（待后端分配新ID）
+- `name`: 数据集名称
+- `description`: 数据集描述
+- `datasetType`: 数据集类型（ACOUSTIC/ENVIRONMENTAL等）
+- `rowCount`: 数据行数
+- `sizeBytes`: 数据集大小（字节）
+- `status`: 数据集状态（READY/LOADING/ERROR等）
+- `preview`: 数据预览样本
+- `statistics`: 数据集统计信息
+
+### 6.3 创建数据集 (DATASET_CREATE) 🔵
 
 **消息作用**: 虚拟机向后端请求创建新的数据集，或后端通知虚拟机准备接收数据集。
 
@@ -1058,6 +1164,7 @@ VM-001 同时执行:
 - 动态创建特定任务的数据子集
 - **多任务场景下的数据隔离**: 通过taskId字段实现数据集的任务级别隔离
 - 数据版本管理和追踪
+- **🆕 v1.5增强**: 支持数据集切片分发，后端精确控制每个虚拟机接收的数据范围
 
 **支持的数据类型**:
 - ACOUSTIC: 水声传播数据
@@ -1076,7 +1183,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "datasetName": "acoustic_features_v1",
     "datasetDescription": "水声传播特征数据集",
     "datasetType": "ACOUSTIC",
@@ -1093,15 +1200,37 @@ VM-001 同时执行:
       "range": "float",
       "transmission_loss": "float",
       "propagation_mode": "int"
+    },
+    "sliceInfo": { // 🆕 v1.5：数据切片元数据
+      "startIndex": 0,              // 切片起始索引（全局，相对于原始数据集）
+      "endIndex": 1999,             // 切片结束索引（全局，包含此索引）
+      "sliceSamples": 2000,         // 当前切片包含的样本数
+      "totalSamples": 10000,        // 原始数据集总样本数
+      "sliceIndex": 1,              // 当前切片编号（1-based）
+      "totalSlices": 5,             // 总切片数（参与任务的虚拟机数量）
+      "allocationStrategy": "IID"   // 分配策略：IID（独立同分布）/NON_IID（非独立同分布）
     }
   },
   "signature": "base64_encoded_signature"
 }
 ```
 
+**🆕 v1.5 sliceInfo字段说明**:
+- `startIndex`: 该虚拟机分配的数据在原始数据集中的起始索引（从0开始）
+- `endIndex`: 该虚拟机分配的数据在原始数据集中的结束索引（包含此索引）
+- `sliceSamples`: 该切片实际包含的样本数量（endIndex - startIndex + 1）
+- `totalSamples`: 原始完整数据集的总样本数
+- `sliceIndex`: 该切片的编号，从1开始，便于识别和日志记录
+- `totalSlices`: 数据集被切分的总数量，通常等于参与任务的虚拟机数量
+- `allocationStrategy`: 数据分配策略
+  - `IID`: 独立同分布，数据随机均匀分配
+  - `NON_IID`: 非独立同分布，按特定规则分配（如按标签聚类）
+
 ### 6.2 追加数据行（批量）(DATASET_APPEND_ROWS) 🔵
 
 **消息作用**: 向已创建的数据集批量添加数据行。
+
+**🆕 v1.5增强**: 新增批次范围信息和双重索引定位，支持精确的数据传输验证。
 
 ```json
 {
@@ -1111,13 +1240,21 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "batchId": "batch-001",
     "totalBatches": 10,
     "currentBatch": 1,
+    "batchRange": { // 🆕 v1.5：批次范围信息
+      "localStartIndex": 0,      // 本地批次起始索引（相对于虚拟机切片，从0开始）
+      "localEndIndex": 199,      // 本地批次结束索引（相对于虚拟机切片，包含此索引）
+      "globalStartIndex": 0,     // 全局批次起始索引（相对于原始数据集，从0开始）
+      "globalEndIndex": 199      // 全局批次结束索引（相对于原始数据集，包含此索引）
+    },
     "rows": [
       {
         "rowId": "row-001",
+        "localIndex": 0,         // 🆕 v1.5：该行在虚拟机切片中的索引（从0开始）
+        "globalIndex": 0,        // 🆕 v1.5：该行在原始数据集中的索引（从0开始）
         "data": {
           "frequency": 1000.0,
           "depth": 50.0,
@@ -1128,6 +1265,8 @@ VM-001 同时执行:
       },
       {
         "rowId": "row-002",
+        "localIndex": 1,         // 🆕 v1.5：该行在虚拟机切片中的索引
+        "globalIndex": 1,        // 🆕 v1.5：该行在原始数据集中的索引
         "data": {
           "frequency": 1500.0,
           "depth": 75.0,
@@ -1144,9 +1283,27 @@ VM-001 同时执行:
 }
 ```
 
+**🆕 v1.5 batchRange字段说明**:
+- `localStartIndex`: 当前批次第一行在虚拟机切片中的索引（从0开始）
+- `localEndIndex`: 当前批次最后一行在虚拟机切片中的索引（包含）
+- `globalStartIndex`: 当前批次第一行在原始完整数据集中的全局索引
+- `globalEndIndex`: 当前批次最后一行在原始完整数据集中的全局索引
+
+**🆕 v1.5 row索引字段说明**:
+- `localIndex`: 该行数据在虚拟机分配的切片中的索引位置
+- `globalIndex`: 该行数据在原始完整数据集中的全局索引位置
+
+**双重索引设计优势**:
+- **完整性验证**: 虚拟机可以验证接收到的数据是否连续完整
+- **问题定位**: 出现数据丢失时，可以快速定位缺失的全局索引范围
+- **可追溯性**: 每行数据都可以追溯到原始数据集中的位置
+- **调试便利**: 本地索引便于虚拟机内部处理，全局索引便于跨虚拟机调试
+
 ### 6.3 完成数据集上传 (DATASET_COMPLETE) 🔵
 
 **消息作用**: 通知数据集上传完成，可以开始使用。
+
+**🆕 v1.5增强**: 新增切片验证信息，虚拟机向后端报告接收到的数据完整性。
 
 ```json
 {
@@ -1156,7 +1313,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "finalRowCount": 9856,
     "totalBatches": 10,
     "uploadDuration": 9.5,
@@ -1164,6 +1321,20 @@ VM-001 同时执行:
       "checksumValid": true,
       "missingRows": 0,
       "duplicateRows": 0
+    },
+    "sliceVerification": { // 🆕 v1.5：切片完整性验证信息
+      "expectedStartIndex": 0,           // 预期切片起始索引（来自DATASET_CREATE的sliceInfo）
+      "expectedEndIndex": 1999,          // 预期切片结束索引（来自DATASET_CREATE的sliceInfo）
+      "expectedSamples": 2000,           // 预期样本数（来自DATASET_CREATE的sliceInfo）
+      "actualStartIndex": 0,             // 实际接收到的最小全局索引
+      "actualEndIndex": 1999,            // 实际接收到的最大全局索引
+      "actualSamples": 2000,             // 实际接收到的样本数
+      "isComplete": true,                // 切片是否完整（所有预期索引都已接收）
+      "missingIndices": [],              // 缺失的全局索引列表（如果有）
+      "continuityCheck": {               // 连续性检查
+        "hasGaps": false,                // 是否存在索引间隙
+        "gapRanges": []                  // 间隙范围列表 [{start: 100, end: 150}]
+      }
     },
     "statistics": {
       "meanFrequency": 1250.5,
@@ -1179,6 +1350,53 @@ VM-001 同时执行:
 }
 ```
 
+**🆕 v1.5 sliceVerification字段说明**:
+- `expectedStartIndex`: 根据DATASET_CREATE中sliceInfo预期的起始索引
+- `expectedEndIndex`: 根据DATASET_CREATE中sliceInfo预期的结束索引
+- `expectedSamples`: 根据DATASET_CREATE中sliceInfo预期的样本总数
+- `actualStartIndex`: 虚拟机实际接收到的最小全局索引
+- `actualEndIndex`: 虚拟机实际接收到的最大全局索引
+- `actualSamples`: 虚拟机实际接收到的样本总数
+- `isComplete`: 是否完整接收（actualSamples == expectedSamples && 无缺失索引）
+- `missingIndices`: 缺失的全局索引列表（用于定位传输错误）
+- `continuityCheck`: 数据连续性检查
+  - `hasGaps`: 是否存在索引间隙（如接收了[0-100]和[200-300]，中间缺失[101-199]）
+  - `gapRanges`: 具体的间隙范围列表
+
+**切片验证的关键作用**:
+- **完整性保证**: 确认虚拟机接收到了所有预期的数据行
+- **错误检测**: 及时发现数据传输过程中的丢失或重复
+- **可追溯性**: 精确定位哪些全局索引的数据丢失了
+- **质量控制**: 后端可以根据验证结果决定是否重传或中止任务
+
+**🆕 v1.5.1 后端验证决策机制**:
+
+后端收到SliceVerification后，SliceVerificationService会执行以下验证流程：
+
+1. **样本数验证**: `actualSamples` 是否等于 `expectedSamples`
+2. **索引范围验证**: `actualStartIndex/actualEndIndex` 是否匹配 `expectedStartIndex/expectedEndIndex`
+3. **缺失索引检测**: 检查 `missingIndices` 列表
+4. **连续性检测**: 验证 `continuityCheck.hasGaps`，检测数据间隙
+
+基于验证结果，后端自动做出决策：
+
+| 缺失率 | 决策 | 说明 |
+|--------|------|------|
+| 0% (完美) | **ACCEPT** | 数据完整，正常进行 |
+| < 5% | **RETRY_MISSING** | 缺失率低，重传缺失数据 |
+| 5%-20% | **EXCLUDE_VM** | 缺失率中等，排除该VM，用其他VM继续任务 |
+| >= 20% | **ABORT_TASK** | 缺失率过高，中止整个任务 |
+
+**决策响应字段**（添加到DATASET_COMPLETE_ACK）:
+```json
+{
+  "verificationPassed": true,           // 验证是否通过
+  "missingRate": 0.02,                  // 缺失率 (0.0-1.0)
+  "recommendedDecision": "RETRY_MISSING", // 推荐决策代码
+  "verificationMessage": "数据验证失败: 缺失40个样本(2.00%)"  // 详细信息（如果失败）
+}
+```
+
 ### 6.4 数据集状态查询 (DATASET_STATUS_QUERY) 🟢
 
 **消息作用**: 后端查询特定数据集的状态和统计信息。
@@ -1191,7 +1409,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "queryType": "FULL",
     "includeStatistics": true,
     "includeMetadata": true,
@@ -1225,7 +1443,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "queryType": "FULL",
     "includeStatistics": true,
     "includeMetadata": true,
@@ -1253,7 +1471,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "status": "READY",
     "rowCount": 9856,
     "sizeBytes": 2048576,
@@ -1293,7 +1511,7 @@ VM-001 同时执行:
   "vmId": "a1b2c3d4e5f678901234567890123456",
   "data": {
     "taskId": "fedtask-123456",
-    "datasetId": "dset-1234567890abcdef1234567890abcd",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend", // 🆕 v1.5：后端分配的统一数据集ID
     "reason": "TASK_COMPLETED",
     "backup": false,
     "force": false
@@ -1304,63 +1522,174 @@ VM-001 同时执行:
 
 ## 7. 标准联邦学习流程
 
-### 7.1 单任务标准流程
+### 7.1 v1.5 完整13步联邦学习流程 🆕
+
+#### 阶段一：环境准备（步骤1-2）
 
 ```
 1. 虚拟机启动控制
    Backend → VM_START → VM
    VM → VM_START_ACK → Backend
 
-2. 虚拟机连接
+2. 虚拟机连接建立
    VM → CONNECT → Backend
    Backend → CONNECT_ACK → VM
+```
 
-3. 数据集分发 (任务前准备)
-   VM → DATASET_CREATE(taskId) → Backend
-   VM → DATASET_APPEND_ROWS(taskId) → Backend (批量)
-   VM → DATASET_COMPLETE(taskId) → Backend
-   Backend → DATASET_STATUS_QUERY(taskId) → VM
-   VM → DATASET_STATUS_RESPONSE(taskId) → Backend
+#### 阶段二：前端任务创建（步骤3-5）
 
-4. 任务启动 (一次性)
-   Backend → FEDERATED_TASK_START(taskId) → All VMs
-   All VMs → FEDERATED_TASK_START_ACK(taskId) → Backend
+```
+3. 前端创建联邦学习任务
+   Frontend → Backend HTTP API: POST /api/federated-tasks
+   // 前端通过REST API创建任务，指定参与虚拟机和数据集要求
 
-5. 轮次循环 (重复执行)
-   Loop for each round:
-     Backend → ROUND_START(taskId, roundNumber) → All VMs
-     All VMs → ROUND_START_ACK(taskId, roundNumber) → Backend
+4. 后端生成数据集关联配置
+   Backend Internal:
+   - 使用 UuidUtil 生成 taskId
+   - 使用 UuidUtil 生成每个虚拟机的 assignedDatasetId
+   - 在 task_participants 表中建立关联关系
 
-     [本地训练执行...]
+5. 后端任务配置确认
+   Backend Internal:
+   - 验证虚拟机可用性
+   - 确认数据集分配策略
+   - 准备任务启动参数
+```
 
-     All VMs → GRADIENT_UPLOAD(taskId, roundNumber) → Backend
-     Backend → GRADIENT_UPLOAD_ACK(taskId, roundNumber) → All VMs
+#### 阶段三：数据集分发（步骤6-8）
 
-     [后端聚合处理...]
+```
+6. 数据集创建分发 🆕 v1.5 优化
+   Backend → DATASET_CREATE(assignedDatasetId, sliceInfo) → Specific VMs
 
-     Backend → GLOBAL_MODEL_BROADCAST(taskId, roundNumber) → All VMs
-     All VMs → GLOBAL_MODEL_BROADCAST_ACK(taskId, roundNumber) → Backend
+   数据集切片信息包含：
+   - assignedDatasetId: 后端为该虚拟机生成的唯一数据集ID
+   - sliceInfo.startIndex: 该虚拟机分配的数据起始索引（全局）
+   - sliceInfo.endIndex: 该虚拟机分配的数据结束索引（全局）
+   - sliceInfo.sliceSamples: 该切片包含的样本数
+   - sliceInfo.totalSamples: 原始数据集总样本数
+   - sliceInfo.sliceIndex: 该切片编号（1-based）
+   - sliceInfo.totalSlices: 总切片数
+   - sliceInfo.allocationStrategy: 分配策略（IID/NON_IID）
 
-     Backend → ROUND_COMPLETE(taskId, roundNumber) → All VMs
-     All VMs → ROUND_COMPLETE_ACK(taskId, roundNumber) → Backend
-   End Loop
+   后端数据切片算法流程：
+   1. 读取原始数据集（totalSamples = 10000）
+   2. 根据参与虚拟机数量（N = 5）和策略进行切分
+   3. IID策略：均匀随机分配
+      VM1: [0-1999]    (2000 samples)
+      VM2: [2000-3999] (2000 samples)
+      VM3: [4000-5999] (2000 samples)
+      VM4: [6000-7999] (2000 samples)
+      VM5: [8000-9999] (2000 samples)
+   4. 为每个虚拟机生成assignedDatasetId
+   5. 发送DATASET_CREATE消息，包含完整的sliceInfo
 
-6. 心跳维持 (并行执行)
+7. 数据集内容分发 🆕 v1.5 增强
+   Backend → DATASET_APPEND_ROWS(batchRange, rows[localIndex, globalIndex]) → Specific VMs (批量)
+
+   批量传输示例（VM1接收第一个批次200行）：
+   - batchRange.localStartIndex: 0 (切片内索引)
+   - batchRange.localEndIndex: 199 (切片内索引)
+   - batchRange.globalStartIndex: 0 (原始数据集索引)
+   - batchRange.globalEndIndex: 199 (原始数据集索引)
+   - rows[0].localIndex: 0, globalIndex: 0
+   - rows[1].localIndex: 1, globalIndex: 1
+   - ...
+   - rows[199].localIndex: 199, globalIndex: 199
+
+   虚拟机接收后验证：
+   1. 验证localIndex连续性（0, 1, 2, ..., 199）
+   2. 验证globalIndex与sliceInfo一致
+   3. 记录已接收的全局索引集合
+
+   Backend → DATASET_COMPLETE(sliceVerification) → Specific VMs
+
+   虚拟机完成验证：
+   - 检查接收的样本数是否等于sliceInfo.sliceSamples
+   - 检查globalIndex范围是否为[startIndex, endIndex]
+   - 检查是否存在缺失或重复的索引
+   - 报告sliceVerification结果给后端
+
+8. 数据集创建确认 🆕 v1.5 新增
+   Backend → DATASET_STATUS_QUERY(assignedDatasetId) → Specific VMs
+   Specific VMs → DATASET_STATUS_RESPONSE(assignedDatasetId, sliceVerification) → Backend
+
+   后端确认流程：
+   1. 查询每个虚拟机的数据集状态
+   2. 验证所有虚拟机的sliceVerification.isComplete = true
+   3. 验证所有切片的globalIndex无重叠无遗漏
+   4. 确认数据集分发成功，准备启动联邦学习任务
+   5. 如有虚拟机数据不完整，标记该虚拟机为异常，考虑重传或排除
+```
+
+#### 阶段四：任务启动（步骤9-10）
+
+```
+9. 联邦学习任务启动 🆕 v1.5 改进
+   Backend → FEDERATED_TASK_START(taskId, assignedDatasetId) → All VMs
+   // 任务启动消息现在包含后端分配的数据集ID
+
+10. 任务启动确认
+    All VMs → FEDERATED_TASK_START_ACK(taskId, datasetStatus) → Backend
+    // 虚拟机确认任务启动并报告数据集状态
+```
+
+#### 阶段五：训练轮次执行（步骤11）
+
+```
+11. 轮次循环执行 (重复执行)
+    Loop for each round:
+      Backend → ROUND_START(taskId, roundNumber) → All VMs
+      All VMs → ROUND_START_ACK(taskId, roundNumber) → Backend
+
+      [虚拟机使用assignedDatasetId执行本地训练...]
+
+      All VMs → GRADIENT_UPLOAD(taskId, roundNumber, gradients) → Backend
+      Backend → GRADIENT_UPLOAD_ACK(taskId, roundNumber) → All VMs
+
+      [后端执行模型聚合...]
+
+      Backend → GLOBAL_MODEL_BROADCAST(taskId, roundNumber, model) → All VMs
+      All VMs → GLOBAL_MODEL_BROADCAST_ACK(taskId, roundNumber) → Backend
+
+      Backend → ROUND_COMPLETE(taskId, roundNumber) → All VMs
+      All VMs → ROUND_COMPLETE_ACK(taskId, roundNumber) → Backend
+    End Loop
+```
+
+#### 阶段六：任务完成清理（步骤12-13）
+
+```
+12. 任务结束处理
+    Backend → FEDERATED_TASK_STOP(taskId) → All VMs
+    All VMs → FEDERATED_TASK_STOP_ACK(taskId) → Backend
+
+13. 资源清理回收
+    Backend → FEDERATED_TASK_DELETE(taskId) → All VMs
+    All VMs → FEDERATED_TASK_DELETE_ACK(taskId) → Backend
+    Backend → DATASET_DELETE(assignedDatasetId) → All VMs
+    Backend → VM_STOP → All VMs
+    All VMs → VM_STOP_ACK → Backend
+```
+
+#### 并行维护流程
+
+```
+心跳维持 (并行执行)
    Every 30s:
      VM → HEARTBEAT → Backend
      Backend → HEARTBEAT_ACK → VM
 
-7. 状态查询 (按需)
+状态查询 (按需执行)
    Backend → VM_STATUS_QUERY → VM
    VM → VM_STATUS_RESPONSE → Backend (包含所有任务概览)
    Backend → FEDERATED_TASK_STATUS_QUERY(taskId) → VM
    VM → FEDERATED_TASK_STATUS_RESPONSE(taskId) → Backend (特定任务详情)
 
-8. 错误处理 (按需)
-   Any time:
-     VM/Backend → ERROR → Recipient
+错误处理 (任何时候)
+   VM/Backend → ERROR → Recipient
 
-9. 任务恢复流程 (可选)
+任务恢复流程 (可选)
    Backend → FEDERATED_TASK_STOP(taskId) → VM
    VM → FEDERATED_TASK_STOP_ACK(taskId) → Backend
 
@@ -1370,15 +1699,6 @@ VM-001 同时执行:
    VM → FEDERATED_TASK_RESUME_ACK(taskId) → Backend
 
    [继续执行轮次循环，从指定轮次开始...]
-
-10. 任务结束清理
-   Backend → FEDERATED_TASK_STOP(taskId) → VM
-   VM → FEDERATED_TASK_STOP_ACK(taskId) → Backend
-   Backend → FEDERATED_TASK_DELETE(taskId) → VM
-   VM → FEDERATED_TASK_DELETE_ACK(taskId) → Backend
-   Backend → DATASET_DELETE(taskId) → VM
-   Backend → VM_STOP → VM
-   VM → VM_STOP_ACK → Backend
 ```
 
 ### 7.2 多任务并发流程示例
@@ -1473,14 +1793,19 @@ VM-001 并发执行两个任务的典型场景:
 - ~~MODEL_TYPE_NEGOTIATION / MODEL_TYPE_NEGOTIATION_ACK~~ → 任务启动时指定
 - ~~ALGORITHM_CONFIG / ALGORITHM_CONFIG_ACK~~ → 合并到任务配置
 
-### 8.2 保留的协议 (27个)
+### 8.2 v1.5 保留和新增的协议 (36个) 🆕
 
 **连接管理 (4个): ✅**
 - CONNECT / CONNECT_ACK
 - HEARTBEAT / HEARTBEAT_ACK
 
-**任务管理 (4个): ✅**
-- FEDERATED_TASK_START / FEDERATED_TASK_START_ACK
+**数据集预查询 (2个): 🆕 v1.5 新增**
+- DATASET_LIST_QUERY → 后端查询虚拟机可用数据集
+- DATASET_LIST_RESPONSE → 虚拟机响应数据集列表
+
+**任务管理 (6个): ✅ v1.5 增强**
+- FEDERATED_TASK_START / FEDERATED_TASK_START_ACK → 现在包含assignedDatasetId
+- FEDERATED_TASK_STOP / FEDERATED_TASK_STOP_ACK
 - FEDERATED_TASK_RESUME / FEDERATED_TASK_RESUME_ACK
 
 **轮次管理 (8个): ✅**
@@ -1489,34 +1814,39 @@ VM-001 并发执行两个任务的典型场景:
 - GLOBAL_MODEL_BROADCAST / GLOBAL_MODEL_BROADCAST_ACK
 - ROUND_COMPLETE / ROUND_COMPLETE_ACK
 
-**状态监控 (3个): ✅**
-- STATUS_QUERY / STATUS_RESPONSE
+**状态监控 (6个): ✅**
+- VM_STATUS_QUERY / VM_STATUS_RESPONSE
+- FEDERATED_TASK_STATUS_QUERY / FEDERATED_TASK_STATUS_RESPONSE
 - ERROR
 
-**虚拟机控制 (4个): ✅ 重新保留**
+**虚拟机控制 (4个): ✅**
 - VM_START / VM_START_ACK → 后端集中控制虚拟机启动
 - VM_STOP / VM_STOP_ACK → 后端集中控制虚拟机停止
 
-**数据集管理 (5个): ✅ 重新保留**
-- DATASET_CREATE → 动态创建数据集
+**数据集管理 (6个): ✅ v1.5 优化**
+- DATASET_CREATE → 现在由后端分发assignedDatasetId
 - DATASET_APPEND_ROWS → 批量数据同步
 - DATASET_COMPLETE → 数据集上传完成通知
 - DATASET_STATUS_QUERY / DATASET_STATUS_RESPONSE → 数据集状态管理
 - DATASET_DELETE → 任务后清理数据集
 
-### 8.3 v1.4协议优化效果
+### 8.3 v1.5协议优化效果 🆕
 
-- **协议数量**: 46 → 34 (减少26%，保留多任务支持)
+- **协议数量**: 46 → 36 (减少22%，新增数据集关联管理)
+- **数据集关联**: 🆕 新增2个协议实现13步完整数据集关联流程
+- **ID统一管理**: 🆕 所有ID由后端UuidUtil生成，确保一致性
 - **多任务支持**: 通过taskId字段实现精确的任务级别控制
 - **完整生命周期**: 支持START→STOP→RESUME→DELETE的完整任务生命周期管理
-- **任务恢复机制**: 新增RESUME协议支持从停止状态精确恢复任务执行
-- **数据集管理**: 保留DATASET_STATUS_QUERY/RESPONSE，支持后端数据集监控
+- **任务恢复机制**: RESUME协议支持从停止状态精确恢复任务执行
+- **数据集管理增强**: 🆕 支持assignedDatasetId精确分发和状态确认
+- **前端后端协调**: 🆕 完整的Frontend→Backend→VM三层协调机制
 - **状态监控统一**: 双层监控机制 - VM整体状态 + 任务详细状态
 - **网络往返**: 减少不必要的RTT，消除协议重复
 - **实现复杂度**: 显著降低整体复杂度，增强任务管理能力
 - **维护成本**: 大幅降低，提供清晰的状态转换机制
 - **集中控制**: 增强后端对虚拟机和数据的完全控制
 - **资源管理**: DELETE协议支持彻底的资源清理和回收
+- **数据隔离**: 🆕 assignedDatasetId确保多任务数据集精确隔离
 
 ## 9. 实施建议
 
@@ -1526,35 +1856,129 @@ VM-001 并发执行两个任务的典型场景:
 3. **兼容性处理**: 提供协议版本协商机制
 4. **集中控制实施**: 先实现虚拟机控制，再实现数据集管理
 
-### 9.2 测试重点
-1. **模型分发一致性**: 确保所有虚拟机收到相同的初始模型
-2. **轮次同步**: 验证所有参与者的轮次同步
-3. **多任务并发**: 测试单VM同时运行多个联邦学习任务
-4. **任务级别控制**: 验证通过taskId进行精确任务控制
-5. **虚拟机生命周期**: 测试启动、停止和故障恢复
-6. **数据集隔离**: 验证多任务场景下的数据集独立性
-7. **状态监控**: 测试VM_STATUS_RESPONSE的多任务状态展示
-8. **错误恢复**: 测试各种异常情况的处理
-9. **性能对比**: 与原协议进行性能基准测试
+### 9.2 v1.5测试重点 🆕
+1. **13步完整流程**: 验证从前端创建到资源清理的完整13步流程
+2. **数据集关联**: 🆕 测试assignedDatasetId的精确分发和关联
+3. **ID一致性**: 🆕 验证UuidUtil生成的ID在整个系统中的一致性
+4. **数据集状态确认**: 🆕 测试DATASET_STATUS_QUERY/RESPONSE的确认机制
+5. **🆕 数据集切片元数据**: 验证sliceInfo字段的正确生成和传递
+   - 测试startIndex、endIndex的准确性
+   - 验证sliceSamples = endIndex - startIndex + 1
+   - 测试totalSamples与原始数据集一致性
+   - 验证sliceIndex和totalSlices的正确性
+6. **🆕 批次范围验证**: 测试batchRange字段的准确性
+   - 验证localStartIndex/localEndIndex的连续性
+   - 测试globalStartIndex/globalEndIndex与sliceInfo的一致性
+   - 验证批次间无重叠无遗漏
+7. **🆕 双重索引一致性**: 测试每行数据的localIndex和globalIndex
+   - 验证localIndex从0开始连续递增
+   - 测试globalIndex在[startIndex, endIndex]范围内
+   - 验证localIndex + startIndex = globalIndex
+8. **🆕 切片完整性验证**: 测试sliceVerification的准确性
+   - 验证actualSamples = expectedSamples
+   - 测试missingIndices为空
+   - 验证continuityCheck无间隙
+   - 测试异常场景下的错误检测
+9. **🆕 数据分配策略**: 测试IID和NON_IID两种分配策略
+   - IID策略：验证数据均匀随机分配
+   - NON_IID策略：验证按标签聚类分配
+   - 测试策略标识的正确传递
+10. **模型分发一致性**: 确保所有虚拟机收到相同的初始模型
+11. **轮次同步**: 验证所有参与者的轮次同步
+12. **多任务并发**: 测试单VM同时运行多个联邦学习任务
+13. **任务级别控制**: 验证通过taskId进行精确任务控制
+14. **虚拟机生命周期**: 测试启动、停止和故障恢复
+15. **数据集隔离**: 验证多任务场景下的数据集独立性
+16. **状态监控**: 测试VM_STATUS_RESPONSE的多任务状态展示
+17. **错误恢复**: 测试各种异常情况的处理
+18. **前端后端协调**: 🆕 测试Frontend→Backend→VM的三层协调
+19. **性能对比**: 与v1.4协议进行性能基准测试
+20. **🆕 切片边界测试**: 测试极端场景
+    - 单个虚拟机（totalSlices = 1）
+    - 大量虚拟机（totalSlices > 100）
+    - 不均匀切片（某些切片样本数不同）
+    - 空切片处理（sliceSamples = 0）
 
-### 9.3 监控指标
-1. **协议覆盖率**: 确保34个协议覆盖所有场景
-2. **多任务性能**: 监控单VM多任务执行效率
-3. **任务生命周期**: 监控START→STOP→RESUME→DELETE完整流程的执行效率
-4. **数据集监控**: 验证DATASET_STATUS_QUERY的数据集管理效果
-5. **任务隔离度**: 监控任务间的资源隔离效果
-6. **状态监控效率**: 验证双层监控机制的有效性
-7. **资源清理效率**: 监控DELETE协议的资源回收效果
-8. **消息传输效率**: 监控网络使用情况
-9. **虚拟机管理效率**: 监控启停时间和成功率
-10. **数据同步性能**: 监控数据传输速度和完整性
-11. **错误率**: 跟踪协议执行的成功率
-12. **同步精度**: 监控虚拟机间的时序一致性
-13. **资源利用率**: 监控VM资源在多任务间的分配效率
+### 9.3 v1.5监控指标 🆕
+1. **协议覆盖率**: 确保36个协议覆盖所有场景
+2. **13步流程完整性**: 🆕 监控从前端创建到资源清理的完整13步执行
+3. **数据集关联准确性**: 🆕 监控assignedDatasetId的分发和关联准确率
+4. **ID一致性检查**: 🆕 验证UuidUtil生成的ID在系统中的一致性
+5. **数据集状态确认效率**: 🆕 监控DATASET_STATUS_QUERY/RESPONSE的响应时间
+6. **🆕 切片分发准确率**: 监控数据切片的正确性
+   - sliceInfo准确率：验证切片范围无重叠无遗漏
+   - batchRange准确率：监控批次范围的正确性
+   - 索引一致性：监控localIndex和globalIndex的匹配度
+7. **🆕 数据完整性验证成功率**: 监控sliceVerification的结果
+   - 完整接收率：actualSamples = expectedSamples的虚拟机占比
+   - 缺失数据检测率：missingIndices准确检测的成功率
+   - 连续性验证成功率：continuityCheck无间隙的比例
+8. **🆕 切片传输效率**: 监控数据切片分发性能
+   - 单个切片传输时间：从DATASET_CREATE到DATASET_COMPLETE的耗时
+   - 批次传输速率：DATASET_APPEND_ROWS的吞吐量（行/秒）
+   - 切片大小影响：不同sliceSamples对传输时间的影响
+   - 并发传输效率：多个虚拟机同时接收数据的性能
+9. **🆕 索引校验开销**: 监控双重索引验证的性能影响
+   - localIndex验证耗时
+   - globalIndex验证耗时
+   - 索引映射计算开销
+10. **🆕 分配策略执行效率**: 监控不同策略的性能
+    - IID策略执行时间
+    - NON_IID策略执行时间
+    - 策略切换开销
+11. **多任务性能**: 监控单VM多任务执行效率
+12. **任务生命周期**: 监控START→STOP→RESUME→DELETE完整流程的执行效率
+13. **数据集监控**: 验证DATASET_STATUS_QUERY的数据集管理效果
+14. **任务隔离度**: 监控任务间的资源隔离效果
+15. **状态监控效率**: 验证双层监控机制的有效性
+16. **资源清理效率**: 监控DELETE协议的资源回收效果
+17. **消息传输效率**: 监控网络使用情况
+18. **虚拟机管理效率**: 监控启停时间和成功率
+19. **数据同步性能**: 监控数据传输速度和完整性
+20. **错误率**: 跟踪协议执行的成功率
+21. **同步精度**: 监控虚拟机间的时序一致性
+22. **资源利用率**: 监控VM资源在多任务间的分配效率
+23. **前端响应性能**: 🆕 监控Frontend→Backend API的响应时间
+24. **数据集隔离效果**: 🆕 验证assignedDatasetId的多任务隔离效果
+25. **🆕 切片重传率**: 监控数据传输失败需要重传的比例
+26. **🆕 异常虚拟机排除率**: 监控因数据不完整被排除的虚拟机比例
 
 ---
 
-**协议版本**: v1.4
-**文档版本**: 1.0
-**最后更新**: 2024-01-01
+**协议版本**: v1.5.1 🆕
+**文档版本**: 2.1
+**最后更新**: 2025-09-30
 **维护者**: FedUWAComm开发团队
+
+## v1.5 更新记录
+
+- **2025-09-30**: 升级到v1.5.1版本 - 数据切片完整性验证增强 🆕
+  - **DATASET_CREATE协议增强**: 新增sliceInfo字段
+    - startIndex/endIndex: 虚拟机分配的数据范围（全局索引）
+    - sliceSamples: 切片样本数
+    - totalSamples: 原始数据集总样本数
+    - sliceIndex/totalSlices: 切片编号信息
+    - allocationStrategy: 分配策略标识（IID/NON_IID）
+  - **DATASET_APPEND_ROWS协议增强**: 新增批次范围和双重索引
+    - batchRange: 批次在切片和全局数据集中的位置
+    - localIndex: 每行在虚拟机切片中的索引
+    - globalIndex: 每行在原始数据集中的全局索引
+    - 支持精确的数据传输验证和问题定位
+  - **DATASET_COMPLETE协议增强**: 新增sliceVerification字段
+    - expectedStartIndex/expectedEndIndex: 预期范围（来自sliceInfo）
+    - actualStartIndex/actualEndIndex: 实际接收范围
+    - isComplete: 切片完整性标识
+    - missingIndices: 缺失数据的全局索引列表
+    - continuityCheck: 数据连续性检查（间隙检测）
+  - **数据集分发流程优化**: 详细说明步骤6-8的切片元数据传递机制
+  - **测试重点扩充**: 新增10个切片相关测试项
+  - **监控指标扩充**: 新增8个切片性能监控指标
+
+- **2025-01-29**: 升级到v1.5版本
+  - 新增13步完整联邦学习流程，包含数据集关联管理
+  - 新增2个数据集预查询协议：DATASET_LIST_QUERY/RESPONSE
+  - 优化FEDERATED_TASK_START协议，新增assignedDatasetId字段
+  - 强化ID统一管理，所有ID由后端UuidUtil生成
+  - 增强前端→后端→虚拟机三层协调机制
+  - 协议总数从34个增加到36个
+  - 更新测试重点和监控指标以适应v1.5新特性

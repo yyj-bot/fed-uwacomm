@@ -1,5 +1,6 @@
 package com.feduwacomm.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
@@ -28,6 +29,7 @@ public enum DataStatus {
         return description;
     }
 
+    @JsonCreator
     public static DataStatus fromCode(String code) {
         if (code == null) {
             return UPLOADING;

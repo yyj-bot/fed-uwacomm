@@ -90,7 +90,8 @@ public class WorkflowOrchestrationIntegrationTest {
         // 1. 手动发布任务创建事件
         String taskId = "test-task-" + System.currentTimeMillis();
         FederatedTaskCreatedEvent event = new FederatedTaskCreatedEvent(
-                taskId, "测试任务", testUserId);
+                this, taskId, "测试任务", testUserId,
+                "test-dataset-id", List.of("vm1", "vm2"), "BALANCED");
         
         eventPublisher.publishEvent(event);
         

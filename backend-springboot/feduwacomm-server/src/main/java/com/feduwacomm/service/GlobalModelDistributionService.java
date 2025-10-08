@@ -159,27 +159,60 @@ public class GlobalModelDistributionService {
     }
 
     /**
-     * 构建全局模型分发消息
+     * 构建全局模型分发消息（符合v1.5.1协议规范）
      */
-    private ProtocolMessage buildGlobalModelMessage(String taskId, Integer roundNumber, 
-                                                   String globalModelId, Map<String, ?> globalMetrics, 
+    private ProtocolMessage buildGlobalModelMessage(String taskId, Integer roundNumber,
+                                                   String globalModelId, Map<String, ?> globalMetrics,
                                                    String algorithm) {
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
         data.put("roundNumber", roundNumber);
-        data.put("globalModelId", globalModelId);
-        data.put("algorithm", algorithm);
-        data.put("nextRound", roundNumber + 1);
-        data.put("distributionTime", Instant.now().toString());
 
-        // 添加全局指标信息
+        // 🆕 构建globalModel嵌套对象（符合v1.5.1协议规范）
+        Map<String, Object> globalModel = new HashMap<>();
+        globalModel.put("modelId", globalModelId != null ? globalModelId : "model-" + taskId + "-r" + roundNumber);
+        globalModel.put("version", "1.0.0");
+
+        // 将globalMetrics作为模型参数
         if (globalMetrics != null && !globalMetrics.isEmpty()) {
-            data.put("globalMetrics", globalMetrics);
+            globalModel.put("parameters", globalMetrics);
+        } else {
+            globalModel.put("parameters", new HashMap<>());
         }
 
-        // 添加训练指令
-        data.put("instruction", "START_NEXT_ROUND");
-        data.put("expectedClientsInNextRound", "ALL_PARTICIPANTS");
+        // 添加校验和（可选）
+        // globalModel.put("checksum", "sha256:...");
+
+        data.put("globalModel", globalModel);
+
+        // 🆕 添加aggregationInfo（符合v1.5.1协议规范）
+        Map<String, Object> aggregationInfo = new HashMap<>();
+        aggregationInfo.put("aggregationMethod", "FEDERATED_AVERAGING");
+
+        if (globalMetrics != null && !globalMetrics.isEmpty()) {
+            // 使用get()方法避免通配符类型问题
+            aggregationInfo.put("participantCount",
+                globalMetrics.get("participantCount") != null ? globalMetrics.get("participantCount") : 0);
+            aggregationInfo.put("globalAccuracy",
+                globalMetrics.get("globalAccuracy") != null ? globalMetrics.get("globalAccuracy") : 0.0);
+            aggregationInfo.put("globalLoss",
+                globalMetrics.get("globalLoss") != null ? globalMetrics.get("globalLoss") : 0.0);
+            aggregationInfo.put("convergenceScore",
+                globalMetrics.get("convergenceScore") != null ? globalMetrics.get("convergenceScore") : 0.0);
+        } else {
+            aggregationInfo.put("participantCount", 0);
+            aggregationInfo.put("globalAccuracy", 0.0);
+            aggregationInfo.put("globalLoss", 0.0);
+            aggregationInfo.put("convergenceScore", 0.0);
+        }
+
+        data.put("aggregationInfo", aggregationInfo);
+
+        // 🆕 添加nextRoundConfig（符合v1.5.1协议规范）
+        Map<String, Object> nextRoundConfig = new HashMap<>();
+        nextRoundConfig.put("startTime", Instant.now().plusSeconds(5).toString());
+        nextRoundConfig.put("learningRate", 0.001);  // 可从任务配置获取
+        data.put("nextRoundConfig", nextRoundConfig);
 
         return ProtocolMessage.builder()
                 .type(ProtocolType.GLOBAL_MODEL_BROADCAST)
