@@ -15,6 +15,7 @@ import {
   mockAllAdminVms,
   mockUserVms
 } from '../data/adminVmMockData'
+import { vmStatusMap, deletedVmIds } from './vmState'
 
 export const adminVmHandlers = [
   // 3.1 管理员查看所有虚拟机 - GET /api/admin/vm/list
@@ -28,8 +29,22 @@ export const adminVmHandlers = [
     const assigned = url.searchParams.get('assigned')
     const keyword = url.searchParams.get('keyword')
     
-    // 使用 adminVmMockData 中的管理员VM列表
-    let vmList = [...mockAllAdminVms]
+    // 使用 adminVmMockData 中的管理员VM列表，并过滤已删除的VM，更新状态
+    let vmList = mockAllAdminVms
+      .filter(vm => !deletedVmIds.has(vm.vmId)) // 过滤已删除的VM
+      .map(vm => {
+        // 更新运行时状态
+        const currentStatus = vmStatusMap.get(vm.vmId) || vm.status
+        const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+          ? 'CONNECTED' 
+          : 'DISCONNECTED'
+        
+        return {
+          ...vm,
+          status: currentStatus,
+          connectionStatus
+        }
+      })
     
     // 应用过滤器
     if (status) {
@@ -74,8 +89,22 @@ export const adminVmHandlers = [
     const url = new URL(request.url)
     const status = url.searchParams.get('status')
     
-    // 使用 adminVmMockData 中的未分配VM列表
-    let unassignedList = [...mockUnassignedVms]
+    // 使用 adminVmMockData 中的未分配VM列表，并过滤已删除的VM，更新状态
+    let unassignedList = mockUnassignedVms
+      .filter(vm => !deletedVmIds.has(vm.vmId)) // 过滤已删除的VM
+      .map(vm => {
+        // 更新运行时状态
+        const currentStatus = vmStatusMap.get(vm.vmId) || vm.status
+        const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+          ? 'CONNECTED' 
+          : 'DISCONNECTED'
+        
+        return {
+          ...vm,
+          status: currentStatus,
+          connectionStatus
+        }
+      })
     
     // 状态过滤
     if (status) {
@@ -355,8 +384,10 @@ export const adminVmHandlers = [
     const size = parseInt(url.searchParams.get('size') || '10')
     
     console.log(`[MSW] 匹配: GET /api/admin/user/${userId}/vms`)
+    console.log(`[MSW] 查询 userId:`, userId, '当前 mockUserVms keys:', Object.keys(mockUserVms))
     
     const userVms = mockUserVms[userId as string] || []
+    console.log(`[MSW] 找到的用户VM数量:`, userVms.length, 'VMs:', userVms)
     
     return HttpResponse.json({
       code: 200,
@@ -365,6 +396,8 @@ export const adminVmHandlers = [
         userId,
         username: `user-${userId}`,
         vms: userVms,
+        list: userVms,  // 添加 list 字段，匹配 service 期望
+        records: userVms,  // 添加 records 字段，作为备用
         total: userVms.length,
         page,
         size
@@ -377,13 +410,50 @@ export const adminVmHandlers = [
     const { userId } = params
     const body = await request.json() as any
     
-    console.log(`[MSW] 匹配: POST /api/admin/user/${userId}/vm/batch-assign`)
+    console.log(`[MSW] 匹配: POST /api/admin/user/${userId}/vm/batch-assign`, body)
+    console.log(`[MSW] 当前 mockUserVms keys:`, Object.keys(mockUserVms))
+    console.log(`[MSW] userId 类型:`, typeof userId, 'userId 值:', userId)
     
-    const results = body.vmIds.map((vmId: string) => ({
-      vmId,
-      status: 'SUCCESS',
-      assignedAt: new Date().toISOString()
-    }))
+    // 实际更新 mockUserVms
+    if (!mockUserVms[userId as string]) {
+      mockUserVms[userId as string] = []
+      console.log(`[MSW] 为用户 ${userId} 创建新的VM列表`)
+    }
+    
+    const results = body.vmIds.map((vmId: string) => {
+      // 从 mockAllAdminVms 中找到对应的 VM
+      const vm = mockAllAdminVms.find(v => v.vmId === vmId)
+      
+      if (vm) {
+        // 添加到用户的 VM 列表（避免重复）
+        const existingIndex = mockUserVms[userId as string].findIndex(v => v.vmId === vmId)
+        const assignedVm = {
+          vmId: vm.vmId,
+          vmName: vm.name,
+          ipAddress: vm.ipAddress,
+          status: vmStatusMap.get(vmId) || vm.status,
+          permissions: body.permissions || ['READ'],
+          assignedAt: new Date().toISOString(),
+          notes: body.notes
+        }
+        
+        if (existingIndex >= 0) {
+          // 更新已存在的分配
+          mockUserVms[userId as string][existingIndex] = assignedVm
+        } else {
+          // 添加新的分配
+          mockUserVms[userId as string].push(assignedVm)
+        }
+        
+        console.log(`[MSW] 批量分配：已将 VM ${vmId} 分配给用户 ${userId}`)
+      }
+      
+      return {
+        vmId,
+        status: 'SUCCESS',
+        assignedAt: new Date().toISOString()
+      }
+    })
     
     return HttpResponse.json({
       code: 200,
@@ -402,7 +472,18 @@ export const adminVmHandlers = [
     const { userId } = params
     const body = await request.json() as any
     
-    console.log(`[MSW] 匹配: DELETE /api/admin/user/${userId}/vm/batch-remove`)
+    console.log(`[MSW] 匹配: DELETE /api/admin/user/${userId}/vm/batch-remove`, body)
+    
+    // 实际更新 mockUserVms
+    if (mockUserVms[userId as string]) {
+      body.vmIds.forEach((vmId: string) => {
+        const index = mockUserVms[userId as string].findIndex(v => v.vmId === vmId)
+        if (index >= 0) {
+          mockUserVms[userId as string].splice(index, 1)
+          console.log(`[MSW] 批量移除：已从用户 ${userId} 移除 VM ${vmId}`)
+        }
+      })
+    }
     
     const results = body.vmIds.map((vmId: string) => ({
       vmId,
@@ -424,10 +505,57 @@ export const adminVmHandlers = [
 
   // 3.4 管理员强制控制VM
   http.post('http://localhost:5173/api/admin/vm/:vmId/force-control', async ({ params, request }) => {
-    const { vmId } = params
+    const { vmId } = params as { vmId: string }
     const body = await request.json() as any
     
-    console.log(`[MSW] 匹配: POST /api/admin/vm/${vmId}/force-control`)
+    console.log(`[MSW] 匹配: POST /api/admin/vm/${vmId}/force-control`, body)
+    
+    // 根据操作类型更新虚拟机状态
+    const action = body.action
+    // 注意：以下延迟时间是为了模拟真实VM操作而设定的，不是从接口文档读取
+    // 真实环境中，后端会立即返回命令已发送，实际状态变化通过 WebSocket 推送
+    // timeout 参数（默认300秒）是操作的最大等待时间，不是实际执行时间
+    switch (action) {
+      case 'START':
+        // 启动：模拟启动过程约3秒
+        vmStatusMap.set(vmId, 'STARTING')
+        setTimeout(() => {
+          vmStatusMap.set(vmId, 'RUNNING')
+          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已启动`)
+        }, 3000)
+        break
+      
+      case 'STOP':
+        // 停止：模拟正常停止约2秒
+        vmStatusMap.set(vmId, 'STOPPING')
+        setTimeout(() => {
+          vmStatusMap.set(vmId, 'STOPPED')
+          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已停止`)
+        }, 2000)
+        break
+      
+      case 'FORCE_STOP':
+        // 强制停止：立即生效（模拟强制断电）
+        vmStatusMap.set(vmId, 'STOPPED')
+        console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已强制停止`)
+        break
+      
+      case 'RESTART':
+        // 重启：模拟完整重启流程约5秒（停止1秒 → 启动2秒 → 完成5秒）
+        vmStatusMap.set(vmId, 'STOPPING')
+        setTimeout(() => {
+          vmStatusMap.set(vmId, 'STARTING')
+          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 正在重启...`)
+        }, 1000)
+        setTimeout(() => {
+          vmStatusMap.set(vmId, 'RUNNING')
+          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 重启完成`)
+        }, 5000)
+        break
+      
+      default:
+        console.warn(`[MSW] 未知的强制控制操作: ${action}`)
+    }
     
     return HttpResponse.json({
       code: 200,
@@ -439,7 +567,7 @@ export const adminVmHandlers = [
         reason: body.reason,
         executedBy: 'admin',
         executedAt: new Date().toISOString(),
-        estimatedTime: 60
+        estimatedTime: action === 'FORCE_STOP' ? 0 : (action === 'RESTART' ? 120 : 60)
       }
     })
   })

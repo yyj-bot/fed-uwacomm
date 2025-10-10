@@ -1,6 +1,13 @@
 /**
- * VM列表组件
- * 显示虚拟机列表，支持搜索、筛选、分页和操作
+ * 虚拟机列表组件（普通用户）
+ * 显示虚拟机列表，支持搜索、筛选、分页
+ * 
+ * 功能：
+ * - 查看虚拟机列表（接口 4.1）
+ * - 查看虚拟机详情（接口 4.2）
+ * - 查看本地模型
+ * 
+ * 注意：不包含虚拟机控制操作（启动/停止/重启），这些功能仅管理员可用
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -24,15 +31,10 @@ import {
 import { 
   SearchOutlined, 
   ReloadOutlined, 
-  PlayCircleOutlined,
-  PauseCircleOutlined,
-  RedoOutlined,
   EyeOutlined,
-  BarChartOutlined,
-  TeamOutlined
+  BarChartOutlined
 } from '@ant-design/icons'
 import { useVM } from '@/store/vm'
-import { useAuth } from '@/store/auth'
 import type { VirtualMachine } from '@/api/vm'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -42,10 +44,9 @@ const { Option } = Select
 interface VMListProps {
   onSelectVM: (vm: VirtualMachine) => void
   onViewModels: (vm: VirtualMachine) => void
-  onViewAssignment?: (vm: VirtualMachine) => void
 }
 
-const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignment }) => {
+const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [osTypeFilter, setOsTypeFilter] = useState<string>('')
@@ -58,19 +59,8 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignm
     fetchVMList,
     setPagination,
     setQueryParams,
-    startVM,
-    stopVM,
-    restartVM,
-    fetchVMStatus,
-    getVMStatus,
-    isVMOperating,
-    canStartVM,
-    canStopVM,
-    canRestartVM
+    getVMStatus
   } = useVM()
-
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'ADMIN'
 
   // 初始化数据
   useEffect(() => {
@@ -114,46 +104,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignm
   const handleTableChange = (page: number, pageSize: number) => {
     setPagination(page, pageSize)
     fetchVMList({ page, size: pageSize })
-  }
-
-  // 处理VM操作
-  const handleStartVM = async (vm: VirtualMachine) => {
-    const result = await startVM(vm.vmId)
-    if (result.success) {
-      message.success(`虚拟机 ${vm.name} 启动成功`)
-      // 延迟刷新状态，等待虚拟机完成启动
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 1500)
-    } else {
-      message.error(`启动失败: ${result.error || '未知错误'}`)
-    }
-  }
-
-  const handleStopVM = async (vm: VirtualMachine) => {
-    const result = await stopVM(vm.vmId)
-    if (result.success) {
-      message.success(`虚拟机 ${vm.name} 停止成功`)
-      // 延迟刷新状态，等待虚拟机完成停止
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 1500)
-    } else {
-      message.error(`停止失败: ${result.error || '未知错误'}`)
-    }
-  }
-
-  const handleRestartVM = async (vm: VirtualMachine) => {
-    const result = await restartVM(vm.vmId)
-    if (result.success) {
-      message.success(`虚拟机 ${vm.name} 重启成功`)
-      // 延迟刷新状态，等待虚拟机完成重启
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 2000)
-    } else {
-      message.error(`重启失败: ${result.error || '未知错误'}`)
-    }
   }
 
   // 渲染状态标签
@@ -263,7 +213,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignm
     {
       title: '操作',
       key: 'actions',
-      width: 240,
+      width: 120,
       fixed: 'right',
       render: (_, record: VirtualMachine) => (
         <Space size="small">
@@ -282,54 +232,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignm
               onClick={() => onViewModels(record)}
             />
           </Tooltip>
-
-          {/* 管理员专用：分配管理 */}
-          {isAdmin && onViewAssignment && (
-            <Tooltip title="分配管理">
-              <Button 
-                type="text" 
-                icon={<TeamOutlined />} 
-                onClick={() => onViewAssignment(record)}
-                style={{ color: '#722ed1' }}
-              />
-            </Tooltip>
-          )}
-          
-          {canStartVM(record) && (
-            <Tooltip title="启动">
-              <Button 
-                type="text" 
-                icon={<PlayCircleOutlined />} 
-                onClick={() => handleStartVM(record)}
-                loading={isVMOperating(record.vmId, 'start')}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
-          )}
-          
-          {canStopVM(record) && (
-            <Tooltip title="停止">
-              <Button 
-                type="text" 
-                icon={<PauseCircleOutlined />} 
-                onClick={() => handleStopVM(record)}
-                loading={isVMOperating(record.vmId, 'stop')}
-                style={{ color: '#fa8c16' }}
-              />
-            </Tooltip>
-          )}
-          
-          {canRestartVM(record) && (
-            <Tooltip title="重启">
-              <Button 
-                type="text" 
-                icon={<RedoOutlined />} 
-                onClick={() => handleRestartVM(record)}
-                loading={isVMOperating(record.vmId, 'restart')}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
-          )}
         </Space>
       )
     }

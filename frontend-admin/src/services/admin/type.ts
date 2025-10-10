@@ -235,7 +235,7 @@ export type VmPermission = 'READ' | 'WRITE' | 'EXECUTE' | 'ADMIN'
 /**
  * VM状态类型
  */
-export type VmStatus = 'RUNNING' | 'STOPPED' | 'ERROR' | 'STARTING' | 'STOPPING'
+export type VmStatus = 'RUNNING' | 'STOPPED' | 'ERROR' | 'STARTING' | 'STOPPING' | 'OFFLINE'
 
 /**
  * VM连接状态类型
@@ -293,18 +293,62 @@ export interface VirtualMachine {
   readonly name: string
   /** IP地址 */
   readonly ipAddress: string
+  /** 端口 */
+  readonly port?: number
   /** 虚拟机状态 */
   readonly status: VmStatus
   /** 连接状态 */
   readonly connectionStatus: VmConnectionStatus
+  /** 操作系统类型 */
+  readonly osType?: string
+  /** CPU核心数 */
+  readonly cpuCores?: number
+  /** 内存大小(MB) */
+  readonly memoryMb?: number
+  /** 磁盘大小(GB) */
+  readonly diskGb?: number
   /** 是否已分配 */
   readonly isAssigned?: boolean
   /** 已分配用户数量 */
   readonly assignedUserCount?: number
   /** 创建时间 */
   readonly createdAt: string
+  /** 更新时间 */
+  readonly updatedAt?: string
   /** 最后心跳时间 */
   readonly lastHeartbeat?: string
+  /** 系统信息 */
+  readonly systemInfo?: {
+    os?: string
+    kernel?: string
+    python?: string
+    gpu?: string
+    cuda?: string
+    cudnn?: string
+  }
+  /** 能力配置 */
+  readonly capabilities?: {
+    supportedAlgorithms?: string[]
+    maxBatchSize?: number
+    maxMemoryUsage?: number
+    gpuMemory?: number
+    networkSpeed?: number
+  }
+  /** 网络配置 */
+  readonly networkConfig?: {
+    uploadSpeed?: number
+    downloadSpeed?: number
+    latency?: number
+    bandwidth?: number
+  }
+  /** 元数据 */
+  readonly metadata?: {
+    description?: string
+    location?: string
+    owner?: string
+    department?: string
+    tags?: string[]
+  }
 }
 
 /**

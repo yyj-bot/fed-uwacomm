@@ -93,6 +93,26 @@ const VMForceControl: React.FC<VMForceControlProps> = ({
     }
   }
 
+  // 检查操作是否可用
+  const isActionDisabled = (action: VmControlAction): boolean => {
+    switch (action) {
+      case 'START':
+        // 只有停止状态才能启动
+        return currentStatus !== 'STOPPED'
+      case 'STOP':
+        // 只有运行状态才能停止
+        return currentStatus !== 'RUNNING'
+      case 'RESTART':
+        // 只有运行或错误状态才能重启
+        return currentStatus !== 'RUNNING' && currentStatus !== 'ERROR'
+      case 'FORCE_STOP':
+        // 任何非停止状态都可以强制停止
+        return currentStatus === 'STOPPED'
+      default:
+        return false
+    }
+  }
+
   const recommendedActions = getRecommendedActions()
 
   // 处理强制控制
@@ -209,17 +229,27 @@ const VMForceControl: React.FC<VMForceControlProps> = ({
             rules={[{ required: true, message: '请选择控制操作' }]}
           >
             <Select placeholder="请选择控制操作">
-              {actionOptions.map(option => (
-                <Option key={option.value} value={option.value}>
-                  <Space>
-                    {option.icon}
-                    {option.label}
-                    {recommendedActions.includes(option.value) && (
-                      <Tag color="blue">推荐</Tag>
-                    )}
-                  </Space>
-                </Option>
-              ))}
+              {actionOptions.map(option => {
+                const disabled = isActionDisabled(option.value)
+                return (
+                  <Option 
+                    key={option.value} 
+                    value={option.value}
+                    disabled={disabled}
+                  >
+                    <Space>
+                      {option.icon}
+                      {option.label}
+                      {recommendedActions.includes(option.value) && (
+                        <Tag color="blue">推荐</Tag>
+                      )}
+                      {disabled && (
+                        <Tag color="default">不可用</Tag>
+                      )}
+                    </Space>
+                  </Option>
+                )
+              })}
             </Select>
           </Form.Item>
 

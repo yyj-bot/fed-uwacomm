@@ -27,7 +27,7 @@ import {
   UserVmList,
   UserVmManagement,
   VMForceControl,
-  VMDetail
+  VMEditDrawer
 } from './components'
 import { AdminVMList, UnassignedVMList } from './components'
 
@@ -53,8 +53,7 @@ const AdminVMManagementPage: React.FC = () => {
   const [userVmDrawerVisible, setUserVmDrawerVisible] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [forceControlDrawerVisible, setForceControlDrawerVisible] = useState(false)
-  const [detailDrawerVisible, setDetailDrawerVisible] = useState(false)
-  const [selectedVmForDetail, setSelectedVmForDetail] = useState<any>(null)
+  const [editDrawerVisible, setEditDrawerVisible] = useState(false)
 
   // 初始化数据
   useEffect(() => {
@@ -75,22 +74,27 @@ const AdminVMManagementPage: React.FC = () => {
     }
   }
 
-  // 处理查看VM详情
-  const handleViewDetail = (vm: any) => {
-    setSelectedVmForDetail(vm)
-    setDetailDrawerVisible(true)
-  }
-
-  // 处理关闭详情抽屉
-  const handleCloseDetailDrawer = () => {
-    setDetailDrawerVisible(false)
-    setSelectedVmForDetail(null)
-  }
-
   // 处理查看VM分配
   const handleViewAssignment = (vm: any) => {
     setSelectedVm(vm)
     setAssignmentDrawerVisible(true)
+  }
+
+  // 处理编辑VM
+  const handleEdit = (vm: any) => {
+    setSelectedVm(vm)
+    setEditDrawerVisible(true)
+  }
+
+  // 处理关闭编辑抽屉
+  const handleCloseEditDrawer = () => {
+    setEditDrawerVisible(false)
+    setSelectedVm(null)
+  }
+
+  // 处理编辑成功
+  const handleEditSuccess = () => {
+    fetchAdminVmList()
   }
 
   // 处理关闭分配抽屉
@@ -127,8 +131,11 @@ const AdminVMManagementPage: React.FC = () => {
   const handleCloseForceControlDrawer = () => {
     setForceControlDrawerVisible(false)
     setSelectedVm(null)
-    // 刷新数据
-    fetchAdminVmList()
+    // 延迟刷新数据，给状态变更一点时间
+    // 注意：mock 延迟时间为 START:3s, STOP:2s, RESTART:5s, FORCE_STOP:0s
+    setTimeout(() => {
+      fetchAdminVmList()
+    }, 5500)
   }
 
   return (
@@ -170,10 +177,10 @@ const AdminVMManagementPage: React.FC = () => {
             <AdminVMList 
               vmList={adminVmList}
               loading={adminVmListLoading}
-              onViewDetail={handleViewDetail}
               onViewAssignment={handleViewAssignment}
               onForceControl={handleForceControl}
               onRefresh={fetchAdminVmList}
+              onEdit={handleEdit}
             />
           </TabPane>
 
@@ -189,7 +196,6 @@ const AdminVMManagementPage: React.FC = () => {
             <UnassignedVMList 
               vmList={unassignedVms}
               loading={unassignedVmsLoading}
-              onViewDetail={handleViewDetail}
               onViewAssignment={handleViewAssignment}
               onRefresh={fetchUnassignedVmList}
             />
@@ -199,7 +205,7 @@ const AdminVMManagementPage: React.FC = () => {
             tab={
               <Space>
                 <UserOutlined />
-                <span>用户VM管理</span>
+                <span>用户虚拟机管理</span>
               </Space>
             } 
             key="user-vm-management"
@@ -255,23 +261,6 @@ const AdminVMManagementPage: React.FC = () => {
         )}
       </Drawer>
 
-      {/* 虚拟机详情抽屉 */}
-      <Drawer
-        title="虚拟机详情"
-        placement="right"
-        width={900}
-        open={detailDrawerVisible}
-        onClose={handleCloseDetailDrawer}
-        destroyOnClose
-      >
-        {selectedVmForDetail && (
-          <VMDetail 
-            vm={selectedVmForDetail}
-            onBack={handleCloseDetailDrawer}
-          />
-        )}
-      </Drawer>
-
       {/* 强制控制抽屉 */}
       <Drawer
         title={`强制控制虚拟机 - ${selectedVm?.name || ''}`}
@@ -290,6 +279,14 @@ const AdminVMManagementPage: React.FC = () => {
           />
         )}
       </Drawer>
+
+      {/* 编辑虚拟机抽屉 */}
+      <VMEditDrawer
+        open={editDrawerVisible}
+        vm={selectedVm}
+        onClose={handleCloseEditDrawer}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   )
 }

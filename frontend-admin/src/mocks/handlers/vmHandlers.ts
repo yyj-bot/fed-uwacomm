@@ -5,14 +5,7 @@
 
 import { http, HttpResponse } from 'msw'
 import { vmApiMock, vmRoundModelsApiMock, multiVmComparisonMock } from '../data/vmApiMockData'
-
-// 虚拟机状态管理（模拟运行时状态）
-const vmStatusMap = new Map<string, string>()
-
-// 初始化默认状态
-vmStatusMap.set('a1b2c3d4e5f678901234567890123456', 'RUNNING')
-vmStatusMap.set('b2c3d4e5f6789012345678901234567a', 'RUNNING')
-vmStatusMap.set('c3d4e5f67890123456789012345678ab', 'STOPPED')
+import { vmStatusMap, deletedVmIds } from './vmState'
 
 export const vmHandlers = [
   // ==================== VM自身操作接口 (/api/v1/vm) ====================
@@ -70,19 +63,21 @@ export const vmHandlers = [
     const osType = url.searchParams.get('osType')
     const keyword = url.searchParams.get('keyword')
     
-    // 更新虚拟机列表的状态
-    let filteredList = vmApiMock.list.success.data.list.map(vm => {
-      const currentStatus = vmStatusMap.get(vm.vmId) || vm.status
-      const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
-        ? 'CONNECTED' 
-        : 'DISCONNECTED'
-      
-      return {
-        ...vm,
-        status: currentStatus,
-        connectionStatus
-      }
-    })
+    // 更新虚拟机列表的状态，并过滤掉已删除的VM
+    let filteredList = vmApiMock.list.success.data.list
+      .filter(vm => !deletedVmIds.has(vm.vmId)) // 过滤已删除的VM
+      .map(vm => {
+        const currentStatus = vmStatusMap.get(vm.vmId) || vm.status
+        const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+          ? 'CONNECTED' 
+          : 'DISCONNECTED'
+        
+        return {
+          ...vm,
+          status: currentStatus,
+          connectionStatus
+        }
+      })
     
     // 状态过滤
     if (statusFilter) {
@@ -169,17 +164,29 @@ export const vmHandlers = [
 
   // 4.4 虚拟机删除接口 - DELETE /api/vm/{vmId}
   http.delete('http://localhost:5173/api/vm/:vmId', ({ params, request }) => {
-    const { vmId } = params
+    const { vmId } = params as { vmId: string }
     const url = new URL(request.url)
     const force = url.searchParams.get('force') === 'true'
     
+    console.log('[Mock] 删除虚拟机请求:', { vmId, force })
+    
     // 模拟虚拟机不存在
-    if (vmId === 'nonexistent') {
+    if (vmId === 'nonexistent' || deletedVmIds.has(vmId)) {
       return HttpResponse.json({
         code: 404,
         message: "虚拟机不存在",
         data: null
       }, { status: 404 })
+    }
+    
+    // 检查是否正在运行（非强制删除时）
+    const currentStatus = vmStatusMap.get(vmId) || 'STOPPED'
+    if (!force && currentStatus === 'RUNNING') {
+      return HttpResponse.json({
+        code: 400,
+        message: "虚拟机正在运行，请先停止虚拟机或使用强制删除",
+        data: null
+      }, { status: 400 })
     }
     
     // 模拟正在运行的虚拟机无法删除（除非强制删除）
@@ -190,6 +197,13 @@ export const vmHandlers = [
         data: null
       }, { status: 400 })
     }
+    
+    // 标记为已删除
+    deletedVmIds.add(vmId)
+    // 从状态映射中移除
+    vmStatusMap.delete(vmId)
+    
+    console.log('[Mock] 虚拟机已删除:', vmId)
     
     return HttpResponse.json(vmApiMock.delete.success)
   }),

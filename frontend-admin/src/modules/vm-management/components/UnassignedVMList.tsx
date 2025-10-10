@@ -20,8 +20,7 @@ import {
 } from 'antd'
 import {
   TeamOutlined,
-  ReloadOutlined,
-  EyeOutlined
+  ReloadOutlined
 } from '@ant-design/icons'
 
 import type { ColumnsType } from 'antd/es/table'
@@ -31,7 +30,6 @@ const { Option } = Select
 interface UnassignedVMListProps {
   vmList: any[]
   loading: boolean
-  onViewDetail?: (vm: any) => void
   onViewAssignment: (vm: any) => void
   onRefresh: () => void
 }
@@ -39,7 +37,6 @@ interface UnassignedVMListProps {
 const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
   vmList,
   loading,
-  onViewDetail,
   onViewAssignment,
   onRefresh
 }) => {
@@ -116,16 +113,6 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
       width: 180,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="查看详情">
-            <Button
-              type="link"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => onViewDetail ? onViewDetail(record) : message.info('虚拟机详情功能开发中')}
-            >
-              详情
-            </Button>
-          </Tooltip>
           <Tooltip title="分配给用户">
             <Button
               type="primary"

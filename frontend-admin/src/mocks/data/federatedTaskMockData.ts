@@ -6,6 +6,9 @@
  * @version 1.4.0
  */
 
+import { baseVmList } from './shared/vm-base'
+import { baseTaskList, type TaskType, type TaskStatus } from './shared/task-base'
+
 // ==================== 数据生成工具函数 ====================
 
 /**
@@ -59,98 +62,11 @@ const generateLoss = (): number => {
 
 // ==================== Mock 数据定义 ====================
 
-// 联邦学习任务列表数据
-export const mockFederatedTasks = [
-  {
-    taskId: 'c3d4e5f6789012345678901234567890',
-    taskName: '水声传播特征分类任务',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'RUNNING' as const,
-    createdAt: '2024-01-01T09:00:00.000Z',
-    startedAt: '2024-01-01T10:00:00.000Z',
-    participantCount: 2,
-    currentRound: 5,
-    totalRounds: 15,
-    progress: 33.33,
-    finalAccuracy: undefined
-  },
-  {
-    taskId: 'd4e5f678901234567890123456789012',
-    taskName: '声学传播回归分析',
-    taskType: 'REGRESSION' as const,
-    status: 'COMPLETED' as const,
-    createdAt: '2024-01-01T08:00:00.000Z',
-    startedAt: '2024-01-01T08:30:00.000Z',
-    completedAt: '2024-01-01T11:00:00.000Z',
-    participantCount: 3,
-    currentRound: undefined,
-    totalRounds: 12,
-    progress: undefined,
-    finalAccuracy: 0.892
-  },
-  {
-    taskId: 'e5f67890123456789012345678901234',
-    taskName: '水下异常检测任务',
-    taskType: 'ANOMALY_DETECTION' as const,
-    status: 'PAUSED' as const,
-    createdAt: '2024-01-01T07:00:00.000Z',
-    startedAt: '2024-01-01T07:30:00.000Z',
-    participantCount: 4,
-    currentRound: 3,
-    totalRounds: 12,
-    progress: 25.0,
-    finalAccuracy: undefined
-  },
-  {
-    taskId: 'f6789012345678901234567890123456',
-    taskName: '海洋声学聚类分析',
-    taskType: 'CLUSTERING' as const,
-    status: 'CONFIGURED' as const,
-    createdAt: '2024-01-01T06:00:00.000Z',
-    participantCount: 5,
-    currentRound: undefined,
-    totalRounds: 20,
-    progress: undefined,
-    finalAccuracy: undefined
-  },
-  {
-    taskId: 'a1b2c3d4e5f678901234567890123456',
-    taskName: '深海声学模式识别',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'CREATED' as const,
-    createdAt: '2024-01-01T05:00:00.000Z',
-    participantCount: 3,
-    currentRound: undefined,
-    totalRounds: 10,
-    progress: undefined,
-    finalAccuracy: undefined
-  },
-  {
-    taskId: 'b2c3d4e5f67890123456789012345678',
-    taskName: '海底地形声学分析',
-    taskType: 'REGRESSION' as const,
-    status: 'FAILED' as const,
-    createdAt: '2024-01-01T04:00:00.000Z',
-    startedAt: '2024-01-01T04:30:00.000Z',
-    participantCount: 4,
-    currentRound: 2,
-    totalRounds: 15,
-    progress: 13.33,
-    finalAccuracy: undefined
-  },
-  {
-    taskId: 'c4d5e6f7890123456789012345678901',
-    taskName: '水声通信优化',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'CONFIGURED' as const,
-    createdAt: '2024-01-01T03:00:00.000Z',
-    participantCount: 2,
-    currentRound: undefined,
-    totalRounds: 8,
-    progress: undefined,
-    finalAccuracy: undefined
-  }
-]
+/**
+ * 联邦学习任务列表数据
+ * 数据来源：baseTaskList（单一数据源）
+ */
+export const mockFederatedTasks = baseTaskList
 
 // 联邦学习任务详情数据
 export const mockFederatedTaskDetails = [
@@ -1072,110 +988,66 @@ export const mockTaskLogs: Record<string, any[]> = {
 }
 
 // 可用虚拟机列表
-export const mockAvailableVMs = [
-  {
-    vmId: 'a1b2c3d4e5f678901234567890123456',
-    name: '水声联邦学习节点-001',
-    ipAddress: '192.168.1.100',
-    status: 'RUNNING' as const,
-    connectionStatus: 'CONNECTED' as const,
-    osType: 'Ubuntu 20.04',
-    resources: {
-      cpuCores: 8,
-      memoryMb: 16384,
-      diskGb: 500,
+// 数据来源：baseVmList（单一数据源）
+// 为联邦任务添加特有字段：resources, capabilities, currentUsage, networkInfo, reliability
+export const mockAvailableVMs = baseVmList.map(vm => {
+  // 根据vmId确定任务特定配置
+  const taskConfigs: Record<string, any> = {
+    'a1b2c3d4e5f678901234567890123456': {
       gpuCount: 1,
-      gpuMemoryMb: 8192
+      gpuMemoryMb: 8192,
+      capabilities: ['GPU', 'HIGH_MEMORY'],
+      supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_PROXIMAL'],
+      currentUsage: { cpuUsage: 45.2, memoryUsage: 60.8, networkUsage: 15.3 },
+      reliability: { uptime: 99.5, avgResponseTime: 150, taskSuccessRate: 0.98 }
     },
-    capabilities: ['GPU', 'HIGH_MEMORY'],
-    supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_PROXIMAL'],
-    currentUsage: {
-      cpuUsage: 45.2,
-      memoryUsage: 60.8,
-      networkUsage: 15.3
-    },
-    networkInfo: {
-      bandwidth: 1000,
-      latency: 12,
-      uploadSpeed: 100,
-      downloadSpeed: 100
-    },
-    lastHeartbeat: generateTimestamp(),
-    reliability: {
-      uptime: 99.5,
-      avgResponseTime: 150,
-      taskSuccessRate: 0.98
-    }
-  },
-  {
-    vmId: 'b2c3d4e5f67890123456789012345678',
-    name: '水声联邦学习节点-002',
-    ipAddress: '192.168.1.101',
-    status: 'RUNNING' as const,
-    connectionStatus: 'CONNECTED' as const,
-    osType: 'Ubuntu 20.04',
-    resources: {
-      cpuCores: 6,
-      memoryMb: 12288,
-      diskGb: 300,
+    'b2c3d4e5f67890123456789012345678': {
       gpuCount: 0,
-      gpuMemoryMb: 0
+      gpuMemoryMb: 0,
+      capabilities: ['TRAINING'],
+      supportedAlgorithms: ['FEDERATED_AVERAGING'],
+      currentUsage: { cpuUsage: 32.1, memoryUsage: 48.5, networkUsage: 8.7 },
+      reliability: { uptime: 97.8, avgResponseTime: 180, taskSuccessRate: 0.95 }
     },
-    capabilities: ['TRAINING'],
-    supportedAlgorithms: ['FEDERATED_AVERAGING'],
-    currentUsage: {
-      cpuUsage: 32.1,
-      memoryUsage: 48.5,
-      networkUsage: 8.7
-    },
-    networkInfo: {
-      bandwidth: 1000,
-      latency: 18,
-      uploadSpeed: 80,
-      downloadSpeed: 80
-    },
-    lastHeartbeat: generateTimestamp(),
-    reliability: {
-      uptime: 97.8,
-      avgResponseTime: 180,
-      taskSuccessRate: 0.95
-    }
-  },
-  {
-    vmId: 'c3d4e5f67890123456789012345678901',
-    name: '水声联邦学习节点-003',
-    ipAddress: '192.168.1.102',
-    status: 'STOPPED' as const,
-    connectionStatus: 'DISCONNECTED' as const,
-    osType: 'Ubuntu 20.04',
-    resources: {
-      cpuCores: 4,
-      memoryMb: 8192,
-      diskGb: 200,
+    'c3d4e5f67890123456789012345678901': {
       gpuCount: 0,
-      gpuMemoryMb: 0
-    },
-    capabilities: ['TRAINING'],
-    supportedAlgorithms: ['FEDERATED_AVERAGING'],
-    currentUsage: {
-      cpuUsage: 0,
-      memoryUsage: 0,
-      networkUsage: 0
-    },
-    networkInfo: {
-      bandwidth: 100,
-      latency: 0,
-      uploadSpeed: 0,
-      downloadSpeed: 0
-    },
-    lastHeartbeat: generateTimestamp(0, -2),
-    reliability: {
-      uptime: 85.2,
-      avgResponseTime: 200,
-      taskSuccessRate: 0.92
+      gpuMemoryMb: 0,
+      capabilities: ['TRAINING'],
+      supportedAlgorithms: ['FEDERATED_AVERAGING'],
+      currentUsage: { cpuUsage: 0, memoryUsage: 0, networkUsage: 0 },
+      reliability: { uptime: 85.2, avgResponseTime: 200, taskSuccessRate: 0.92 }
     }
   }
-]
+  
+  const config = taskConfigs[vm.vmId] || taskConfigs['c3d4e5f67890123456789012345678901']
+  
+  return {
+    vmId: vm.vmId,
+    name: vm.name,
+    ipAddress: vm.ipAddress,
+    status: vm.status,
+    connectionStatus: vm.connectionStatus,
+    osType: vm.osType,
+    resources: {
+      cpuCores: vm.cpuCores,
+      memoryMb: vm.memoryMb,
+      diskGb: vm.diskGb,
+      gpuCount: config.gpuCount,
+      gpuMemoryMb: config.gpuMemoryMb
+    },
+    capabilities: config.capabilities,
+    supportedAlgorithms: config.supportedAlgorithms,
+    currentUsage: config.currentUsage,
+    networkInfo: {
+      bandwidth: vm.networkConfig?.bandwidth || 1000,
+      latency: vm.networkConfig?.latency || 12,
+      uploadSpeed: vm.networkConfig?.uploadSpeed / 10 || 100,
+      downloadSpeed: vm.networkConfig?.downloadSpeed / 10 || 100
+    },
+    lastHeartbeat: vm.status === 'RUNNING' ? generateTimestamp() : generateTimestamp(0, -2),
+    reliability: config.reliability
+  }
+})
 
 // 可用数据集列表
 export const mockAvailableDatasets = [

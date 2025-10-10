@@ -19,6 +19,7 @@ export { default as UserVmManagement } from './UserVmManagement'
 export { default as VMForceControl } from './VMForceControl'
 export { default as AdminVMList } from './AdminVMList'
 export { default as UnassignedVMList } from './UnassignedVMList'
+export { default as VMEditDrawer } from './VMEditDrawer'
 
 
 

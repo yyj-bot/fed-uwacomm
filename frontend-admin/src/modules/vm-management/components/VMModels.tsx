@@ -11,7 +11,7 @@ import {
   Card, 
   Table, 
   Button, 
-  Space, 
+  Space,
   Input, 
   Select, 
   Tabs,
@@ -200,27 +200,6 @@ const VMModels: React.FC<VMModelsProps> = ({ vm, onBack }) => {
         <span>{record.metrics.loss.toFixed(4)}</span>
       ),
       sorter: (a, b) => a.metrics.loss - b.metrics.loss
-    },
-    {
-      title: '其他指标',
-      key: 'otherMetrics',
-      width: 200,
-      render: (_, record: VMRoundModel) => {
-        const otherMetrics = Object.entries(record.metrics)
-          .filter(([key]) => !['accuracy', 'loss'].includes(key))
-        
-        if (otherMetrics.length === 0) return '-'
-        
-        return (
-          <Space wrap>
-            {otherMetrics.map(([key, value]) => (
-              <Tag key={key} color="blue">
-                {key}: {typeof value === 'number' ? value.toFixed(4) : value}
-              </Tag>
-            ))}
-          </Space>
-        )
-      }
     },
     {
       title: '创建时间',
@@ -452,9 +431,6 @@ const VMModels: React.FC<VMModelsProps> = ({ vm, onBack }) => {
                   >
                     <Option value="accuracy">准确率</Option>
                     <Option value="loss">损失值</Option>
-                    <Option value="precision">精确率</Option>
-                    <Option value="recall">召回率</Option>
-                    <Option value="f1">F1分数</Option>
                   </Select>
                 </Col>
                 <Col span={4}>
@@ -511,9 +487,6 @@ const VMModels: React.FC<VMModelsProps> = ({ vm, onBack }) => {
                   >
                     <Option value="accuracy">准确率</Option>
                     <Option value="loss">损失值</Option>
-                    <Option value="precision">精确率</Option>
-                    <Option value="recall">召回率</Option>
-                    <Option value="f1">F1分数</Option>
                   </Select>
                 </Col>
                 <Col span={6}>
@@ -580,15 +553,20 @@ const VMModels: React.FC<VMModelsProps> = ({ vm, onBack }) => {
 
             <Card title="评估指标" style={{ marginTop: 16 }}>
               <Row gutter={16}>
-                {Object.entries(currentVMRoundModel.metrics).map(([key, value]) => (
-                  <Col span={8} key={key}>
-                    <Statistic
-                      title={key}
-                      value={typeof value === 'number' ? value.toFixed(4) : value}
-                      precision={4}
-                    />
-                  </Col>
-                ))}
+                <Col span={12}>
+                  <Statistic
+                    title="准确率 (accuracy)"
+                    value={currentVMRoundModel.metrics.accuracy.toFixed(4)}
+                    precision={4}
+                  />
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="损失值 (loss)"
+                    value={currentVMRoundModel.metrics.loss.toFixed(4)}
+                    precision={4}
+                  />
+                </Col>
               </Row>
             </Card>
 

@@ -386,12 +386,22 @@ export class AdminVmService {
       vmId: vm.vmId,
       name: vm.name,
       ipAddress: vm.ipAddress,
+      port: vm.port,
       status: vm.status,
       connectionStatus: vm.connectionStatus,
+      osType: vm.osType,
+      cpuCores: vm.cpuCores,
+      memoryMb: vm.memoryMb,
+      diskGb: vm.diskGb,
       isAssigned: vm.isAssigned,
       assignedUserCount: vm.assignedUserCount,
       createdAt: vm.createdAt,
-      lastHeartbeat: vm.lastHeartbeat
+      updatedAt: vm.updatedAt,
+      lastHeartbeat: vm.lastHeartbeat,
+      systemInfo: vm.systemInfo,
+      capabilities: vm.capabilities,
+      networkConfig: vm.networkConfig,
+      metadata: vm.metadata
     }
   }
 

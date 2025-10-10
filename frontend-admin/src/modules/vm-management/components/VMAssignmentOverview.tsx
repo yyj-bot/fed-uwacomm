@@ -41,7 +41,8 @@ const VMAssignmentOverview: React.FC = () => {
       'STOPPED': 'default',
       'ERROR': 'error',
       'STARTING': 'processing',
-      'STOPPING': 'warning'
+      'STOPPING': 'warning',
+      'OFFLINE': 'default'
     }
     return colorMap[status] || 'default'
   }

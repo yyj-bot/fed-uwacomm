@@ -60,7 +60,13 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
   const loading = isUserVmListLoading(userId)
   const error = getUserVmListError(userId)
 
+  // 调试日志
+  console.log('[UserVmList] userId:', userId)
+  console.log('[UserVmList] userVmData:', userVmData)
+  console.log('[UserVmList] VMs 数量:', userVmData?.vms?.length)
+
   useEffect(() => {
+    console.log('[UserVmList] useEffect 触发，获取用户VM列表:', userId)
     fetchUserVmList(userId)
     fetchUnassignedVmList()
   }, [userId])
@@ -80,7 +86,8 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
       'STOPPED': 'default',
       'ERROR': 'error',
       'STARTING': 'processing',
-      'STOPPING': 'warning'
+      'STOPPING': 'warning',
+      'OFFLINE': 'default'
     }
     return colorMap[status]
   }

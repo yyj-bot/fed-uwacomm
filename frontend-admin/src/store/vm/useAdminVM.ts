@@ -307,16 +307,13 @@ export const useAdminVM = () => {
    */
   const isVmOperating = useCallback((vmId: string, operation?: string): boolean => {
     if (operation) {
-      return !!operationLoading[`${operation}-${vmId}`]
+      return !!operationLoading[operation]
     }
     
-    // 检查是否有任何操作正在进行
-    const operations = ['assign', 'unassign', 'force-control']
-    return operations.some(op => {
-      return Object.keys(operationLoading).some(key => 
-        key.startsWith(`${op}-${vmId}`)
-      )
-    })
+    // 检查是否有任何与该 vmId 相关的操作正在进行
+    return Object.keys(operationLoading).some(key => 
+      key.includes(vmId) && operationLoading[key]
+    )
   }, [operationLoading])
 
   /**

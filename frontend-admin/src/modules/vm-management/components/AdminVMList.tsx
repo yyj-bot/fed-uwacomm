@@ -2,6 +2,15 @@
  * 管理员虚拟机列表组件
  * 使用管理员API查看所有虚拟机，不受权限限制
  * 
+ * 功能：
+ * - 查看虚拟机列表（管理员接口）
+ * - 虚拟机更新（接口 4.3）
+ * - 虚拟机删除（接口 4.4）
+ * - 虚拟机控制：启动（接口 5.1）、停止（接口 5.2）、重启（接口 5.3）
+ * - 虚拟机分配管理
+ * 
+ * 注意：查看虚拟机详情请使用"虚拟机列表"模块
+ * 
  * @author FedUWAComm Team
  * @version 1.0.0
  */
@@ -18,15 +27,21 @@ import {
   Badge,
   Spin,
   Alert,
-  message
+  message,
+  Popconfirm,
+  Modal
 } from 'antd'
 import {
   SearchOutlined,
   TeamOutlined,
   ControlOutlined,
   ReloadOutlined,
-  EyeOutlined
+  PlayCircleOutlined,
+  PoweroffOutlined,
+  EditOutlined,
+  DeleteOutlined
 } from '@ant-design/icons'
+import { vmService } from '@/services/vm/vmService'
 
 import type { ColumnsType } from 'antd/es/table'
 
@@ -35,24 +50,25 @@ const { Option } = Select
 interface AdminVMListProps {
   vmList: any[]
   loading: boolean
-  onViewDetail?: (vm: any) => void
   onViewAssignment: (vm: any) => void
   onForceControl: (vm: any) => void
   onRefresh: () => void
+  onEdit?: (vm: any) => void
 }
 
 const AdminVMList: React.FC<AdminVMListProps> = ({
   vmList,
   loading,
-  onViewDetail,
   onViewAssignment,
   onForceControl,
-  onRefresh
+  onRefresh,
+  onEdit
 }) => {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [assignedFilter, setAssignedFilter] = useState<boolean | undefined>(undefined)
   const [filteredVmList, setFilteredVmList] = useState<any[]>([])
+  const [controlLoading, setControlLoading] = useState<string | null>(null)
 
   // 应用过滤器
   useEffect(() => {
@@ -92,6 +108,81 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
     setSearchKeyword('')
     setStatusFilter('')
     setAssignedFilter(undefined)
+  }
+
+  // 处理虚拟机启动 (接口 5.1)
+  const handleStartVM = async (vmId: string) => {
+    setControlLoading(vmId)
+    try {
+      await vmService.startVM(vmId)
+      message.success('虚拟机启动命令已发送')
+      // 延迟刷新，给状态变更一点时间（mock 启动延迟 3s）
+      setTimeout(() => {
+        onRefresh()
+        setControlLoading(null)
+      }, 3500)
+    } catch (error: any) {
+      message.error(error.message || '虚拟机启动失败')
+      console.error('启动虚拟机失败:', error)
+      setControlLoading(null)
+    }
+  }
+
+  // 处理虚拟机停止 (接口 5.2)
+  const handleStopVM = async (vmId: string) => {
+    setControlLoading(vmId)
+    try {
+      await vmService.stopVM(vmId, { force: false })
+      message.success('虚拟机停止命令已发送')
+      // 延迟刷新，给状态变更一点时间（mock 延迟 1000ms）
+      setTimeout(() => {
+        onRefresh()
+        setControlLoading(null)
+      }, 1500)
+    } catch (error: any) {
+      message.error(error.message || '虚拟机停止失败')
+      console.error('停止虚拟机失败:', error)
+      setControlLoading(null)
+    }
+  }
+
+  // 处理虚拟机重启 (接口 5.3)
+  const handleRestartVM = async (vmId: string) => {
+    setControlLoading(vmId)
+    try {
+      await vmService.restartVM(vmId)
+      message.success('虚拟机重启命令已发送')
+      // 延迟刷新，给状态变更一点时间（mock 延迟 1000ms）
+      setTimeout(() => {
+        onRefresh()
+        setControlLoading(null)
+      }, 1500)
+    } catch (error: any) {
+      message.error(error.message || '虚拟机重启失败')
+      console.error('重启虚拟机失败:', error)
+      setControlLoading(null)
+    }
+  }
+
+  // 处理编辑虚拟机 (接口 4.3)
+  const handleEditVM = (vm: any) => {
+    if (onEdit) {
+      onEdit(vm)
+    } else {
+      message.info('编辑功能开发中')
+    }
+  }
+
+  // 处理删除虚拟机 (接口 4.4)
+  const handleDeleteVM = async (vmId: string, vmName: string) => {
+    try {
+      await vmService.deleteVM(vmId, false)
+      message.success(`虚拟机 "${vmName}" 删除成功`)
+      onRefresh()
+    } catch (error: any) {
+      message.error(error.message || '虚拟机删除失败')
+      console.error('删除虚拟机失败:', error)
+    }
   }
 
   // 获取状态标签
@@ -183,41 +274,133 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
       title: '操作',
       key: 'actions',
       fixed: 'right',
-      width: 240,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="查看详情">
-            <Button
-              type="link"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => onViewDetail ? onViewDetail(record) : message.info('虚拟机详情功能开发中')}
-            >
-              详情
-            </Button>
-          </Tooltip>
-          <Tooltip title="分配管理">
-            <Button
-              type="link"
-              size="small"
-              icon={<TeamOutlined />}
-              onClick={() => onViewAssignment(record)}
-            >
-              分配
-            </Button>
-          </Tooltip>
-          <Tooltip title="强制控制">
-            <Button
-              type="link"
-              size="small"
-              icon={<ControlOutlined />}
-              onClick={() => onForceControl(record)}
-            >
-              控制
-            </Button>
-          </Tooltip>
-        </Space>
-      )
+      width: 450,
+      render: (_, record) => {
+        const isRunning = record.status === 'RUNNING'
+        const isStopped = record.status === 'STOPPED'
+        const isConnected = record.connectionStatus === 'CONNECTED'
+        const isLoading = controlLoading === record.vmId
+
+        return (
+          <Space size="small" wrap>
+            {isStopped && (
+              <Tooltip title="启动虚拟机">
+                <Popconfirm
+                  title="确认启动虚拟机？"
+                  onConfirm={() => handleStartVM(record.vmId)}
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<PlayCircleOutlined />}
+                    loading={isLoading}
+                  >
+                    启动
+                  </Button>
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {isRunning && (
+              <Tooltip title="停止虚拟机">
+                <Popconfirm
+                  title="确认停止虚拟机？"
+                  onConfirm={() => handleStopVM(record.vmId)}
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<PoweroffOutlined />}
+                    loading={isLoading}
+                    disabled={!isConnected}
+                    danger
+                  >
+                    停止
+                  </Button>
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            {isRunning && (
+              <Tooltip title="重启虚拟机">
+                <Popconfirm
+                  title="确认重启虚拟机？"
+                  onConfirm={() => handleRestartVM(record.vmId)}
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    loading={isLoading}
+                    disabled={!isConnected}
+                  >
+                    重启
+                  </Button>
+                </Popconfirm>
+              </Tooltip>
+            )}
+
+            <Tooltip title="编辑虚拟机">
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEditVM(record)}
+              >
+                编辑
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="分配管理">
+              <Button
+                type="link"
+                size="small"
+                icon={<TeamOutlined />}
+                onClick={() => onViewAssignment(record)}
+              >
+                分配
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="强制控制">
+              <Button
+                type="link"
+                size="small"
+                icon={<ControlOutlined />}
+                onClick={() => onForceControl(record)}
+              >
+                强控
+              </Button>
+            </Tooltip>
+
+                  <Tooltip title="删除虚拟机">
+                    <Popconfirm
+                      title={`确认删除虚拟机 "${record.name}"？`}
+                      description="此操作不可恢复！请确认删除。"
+                      onConfirm={() => handleDeleteVM(record.vmId, record.name)}
+                      okText="确认删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                    >
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        danger
+                      >
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Tooltip>
+          </Space>
+        )
+      }
     }
   ]
 

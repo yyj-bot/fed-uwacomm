@@ -1,6 +1,8 @@
 // 虚拟机API Mock数据
 // 基于 vm-api-reference.md 和 vm-round-models-api-reference.md 文档
 
+import { baseVmList, getVmById } from './shared/vm-base'
+
 export const vmApiMock = {
   // 3.1 虚拟机注册接口 - POST /api/v1/vm/register
   register: {
@@ -76,109 +78,38 @@ export const vmApiMock = {
       code: 200,
       message: "查询成功",
       data: {
-        total: 10,
+        total: baseVmList.length,
         page: 1,
         size: 20,
         pages: 1,
-        list: [
-          {
-            vmId: "a1b2c3d4e5f678901234567890123456",
-            name: "水声联邦学习节点-001",
-            ipAddress: "192.168.1.100",
-            port: 22,
-            status: "RUNNING",
-            osType: "Ubuntu 20.04",
-            cpuCores: 4,
-            memoryMb: 8192,
-            diskGb: 100,
-            connectionStatus: "CONNECTED",
-            lastHeartbeat: "2024-01-01T00:00:00.000Z",
-            createdAt: "2024-01-01T00:00:00.000Z",
-            updatedAt: "2024-01-01T00:00:00.000Z"
-          },
-          {
-            vmId: "b2c3d4e5f6789012345678901234567a",
-            name: "水声联邦学习节点-002",
-            ipAddress: "192.168.1.101",
-            port: 22,
-            status: "RUNNING",
-            osType: "Ubuntu 22.04",
-            cpuCores: 8,
-            memoryMb: 16384,
-            diskGb: 200,
-            connectionStatus: "CONNECTED",
-            lastHeartbeat: "2024-01-01T01:00:00.000Z",
-            createdAt: "2024-01-01T01:00:00.000Z",
-            updatedAt: "2024-01-01T01:00:00.000Z"
-          },
-          {
-            vmId: "c3d4e5f67890123456789012345678ab",
-            name: "水声联邦学习节点-003",
-            ipAddress: "192.168.1.102",
-            port: 22,
-            status: "RUNNING",
-            osType: "CentOS 7",
-            cpuCores: 6,
-            memoryMb: 12288,
-            diskGb: 150,
-            connectionStatus: "CONNECTED",
-            lastHeartbeat: "2024-01-01T02:00:00.000Z",
-            createdAt: "2024-01-01T02:00:00.000Z",
-            updatedAt: "2024-01-01T02:00:00.000Z"
-          }
-        ]
+        list: baseVmList.map(vm => ({
+          vmId: vm.vmId,
+          name: vm.name,
+          ipAddress: vm.ipAddress,
+          port: vm.port,
+          status: vm.status,
+          osType: vm.osType,
+          cpuCores: vm.cpuCores,
+          memoryMb: vm.memoryMb,
+          diskGb: vm.diskGb,
+          connectionStatus: vm.connectionStatus,
+          lastHeartbeat: vm.lastHeartbeat,
+          createdAt: vm.createdAt,
+          updatedAt: vm.updatedAt
+        }))
       }
     }
   },
 
   // 4.2 虚拟机详情查询接口 - GET /api/vm/{vmId}
+  // 数据来源：baseVmList（通过vmId动态获取）
   detail: {
     success: {
       code: 200,
       message: "查询成功",
       data: {
-        vmId: "a1b2c3d4e5f678901234567890123456",
-        name: "水声联邦学习节点-001",
-        ipAddress: "192.168.1.100",
-        port: 22,
-        status: "RUNNING",
-        osType: "Ubuntu 20.04",
-        cpuCores: 4,
-        memoryMb: 8192,
-        diskGb: 100,
-        connectionStatus: "CONNECTED",
-        lastHeartbeat: "2024-01-01T00:00:00.000Z",
-        wsSessionId: "session-123456",
-        createdAt: "2024-01-01T00:00:00.000Z",
-        updatedAt: "2024-01-01T00:00:00.000Z",
-        systemInfo: {
-          os: "Ubuntu 20.04 LTS",
-          kernel: "5.4.0-42-generic",
-          python: "3.8.10",
-          gpu: "NVIDIA Tesla V100",
-          cuda: "11.0",
-          cudnn: "8.0.5"
-        },
-        capabilities: {
-          supportedAlgorithms: ["FEDAVG", "FEDPROX", "FEDNOVA", "SCAFFOLD"],
-          maxBatchSize: 128,
-          maxMemoryUsage: 6144,
-          gpuMemory: 16384,
-          networkSpeed: 1000
-        },
-        networkConfig: {
-          uploadSpeed: 100,
-          downloadSpeed: 200,
-          latency: 50,
-          bandwidth: 1000
-        },
-        metadata: {
-          description: "水声联邦学习专用虚拟机节点",
-          location: "实验室A-机架01",
-          owner: "张三",
-          department: "水声工程学院",
-          tags: ["水声", "联邦学习", "GPU节点"]
-        }
+        ...(baseVmList[0] || {}),
+        wsSessionId: "session-123456"
       }
     }
   },

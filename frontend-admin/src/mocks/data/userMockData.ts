@@ -2,6 +2,12 @@
 // 基于 user-api-reference.md 文档
 
 /**
+ * ==================== 导入共享用户数据 ====================
+ * 数据来源：shared/user-base.ts（单一数据源）
+ */
+import { baseUserList, type UserRole, type UserStatus } from './shared/user-base'
+
+/**
  * 生成长期有效的Mock JWT Token（用于开发环境）
  * 过期时间设置为30天后，避免频繁重新登录
  */
@@ -34,16 +40,6 @@ function generateMockRefreshToken(): string {
 }
 
 /**
- * 用户角色类型
- */
-type UserRole = "ADMIN" | "RESEARCHER" | "OPERATOR" | "VIEWER";
-
-/**
- * 用户状态类型
- */
-type UserStatus = "ACTIVE" | "INACTIVE" | "LOCKED" | "DELETED";
-
-/**
  * Mock 用户数据接口
  */
 interface MockUser {
@@ -61,158 +57,10 @@ interface MockUser {
 
 /**
  * Mock 用户数据
+ * 数据来源：baseUserList（单一数据源）
  * 注意：实际API中不会返回密码，密码仅用于登录验证
  */
-export const mockUsers: MockUser[] = [
-  // 管理员用户
-  {
-    userId: "a1b2c3d4e5f678901234567890123456",
-    username: "admin",
-    email: "admin@feduwacomm.com",
-    password: "ab123456", // 仅用于mock验证，实际API不返回
-    role: "ADMIN",
-    status: "ACTIVE",
-    createdAt: "2024-01-01T00:00:00.000Z",
-    updatedAt: "2024-01-01T00:00:00.000Z",
-    lastLoginTime: "2024-01-10T10:00:00.000Z",
-    lastLoginIp: "192.168.1.100"
-  },
-  // 研究员用户
-  {
-    userId: "researcher-001",
-    username: "researcher01",
-    email: "researcher01@example.com",
-    password: "password123",
-    role: "RESEARCHER",
-    status: "ACTIVE",
-    createdAt: "2024-01-02T00:00:00.000Z",
-    updatedAt: "2024-01-05T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T14:30:00.000Z",
-    lastLoginIp: "192.168.1.101"
-  },
-  {
-    userId: "researcher-002",
-    username: "researcher02",
-    email: "researcher02@example.com",
-    password: "password123",
-    role: "RESEARCHER",
-    status: "ACTIVE",
-    createdAt: "2024-01-02T00:00:00.000Z",
-    updatedAt: "2024-01-06T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T15:20:00.000Z",
-    lastLoginIp: "192.168.1.102"
-  },
-  {
-    userId: "researcher-003",
-    username: "researcher03",
-    email: "researcher03@example.com",
-    password: "password123",
-    role: "RESEARCHER",
-    status: "ACTIVE",
-    createdAt: "2024-01-03T00:00:00.000Z",
-    updatedAt: "2024-01-07T00:00:00.000Z",
-    lastLoginTime: "2024-01-08T11:00:00.000Z",
-    lastLoginIp: "192.168.1.103"
-  },
-  {
-    userId: "researcher-004",
-    username: "researcher04",
-    email: "researcher04@example.com",
-    password: "password123",
-    role: "RESEARCHER",
-    status: "ACTIVE",
-    createdAt: "2024-01-03T00:00:00.000Z",
-    updatedAt: "2024-01-07T00:00:00.000Z",
-    lastLoginTime: "2024-01-07T09:30:00.000Z",
-    lastLoginIp: "192.168.1.104"
-  },
-  {
-    userId: "researcher-005",
-    username: "researcher05",
-    email: "researcher05@example.com",
-    password: "password123",
-    role: "RESEARCHER",
-    status: "INACTIVE",
-    createdAt: "2024-01-04T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-05T16:00:00.000Z",
-    lastLoginIp: "192.168.1.105"
-  },
-  // 操作员用户
-  {
-    userId: "operator-001",
-    username: "operator01",
-    email: "operator01@example.com",
-    password: "password123",
-    role: "OPERATOR",
-    status: "ACTIVE",
-    createdAt: "2024-01-04T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T08:00:00.000Z",
-    lastLoginIp: "192.168.1.106"
-  },
-  {
-    userId: "operator-002",
-    username: "operator02",
-    email: "operator02@example.com",
-    password: "password123",
-    role: "OPERATOR",
-    status: "ACTIVE",
-    createdAt: "2024-01-05T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T09:15:00.000Z",
-    lastLoginIp: "192.168.1.107"
-  },
-  {
-    userId: "operator-003",
-    username: "operator03",
-    email: "operator03@example.com",
-    password: "password123",
-    role: "OPERATOR",
-    status: "ACTIVE",
-    createdAt: "2024-01-05T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-08T13:45:00.000Z",
-    lastLoginIp: "192.168.1.108"
-  },
-  // 查看者用户
-  {
-    userId: "viewer-001",
-    username: "viewer01",
-    email: "viewer01@example.com",
-    password: "password123",
-    role: "VIEWER",
-    status: "ACTIVE",
-    createdAt: "2024-01-06T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T10:00:00.000Z",
-    lastLoginIp: "192.168.1.109"
-  },
-  {
-    userId: "viewer-002",
-    username: "viewer02",
-    email: "viewer02@example.com",
-    password: "password123",
-    role: "VIEWER",
-    status: "ACTIVE",
-    createdAt: "2024-01-06T00:00:00.000Z",
-    updatedAt: "2024-01-08T00:00:00.000Z",
-    lastLoginTime: "2024-01-09T11:30:00.000Z",
-    lastLoginIp: "192.168.1.110"
-  },
-  {
-    userId: "viewer-003",
-    username: "viewer03",
-    email: "viewer03@example.com",
-    password: "password123",
-    role: "VIEWER",
-    status: "LOCKED",
-    createdAt: "2024-01-07T00:00:00.000Z",
-    updatedAt: "2024-01-09T00:00:00.000Z",
-    lastLoginTime: "2024-01-08T17:00:00.000Z",
-    lastLoginIp: "192.168.1.111"
-  }
-];
+export const mockUsers: MockUser[] = baseUserList;
 
 /**
  * 用户API Mock数据
