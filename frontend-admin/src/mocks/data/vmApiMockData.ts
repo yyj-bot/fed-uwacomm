@@ -17,10 +17,6 @@ export const vmApiMock = {
         accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMWIyYzNkNGU1ZjY3ODkwMTIzNDU2Nzg5MDEyMzQ1NiIsInZtSWQiOiJhMWIyYzNkNGU1ZjY3ODkwMTIzNDU2Nzg5MDEyMzQ1NiIsImlhdCI6MTcwNDEwMDgwMCwiZXhwIjoxNzA0MTg3MjAwfQ.example_signature",
         secretId: "s3cr3t_8f14e45fceea167a5a36dedd4bea2543",
         tokenExpireSeconds: 86400,
-        websocket: {
-          sockjs: "http://localhost:8080/ws",
-          native: "ws://localhost:8080/ws-native"
-        },
         apiEndpoints: {
           status: "/api/v1/vm/a1b2c3d4e5f678901234567890123456/status",
           control: "/api/v1/vm/a1b2c3d4e5f678901234567890123456/control"

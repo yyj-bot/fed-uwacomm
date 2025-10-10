@@ -13,6 +13,7 @@ import {
   UnderwaterOptimizationPage,
   EnvironmentAnalysisPage,
   VMManagementPage,
+  AdminVMManagementPage,
   UserProfilePage,
   AccountSettingsPage
 } from '@/modules'
@@ -32,7 +33,7 @@ import OrchestrationDetailPage from '@/modules/federated-learning/OrchestrationD
 import OrchestrationTimelinePage from '@/modules/federated-learning/OrchestrationTimelinePage'
 import OrchestrationAnalyticsPage from '@/modules/federated-learning/OrchestrationAnalyticsPage'
 
-import { userService, websocketService } from '@/services'
+import { userService } from '@/services'
 import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
 import { useAuthStore } from '@/store/auth/authStore'
 
@@ -170,7 +171,9 @@ const App: React.FC = () => {
                       {/* 部署运维功能已合并到版本管理页面 */}
                       
                       {/* VM管理路由 */}
-                      <Route path="/vm-management" element={<VMManagementPage />} />
+                      <Route path="/vm-management" element={<Navigate to="/vm-management/list" replace />} />
+                      <Route path="/vm-management/list" element={<VMManagementPage />} />
+                      <Route path="/vm-management/admin" element={<AdminVMManagementPage />} />
                       
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />

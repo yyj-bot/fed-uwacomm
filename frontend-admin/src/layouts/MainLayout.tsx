@@ -26,9 +26,7 @@ import {
   DesktopOutlined
 } from '@ant-design/icons'
 
-import { useAuth, useWebSocket } from '@/store'
-import { StatusIndicator } from '@/components'
-import { ConnectionState } from '@/services'
+import { useAuth } from '@/store'
 import './MainLayout.module.css'
 
 const { Header, Sider, Content } = Layout
@@ -42,46 +40,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
-  const { isConnected, connectionStatus, connect } = useWebSocket()
   
   const [collapsed, setCollapsed] = useState(false)
-
-  // 自动连接WebSocket
-  useEffect(() => {
-    const connectWebSocket = async () => {
-      const token = localStorage.getItem('access_token')
-      if (token && !isConnected && connectionStatus === ConnectionState.DISCONNECTED) {
-        try {
-          console.log('📡 尝试连接WebSocket...')
-          await connect()
-          console.log('✅ WebSocket连接成功')
-        } catch (error) {
-          console.error('❌ WebSocket连接失败:', error)
-        }
-      }
-    }
-    
-    connectWebSocket()
-  }, [isConnected, connectionStatus, connect])
-
-  // 获取连接状态文本
-  const getConnectionStatusText = (connected: boolean, status: ConnectionState): string => {
-    if (connected) {
-      return '连接成功'
-    }
-    
-    switch (status) {
-      case ConnectionState.CONNECTING:
-        return '正在连接'
-      case ConnectionState.RECONNECTING:
-        return '重新连接中'
-      case ConnectionState.ERROR:
-        return '连接失败'
-      case ConnectionState.DISCONNECTED:
-      default:
-        return '连接断开'
-    }
-  }
 
   // 侧边栏菜单配置
   const menuItems = [
@@ -116,7 +76,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: '/vm-management',
       icon: <DesktopOutlined />,
-      label: '虚拟机管理'
+      label: '虚拟机管理',
+      children: [
+        { key: '/vm-management/list', label: '虚拟机列表' },
+        { key: '/vm-management/admin', label: '虚拟机管理' }
+      ]
     },
     {
       key: '/training-data',
@@ -280,16 +244,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           zIndex: 1002
         }}>
           <Space size="middle" wrap={false}>
-            {/* WebSocket 连接状态 */}
-            <div style={{ color: 'white' }}>
-              <StatusIndicator
-                status={isConnected ? 'online' : 'offline'}
-                text={getConnectionStatusText(isConnected, connectionStatus)}
-                variant="dot"
-                size="small"
-              />
-            </div>
-
             {/* 用户信息 */}
             <Dropdown
               menu={{ items: userMenuItems, onClick: handleUserMenuClick }}

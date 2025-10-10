@@ -78,29 +78,41 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
 
   // VM操作处理
   const handleStartVM = async () => {
-    try {
-      await startVM(vm.vmId)
+    const result = await startVM(vm.vmId)
+    if (result.success) {
       message.success('虚拟机启动成功')
-    } catch (error) {
-      message.error(`启动失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成启动
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 1500)
+    } else {
+      message.error(`启动失败: ${result.error || '未知错误'}`)
     }
   }
 
   const handleStopVM = async () => {
-    try {
-      await stopVM(vm.vmId)
+    const result = await stopVM(vm.vmId)
+    if (result.success) {
       message.success('虚拟机停止成功')
-    } catch (error) {
-      message.error(`停止失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成停止
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 1500)
+    } else {
+      message.error(`停止失败: ${result.error || '未知错误'}`)
     }
   }
 
   const handleRestartVM = async () => {
-    try {
-      await restartVM(vm.vmId)
+    const result = await restartVM(vm.vmId)
+    if (result.success) {
       message.success('虚拟机重启成功')
-    } catch (error) {
-      message.error(`重启失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成重启
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 2000)
+    } else {
+      message.error(`重启失败: ${result.error || '未知错误'}`)
     }
   }
 
@@ -253,9 +265,6 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
             <Descriptions.Item label="运行状态">{renderStatus()}</Descriptions.Item>
             <Descriptions.Item label="连接状态">{renderConnectionStatus()}</Descriptions.Item>
             <Descriptions.Item label="操作系统">{vm.osType}</Descriptions.Item>
-            <Descriptions.Item label="WebSocket会话">
-              {vmStatus?.wsSessionId || vm.wsSessionId || '无'}
-            </Descriptions.Item>
             <Descriptions.Item label="创建时间">
               {new Date(vm.createdAt).toLocaleString()}
             </Descriptions.Item>

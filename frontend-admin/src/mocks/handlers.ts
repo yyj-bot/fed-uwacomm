@@ -8,10 +8,18 @@ import { federatedTaskHandlers } from './handlers/federatedTaskHandlers'
 import { modelManagementHandlers } from './handlers/modelManagementHandlers'
 import { vmHandlers } from './handlers/vmHandlers'
 import { userHandlers } from './handlers/userHandlers'
+import { systemLogHandlers } from './handlers/systemLogHandlers'
+import { adminVmHandlers } from './handlers/adminVmHandlers'
 
 export const handlers = [
   // ==================== 用户管理 API ====================
   ...userHandlers,
+
+  // ==================== 系统日志管理 API ====================
+  ...systemLogHandlers,
+
+  // ==================== 管理员虚拟机管理 API ====================
+  ...adminVmHandlers,
 
   // 仪表盘概览数据
   http.get('http://localhost:5173/api/dashboard/overview', () => {

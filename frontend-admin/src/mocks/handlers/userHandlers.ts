@@ -265,6 +265,22 @@ export const userHandlers = [
 
   // ==================== 管理员用户管理接口 (/api/admin/user) ====================
 
+  // 用户统计信息 - GET /api/admin/user/statistics
+  http.get('http://localhost:5173/api/admin/user/statistics', ({ request }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    // 检查Authorization头
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json({
+        code: 401,
+        message: "Token缺失",
+        data: null
+      }, { status: 401 })
+    }
+
+    return HttpResponse.json(adminUserApiMock.statistics.success)
+  }),
+
   // 管理员用户列表 - GET /api/admin/user/list
   http.get('http://localhost:5173/api/admin/user/list', ({ request }) => {
     const authHeader = request.headers.get('Authorization')
@@ -282,18 +298,56 @@ export const userHandlers = [
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const size = parseInt(url.searchParams.get('size') || '10')
+    const keyword = url.searchParams.get('keyword') || ''
+    const role = url.searchParams.get('role') || ''
+    const status = url.searchParams.get('status') || ''
 
-    // 返回用户列表
-    const responseData = {
-      ...adminUserApiMock.list.success,
-      data: {
-        ...adminUserApiMock.list.success.data,
-        page,
-        size
-      }
+    // 过滤用户
+    let filteredUsers = [...mockUsers]
+    
+    if (keyword) {
+      filteredUsers = filteredUsers.filter(u => 
+        u.username.toLowerCase().includes(keyword.toLowerCase()) ||
+        u.email.toLowerCase().includes(keyword.toLowerCase())
+      )
+    }
+    
+    if (role) {
+      filteredUsers = filteredUsers.filter(u => u.role === role)
+    }
+    
+    if (status) {
+      filteredUsers = filteredUsers.filter(u => u.status === status)
     }
 
-    return HttpResponse.json(responseData)
+    // 分页
+    const total = filteredUsers.length
+    const pages = Math.ceil(total / size)
+    const start = (page - 1) * size
+    const end = start + size
+    const records = filteredUsers.slice(start, end).map(user => ({
+      userId: user.userId,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      lastLoginTime: user.lastLoginTime || null,
+      lastLoginIp: user.lastLoginIp || null
+    }))
+
+    return HttpResponse.json({
+      code: 200,
+      message: "获取成功",
+      data: {
+        total,
+        page,
+        size,
+        pages,
+        records
+      }
+    })
   }),
 
   // 创建用户 - POST /api/admin/user/create
@@ -372,14 +426,149 @@ export const userHandlers = [
     // 检查用户是否存在
     const user = mockUsers.find(u => u.userId === userId)
     if (!user) {
-      return HttpResponse.json({
-        code: 404,
-        message: "用户不存在",
-        data: null
-      }, { status: 404 })
+      return HttpResponse.json(adminUserApiMock.delete.error404, { status: 404 })
     }
 
     return HttpResponse.json(adminUserApiMock.delete.success)
+  }),
+
+  // 获取用户详情 - GET /api/admin/user/:userId
+  http.get('http://localhost:5173/api/admin/user/:userId', ({ request, params }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    // 检查Authorization头
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json({
+        code: 401,
+        message: "Token缺失",
+        data: null
+      }, { status: 401 })
+    }
+
+    const { userId } = params
+
+    // 检查用户是否存在
+    const user = mockUsers.find(u => u.userId === userId)
+    if (!user) {
+      return HttpResponse.json(adminUserApiMock.detail.error404, { status: 404 })
+    }
+
+    // 返回用户详情（不包含密码）
+    const responseData = {
+      ...adminUserApiMock.detail.success,
+      data: {
+        userId: user.userId,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    }
+
+    return HttpResponse.json(responseData)
+  }),
+
+  // 锁定用户 - POST /api/admin/user/:userId/lock
+  http.post('http://localhost:5173/api/admin/user/:userId/lock', async ({ request, params }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    // 检查Authorization头
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json({
+        code: 401,
+        message: "Token缺失",
+        data: null
+      }, { status: 401 })
+    }
+
+    const { userId } = params
+
+    // 检查用户是否存在
+    const user = mockUsers.find(u => u.userId === userId)
+    if (!user) {
+      return HttpResponse.json(adminUserApiMock.lock.error404, { status: 404 })
+    }
+
+    const body = await request.json() as any
+    const duration = body.duration || 3600 // 默认1小时
+
+    // 计算锁定截止时间
+    const lockedUntil = new Date(Date.now() + duration * 1000).toISOString()
+
+    const responseData = {
+      ...adminUserApiMock.lock.success,
+      data: {
+        userId: user.userId,
+        lockedUntil
+      }
+    }
+
+    return HttpResponse.json(responseData)
+  }),
+
+  // 解锁用户 - POST /api/admin/user/:userId/unlock
+  http.post('http://localhost:5173/api/admin/user/:userId/unlock', ({ request, params }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    // 检查Authorization头
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json({
+        code: 401,
+        message: "Token缺失",
+        data: null
+      }, { status: 401 })
+    }
+
+    const { userId } = params
+
+    // 检查用户是否存在
+    const user = mockUsers.find(u => u.userId === userId)
+    if (!user) {
+      return HttpResponse.json(adminUserApiMock.unlock.error404, { status: 404 })
+    }
+
+    const responseData = {
+      ...adminUserApiMock.unlock.success,
+      data: {
+        userId: user.userId,
+        status: "ACTIVE"
+      }
+    }
+
+    return HttpResponse.json(responseData)
+  }),
+
+  // 重置用户密码 - POST /api/admin/user/:userId/reset-password
+  http.post('http://localhost:5173/api/admin/user/:userId/reset-password', async ({ request, params }) => {
+    const authHeader = request.headers.get('Authorization')
+
+    // 检查Authorization头
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return HttpResponse.json({
+        code: 401,
+        message: "Token缺失",
+        data: null
+      }, { status: 401 })
+    }
+
+    const { userId } = params
+
+    // 检查用户是否存在
+    const user = mockUsers.find(u => u.userId === userId)
+    if (!user) {
+      return HttpResponse.json(adminUserApiMock.resetPassword.error404, { status: 404 })
+    }
+
+    const body = await request.json() as any
+
+    // 参数验证
+    if (!body.newPassword) {
+      return HttpResponse.json(adminUserApiMock.resetPassword.error400, { status: 400 })
+    }
+
+    return HttpResponse.json(adminUserApiMock.resetPassword.success)
   })
 ];
 

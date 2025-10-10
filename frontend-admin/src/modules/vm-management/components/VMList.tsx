@@ -27,13 +27,12 @@ import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   RedoOutlined,
-  DeleteOutlined,
   EyeOutlined,
-  EditOutlined,
-  BarChartOutlined
+  BarChartOutlined,
+  TeamOutlined
 } from '@ant-design/icons'
 import { useVM } from '@/store/vm'
-import VMEditModal from './VMEditModal'
+import { useAuth } from '@/store/auth'
 import type { VirtualMachine } from '@/api/vm'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -43,14 +42,13 @@ const { Option } = Select
 interface VMListProps {
   onSelectVM: (vm: VirtualMachine) => void
   onViewModels: (vm: VirtualMachine) => void
+  onViewAssignment?: (vm: VirtualMachine) => void
 }
 
-const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
+const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels, onViewAssignment }) => {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [osTypeFilter, setOsTypeFilter] = useState<string>('')
-  const [editModalVisible, setEditModalVisible] = useState(false)
-  const [editingVM, setEditingVM] = useState<VirtualMachine | null>(null)
 
   const {
     vmList,
@@ -60,17 +58,19 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
     fetchVMList,
     setPagination,
     setQueryParams,
-    updateVM,
-    deleteVM,
     startVM,
     stopVM,
     restartVM,
+    fetchVMStatus,
     getVMStatus,
     isVMOperating,
     canStartVM,
     canStopVM,
     canRestartVM
   } = useVM()
+
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
 
   // 初始化数据
   useEffect(() => {
@@ -82,7 +82,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
     setSearchText(value)
     setQueryParams({
       keyword: value,
-      status: statusFilter || undefined,
+      status: statusFilter as any || undefined,
       osType: osTypeFilter || undefined
     })
     fetchVMList({ page: 1 })
@@ -93,7 +93,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
     setStatusFilter(value)
     setQueryParams({
       keyword: searchText || undefined,
-      status: value || undefined,
+      status: value as any || undefined,
       osType: osTypeFilter || undefined
     })
     fetchVMList({ page: 1 })
@@ -104,7 +104,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
     setOsTypeFilter(value)
     setQueryParams({
       keyword: searchText || undefined,
-      status: statusFilter || undefined,
+      status: statusFilter as any || undefined,
       osType: value || undefined
     })
     fetchVMList({ page: 1 })
@@ -118,57 +118,41 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
 
   // 处理VM操作
   const handleStartVM = async (vm: VirtualMachine) => {
-    try {
-      await startVM(vm.vmId)
+    const result = await startVM(vm.vmId)
+    if (result.success) {
       message.success(`虚拟机 ${vm.name} 启动成功`)
-    } catch (error) {
-      message.error(`启动失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成启动
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 1500)
+    } else {
+      message.error(`启动失败: ${result.error || '未知错误'}`)
     }
   }
 
   const handleStopVM = async (vm: VirtualMachine) => {
-    try {
-      await stopVM(vm.vmId)
+    const result = await stopVM(vm.vmId)
+    if (result.success) {
       message.success(`虚拟机 ${vm.name} 停止成功`)
-    } catch (error) {
-      message.error(`停止失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成停止
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 1500)
+    } else {
+      message.error(`停止失败: ${result.error || '未知错误'}`)
     }
   }
 
   const handleRestartVM = async (vm: VirtualMachine) => {
-    try {
-      await restartVM(vm.vmId)
+    const result = await restartVM(vm.vmId)
+    if (result.success) {
       message.success(`虚拟机 ${vm.name} 重启成功`)
-    } catch (error) {
-      message.error(`重启失败: ${error instanceof Error ? error.message : '未知错误'}`)
-    }
-  }
-
-  const handleDeleteVM = async (vm: VirtualMachine) => {
-    try {
-      await deleteVM(vm.vmId)
-      message.success(`虚拟机 ${vm.name} 删除成功`)
-    } catch (error) {
-      message.error(`删除失败: ${error instanceof Error ? error.message : '未知错误'}`)
-    }
-  }
-
-  // 处理编辑
-  const handleEdit = (vm: VirtualMachine) => {
-    setEditingVM(vm)
-    setEditModalVisible(true)
-  }
-
-  const handleEditSubmit = async (values: any) => {
-    if (!editingVM) return
-    
-    try {
-      await updateVM(editingVM.vmId, values)
-      message.success('虚拟机信息更新成功')
-      setEditModalVisible(false)
-      setEditingVM(null)
-    } catch (error) {
-      message.error(`更新失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      // 延迟刷新状态，等待虚拟机完成重启
+      setTimeout(() => {
+        fetchVMStatus(vm.vmId)
+      }, 2000)
+    } else {
+      message.error(`重启失败: ${result.error || '未知错误'}`)
     }
   }
 
@@ -279,7 +263,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
     {
       title: '操作',
       key: 'actions',
-      width: 280,
+      width: 240,
       fixed: 'right',
       render: (_, record: VirtualMachine) => (
         <Space size="small">
@@ -291,14 +275,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
             />
           </Tooltip>
           
-          <Tooltip title="编辑">
-            <Button 
-              type="text" 
-              icon={<EditOutlined />} 
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          
           <Tooltip title="本地模型">
             <Button 
               type="text" 
@@ -306,6 +282,18 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
               onClick={() => onViewModels(record)}
             />
           </Tooltip>
+
+          {/* 管理员专用：分配管理 */}
+          {isAdmin && onViewAssignment && (
+            <Tooltip title="分配管理">
+              <Button 
+                type="text" 
+                icon={<TeamOutlined />} 
+                onClick={() => onViewAssignment(record)}
+                style={{ color: '#722ed1' }}
+              />
+            </Tooltip>
+          )}
           
           {canStartVM(record) && (
             <Tooltip title="启动">
@@ -342,22 +330,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
               />
             </Tooltip>
           )}
-          
-          <Popconfirm
-            title="确定要删除这个虚拟机吗？"
-            onConfirm={() => handleDeleteVM(record)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Tooltip title="删除">
-              <Button 
-                type="text" 
-                icon={<DeleteOutlined />} 
-                loading={isVMOperating(record.vmId, 'delete')}
-                style={{ color: '#ff4d4f' }}
-              />
-            </Tooltip>
-          </Popconfirm>
         </Space>
       )
     }
@@ -434,17 +406,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
         }}
         scroll={{ x: 1200 }}
         size="middle"
-      />
-
-      {/* 编辑模态框 */}
-      <VMEditModal
-        visible={editModalVisible}
-        vm={editingVM}
-        onSubmit={handleEditSubmit}
-        onCancel={() => {
-          setEditModalVisible(false)
-          setEditingVM(null)
-        }}
       />
     </div>
   )

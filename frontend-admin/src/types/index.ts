@@ -1,8 +1,5 @@
 // 水声联邦学习系统类型定义 - 严格按照API文档设计
 
-// WebSocket相关类型
-export * from './websocket'
-
 // 工具类型
 export * from './utils'
 
@@ -240,16 +237,6 @@ export interface SortParams {
 export interface TimeRangeParams {
   readonly startTime?: string
   readonly endTime?: string
-}
-
-// ==================== WebSocket消息类型 ====================
-export interface WebSocketMessage {
-  readonly type: string
-  readonly id: string
-  readonly timestamp: string
-  readonly vmId: string
-  readonly data: unknown
-  readonly signature?: string
 }
 
 // ==================== 图表配置类型 ====================

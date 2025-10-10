@@ -314,7 +314,9 @@ export const useVM = () => {
   const canStartVM = useCallback((vm: VirtualMachine): boolean => {
     if (!vm) return false
     const status = getVMStatus(vm.vmId)
-    return status?.status === 'STOPPED' && !isVMOperating(vm.vmId)
+    const currentStatus = status?.status || vm.status
+    // 只有在STOPPED或OFFLINE状态下才能启动，且不在操作中
+    return (currentStatus === 'STOPPED' || currentStatus === 'OFFLINE') && !isVMOperating(vm.vmId)
   }, [getVMStatus, isVMOperating])
 
   /**
@@ -323,7 +325,10 @@ export const useVM = () => {
   const canStopVM = useCallback((vm: VirtualMachine): boolean => {
     if (!vm) return false
     const status = getVMStatus(vm.vmId)
-    return status?.status === 'RUNNING' && !isVMOperating(vm.vmId)
+    const currentStatus = status?.status || vm.status
+    // 只有在RUNNING状态下才能停止，且不在操作中
+    // STARTING和STOPPING状态下不显示停止按钮
+    return currentStatus === 'RUNNING' && !isVMOperating(vm.vmId)
   }, [getVMStatus, isVMOperating])
 
   /**
@@ -332,7 +337,10 @@ export const useVM = () => {
   const canRestartVM = useCallback((vm: VirtualMachine): boolean => {
     if (!vm) return false
     const status = getVMStatus(vm.vmId)
-    return status?.status === 'RUNNING' && !isVMOperating(vm.vmId)
+    const currentStatus = status?.status || vm.status
+    // 只有在RUNNING状态下才能重启，且不在操作中
+    // STARTING和STOPPING状态下不显示重启按钮
+    return currentStatus === 'RUNNING' && !isVMOperating(vm.vmId)
   }, [getVMStatus, isVMOperating])
 
   /**

@@ -6,6 +6,14 @@
 import { http, HttpResponse } from 'msw'
 import { vmApiMock, vmRoundModelsApiMock, multiVmComparisonMock } from '../data/vmApiMockData'
 
+// 虚拟机状态管理（模拟运行时状态）
+const vmStatusMap = new Map<string, string>()
+
+// 初始化默认状态
+vmStatusMap.set('a1b2c3d4e5f678901234567890123456', 'RUNNING')
+vmStatusMap.set('b2c3d4e5f6789012345678901234567a', 'RUNNING')
+vmStatusMap.set('c3d4e5f67890123456789012345678ab', 'STOPPED')
+
 export const vmHandlers = [
   // ==================== VM自身操作接口 (/api/v1/vm) ====================
   
@@ -58,15 +66,27 @@ export const vmHandlers = [
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
     const size = parseInt(url.searchParams.get('size') || '20')
-    const status = url.searchParams.get('status')
+    const statusFilter = url.searchParams.get('status')
     const osType = url.searchParams.get('osType')
     const keyword = url.searchParams.get('keyword')
     
-    let filteredList = [...vmApiMock.list.success.data.list]
+    // 更新虚拟机列表的状态
+    let filteredList = vmApiMock.list.success.data.list.map(vm => {
+      const currentStatus = vmStatusMap.get(vm.vmId) || vm.status
+      const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+        ? 'CONNECTED' 
+        : 'DISCONNECTED'
+      
+      return {
+        ...vm,
+        status: currentStatus,
+        connectionStatus
+      }
+    })
     
     // 状态过滤
-    if (status) {
-      filteredList = filteredList.filter(vm => vm.status === status)
+    if (statusFilter) {
+      filteredList = filteredList.filter(vm => vm.status === statusFilter)
     }
     
     // 操作系统过滤
@@ -101,7 +121,7 @@ export const vmHandlers = [
 
   // 4.2 虚拟机详情查询接口 - GET /api/vm/{vmId}
   http.get('http://localhost:5173/api/vm/:vmId', ({ params }) => {
-    const { vmId } = params
+    const { vmId } = params as { vmId: string }
     
     // 模拟虚拟机不存在
     if (vmId === 'nonexistent') {
@@ -112,7 +132,22 @@ export const vmHandlers = [
       }, { status: 404 })
     }
     
-    return HttpResponse.json(vmApiMock.detail.success)
+    // 获取当前状态
+    const currentStatus = vmStatusMap.get(vmId) || vmApiMock.detail.success.data.status
+    const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+      ? 'CONNECTED' 
+      : 'DISCONNECTED'
+    
+    return HttpResponse.json({
+      code: 200,
+      message: "查询成功",
+      data: {
+        ...vmApiMock.detail.success.data,
+        vmId,
+        status: currentStatus,
+        connectionStatus
+      }
+    })
   }),
 
   // 4.3 虚拟机更新接口 - PUT /api/vm/{vmId}
@@ -163,8 +198,20 @@ export const vmHandlers = [
   
   // 5.1 虚拟机启动接口 - POST /api/vm/{vmId}/start
   http.post('http://localhost:5173/api/vm/:vmId/start', async ({ params, request }) => {
-    const { vmId } = params
-    const body = await request.json() as any
+    const { vmId } = params as { vmId: string }
+    
+    // 尝试读取请求体，如果为空则使用空对象
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (error) {
+      console.log('[Mock] 启动虚拟机请求体为空或解析失败，使用默认参数')
+    }
+    
+    console.log('[Mock] 接收到启动虚拟机请求:', { vmId, body })
     
     // 模拟虚拟机不存在
     if (vmId === 'nonexistent') {
@@ -175,8 +222,9 @@ export const vmHandlers = [
       }, { status: 404 })
     }
     
-    // 模拟虚拟机已在运行
-    if (vmId === 'already-running') {
+    // 检查当前状态
+    const currentStatus = vmStatusMap.get(vmId) || 'STOPPED'
+    if (currentStatus === 'RUNNING') {
       return HttpResponse.json({
         code: 400,
         message: "虚拟机已在运行",
@@ -184,13 +232,37 @@ export const vmHandlers = [
       }, { status: 400 })
     }
     
+    // 更新状态为 STARTING，然后异步更新为 RUNNING
+    vmStatusMap.set(vmId, 'STARTING')
+    setTimeout(() => {
+      vmStatusMap.set(vmId, 'RUNNING')
+      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 RUNNING`)
+    }, 1000)
+    
     return HttpResponse.json(vmApiMock.start.success)
   }),
 
   // 5.2 虚拟机停止接口 - POST /api/vm/{vmId}/stop
   http.post('http://localhost:5173/api/vm/:vmId/stop', async ({ params, request }) => {
-    const { vmId } = params
-    const body = await request.json() as any
+    const { vmId } = params as { vmId: string }
+    
+    console.log('[Mock] ========== 停止虚拟机请求被拦截 ==========')
+    console.log('[Mock] vmId:', vmId)
+    console.log('[Mock] request.url:', request.url)
+    
+    // 尝试读取请求体，如果为空则使用空对象
+    let body: any = {}
+    try {
+      const text = await request.text()
+      console.log('[Mock] 请求体文本:', text)
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (error) {
+      console.log('[Mock] 停止虚拟机请求体为空或解析失败，使用默认参数')
+    }
+    
+    console.log('[Mock] 接收到停止虚拟机请求:', { vmId, body })
     
     // 模拟虚拟机不存在
     if (vmId === 'nonexistent') {
@@ -201,8 +273,9 @@ export const vmHandlers = [
       }, { status: 404 })
     }
     
-    // 模拟虚拟机已停止
-    if (vmId === 'already-stopped') {
+    // 检查当前状态
+    const currentStatus = vmStatusMap.get(vmId) || 'RUNNING'
+    if (currentStatus === 'STOPPED') {
       return HttpResponse.json({
         code: 400,
         message: "虚拟机已停止",
@@ -210,13 +283,33 @@ export const vmHandlers = [
       }, { status: 400 })
     }
     
+    // 更新状态为 STOPPING，然后异步更新为 STOPPED
+    vmStatusMap.set(vmId, 'STOPPING')
+    setTimeout(() => {
+      vmStatusMap.set(vmId, 'STOPPED')
+      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 STOPPED`)
+    }, 1000)
+    
+    console.log('[Mock] 返回停止虚拟机成功响应:', vmApiMock.stop.success)
     return HttpResponse.json(vmApiMock.stop.success)
   }),
 
   // 5.3 虚拟机重启接口 - POST /api/vm/{vmId}/restart
   http.post('http://localhost:5173/api/vm/:vmId/restart', async ({ params, request }) => {
-    const { vmId } = params
-    const body = await request.json() as any
+    const { vmId } = params as { vmId: string }
+    
+    // 尝试读取请求体，如果为空则使用空对象
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (error) {
+      console.log('[Mock] 重启虚拟机请求体为空或解析失败，使用默认参数')
+    }
+    
+    console.log('[Mock] 接收到重启虚拟机请求:', { vmId, body })
     
     // 模拟虚拟机不存在
     if (vmId === 'nonexistent') {
@@ -226,6 +319,17 @@ export const vmHandlers = [
         data: null
       }, { status: 404 })
     }
+    
+    // 更新状态：STOPPING -> STARTING -> RUNNING
+    vmStatusMap.set(vmId, 'STOPPING')
+    setTimeout(() => {
+      vmStatusMap.set(vmId, 'STARTING')
+      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 STARTING`)
+      setTimeout(() => {
+        vmStatusMap.set(vmId, 'RUNNING')
+        console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 RUNNING`)
+      }, 1000)
+    }, 500)
     
     return HttpResponse.json(vmApiMock.restart.success)
   }),
@@ -234,7 +338,9 @@ export const vmHandlers = [
   
   // 6.1 虚拟机状态查询接口 - GET /api/vm/{vmId}/status
   http.get('http://localhost:5173/api/vm/:vmId/status', ({ params }) => {
-    const { vmId } = params
+    const { vmId } = params as { vmId: string }
+    
+    console.log('[Mock] 查询虚拟机状态:', vmId)
     
     // 模拟虚拟机不存在
     if (vmId === 'nonexistent') {
@@ -254,7 +360,26 @@ export const vmHandlers = [
       }, { status: 500 })
     }
     
-    return HttpResponse.json(vmApiMock.status.success)
+    // 获取当前状态，默认为 RUNNING
+    const currentStatus = vmStatusMap.get(vmId) || 'RUNNING'
+    console.log('[Mock] 当前虚拟机状态:', currentStatus)
+    
+    // 根据状态返回相应的连接状态
+    const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
+      ? 'CONNECTED' 
+      : 'DISCONNECTED'
+    
+    // 返回状态信息，使用当前状态
+    return HttpResponse.json({
+      code: 200,
+      message: "查询成功",
+      data: {
+        ...vmApiMock.status.success.data,
+        vmId,
+        status: currentStatus,
+        connectionStatus
+      }
+    })
   }),
 
   // ==================== 本地模型接口 (/api/model/vm-round-models) ====================

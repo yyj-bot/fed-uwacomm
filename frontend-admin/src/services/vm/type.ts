@@ -389,8 +389,6 @@ export interface VMServiceConfig {
   readonly maxRetries: number
   /** 重试延迟（毫秒） */
   readonly retryDelay: number
-  /** WebSocket连接超时时间（毫秒） */
-  readonly websocketTimeout: number
   /** 心跳检测间隔（毫秒） */
   readonly heartbeatInterval: number
 }

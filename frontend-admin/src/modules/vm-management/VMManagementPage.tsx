@@ -7,19 +7,24 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { Tabs, Card, Button, Space, message, Spin } from 'antd'
+import { Tabs, Card, Button, Space, message, Modal, Drawer } from 'antd'
 import { 
   DesktopOutlined, 
-  DatabaseOutlined, 
   BarChartOutlined,
   ReloadOutlined,
-  PlusOutlined
+  TeamOutlined,
+  ControlOutlined
 } from '@ant-design/icons'
 import { useVM } from '@/store/vm'
+import { useAuth } from '@/store/auth'
 import VMList from './components/VMList'
 import VMDetail from './components/VMDetail'
 import VMModels from './components/VMModels'
 import VMStatistics from './components/VMStatistics'
+import { 
+  VMAssignmentOverview,
+  VMAssignmentManager
+} from './components'
 import type { VirtualMachine } from '@/api/vm'
 import './VMManagementPage.css'
 
@@ -28,6 +33,9 @@ const { TabPane } = Tabs
 const VMManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('list')
   const [selectedVM, setSelectedVM] = useState<VirtualMachine | null>(null)
+  const [detailDrawerVisible, setDetailDrawerVisible] = useState(false)
+  const [modelsDrawerVisible, setModelsDrawerVisible] = useState(false)
+  const [assignmentDrawerVisible, setAssignmentDrawerVisible] = useState(false)
   
   const {
     vmList,
@@ -39,6 +47,11 @@ const VMManagementPage: React.FC = () => {
     offlineVMCount,
     errorVMCount
   } = useVM()
+
+  const { user } = useAuth()
+  
+  // 检查是否是管理员
+  const isAdmin = user?.role === 'ADMIN'
 
   // 初始化数据
   useEffect(() => {
@@ -56,16 +69,40 @@ const VMManagementPage: React.FC = () => {
     }
   }
 
-  // 选择虚拟机
+  // 选择虚拟机 - 打开详情抽屉
   const handleSelectVM = (vm: VirtualMachine) => {
     setSelectedVM(vm)
-    setActiveTab('detail')
+    setDetailDrawerVisible(true)
   }
 
-  // 查看VM模型
+  // 查看VM模型 - 打开模型抽屉
   const handleViewModels = (vm: VirtualMachine) => {
     setSelectedVM(vm)
-    setActiveTab('models')
+    setModelsDrawerVisible(true)
+  }
+
+  // 关闭详情抽屉
+  const handleCloseDetailDrawer = () => {
+    setDetailDrawerVisible(false)
+    setSelectedVM(null)
+  }
+
+  // 关闭模型抽屉
+  const handleCloseModelsDrawer = () => {
+    setModelsDrawerVisible(false)
+    setSelectedVM(null)
+  }
+
+  // 查看VM分配管理
+  const handleViewAssignment = (vm: VirtualMachine) => {
+    setSelectedVM(vm)
+    setAssignmentDrawerVisible(true)
+  }
+
+  // 关闭分配管理抽屉
+  const handleCloseAssignmentDrawer = () => {
+    setAssignmentDrawerVisible(false)
+    setSelectedVM(null)
   }
 
   // 渲染页面头部
@@ -149,43 +186,8 @@ const VMManagementPage: React.FC = () => {
             <VMList 
               onSelectVM={handleSelectVM}
               onViewModels={handleViewModels}
+              onViewAssignment={isAdmin ? handleViewAssignment : undefined}
             />
-          </TabPane>
-          
-          <TabPane 
-            tab={
-              <span>
-                <DatabaseOutlined />
-                虚拟机详情
-              </span>
-            } 
-            key="detail"
-            disabled={!selectedVM}
-          >
-            {selectedVM && (
-              <VMDetail 
-                vm={selectedVM}
-                onBack={() => setActiveTab('list')}
-              />
-            )}
-          </TabPane>
-          
-          <TabPane 
-            tab={
-              <span>
-                <BarChartOutlined />
-                本地模型
-              </span>
-            } 
-            key="models"
-            disabled={!selectedVM}
-          >
-            {selectedVM && (
-              <VMModels 
-                vm={selectedVM}
-                onBack={() => setActiveTab('list')}
-              />
-            )}
           </TabPane>
           
           <TabPane 
@@ -199,8 +201,78 @@ const VMManagementPage: React.FC = () => {
           >
             <VMStatistics />
           </TabPane>
+
+          {/* 管理员专用功能 */}
+          {isAdmin && (
+            <>
+              <TabPane 
+                tab={
+                  <span>
+                    <ControlOutlined />
+                    分配概况
+                  </span>
+                } 
+                key="assignment-overview"
+              >
+                <VMAssignmentOverview />
+              </TabPane>
+            </>
+          )}
         </Tabs>
       </Card>
+
+      {/* 虚拟机详情抽屉 */}
+      <Drawer
+        title={`虚拟机详情 - ${selectedVM?.name || ''}`}
+        placement="right"
+        width={720}
+        onClose={handleCloseDetailDrawer}
+        open={detailDrawerVisible}
+        destroyOnClose
+      >
+        {selectedVM && (
+          <VMDetail 
+            vm={selectedVM}
+            onBack={handleCloseDetailDrawer}
+          />
+        )}
+      </Drawer>
+
+      {/* 本地模型抽屉 */}
+      <Drawer
+        title={`本地模型 - ${selectedVM?.name || ''}`}
+        placement="right"
+        width={900}
+        onClose={handleCloseModelsDrawer}
+        open={modelsDrawerVisible}
+        destroyOnClose
+      >
+        {selectedVM && (
+          <VMModels 
+            vm={selectedVM}
+            onBack={handleCloseModelsDrawer}
+          />
+        )}
+      </Drawer>
+
+      {/* 管理员分配管理抽屉 */}
+      {isAdmin && (
+        <Drawer
+          title="VM分配管理"
+          placement="right"
+          width={1000}
+          onClose={handleCloseAssignmentDrawer}
+          open={assignmentDrawerVisible}
+          destroyOnClose
+        >
+          {selectedVM && (
+            <VMAssignmentManager 
+              vmId={selectedVM.vmId}
+              vmName={selectedVM.name}
+            />
+          )}
+        </Drawer>
+      )}
     </div>
   )
 }

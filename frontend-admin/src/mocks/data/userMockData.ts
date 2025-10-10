@@ -64,6 +64,7 @@ interface MockUser {
  * 注意：实际API中不会返回密码，密码仅用于登录验证
  */
 export const mockUsers: MockUser[] = [
+  // 管理员用户
   {
     userId: "a1b2c3d4e5f678901234567890123456",
     username: "admin",
@@ -73,8 +74,143 @@ export const mockUsers: MockUser[] = [
     status: "ACTIVE",
     createdAt: "2024-01-01T00:00:00.000Z",
     updatedAt: "2024-01-01T00:00:00.000Z",
-    lastLoginTime: "2024-01-01T10:00:00.000Z",
+    lastLoginTime: "2024-01-10T10:00:00.000Z",
     lastLoginIp: "192.168.1.100"
+  },
+  // 研究员用户
+  {
+    userId: "researcher-001",
+    username: "researcher01",
+    email: "researcher01@example.com",
+    password: "password123",
+    role: "RESEARCHER",
+    status: "ACTIVE",
+    createdAt: "2024-01-02T00:00:00.000Z",
+    updatedAt: "2024-01-05T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T14:30:00.000Z",
+    lastLoginIp: "192.168.1.101"
+  },
+  {
+    userId: "researcher-002",
+    username: "researcher02",
+    email: "researcher02@example.com",
+    password: "password123",
+    role: "RESEARCHER",
+    status: "ACTIVE",
+    createdAt: "2024-01-02T00:00:00.000Z",
+    updatedAt: "2024-01-06T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T15:20:00.000Z",
+    lastLoginIp: "192.168.1.102"
+  },
+  {
+    userId: "researcher-003",
+    username: "researcher03",
+    email: "researcher03@example.com",
+    password: "password123",
+    role: "RESEARCHER",
+    status: "ACTIVE",
+    createdAt: "2024-01-03T00:00:00.000Z",
+    updatedAt: "2024-01-07T00:00:00.000Z",
+    lastLoginTime: "2024-01-08T11:00:00.000Z",
+    lastLoginIp: "192.168.1.103"
+  },
+  {
+    userId: "researcher-004",
+    username: "researcher04",
+    email: "researcher04@example.com",
+    password: "password123",
+    role: "RESEARCHER",
+    status: "ACTIVE",
+    createdAt: "2024-01-03T00:00:00.000Z",
+    updatedAt: "2024-01-07T00:00:00.000Z",
+    lastLoginTime: "2024-01-07T09:30:00.000Z",
+    lastLoginIp: "192.168.1.104"
+  },
+  {
+    userId: "researcher-005",
+    username: "researcher05",
+    email: "researcher05@example.com",
+    password: "password123",
+    role: "RESEARCHER",
+    status: "INACTIVE",
+    createdAt: "2024-01-04T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-05T16:00:00.000Z",
+    lastLoginIp: "192.168.1.105"
+  },
+  // 操作员用户
+  {
+    userId: "operator-001",
+    username: "operator01",
+    email: "operator01@example.com",
+    password: "password123",
+    role: "OPERATOR",
+    status: "ACTIVE",
+    createdAt: "2024-01-04T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T08:00:00.000Z",
+    lastLoginIp: "192.168.1.106"
+  },
+  {
+    userId: "operator-002",
+    username: "operator02",
+    email: "operator02@example.com",
+    password: "password123",
+    role: "OPERATOR",
+    status: "ACTIVE",
+    createdAt: "2024-01-05T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T09:15:00.000Z",
+    lastLoginIp: "192.168.1.107"
+  },
+  {
+    userId: "operator-003",
+    username: "operator03",
+    email: "operator03@example.com",
+    password: "password123",
+    role: "OPERATOR",
+    status: "ACTIVE",
+    createdAt: "2024-01-05T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-08T13:45:00.000Z",
+    lastLoginIp: "192.168.1.108"
+  },
+  // 查看者用户
+  {
+    userId: "viewer-001",
+    username: "viewer01",
+    email: "viewer01@example.com",
+    password: "password123",
+    role: "VIEWER",
+    status: "ACTIVE",
+    createdAt: "2024-01-06T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T10:00:00.000Z",
+    lastLoginIp: "192.168.1.109"
+  },
+  {
+    userId: "viewer-002",
+    username: "viewer02",
+    email: "viewer02@example.com",
+    password: "password123",
+    role: "VIEWER",
+    status: "ACTIVE",
+    createdAt: "2024-01-06T00:00:00.000Z",
+    updatedAt: "2024-01-08T00:00:00.000Z",
+    lastLoginTime: "2024-01-09T11:30:00.000Z",
+    lastLoginIp: "192.168.1.110"
+  },
+  {
+    userId: "viewer-003",
+    username: "viewer03",
+    email: "viewer03@example.com",
+    password: "password123",
+    role: "VIEWER",
+    status: "LOCKED",
+    createdAt: "2024-01-07T00:00:00.000Z",
+    updatedAt: "2024-01-09T00:00:00.000Z",
+    lastLoginTime: "2024-01-08T17:00:00.000Z",
+    lastLoginIp: "192.168.1.111"
   }
 ];
 
@@ -262,30 +398,72 @@ export const userApiMock = {
  * 管理员用户管理 API Mock数据
  */
 export const adminUserApiMock = {
+  // 用户统计信息 - GET /api/admin/user/statistics
+  // 注意：这里的统计数据应该从 mockUsers 动态计算，而不是硬编码
+  statistics: {
+    success: {
+      code: 200,
+      message: "获取成功",
+      data: {
+        totalUsers: mockUsers.length,
+        activeUsers: mockUsers.filter(u => u.status === 'ACTIVE').length,
+        lockedUsers: mockUsers.filter(u => u.status === 'LOCKED').length,
+        adminUsers: mockUsers.filter(u => u.role === 'ADMIN').length,
+        researcherUsers: mockUsers.filter(u => u.role === 'RESEARCHER').length,
+        operatorUsers: mockUsers.filter(u => u.role === 'OPERATOR').length,
+        viewerUsers: mockUsers.filter(u => u.role === 'VIEWER').length,
+        todayNewUsers: 0, // 根据实际情况计算
+        timestamp: Date.now(),
+        hasUsers: mockUsers.length > 0
+      }
+    }
+  },
+
   // 管理员用户列表 - GET /api/admin/user/list
+  // 注意：这里的用户列表应该从 mockUsers 动态返回，而不是硬编码
   list: {
     success: {
       code: 200,
       message: "获取成功",
       data: {
-        total: 1,
+        total: mockUsers.length,
         page: 1,
         size: 10,
-        pages: 1,
-        items: [
-          {
-            userId: "a1b2c3d4e5f678901234567890123456",
-            username: "admin",
-            email: "admin@feduwacomm.com",
-            role: "ADMIN",
-            status: "ACTIVE",
-            createdAt: "2024-01-01T00:00:00.000Z",
-            updatedAt: "2024-01-01T00:00:00.000Z",
-            lastLoginTime: "2024-01-01T10:00:00.000Z",
-            lastLoginIp: "192.168.1.100"
-          }
-        ]
+        pages: Math.ceil(mockUsers.length / 10),
+        records: mockUsers.map(user => ({
+          userId: user.userId,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          lastLoginTime: user.lastLoginTime || null,
+          lastLoginIp: user.lastLoginIp || null
+        }))
       }
+    }
+  },
+
+  // 获取用户详情 - GET /api/admin/user/{userId}
+  detail: {
+    success: {
+      code: 200,
+      message: "获取成功",
+      data: {
+        userId: "a1b2c3d4e5f678901234567890123456",
+        username: "admin",
+        email: "admin@example.com",
+        role: "ADMIN",
+        status: "ACTIVE",
+        createdAt: "2024-01-01T10:00:00",
+        updatedAt: "2024-01-01T13:00:00"
+      }
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
     }
   },
 
@@ -293,14 +471,30 @@ export const adminUserApiMock = {
   create: {
     success: {
       code: 200,
-      message: "用户创建成功",
+      message: "创建成功",
       data: {
-        userId: "new-user-id",
+        userId: "a1b2c3d4e5f678901234567890123456",
         username: "newuser",
         email: "newuser@example.com",
-        role: "VIEWER",
+        role: "RESEARCHER",
         status: "ACTIVE",
-        createdAt: new Date().toISOString()
+        createdAt: "2024-01-01T10:00:00"
+      }
+    },
+    error400: {
+      code: 400,
+      message: "参数验证失败",
+      data: {
+        field: "username",
+        error: "用户名不能为空"
+      }
+    },
+    error409: {
+      code: 409,
+      message: "用户已存在",
+      data: {
+        field: "username",
+        error: "用户名已存在"
       }
     }
   },
@@ -309,15 +503,20 @@ export const adminUserApiMock = {
   update: {
     success: {
       code: 200,
-      message: "用户更新成功",
+      message: "更新成功",
       data: {
         userId: "a1b2c3d4e5f678901234567890123456",
-        username: "admin",
-        email: "admin@feduwacomm.com",
-        role: "ADMIN",
+        username: "updateduser",
+        email: "updated@example.com",
+        role: "RESEARCHER",
         status: "ACTIVE",
-        updatedAt: new Date().toISOString()
+        updatedAt: "2024-01-01T13:00:00"
       }
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
     }
   },
 
@@ -325,11 +524,69 @@ export const adminUserApiMock = {
   delete: {
     success: {
       code: 200,
-      message: "用户删除成功",
+      message: "删除成功",
+      data: null
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
+    }
+  },
+
+  // 锁定用户 - POST /api/admin/user/{userId}/lock
+  lock: {
+    success: {
+      code: 200,
+      message: "用户已锁定",
       data: {
         userId: "a1b2c3d4e5f678901234567890123456",
-        deletedAt: new Date().toISOString()
+        lockedUntil: "2024-01-01T14:00:00"
       }
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
+    }
+  },
+
+  // 解锁用户 - POST /api/admin/user/{userId}/unlock
+  unlock: {
+    success: {
+      code: 200,
+      message: "用户已解锁",
+      data: {
+        userId: "a1b2c3d4e5f678901234567890123456",
+        status: "ACTIVE"
+      }
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
+    }
+  },
+
+  // 重置用户密码 - POST /api/admin/user/{userId}/reset-password
+  resetPassword: {
+    success: {
+      code: 200,
+      message: "密码重置成功",
+      data: null
+    },
+    error400: {
+      code: 400,
+      message: "参数验证失败",
+      data: {
+        field: "newPassword",
+        error: "新密码不能为空"
+      }
+    },
+    error404: {
+      code: 404,
+      message: "用户不存在",
+      data: null
     }
   }
 };

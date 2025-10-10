@@ -6,6 +6,7 @@
  */
 
 export { default as VMManagementPage } from './VMManagementPage'
+export { default as AdminVMManagementPage } from './AdminVMManagementPage'
 export * from './components'
 
 

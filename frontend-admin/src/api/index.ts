@@ -23,5 +23,4 @@ export { log as logApi } from './system-log'
 
 
 // 重新导出服务层
-export { userService as authService } from '../services/user'
-export { wsService as websocketService } from '../services/websocket' 
+export { userService as authService } from '../services/user' 
