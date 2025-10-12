@@ -20,15 +20,19 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 
 /**
  * 模拟虚拟机类 v1.4
@@ -90,6 +94,10 @@ public class MockVirtualMachine {
     private int protocolViolationCount = 0; // 协议违规计数
     private boolean simulateUploadFailure = false; // 是否模拟上传失败
     private double uploadFailureRate = 0.0; // 上传失败率 (0.0 - 1.0)
+
+    // ACK模拟配置
+    private final Map<ProtocolType, AckSimulationConfig> ackSimulationConfigs = new ConcurrentHashMap<>();
+    private final List<AckSimulationEvent> ackSimulationEvents = Collections.synchronizedList(new ArrayList<>());
 
     // 错误统计相关字段
     private int messageErrorCount = 0; // MESSAGE_ERROR消息计数
@@ -251,7 +259,7 @@ public class MockVirtualMachine {
 
             // 等待连接建立
             System.out.println("⏳ [" + vmData.getName() + "] 等待连接稳定...");
-            Thread.sleep(1000);
+            awaitDelay(Duration.ofSeconds(1));
 
             if (stompSession != null && stompSession.isConnected()) {
                 System.out.println("📡 [" + vmData.getName() + "] 开始订阅消息队列...");
@@ -371,6 +379,41 @@ public class MockVirtualMachine {
         }
     }
 
+    private static final Duration DEFAULT_AWAIT_TOLERANCE = Duration.ofMillis(200);
+
+    private void awaitDelay(Duration delay) {
+        awaitDelay(delay, null);
+    }
+
+    private void awaitDelay(Duration delay, String context) {
+        if (delay == null || delay.isNegative() || delay.isZero()) {
+            return;
+        }
+
+        Duration tolerance = delay.compareTo(Duration.ofSeconds(5)) > 0
+            ? Duration.ofSeconds(1)
+            : DEFAULT_AWAIT_TOLERANCE;
+
+        long pollIntervalMillis = Math.max(25L, Math.min(delay.toMillis(), 200L));
+
+        try {
+            Awaitility.await()
+                .alias("mock-vm-delay-" + (context != null ? context : "default"))
+                .pollDelay(delay)
+                .pollInterval(Duration.ofMillis(pollIntervalMillis))
+                .atMost(delay.plus(tolerance))
+                .until(() -> true);
+        } catch (ConditionTimeoutException ex) {
+            if (context != null) {
+                log.warn("⚠️ [{}] 延时等待超时: {} ms (context: {})",
+                        vmData.getName(), delay.toMillis(), context);
+            } else {
+                log.warn("⚠️ [{}] 延时等待超时: {} ms",
+                        vmData.getName(), delay.toMillis());
+            }
+        }
+    }
+
     /**
      * 模拟训练轮次 v2.0 (支持多模型类型和多算法)
      */
@@ -378,7 +421,8 @@ public class MockVirtualMachine {
         try {
             // 根据VM性能调整训练时间
             int baseTrainingTime = vmData.getBaseTrainingTime();
-            Thread.sleep(baseTrainingTime + (int)(Math.random() * 500));
+            long trainingDelay = baseTrainingTime + (int)(Math.random() * 500);
+            awaitDelay(Duration.ofMillis(trainingDelay));
 
             // 生成基于VM能力的训练结果
             TrainingMetrics metrics = generateTrainingMetrics(round);
@@ -390,7 +434,7 @@ public class MockVirtualMachine {
             uploadGradients(taskId, round);
 
             // 等待一段时间模拟梯度处理
-            Thread.sleep(500);
+            awaitDelay(Duration.ofMillis(500));
 
             // 然后上传模型参数
             Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
@@ -745,6 +789,83 @@ public class MockVirtualMachine {
         }
     }
 
+    private void recordAckSimulationEvent(ProtocolType protocolType, AckSimulationMode mode, String messageId, String detail) {
+        AckSimulationEvent event = new AckSimulationEvent(protocolType, mode, messageId, Instant.now(), detail);
+        ackSimulationEvents.add(event);
+    }
+
+    private boolean applyAckSimulationBeforeSend(ProtocolType protocolType, Map<String, Object> message, String messageId) {
+        if (protocolType == null) {
+            return false;
+        }
+
+        AckSimulationConfig config = ackSimulationConfigs.get(protocolType);
+        if (config == null) {
+            return false;
+        }
+
+        if (!config.shouldApply()) {
+            if (config.isDrained()) {
+                ackSimulationConfigs.remove(protocolType);
+            }
+            return false;
+        }
+
+        String contextId = messageId != null ? messageId : String.valueOf(message.getOrDefault("id", "N/A"));
+        boolean skipSend = false;
+
+        switch (config.mode) {
+            case TIMEOUT:
+                Duration timeout = config.timeout != null ? config.timeout : Duration.ofSeconds(5);
+                long delayMillis = Math.max(1L, timeout.toMillis());
+                log.warn("⏱️ [{}] 模拟 {} ACK 超时，跳过发送，延迟 {} ms (messageId={})",
+                        vmData.getName(), protocolType, delayMillis, contextId);
+                if (passiveScheduler != null && !passiveScheduler.isShutdown()) {
+                    passiveScheduler.schedule(() ->
+                                log.warn("⏱️ [{}] {} ACK 超时模拟完成 (未发送), messageId={}",
+                                        vmData.getName(), protocolType, contextId),
+                            delayMillis, TimeUnit.MILLISECONDS);
+                }
+                recordAckSimulationEvent(protocolType, AckSimulationMode.TIMEOUT, contextId,
+                        "delayMillis=" + delayMillis);
+                skipSend = true;
+                break;
+            case FAILURE:
+                Map<String, Object> data = getOrCreateAckData(message);
+                String failureStatus = config.failureStatus != null ? config.failureStatus : "FAILED";
+                String failureReason = config.failureReason != null ? config.failureReason : "模拟ACK失败";
+                data.put("status", failureStatus);
+                data.put("acknowledged", false);
+                data.put("error", failureReason);
+                data.put("simulatedFailure", true);
+                data.put("failureAt", Instant.now().toString());
+                log.warn("❗ [{}] 模拟 {} ACK 失败 (messageId={}, status={}, reason={})",
+                        vmData.getName(), protocolType, contextId, failureStatus, failureReason);
+                recordAckSimulationEvent(protocolType, AckSimulationMode.FAILURE, contextId,
+                        "status=" + failureStatus + ",reason=" + failureReason);
+                break;
+            default:
+                break;
+        }
+
+        if (config.isDrained()) {
+            ackSimulationConfigs.remove(protocolType);
+        }
+
+        return skipSend;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getOrCreateAckData(Map<String, Object> message) {
+        Object existing = message.get("data");
+        if (existing instanceof Map) {
+            return (Map<String, Object>) existing;
+        }
+        Map<String, Object> newData = new HashMap<>();
+        message.put("data", newData);
+        return newData;
+    }
+
     /**
      * 发送STOMP消息 - 确保WebSocket连接的强健性
      */
@@ -752,6 +873,20 @@ public class MockVirtualMachine {
         String messageType = (String) message.get("type");
         String messageId = (String) message.get("id");
         int maxRetries = 3;
+
+        ProtocolType protocolType = null;
+        if (messageType != null) {
+            try {
+                protocolType = ProtocolType.valueOf(messageType);
+            } catch (IllegalArgumentException ignored) {
+                // 非协议枚举定义的消息类型
+            }
+        }
+
+        if (applyAckSimulationBeforeSend(protocolType, message, messageId)) {
+            System.out.println("⏱️ [" + vmData.getName() + "] 已跳过发送 " + messageType + " (ACK超时模拟)");
+            return;
+        }
 
         System.out.println("📤 [" + vmData.getName() + "] 准备发送消息: " + messageType + " (ID: " + messageId + ")");
 
@@ -830,8 +965,9 @@ public class MockVirtualMachine {
                         // 等待后重试，增加随机延迟避免雷群效应
                         int baseDelay = 1000 * attempt;
                         int randomDelay = (int)(Math.random() * 1000);
-                        System.out.println("⏳ [" + vmData.getName() + "] 等待 " + (baseDelay + randomDelay) + "ms 后重试...");
-                        Thread.sleep(baseDelay + randomDelay);
+                        long retryDelay = baseDelay + randomDelay;
+                        System.out.println("⏳ [" + vmData.getName() + "] 等待 " + retryDelay + "ms 后重试...");
+                        awaitDelay(Duration.ofMillis(retryDelay));
                     } else {
                         // 最后一次重试失败，抛出异常
                         throw new Exception("WebSocket连接持续失败，无法发送消息: " + messageType);
@@ -852,7 +988,7 @@ public class MockVirtualMachine {
             System.out.println("🔄 " + vmData.getName() + " 模拟WebSocket连接恢复...");
 
             // 等待一段时间模拟重连过程
-            Thread.sleep(200);
+            awaitDelay(Duration.ofMillis(200));
 
             // 创建一个模拟的连接状态，确保消息发送逻辑能够继续
             connected = true;
@@ -895,7 +1031,8 @@ public class MockVirtualMachine {
                     System.out.println("📊 [" + vmData.getName() + "] 模型上传消息已发送 - 任务ID: " + taskId + ", 轮次: " + round);
 
                     // 模拟一个短暂的网络延迟
-                    Thread.sleep(50 + (int)(Math.random() * 100));
+                    long simulatedDelay = 50 + (int) (Math.random() * 100);
+                    awaitDelay(Duration.ofMillis(simulatedDelay), "simulateMessageSend:GRADIENT_UPLOAD");
                     return true;
 
 
@@ -928,18 +1065,13 @@ public class MockVirtualMachine {
                 } else {
                     System.out.println("⚠️ " + vmData.getName() + " WebSocket连接断开，尝试重连 (" + attempt + "/" + maxRetries + ")");
                     if (attempt < maxRetries) {
-                        Thread.sleep(500); // 短暂等待后重试
+                        awaitDelay(Duration.ofMillis(500), "sendStompMessageWithRetry:fixed-backoff");
                     }
                 }
             } catch (Exception e) {
                 System.err.println("⚠️ " + vmData.getName() + " 发送消息失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
                 if (attempt < maxRetries) {
-                    try {
-                        Thread.sleep(500 * attempt); // 递增退避
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+                    awaitDelay(Duration.ofMillis(500L * attempt), "sendStompMessageWithRetry:incremental-backoff");
                 }
             }
         }
@@ -971,7 +1103,7 @@ public class MockVirtualMachine {
             }
 
             // 等待一段时间后重连
-            Thread.sleep(1000);
+            awaitDelay(Duration.ofSeconds(1), "reconnectWebSocket:cooldown");
 
             // 模拟重连成功（在实际环境中，这里应该重新建立连接）
             connected = true;
@@ -1451,7 +1583,8 @@ public class MockVirtualMachine {
                     ackMessage.put("data", ackData);
 
                     // 模拟一些ACK延迟，增加真实性
-                    Thread.sleep(50 + (int) (Math.random() * 100)); // 50-150ms随机延迟
+                    long ackDelay = 50 + (int) (Math.random() * 100); // 50-150ms随机延迟
+                    awaitDelay(Duration.ofMillis(ackDelay), "handleGlobalModelBroadcast:ack-delay");
 
                     sendStompMessage(ackMessage);
                     System.out.println("📤 " + vmData.getName() + " 已发送GLOBAL_MODEL_BROADCAST_ACK确认");
@@ -1734,10 +1867,10 @@ public class MockVirtualMachine {
     /**
      * 模拟训练过程 - v1.4协议
      */
-    private void simulateTrainingProcess(TaskExecutionContext taskContext, LocalModel localModel, int roundNumber) throws InterruptedException {
+    private void simulateTrainingProcess(TaskExecutionContext taskContext, LocalModel localModel, int roundNumber) {
         // 模拟训练时间（根据轮次变化）
         int trainingTime = 2000 + (roundNumber * 500); // 2-6秒
-        Thread.sleep(trainingTime);
+        awaitDelay(Duration.ofMillis(trainingTime), "simulateTrainingProcess:training");
 
         // 更新本地模型指标模拟结果
         double accuracy = 0.7 + (roundNumber * 0.02); // 精度逐渐提高
@@ -3245,7 +3378,7 @@ public class MockVirtualMachine {
         messageExecutor.schedule(() -> {
             try {
                 // 模拟本地训练延迟
-                Thread.sleep(simulateTrainingDelay());
+                awaitDelay(Duration.ofMillis(simulateTrainingDelay()), "scheduleGradientUploadV15:training-delay");
 
                 // 生成并发送梯度（包含assignedDatasetId验证）
                 double[] gradientArray = generateMockGradients();
@@ -3259,6 +3392,158 @@ public class MockVirtualMachine {
                          vmData.getVmId(), taskId, round, e.getMessage());
             }
         }, 1, TimeUnit.SECONDS);
+    }
+
+    // ==================== ACK模拟配置 ====================
+
+    public enum AckSimulationMode {
+        NONE,
+        TIMEOUT,
+        FAILURE
+    }
+
+    private static final class AckSimulationConfig {
+        private final AckSimulationMode mode;
+        private final Duration timeout;
+        private final String failureStatus;
+        private final String failureReason;
+        private final AtomicInteger remainingCount;
+
+        private AckSimulationConfig(
+                AckSimulationMode mode,
+                Duration timeout,
+                String failureStatus,
+                String failureReason,
+                int occurrences
+        ) {
+            this.mode = Objects.requireNonNull(mode, "mode");
+            this.timeout = timeout;
+            this.failureStatus = failureStatus;
+            this.failureReason = failureReason;
+            this.remainingCount = occurrences > 0 ? new AtomicInteger(occurrences) : null;
+        }
+
+        static AckSimulationConfig timeout(Duration timeout, int occurrences) {
+            return new AckSimulationConfig(AckSimulationMode.TIMEOUT, timeout, null, null, occurrences);
+        }
+
+        static AckSimulationConfig failure(String status, String reason, int occurrences) {
+            return new AckSimulationConfig(AckSimulationMode.FAILURE, null, status, reason, occurrences);
+        }
+
+        boolean shouldApply() {
+            if (remainingCount == null) {
+                return true;
+            }
+            while (true) {
+                int current = remainingCount.get();
+                if (current <= 0) {
+                    return false;
+                }
+                if (remainingCount.compareAndSet(current, current - 1)) {
+                    return true;
+                }
+            }
+        }
+
+        boolean isDrained() {
+            return remainingCount != null && remainingCount.get() <= 0;
+        }
+    }
+
+    public static final class AckSimulationEvent {
+        private final ProtocolType protocolType;
+        private final AckSimulationMode mode;
+        private final String messageId;
+        private final Instant timestamp;
+        private final String detail;
+
+        private AckSimulationEvent(ProtocolType protocolType, AckSimulationMode mode, String messageId, Instant timestamp, String detail) {
+            this.protocolType = protocolType;
+            this.mode = mode;
+            this.messageId = messageId;
+            this.timestamp = timestamp;
+            this.detail = detail;
+        }
+
+        public ProtocolType getProtocolType() {
+            return protocolType;
+        }
+
+        public AckSimulationMode getMode() {
+            return mode;
+        }
+
+        public String getMessageId() {
+            return messageId;
+        }
+
+        public Instant getTimestamp() {
+            return timestamp;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+    }
+
+    public void simulateAckTimeout(ProtocolType protocolType, Duration timeout) {
+        simulateAckTimeout(protocolType, timeout, 1);
+    }
+
+    public void simulateAckTimeout(ProtocolType protocolType, Duration timeout, int occurrences) {
+        Objects.requireNonNull(protocolType, "protocolType");
+        ackSimulationConfigs.put(protocolType, AckSimulationConfig.timeout(timeout, occurrences));
+    }
+
+    public void simulateAckFailure(ProtocolType protocolType, String failureStatus, String failureReason) {
+        simulateAckFailure(protocolType, failureStatus, failureReason, 1);
+    }
+
+    public void simulateAckFailure(ProtocolType protocolType, String failureStatus, String failureReason, int occurrences) {
+        Objects.requireNonNull(protocolType, "protocolType");
+        ackSimulationConfigs.put(protocolType, AckSimulationConfig.failure(failureStatus, failureReason, occurrences));
+    }
+
+    public void clearAckSimulation(ProtocolType protocolType) {
+        if (protocolType == null) {
+            return;
+        }
+        ackSimulationConfigs.remove(protocolType);
+    }
+
+    public void clearAllAckSimulations() {
+        ackSimulationConfigs.clear();
+    }
+
+    public List<AckSimulationEvent> getAckSimulationEvents() {
+        synchronized (ackSimulationEvents) {
+            return new ArrayList<>(ackSimulationEvents);
+        }
+    }
+
+    public void clearAckSimulationEvents() {
+        synchronized (ackSimulationEvents) {
+            ackSimulationEvents.clear();
+        }
+    }
+
+    /**
+     * 测试辅助方法：直接发送指定协议类型的ACK消息
+     * 方便在单元/集成测试中触发ACK模拟逻辑
+     *
+     * @param protocolType 协议类型
+     * @param data 自定义数据，可为null
+     * @return 最终发送的数据副本（包含模拟逻辑注入的字段）
+     */
+    public Map<String, Object> sendAckForTesting(ProtocolType protocolType, Map<String, Object> data) throws Exception {
+        Objects.requireNonNull(protocolType, "protocolType");
+        Map<String, Object> payloadData = data != null ? new HashMap<>(data) : new HashMap<>();
+        Map<String, Object> message = createProtocolMessage(protocolType, payloadData);
+        sendStompMessage(message);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ackData = (Map<String, Object>) message.get("data");
+        return ackData;
     }
 
 

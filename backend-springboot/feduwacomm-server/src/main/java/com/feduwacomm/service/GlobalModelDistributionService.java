@@ -7,6 +7,7 @@ import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.event.AggregationCompletedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.VmRoundModelsMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
 import com.feduwacomm.service.VmInstanceService;
 import com.feduwacomm.dto.VmQueryDTO;
 import com.feduwacomm.vo.VmListVO;
@@ -41,6 +42,7 @@ public class GlobalModelDistributionService {
     private final AggregationConfig aggregationConfig;
     private final ObjectMapper objectMapper;
     private final VmInstanceService vmInstanceService;
+    private final TaskParticipantsMapper taskParticipantsMapper;
 
     /**
      * 监听聚合完成事件，自动分发全局模型
@@ -69,8 +71,14 @@ public class GlobalModelDistributionService {
     /**
      * 分发全局模型给指定任务的所有参与客户端
      */
-    public void distributeGlobalModel(String taskId, Integer roundNumber, 
+    public void distributeGlobalModel(String taskId, Integer roundNumber,
                                      String globalModelId, Map<String, ?> globalMetrics) {
+        distributeGlobalModel(taskId, roundNumber, globalModelId, globalMetrics, null);
+    }
+
+    public void distributeGlobalModel(String taskId, Integer roundNumber,
+                                      String globalModelId, Map<String, ?> globalMetrics,
+                                      List<String> explicitVmIds) {
         try {
             // 获取任务信息
             FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
@@ -81,42 +89,50 @@ public class GlobalModelDistributionService {
             // 获取参与该轮的所有客户端
             List<String> participantVmIds;
 
-            if (roundNumber == 1) {
+            if (explicitVmIds != null && !explicitVmIds.isEmpty()) {
+                participantVmIds = new ArrayList<>(explicitVmIds);
+            } else if (roundNumber == 1) {
                 // 第1轮训练：使用任务的所有参与VM（从任务配置中获取）
-                String configJson = task.getConfig();
-                participantVmIds = new ArrayList<>();
+                participantVmIds = taskParticipantsMapper.selectParticipantsByTaskId(taskId).stream()
+                        .filter(p -> p.getDatasetStatus() != null && p.getDatasetStatus().equalsIgnoreCase("COMPLETED"))
+                        .map(p -> p.getVmId())
+                        .toList();
 
-                if (configJson != null && !configJson.trim().isEmpty()) {
-                    try {
-                        // 解析配置JSON，查找参与VM列表
-                        Map<String, Object> config = objectMapper.readValue(configJson, Map.class);
-                        Object vmIds = config.get("participantVmIds");
-                        if (vmIds instanceof List) {
-                            participantVmIds = (List<String>) vmIds;
-                        } else if (vmIds instanceof String) {
-                            participantVmIds = Arrays.asList(objectMapper.readValue((String) vmIds, String[].class));
-                        }
-                    } catch (Exception e) {
-                        log.warn("解析任务配置中的参与VM ID失败: {}", e.getMessage());
-                    }
-                }
-
-                // 如果配置中没有找到，使用前5个可用的VM
                 if (participantVmIds.isEmpty()) {
-                    log.info("配置中未找到参与VM，从VM服务获取前5个可用的虚拟机");
-                    try {
-                        VmQueryDTO queryDTO = VmQueryDTO.builder()
-                            .page(1)
-                            .size(5)
-                            .build();
-                        List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getList();
-                        participantVmIds = availableVms.stream()
-                            .map(VmListVO::getVmId)
-                            .toList();
-                        log.info("从VM服务获取到 {} 个可用虚拟机: {}", participantVmIds.size(), participantVmIds);
-                    } catch (Exception e) {
-                        log.error("获取VM列表失败，使用空列表: {}", e.getMessage());
-                        participantVmIds = new ArrayList<>();
+                    log.warn("任务{} 的参与者尚未就绪，尝试回退到任务配置", taskId);
+                    String configJson = task.getConfig();
+                    participantVmIds = new ArrayList<>();
+
+                    if (configJson != null && !configJson.trim().isEmpty()) {
+                        try {
+                            Map<String, Object> config = objectMapper.readValue(configJson, Map.class);
+                            Object vmIds = config.get("participantVmIds");
+                            if (vmIds instanceof List) {
+                                participantVmIds = (List<String>) vmIds;
+                            } else if (vmIds instanceof String) {
+                                participantVmIds = Arrays.asList(objectMapper.readValue((String) vmIds, String[].class));
+                            }
+                        } catch (Exception e) {
+                            log.warn("解析任务配置中的参与VM ID失败: {}", e.getMessage());
+                        }
+                    }
+
+                    if (participantVmIds.isEmpty()) {
+                        log.info("配置中未找到参与VM，从VM服务获取前5个可用虚拟机");
+                        try {
+                            VmQueryDTO queryDTO = VmQueryDTO.builder()
+                                .page(1)
+                                .size(5)
+                                .build();
+                            List<VmListVO> availableVms = vmInstanceService.queryVmList(queryDTO).getList();
+                            participantVmIds = availableVms.stream()
+                                .map(VmListVO::getVmId)
+                                .toList();
+                            log.info("从VM服务获取到 {} 个可用虚拟机: {}", participantVmIds.size(), participantVmIds);
+                        } catch (Exception e) {
+                            log.error("获取VM列表失败，使用空列表: {}", e.getMessage());
+                            participantVmIds = new ArrayList<>();
+                        }
                     }
                 }
             } else {

@@ -9,6 +9,7 @@ import com.feduwacomm.integration.mock.VmTestData;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import lombok.Data;
 import org.junit.jupiter.api.*;
+import org.awaitility.Awaitility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -21,6 +22,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -207,7 +209,10 @@ class CompleteFederatedLearningFlowTestV151 {
             }
         }
 
-        Thread.sleep(2000);
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> mockVMs.forEach(vm -> assertThat(vm.isConnected()).isTrue()));
 
         for (MockVirtualMachine mockVM : mockVMs) {
             assertThat(mockVM.isConnected()).isTrue();
@@ -431,7 +436,7 @@ class CompleteFederatedLearningFlowTestV151 {
         System.out.println("\n📦 步骤8：数据集分配验证测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：DATASET_CREATE消息包含SliceInfo");
 
-        Thread.sleep(3000);
+        waitForDatasetSliceInfo();
 
         // 🆕 验证每个VM的SliceInfo
         for (MockVirtualMachine mockVM : mockVMs) {
@@ -483,7 +488,7 @@ class CompleteFederatedLearningFlowTestV151 {
         System.out.println("\n📡 步骤9：数据传输监控测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：DATASET_APPEND_ROWS包含BatchRange和globalIndex");
 
-        Thread.sleep(3000);
+        waitForBatchRanges();
 
         // 🆕 验证每个VM接收到的BatchRange
         for (MockVirtualMachine mockVM : mockVMs) {
@@ -539,7 +544,7 @@ class CompleteFederatedLearningFlowTestV151 {
         System.out.println("\n🔍 步骤10：数据完整性验证测试 (v1.5.1核心功能)");
         System.out.println("🎯 验证目标：VM生成SliceVerification并通过backend验证");
 
-        Thread.sleep(3000);
+        waitForSliceVerification();
 
         // 🆕 验证每个VM的SliceVerification
         for (MockVirtualMachine mockVM : mockVMs) {
@@ -650,7 +655,9 @@ class CompleteFederatedLearningFlowTestV151 {
         }
 
         // 等待后端处理梯度和聚合
-        Thread.sleep(3000);
+        awaitVmRoundRecords(1);
+        awaitRoundStateCompletion(1);
+        awaitGlobalModelRecord(1);
 
         // 验证第1轮
         System.out.println("\n📊 验证第1轮梯度存储");
@@ -677,8 +684,10 @@ class CompleteFederatedLearningFlowTestV151 {
             System.out.println("\n⏳ 等待VM接收全局模型并自动上传第" + round + "轮梯度...");
             System.out.println("   预计流程：聚合(3s) + 分发(1s) + VM处理(1s) + 训练(1s) + 上传(1s) = 7s");
 
-            // 等待时间：聚合 + 分发 + VM处理 + 训练 + 上传
-            Thread.sleep(7000);
+            // 等待聚合、分发及自动上传完成
+            awaitVmRoundRecords(round);
+            awaitRoundStateCompletion(round);
+            awaitGlobalModelRecord(round);
 
             // 验证梯度已自动上传
             System.out.println("\n📊 验证第" + round + "轮梯度存储");
@@ -849,11 +858,101 @@ class CompleteFederatedLearningFlowTestV151 {
     }
 
     private void waitForDatasetAllocation() {
-        try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(120))
+            .pollInterval(Duration.ofSeconds(2))
+            .untilAsserted(() -> {
+                Integer completed = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM task_participants WHERE task_id = ? AND dataset_status = 'COMPLETED'",
+                    Integer.class, taskId
+                );
+                assertThat(completed).isEqualTo(mockVMs.size());
+            });
+    }
+
+    private void waitForDatasetSliceInfo() {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(60))
+            .pollInterval(Duration.ofMillis(500))
+            .untilAsserted(() -> mockVMs.forEach(vm ->
+                assertThat(vm.getSliceInfoForLatestDataset()).isNotNull()
+            ));
+    }
+
+    private void waitForBatchRanges() {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(60))
+            .pollInterval(Duration.ofMillis(500))
+            .untilAsserted(() -> mockVMs.forEach(vm -> {
+                List<Map<String, Object>> ranges = vm.getBatchRangesForLatestDataset();
+                assertThat(ranges).isNotNull();
+                assertThat(ranges).isNotEmpty();
+            }));
+    }
+
+    private void waitForSliceVerification() {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(60))
+            .pollInterval(Duration.ofMillis(500))
+            .untilAsserted(() -> mockVMs.forEach(vm ->
+                assertThat(vm.getSliceVerificationForLatestDataset()).isNotNull()
+            ));
+    }
+
+    private void awaitVmRoundRecords(int round) {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(90))
+            .pollInterval(Duration.ofSeconds(1))
+            .untilAsserted(() -> {
+                Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM vm_round_models WHERE task_id = ? AND round_number = ?",
+                    Integer.class, taskId, round
+                );
+                assertThat(count).isEqualTo(mockVMs.size());
+            });
+    }
+
+    private void awaitGlobalModelRecord(int round) {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(90))
+            .pollInterval(Duration.ofSeconds(1))
+            .untilAsserted(() -> {
+                Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM global_models WHERE task_id = ? AND round_number = ?",
+                    Integer.class, taskId, round
+                );
+                assertThat(count).isGreaterThanOrEqualTo(1);
+            });
+    }
+
+    private void awaitRoundStateCompletion(int round) {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(90))
+            .pollInterval(Duration.ofSeconds(1))
+            .ignoreExceptions()
+            .until(() -> {
+                Map<String, Object> roundState = jdbcTemplate.queryForMap(
+                        "SELECT state, gradient_uploads_received, completed_participants FROM round_states WHERE task_id = ? AND round_number = ?",
+                        taskId, round);
+
+                String state = (String) roundState.get("state");
+                Integer gradientsReceived = (Integer) roundState.get("gradient_uploads_received");
+                Integer completedParticipants = (Integer) roundState.get("completed_participants");
+
+                System.out.println("    📊 轮次状态: " + state +
+                        ", 梯度数=" + gradientsReceived +
+                        "/" + mockVMs.size() +
+                        ", 完成VM数=" + completedParticipants +
+                        "/" + mockVMs.size());
+
+                if ("COMPLETED".equals(state)) {
+                    assertThat(gradientsReceived).isGreaterThanOrEqualTo(mockVMs.size() - 1);
+                    return true;
+                }
+                return false;
+            });
+
+        System.out.println("    ✅ 轮次 " + round + " 状态: COMPLETED");
     }
 
     /**
@@ -928,44 +1027,9 @@ class CompleteFederatedLearningFlowTestV151 {
     /**
      * 验证模型聚合
      */
-    private void verifyModelAggregation(int round) throws InterruptedException {
+    private void verifyModelAggregation(int round) {
         System.out.println("  ⏳ 等待模型聚合...");
-
-        // 轮询round_states表，等待状态变为COMPLETED
-        int maxAttempts = 30;
-        for (int i = 0; i < maxAttempts; i++) {
-            try {
-                String sql = "SELECT state, gradient_uploads_received, completed_participants " +
-                             "FROM round_states WHERE task_id = ? AND round_number = ?";
-                Map<String, Object> roundState = jdbcTemplate.queryForMap(sql, taskId, round);
-
-                String state = (String) roundState.get("state");
-                Integer gradientsReceived = (Integer) roundState.get("gradient_uploads_received");
-                Integer completedParticipants = (Integer) roundState.get("completed_participants");
-
-                System.out.println("    📊 轮次状态: " + state +
-                    ", 梯度数=" + gradientsReceived +
-                    "/" + mockVMs.size() +
-                    ", 完成VM数=" + completedParticipants +
-                    "/" + mockVMs.size());
-
-                if ("COMPLETED".equals(state)) {
-                    assertThat(gradientsReceived).isGreaterThanOrEqualTo(mockVMs.size() - 1); // 允许部分VM
-                    System.out.println("    ✅ 轮次 " + round + " 状态: COMPLETED");
-                    return;
-                }
-
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                // round_states记录可能还未创建，继续等待
-                if (i > 10) {
-                    System.out.println("    ⚠️  轮次状态查询异常: " + e.getMessage());
-                }
-                Thread.sleep(1000);
-            }
-        }
-
-        System.out.println("    ⚠️  轮次 " + round + " 未能在预期时间内完成（可能是被动模式，无需等待）");
+        awaitRoundStateCompletion(round);
     }
 
     /**

@@ -888,6 +888,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                         participant.setAssignedDatasetId(assignedDatasetId);
                         participant.setDatasetStatus("UPLOADING");
                         participant.setDatasetCreatedAt(LocalDateTime.now());
+                        participant.setLocalPath("/data/assigned/" + assignedDatasetId);
                         participant.setUpdatedAt(LocalDateTime.now());
 
                         int updated = taskParticipantsMapper.updateParticipant(participant);
@@ -972,33 +973,11 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             log.info("✅ 数据行传输完成: vmId={}, totalBatches={}, totalRows={}", vmId, batchCount, offset - startIndex);
 
             // 步骤3：发送DATASET_COMPLETE消息
-            sendDatasetCompleteV151(vmId, assignedDatasetId, offset - startIndex);
+            sendDatasetCompleteV151(taskId, vmId, assignedDatasetId, offset - startIndex);
             log.info("✅ DATASET_COMPLETE消息已发送: vmId={}, totalRows={}", vmId, offset - startIndex);
 
             // 更新传输大小
             dataDistributionDetailMapper.updateTransferredSize(detail.getId(), totalTransferredBytes);
-
-            // 更新TaskParticipant状态为READY（数据传输完成）
-            TransactionTemplate finalUpdateTemplate = new TransactionTemplate(transactionManager);
-            // 🔥 强制创建新事务，不加入外层事务
-            finalUpdateTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            finalUpdateTemplate.execute(status -> {
-                try {
-                    TaskParticipant finalParticipant = taskParticipantsMapper.selectParticipant(taskId, vmId);
-                    if (finalParticipant != null) {
-                        finalParticipant.setDatasetStatus("COMPLETED");
-                        finalParticipant.setUpdatedAt(LocalDateTime.now());
-                        int updated = taskParticipantsMapper.updateParticipant(finalParticipant);
-                        log.info("✅ 数据集状态更新为COMPLETED: vmId={}, updateCount={}", vmId, updated);
-                        return updated;
-                    }
-                    return 0;
-                } catch (Exception e) {
-                    log.error("❌ 更新COMPLETED状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
-                    status.setRollbackOnly();
-                    return 0;
-                }
-            });
 
         } catch (Exception e) {
             log.error("❌ VM数据分发异常: vmId={}, error={}", vmId, e.getMessage(), e);
@@ -1097,8 +1076,9 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     /**
      * 发送DATASET_COMPLETE消息（v1.5.1协议）
      */
-    private void sendDatasetCompleteV151(String vmId, String assignedDatasetId, int totalRows) {
+    private void sendDatasetCompleteV151(String taskId, String vmId, String assignedDatasetId, int totalRows) {
         Map<String, Object> messageData = new HashMap<>();
+        messageData.put("taskId", taskId);
         messageData.put("assignedDatasetId", assignedDatasetId);
         messageData.put("totalRows", totalRows);
         messageData.put("status", "COMPLETE");

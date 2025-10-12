@@ -14,6 +14,7 @@ import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.service.TrainingDataService;
 import com.feduwacomm.service.WebSocketProtocolService;
+import com.feduwacomm.service.FederatedOrchestrationService;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
@@ -91,6 +92,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private com.feduwacomm.mapper.TaskParticipantsMapper taskParticipantsMapper;
 
+    @Autowired
+    private FederatedOrchestrationService orchestrationService;
+
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
     private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
@@ -100,6 +104,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private static final FederatedTaskStatus STATUS_COMPLETED = FederatedTaskStatus.COMPLETED;
     private static final FederatedTaskStatus STATUS_FAILED = FederatedTaskStatus.FAILED;
     private static final FederatedTaskStatus STATUS_CANCELLED = FederatedTaskStatus.CANCELLED;
+    @org.springframework.beans.factory.annotation.Value("${federated.datasetAck.timeoutSeconds:120}")
+    private int datasetAckTimeoutSeconds;
 
     @Override
     @Transactional
@@ -224,8 +230,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .map(TaskParticipant::getVmId)
                 .collect(Collectors.toList());
 
+        boolean shouldDistribute = datasetId != null && !datasetId.isEmpty() && !participantVmIds.isEmpty();
+
+        if (shouldDistribute) {
+            vmAckTracker.initializeDatasetAck(taskId, participantVmIds);
+        }
+
         // 发布任务启动事件，触发数据分发
-        if (datasetId != null && !datasetId.isEmpty() && !participantVmIds.isEmpty()) {
+        if (shouldDistribute) {
             log.info("🔥 发布任务启动事件，触发数据分发: taskId={}, datasetId={}, vmCount={}, strategy={}",
                     taskId, datasetId, participantVmIds.size(), distributionStrategy);
 
@@ -240,6 +252,42 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             ));
 
             log.info("✅ 任务启动事件已发布，等待数据分发完成...");
+
+            try {
+                waitForDatasetAcknowledgments(taskId);
+            } catch (UserException e) {
+                // ACK失败/超时，需主动终止已启动的异步工作流，避免继续执行到后续阶段
+                try {
+                    com.feduwacomm.entity.OrchestrationWorkflow workflow =
+                        orchestrationService.getWorkflowByTaskId(taskId);
+                    if (workflow != null) {
+                        log.warn("检测到数据分发ACK失败，终止已触发的工作流: taskId={}, orchestrationId={}",
+                                taskId, workflow.getId());
+                        orchestrationService.terminateOrchestration(workflow.getId(),
+                                "数据分发ACK失败或超时，启动流程被回滚");
+                    } else {
+                        log.warn("检测到数据分发ACK失败，但未找到对应工作流记录: taskId={}", taskId);
+                    }
+                } catch (Exception terminateEx) {
+                    log.error("尝试终止工作流时发生异常: taskId={}, err={}", taskId, terminateEx.getMessage(), terminateEx);
+                }
+                // 将错误继续抛出，保持原有API返回语义
+                throw e;
+            }
+
+            // 重新加载参与者，获取最新的分配信息
+            participants = tasksMapper.selectParticipantsByTaskId(taskId);
+
+            log.info("✅ 数据分发完成并全部确认: taskId={}", taskId);
+
+            List<String> datasetNotReadyVms = participants.stream()
+                    .filter(p -> p.getDatasetStatus() == null || !"COMPLETED".equalsIgnoreCase(p.getDatasetStatus()))
+                    .map(TaskParticipant::getVmId)
+                    .collect(Collectors.toList());
+            if (!datasetNotReadyVms.isEmpty()) {
+                log.error("数据分发确认完成但仍有VM数据集未就绪: taskId={}, vmIds={}", taskId, datasetNotReadyVms);
+                throw new UserException("部分虚拟机数据集未完成准备: " + datasetNotReadyVms);
+            }
         } else {
             log.warn("⚠️ 任务没有配置数据集或参与者，跳过数据分发: taskId={}, datasetId={}, vmCount={}",
                     taskId, datasetId, participantVmIds.size());
@@ -254,7 +302,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 记录操作日志
-        logTask(taskId, "INFO", "任务启动成功", "TASK_MANAGER", null, 
+        logTask(taskId, "INFO", "任务启动成功", "TASK_MANAGER", null,
             Map.of("participants", participants.stream().map(TaskParticipant::getVmId).collect(Collectors.toList())));
 
         // 构建参与者状态列表
@@ -750,6 +798,12 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     continue;
                 }
 
+                if (!"COMPLETED".equalsIgnoreCase(participant.getDatasetStatus())) {
+                    log.error("参与者数据集状态未就绪，跳过发送: vmId={}, taskId={}, datasetStatus={}",
+                            participant.getVmId(), taskId, participant.getDatasetStatus());
+                    continue;
+                }
+
                 // 如果dataPath为null，生成默认路径
                 if (dataPath == null || dataPath.trim().isEmpty()) {
                     dataPath = "/data/assigned/" + assignedDatasetId;
@@ -785,6 +839,17 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         log.info("训练启动指令发送完成: taskId={}, algorithm={}, 成功发送给{}个参与者",
                 taskId, algorithmCode, participants.size());
+    }
+
+    private void waitForDatasetAcknowledgments(String taskId) {
+        boolean allAcknowledged = vmAckTracker.waitForAllAcknowledgments(
+                taskId,
+                VmAckTracking.AckType.DATASET_COMPLETE.name(),
+                datasetAckTimeoutSeconds);
+
+        if (!allAcknowledged) {
+            throw new UserException("数据分发确认超时或失败，请稍后重试");
+        }
     }
 
     private FederatedTask buildTaskFromCreateDTO(TaskCreateDTO createDTO, String taskId, String createdBy, LocalDateTime now) {
@@ -2587,19 +2652,38 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             DatasetQueryResult queryResult = queryDatasetStatus(
                 participant.getVmId(), taskId, participant.getAssignedDatasetId());
 
-            if (queryResult.isSuccess() && "CREATED".equals(queryResult.getDatasetStatus())) {
-                // 更新数据库中的数据集状态
-                participant.setDatasetStatus("CREATED");
-                participant.setDatasetCreatedAt(LocalDateTime.now());
+            boolean datasetReady = queryResult.isSuccess()
+                    && queryResult.getDatasetStatus() != null
+                    && List.of("CREATED", "COMPLETED", "READY").contains(queryResult.getDatasetStatus());
+
+            if (datasetReady) {
+                String status = queryResult.getDatasetStatus();
+                participant.setDatasetStatus(status);
+                if ("COMPLETED".equals(status)) {
+                    if (participant.getDatasetCompletedAt() == null) {
+                        participant.setDatasetCompletedAt(LocalDateTime.now());
+                    }
+                } else {
+                    if (participant.getDatasetCreatedAt() == null) {
+                        participant.setDatasetCreatedAt(LocalDateTime.now());
+                    }
+                }
+                if (queryResult.getLocalPath() != null) {
+                    participant.setLocalPath(queryResult.getLocalPath());
+                }
+                participant.setUpdatedAt(LocalDateTime.now());
                 taskParticipantsMapper.updateParticipant(participant);
 
                 readyCount++;
                 validationResults.put(participant.getVmId(), "READY");
                 log.info("VM数据集验证成功: vmId={}", participant.getVmId());
             } else {
-                validationResults.put(participant.getVmId(), "NOT_READY");
-                log.warn("VM数据集验证失败: vmId={}, status={}",
-                        participant.getVmId(), queryResult.getDatasetStatus());
+                String failureReason = queryResult.getErrorMessage() != null
+                        ? queryResult.getErrorMessage()
+                        : "status=" + queryResult.getDatasetStatus();
+                validationResults.put(participant.getVmId(), "NOT_READY:" + failureReason);
+                log.warn("VM数据集验证失败: vmId={}, status={}, reason={}",
+                        participant.getVmId(), queryResult.getDatasetStatus(), failureReason);
             }
         }
 
@@ -2656,16 +2740,39 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
      * 查询数据集状态
      */
     private DatasetQueryResult queryDatasetStatus(String vmId, String taskId, String assignedDatasetId) {
-        // 发送DATASET_LIST_QUERY查询数据集状态
-        // TODO: 实现实际的WebSocket查询逻辑
         log.info("查询数据集状态: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
 
-        // 暂时返回成功结果，实际实现时需要真正的WebSocket查询
-        return DatasetQueryResult.builder()
-            .success(true)
-            .datasetStatus("CREATED")
-            .localPath("/data/assigned/" + assignedDatasetId)
-            .build();
+        if (assignedDatasetId == null || assignedDatasetId.trim().isEmpty()) {
+            log.warn("查询数据集状态失败：assignedDatasetId为空, vmId={}, taskId={}", vmId, taskId);
+            return DatasetQueryResult.builder()
+                    .success(false)
+                    .datasetStatus("UNKNOWN")
+                    .errorMessage("assignedDatasetId为空")
+                    .build();
+        }
+
+        try {
+            DatasetQueryResult result = webSocketProtocolService.queryDatasetStatus(vmId, taskId, assignedDatasetId);
+            if (result == null) {
+                log.warn("数据集状态查询返回null: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+                return DatasetQueryResult.builder()
+                        .success(false)
+                        .datasetStatus("UNKNOWN")
+                        .errorMessage("查询结果为空")
+                        .build();
+            }
+            log.info("数据集状态查询结果: vmId={}, assignedDatasetId={}, status={}, localPath={}",
+                    vmId, assignedDatasetId, result.getDatasetStatus(), result.getLocalPath());
+            return result;
+        } catch (Exception e) {
+            log.error("查询数据集状态异常: vmId={}, taskId={}, assignedDatasetId={}, error={}",
+                    vmId, taskId, assignedDatasetId, e.getMessage(), e);
+            return DatasetQueryResult.builder()
+                    .success(false)
+                    .datasetStatus("UNKNOWN")
+                    .errorMessage("查询异常: " + e.getMessage())
+                    .build();
+        }
     }
 
     /**

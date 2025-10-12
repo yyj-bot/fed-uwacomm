@@ -52,70 +52,71 @@ public class DataDistributionStageHandler extends AbstractStageHandler {
         log.info("执行数据分发阶段: orchestrationId={}, taskId={}", orchestrationId, taskId);
 
         try {
-            // 🆕 v1.5.1: FederatedTaskEventListener已经自动创建并启动数据分发任务
-            // 这里不需要再创建，直接跳过此阶段
-            log.info("⏭️ 跳过数据分发阶段：数据分发由FederatedTaskEventListener自动处理 (v1.5.1) - taskId={}", taskId);
+            List<String> datasetIds = getDatasetIds(context);
+            if (datasetIds.isEmpty()) {
+                log.warn("无法执行数据分发：缺少可用的数据集，taskId={}", taskId);
+                return StageResult.success()
+                        .addOutput("distributionSkipped", true)
+                        .addOutput("reason", "缺少可用的数据集");
+            }
 
-            // 直接返回成功，让工作流继续
-            return StageResult.success()
-                    .addOutput("distributionSkipped", true)
-                    .addOutput("reason", "由FederatedTaskEventListener自动处理");
+            List<String> targetVmIds = getTargetVmIds(context);
+            if (targetVmIds.isEmpty()) {
+                log.warn("无法执行数据分发：缺少参与虚拟机，taskId={}", taskId);
+                return StageResult.success()
+                        .addOutput("distributionSkipped", true)
+                        .addOutput("reason", "缺少参与虚拟机");
+            }
 
-            /* 原工作流分发逻辑已禁用（v1.5.1之前使用）
-            log.info("🔄 开始工作流数据分发: taskId={}, orchestrationId={}", taskId, orchestrationId);
-            // 从上下文获取初始模型ID（如果需要）
-            String initialModelId = (String) context.getVariable("initialModelId");
-            log.info("关联的初始模型ID: {}", initialModelId);
-            
-            // 获取分发配置参数
             String distributionStrategy = (String) context.getVariable("distributionStrategy");
             if (distributionStrategy == null) {
                 distributionStrategy = "BALANCED";
             }
-            List<String> datasetIds = getDatasetIds(context);
-            List<String> targetVmIds = getTargetVmIds(context);
+
             Map<String, Object> distributionConfig = getDistributionConfig(context);
-            
-            // 构造数据分发请求
+
             DataDistributionDTO distributionDTO = DataDistributionDTO.builder()
                     .taskId(taskId)
                     .datasetIds(datasetIds)
                     .distributionStrategy(distributionStrategy)
                     .targetVmIds(targetVmIds)
                     .distributionConfig(distributionConfig)
-                    .shardCount(Math.min(targetVmIds.size() * 2, datasetIds.size()))
-                    .enableShuffle(true)
-                    .enableCompression(true)
+                    .shardCount(Math.min(Math.max(targetVmIds.size(), 1) * 2, datasetIds.size()))
+                    .enableShuffle(false)
+                    .enableCompression(false)
                     .verifyIntegrity(true)
                     .timeoutSeconds(600)
                     .maxRetries(3)
                     .build();
-            
-            // 调用真实的数据分发服务
-            log.info("开始真实的数据分发: taskId={}, strategy={}, datasetCount={}, vmCount={}", 
+
+            log.info("开始工作流驱动的数据分发: taskId={}, strategy={}, datasetCount={}, vmCount={}",
                     taskId, distributionStrategy, datasetIds.size(), targetVmIds.size());
-            DataDistributionTaskVO distributionTask = dataDistributionService.createDistributionTask(distributionDTO, createdBy);
-            
-            // 启动分发
-            DataDistributionTaskVO startedTask = dataDistributionService.startDistribution(distributionTask.getDistributionId(), createdBy);
-            
-            // 保存分发信息到上下文
+
+            DataDistributionTaskVO distributionTask =
+                    dataDistributionService.createDistributionTask(distributionDTO, createdBy);
+
+            if (distributionTask == null) {
+                throw new IllegalStateException("数据分发任务创建失败");
+            }
+
+            DataDistributionTaskVO startedTask =
+                    dataDistributionService.startDistribution(distributionTask.getDistributionId(), createdBy);
+
             context.setVariable("distributionTaskId", startedTask.getDistributionId());
             context.setVariable("distributionStrategy", startedTask.getDistributionStrategy());
             context.setVariable("distributionStatus", startedTask.getStatus());
             context.setVariable("targetVmCount", startedTask.getTargetVmCount());
-            
-            log.info("数据分发阶段完成: orchestrationId={}, taskId={}, distributionId={}, status={}", 
-                orchestrationId, taskId, startedTask.getDistributionId(), startedTask.getStatus());
-            
+
+            log.info("数据分发阶段完成: orchestrationId={}, taskId={}, distributionId={}, status={}",
+                    orchestrationId, taskId, startedTask.getDistributionId(), startedTask.getStatus());
+
             return StageResult.success()
-                .addOutput("distributionId", startedTask.getDistributionId())
-                .addOutput("strategy", startedTask.getDistributionStrategy())
-                .addOutput("targetVmCount", startedTask.getTargetVmCount())
-                .addOutput("successVmCount", startedTask.getSuccessVmCount())
-                .addOutput("progress", startedTask.getProgress())
-                .addOutput("status", startedTask.getStatus());
-            */
+                    .addOutput("distributionId", startedTask.getDistributionId())
+                    .addOutput("strategy", startedTask.getDistributionStrategy())
+                    .addOutput("targetVmCount", startedTask.getTargetVmCount())
+                    .addOutput("successVmCount", startedTask.getSuccessVmCount())
+                    .addOutput("progress", startedTask.getProgress())
+                    .addOutput("status", startedTask.getStatus());
 
         } catch (Exception e) {
             log.error("数据分发阶段执行失败: orchestrationId={}, taskId={}", orchestrationId, taskId, e);

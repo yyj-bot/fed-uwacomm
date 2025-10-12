@@ -159,6 +159,14 @@
         ORDER BY created_at ASC
     </select>
 
+    <!-- 根据assignedDatasetId查询参与者 -->
+    <select id="selectParticipantByAssignedDatasetId" resultMap="TaskParticipantResultMap">
+        SELECT *
+        FROM task_participants
+        WHERE assigned_dataset_id = #{assignedDatasetId}
+        LIMIT 1
+    </select>
+
     <!-- 查询指定任务和轮次中未完成的参与者 -->
     <select id="selectIncompleteParticipants" resultMap="TaskParticipantResultMap">
         SELECT *

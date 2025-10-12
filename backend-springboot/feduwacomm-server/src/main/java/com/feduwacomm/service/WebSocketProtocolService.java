@@ -1443,17 +1443,42 @@ public class WebSocketProtocolService {
      */
     private ProtocolAck onDatasetCreateAck(ProtocolMessage msg) {
         String vmId = msg.getVmId();
-        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String datasetId = valueAsString(msg.getData(), "assignedDatasetId");
         String status = valueAsString(msg.getData(), "status");
 
         log.info("收到数据集创建确认: vmId={}, datasetId={}, status={}", vmId, datasetId, status);
 
-        if ("SUCCESS".equals(status)) {
-            // 更新数据集状态
-            log.debug("数据集创建成功: vmId={}, datasetId={}", vmId, datasetId);
+        if ("SUCCESS".equalsIgnoreCase(status)) {
+            try {
+                TaskParticipant participant = taskParticipantsMapper.selectParticipantByAssignedDatasetId(datasetId);
+                if (participant != null) {
+                    if (participant.getDatasetStatus() == null || !"CREATED".equals(participant.getDatasetStatus())) {
+                        participant.setDatasetStatus("CREATED");
+                    }
+                    if (participant.getDatasetCreatedAt() == null) {
+                        participant.setDatasetCreatedAt(LocalDateTime.now());
+                    }
+                    participant.setUpdatedAt(LocalDateTime.now());
+                    taskParticipantsMapper.updateParticipant(participant);
+                } else {
+                    log.warn("数据集创建确认未找到参与者: datasetId={}, vmId={}", datasetId, vmId);
+                }
+            } catch (Exception e) {
+                log.error("处理数据集创建确认失败: vmId={}, datasetId={}, error={}", vmId, datasetId, e.getMessage(), e);
+            }
         } else {
             String errorMessage = valueAsString(msg.getData(), "message");
             log.error("数据集创建失败: vmId={}, datasetId={}, message={}", vmId, datasetId, errorMessage);
+            try {
+                TaskParticipant participant = taskParticipantsMapper.selectParticipantByAssignedDatasetId(datasetId);
+                if (participant != null) {
+                    participant.setDatasetStatus("FAILED");
+                    participant.setUpdatedAt(LocalDateTime.now());
+                    taskParticipantsMapper.updateParticipant(participant);
+                }
+            } catch (Exception e) {
+                log.error("更新数据集失败状态异常: vmId={}, datasetId={}, error={}", vmId, datasetId, e.getMessage(), e);
+            }
         }
 
         return null;
@@ -1464,12 +1489,25 @@ public class WebSocketProtocolService {
      */
     private ProtocolAck onDatasetAppendRowsAck(ProtocolMessage msg) {
         String vmId = msg.getVmId();
-        String datasetId = valueAsString(msg.getData(), "datasetId");
+        String datasetId = valueAsString(msg.getData(), "assignedDatasetId");
         String status = valueAsString(msg.getData(), "status");
         Integer appendedRows = numberAsInt(msg.getData(), "appendedRows");
 
         log.info("收到数据集追加行确认: vmId={}, datasetId={}, status={}, appendedRows={}",
                 vmId, datasetId, status, appendedRows);
+
+        if (datasetId != null && "SUCCESS".equalsIgnoreCase(status)) {
+            try {
+                TaskParticipant participant = taskParticipantsMapper.selectParticipantByAssignedDatasetId(datasetId);
+                if (participant != null) {
+                    participant.setDatasetStatus("UPLOADING");
+                    participant.setUpdatedAt(LocalDateTime.now());
+                    taskParticipantsMapper.updateParticipant(participant);
+                }
+            } catch (Exception e) {
+                log.error("更新数据集追加状态失败: vmId={}, datasetId={}, error={}", vmId, datasetId, e.getMessage(), e);
+            }
+        }
 
         return null;
     }
@@ -1479,10 +1517,54 @@ public class WebSocketProtocolService {
      */
     private ProtocolAck onDatasetCompleteAck(ProtocolMessage msg) {
         String vmId = msg.getVmId();
-        String datasetId = valueAsString(msg.getData(), "datasetId");
-        String status = valueAsString(msg.getData(), "status");
+        Map<String, Object> data = msg.getData();
+        String datasetId = valueAsString(data, "assignedDatasetId");
+        String status = valueAsString(data, "status");
+        String errorMessage = valueAsString(data, "message");
 
         log.info("收到数据集完成确认: vmId={}, datasetId={}, status={}", vmId, datasetId, status);
+
+        if (datasetId == null) {
+            log.warn("数据集完成确认缺少assignedDatasetId: vmId={}", vmId);
+            return null;
+        }
+
+        try {
+            TaskParticipant participant = taskParticipantsMapper.selectParticipantByAssignedDatasetId(datasetId);
+            if (participant == null) {
+                log.warn("数据集完成确认未找到参与者: datasetId={}, vmId={}", datasetId, vmId);
+                return null;
+            }
+
+            boolean success = "SUCCESS".equalsIgnoreCase(status);
+            participant.setDatasetStatus(success ? "COMPLETED" : "FAILED");
+            participant.setDatasetCompletedAt(LocalDateTime.now());
+            participant.setUpdatedAt(LocalDateTime.now());
+            taskParticipantsMapper.updateParticipant(participant);
+
+            String ackDataJson = null;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> sliceVerification = (Map<String, Object>) data.get("sliceVerification");
+            if (sliceVerification != null) {
+                try {
+                    ackDataJson = objectMapper.writeValueAsString(sliceVerification);
+                } catch (Exception e) {
+                    log.warn("序列化sliceVerification失败: {}", e.getMessage());
+                }
+            }
+
+            vmAckTracker.recordDatasetAck(
+                participant.getTaskId(),
+                vmId,
+                datasetId,
+                success,
+                ackDataJson,
+                success ? null : errorMessage
+            );
+
+        } catch (Exception e) {
+            log.error("处理数据集完成确认失败: vmId={}, datasetId={}, error={}", vmId, datasetId, e.getMessage(), e);
+        }
 
         return null;
     }
