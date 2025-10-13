@@ -575,6 +575,14 @@ Content-Type: application/json
 }
 ```
 
+### 3.13 与联邦学习任务集成
+
+上传或登记训练数据后，将返回唯一的 `datasetId`。创建联邦学习任务时需要在 `datasetConfig.datasetId` 中引用该标识，并结合初始模型ID完成绑定。推荐流程如下：
+- 调用 `POST /api/training-data/upload` 或 `POST /api/training-data/text` 上传数据，记录返回的 `datasetId`
+- 使用初始模型管理API生成或上传模型，获取 `modelId`
+- 在 `POST /api/federated/tasks` 请求中，将 `datasetConfig.datasetId` 设置为步骤一的值，同时在 `initialModelConfig` 中选择 `CUSTOM` 并传入 `initialModelId`
+- 若未提供 `initialModelId`，后端会按任务配置自动生成默认初始模型
+
 ## 4. 错误码定义
 
 ### 4.1 数据相关错误码

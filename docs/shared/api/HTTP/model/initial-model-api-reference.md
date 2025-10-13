@@ -13,6 +13,7 @@
 ### 1.2 功能概述
 - 随机生成初始模型
 - 上传自定义初始模型
+- 使用初始模型ID在联邦学习任务创建时完成绑定
 - 查询任务初始模型信息
 - 分发初始模型到参与虚拟机
 - 初始模型版本管理
@@ -67,7 +68,6 @@
 **请求参数**
 ```json
 {
-  "taskId": "task_001",
   "modelType": "RANDOM_FOREST",
   "architecture": {
     "n_estimators": 100,
@@ -75,18 +75,19 @@
     "task_type": "regression"
   },
   "randomSeed": 42,
-  "description": "水声信号分类初始模型"
+  "description": "水声信号分类初始模型",
+  "labels": ["baseline", "v1.0"]
 }
 ```
 
 **参数说明**
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| taskId | string | 是 | 联邦学习任务ID |
 | modelType | string | 是 | 模型类型，可选值：RANDOM_FOREST, NEURAL_NETWORK |
 | architecture | object | 是 | 模型架构参数（不同模型类型参数不同，见1.3节） |
 | randomSeed | number | 否 | 随机种子，用于可重复性实验 |
 | description | string | 否 | 模型描述 |
+| labels | array[string] | 否 | 自定义标签，便于分类检索 |
 
 **响应示例**
 ```json
@@ -95,7 +96,6 @@
   "message": "初始模型生成成功",
   "data": {
     "modelId": "initial_model_001",
-    "taskId": "task_001",
     "modelType": "RANDOM_FOREST",
     "modelSize": 8192,
     "parametersCount": 100,
@@ -105,6 +105,7 @@
       "task_type": "regression"
     },
     "generatedAt": "2024-09-10T10:00:00Z",
+    "boundTaskId": null,
     "status": "READY",
     "checksum": "sha256:abcd1234..."
   }
@@ -122,7 +123,6 @@
 
 **请求参数**
 ```
-taskId: "task_001" (required)
 modelType: "RANDOM_FOREST" (required)
 description: "预训练的随机森林模型" (optional)
 file: [binary file] (required)
@@ -135,6 +135,7 @@ metadata: {
   "framework": "sklearn",
   "version": "1.0"
 } (optional, JSON string)
+labels: ["baseline", "v1.0"] (optional)
 ```
 
 **响应示例**
@@ -144,12 +145,12 @@ metadata: {
   "message": "初始模型上传成功",
   "data": {
     "modelId": "initial_model_002",
-    "taskId": "task_001",
     "modelType": "RANDOM_FOREST",
     "fileName": "initial_model.pkl",
     "modelSize": 10240,
     "uploadedAt": "2024-09-10T10:00:00Z",
     "status": "UPLOADED",
+    "boundTaskId": null,
     "checksum": "sha256:efgh5678...",
     "metadata": {
       "architecture": {
@@ -164,12 +165,50 @@ metadata: {
 }
 ```
 
-### 2.3 获取任务初始模型
-查询指定联邦学习任务的初始模型信息
+### 2.3 获取初始模型详情
+查询指定初始模型的完整信息（与任务绑定状态无关）
 
 **接口信息**
-- **URL**: `GET /api/model/initial/{taskId}`
-- **描述**: 获取任务的初始模型详情
+- **URL**: `GET /api/model/initial/{modelId}`
+- **描述**: 获取初始模型的元数据和绑定状态
+- **认证**: 需要JWT Token
+
+**路径参数**
+- `modelId` (string, required): 初始模型ID
+
+**查询参数**
+- `includeParameters` (boolean, optional): 是否包含模型参数，默认false
+- `format` (string, optional): 返回格式 (json|binary)，默认json
+
+**响应示例**
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "modelId": "initial_model_001",
+    "modelType": "RANDOM_FOREST",
+    "modelSize": 8192,
+    "createdAt": "2024-09-10T10:00:00Z",
+    "status": "READY",
+    "bindingStatus": "UNBOUND",
+    "architecture": {
+      "n_estimators": 100,
+      "n_features": 5,
+      "task_type": "regression"
+    },
+    "bindings": [],
+    "checksum": "sha256:abcd1234..."
+  }
+}
+```
+
+### 2.4 获取任务当前初始模型
+查询指定联邦学习任务正在使用的初始模型信息
+
+**接口信息**
+- **URL**: `GET /api/model/initial/task/{taskId}`
+- **描述**: 根据任务ID查询已绑定的初始模型详情
 - **认证**: 需要JWT Token
 
 **路径参数**
@@ -189,7 +228,7 @@ metadata: {
     "taskId": "task_001",
     "modelType": "RANDOM_FOREST",
     "modelSize": 8192,
-    "createdAt": "2024-09-10T10:00:00Z",
+    "boundAt": "2024-09-10T09:30:00Z",
     "status": "DISTRIBUTED",
     "architecture": {
       "n_estimators": 100,
@@ -207,11 +246,11 @@ metadata: {
 }
 ```
 
-### 2.4 分发初始模型
+### 2.5 分发初始模型
 将初始模型分发到参与联邦学习的虚拟机
 
 **接口信息**
-- **URL**: `POST /api/model/initial/{taskId}/distribute`
+- **URL**: `POST /api/model/initial/task/{taskId}/distribute`
 - **描述**: 分发初始模型到指定虚拟机
 - **认证**: 需要JWT Token (ADMIN或EDITOR权限)
 
@@ -254,7 +293,7 @@ metadata: {
 }
 ```
 
-### 2.5 查询分发状态
+### 2.6 查询分发状态
 查询初始模型分发的实时状态
 
 **接口信息**
@@ -310,17 +349,17 @@ metadata: {
 }
 ```
 
-### 2.6 下载初始模型
+### 2.7 下载初始模型
 下载初始模型文件
 
 **接口信息**
-- **URL**: `GET /api/model/initial/{taskId}/download`
+- **URL**: `GET /api/model/initial/{modelId}/download`
 - **描述**: 下载初始模型文件
 - **认证**: 需要JWT Token
 - **响应类型**: application/octet-stream
 
 **路径参数**
-- `taskId` (string, required): 联邦学习任务ID
+- `modelId` (string, required): 初始模型ID
 
 **查询参数**
 - `format` (string, optional): 下载格式 (binary|json)，默认binary
@@ -328,21 +367,21 @@ metadata: {
 **响应**
 - 成功时返回模型文件的二进制数据
 - Content-Type: application/octet-stream
-- Content-Disposition: attachment; filename="initial_model_{taskId}.pth"
+- Content-Disposition: attachment; filename="initial_model_{modelId}.pth"
 
-### 2.7 删除初始模型
-删除指定任务的初始模型
+### 2.8 删除初始模型
+删除指定初始模型（需确保未绑定任务或强制删除）
 
 **接口信息**
-- **URL**: `DELETE /api/model/initial/{taskId}`
-- **描述**: 删除任务初始模型
+- **URL**: `DELETE /api/model/initial/{modelId}`
+- **描述**: 删除初始模型及其文件
 - **认证**: 需要JWT Token (ADMIN权限)
 
 **路径参数**
-- `taskId` (string, required): 联邦学习任务ID
+- `modelId` (string, required): 初始模型ID
 
 **查询参数**
-- `force` (boolean, optional): 强制删除，即使模型已分发，默认false
+- `force` (boolean, optional): 强制删除，即使模型已绑定任务，默认false
 
 **响应示例**
 ```json
@@ -350,7 +389,6 @@ metadata: {
   "code": 200,
   "message": "初始模型删除成功",
   "data": {
-    "taskId": "task_001",
     "modelId": "initial_model_001",
     "deletedAt": "2024-09-10T10:00:00Z",
     "cleanupStatus": {
@@ -370,12 +408,20 @@ metadata: {
 ```json
 {
   "modelId": "string",           // 模型唯一标识
-  "taskId": "string",            // 关联的任务ID
   "modelType": "string",         // 模型类型（RANDOM_FOREST, NEURAL_NETWORK）
   "modelSize": "number",         // 模型大小(字节)
   "architecture": "object",      // 模型架构参数（根据modelType不同而不同）
+  "labels": ["string"],         // 模型标签
   "status": "string",           // 模型状态
+  "bindingStatus": "string",    // 绑定状态：UNBOUND/BOUND
+  "bindings": [                 // 任务绑定记录
+    {
+      "taskId": "string",
+      "boundAt": "string"
+    }
+  ],
   "createdAt": "string",        // 创建时间
+  "updatedAt": "string",        // 最后更新时间
   "checksum": "string"          // 模型校验和
 }
 ```
@@ -460,69 +506,100 @@ metadata: {
 
 ## 5. 使用示例
 
-### 5.1 完整的初始模型创建流程
+### 5.1 流程示例：创建初始模型并在任务中绑定
 
 ```javascript
-// 1. 生成随机初始模型
+// 1. 生成随机初始模型（无需提供 taskId）
 const generateResponse = await fetch('/api/model/initial/generate', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer ' + token,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    taskId: 'task_001',
     modelType: 'RANDOM_FOREST',
     architecture: {
       n_estimators: 100,
       n_features: 5,
       task_type: 'regression'
+    },
+    description: '水声信号分类初始模型'
+  })
+});
+
+const { data: modelData } = await generateResponse.json();
+const initialModelId = modelData.modelId;
+
+// 2. 上传训练数据集（示例引用训练数据API）
+const datasetResponse = await fetch('/api/training-data/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  },
+  body: createFormDataWithFileAndMetadata()
+});
+const { data: datasetData } = await datasetResponse.json();
+const datasetId = datasetData.datasetId;
+
+// 3. 创建联邦学习任务时绑定初始模型与数据集
+const createTaskResponse = await fetch('/api/federated/tasks', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    taskName: '水声传播特征分类任务',
+    taskType: 'CLASSIFICATION',
+    algorithm: 'FEDERATED_AVERAGING',
+    datasetConfig: {
+      datasetId,
+      distributionStrategy: 'BALANCED'
+    },
+    initialModelConfig: {
+      mode: 'CUSTOM',
+      initialModelId
+    },
+    participantConfig: {
+      selectionMode: 'MANUAL',
+      participants: [
+        { vmId: 'vm_001', role: 'PARTICIPANT', dataRatio: 0.6 },
+        { vmId: 'vm_002', role: 'PARTICIPANT', dataRatio: 0.4 }
+      ]
     }
   })
 });
 
-const model = await generateResponse.json();
+const { data: taskData } = await createTaskResponse.json();
+const taskId = taskData.taskId;
 
-// 2. 分发初始模型
-const distributeResponse = await fetch(`/api/model/initial/${taskId}/distribute`, {
+// 4. 需要分发时，根据任务ID触发分发
+const distributeResponse = await fetch(`/api/model/initial/task/${taskId}/distribute`, {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer ' + token,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    vmIds: ['vm_001', 'vm_002', 'vm_003'],
+    vmIds: ['vm_001', 'vm_002'],
     distributionMode: 'ASYNC',
     verifyChecksum: true
   })
 });
 
 const distribution = await distributeResponse.json();
-
-// 3. 监控分发进度
-const checkProgress = async (distributionId) => {
-  const response = await fetch(`/api/model/initial/distribution/${distributionId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'Bearer ' + token
-    }
-  });
-  
-  const status = await response.json();
-  return status.data;
-};
 ```
 
 ### 5.2 上传自定义初始模型
 
 ```javascript
 // 上传自定义模型文件
-const uploadCustomModel = async (taskId, modelFile) => {
+const uploadCustomModel = async (modelFile) => {
   const formData = new FormData();
-  formData.append('taskId', taskId);
   formData.append('modelType', 'RANDOM_FOREST');
   formData.append('description', '预训练的随机森林模型');
   formData.append('file', modelFile);
+  formData.append('labels', ['baseline']);
   formData.append('metadata', JSON.stringify({
     architecture: {
       n_estimators: 100,
@@ -536,12 +613,13 @@ const uploadCustomModel = async (taskId, modelFile) => {
   const response = await fetch('/api/model/initial/upload', {
     method: 'POST',
     headers: {
-      'Authorization': 'Bearer ' + token
+      'Authorization': `Bearer ${token}`
     },
     body: formData
   });
 
-  return await response.json();
+  const { data } = await response.json();
+  return data.modelId; // 在创建联邦学习任务时引用该ID
 };
 ```
 
