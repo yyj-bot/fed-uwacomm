@@ -231,10 +231,10 @@ const VMAssignmentManager: React.FC<VMAssignmentManagerProps> = ({ vmId, vmName 
           >
             <Button
               type="link"
-              danger
               size="small"
               icon={<DeleteOutlined />}
               loading={isVmOperating(vmId, `unassign-${vmId}-${record.userId}`)}
+              style={{ color: '#ff4d4f' }}
             >
               取消分配
             </Button>
@@ -317,6 +317,7 @@ const VMAssignmentManager: React.FC<VMAssignmentManagerProps> = ({ vmId, vmName 
           setAssignModalVisible(false)
           form.resetFields()
         }}
+        centered
         okText="确定"
         cancelText="取消"
       >
@@ -369,6 +370,7 @@ const VMAssignmentManager: React.FC<VMAssignmentManagerProps> = ({ vmId, vmName 
           setEditPermissionModalVisible(false)
           permissionForm.resetFields()
         }}
+        centered
         okText="确定"
         cancelText="取消"
       >

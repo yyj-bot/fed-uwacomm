@@ -7,7 +7,7 @@
  */
 
 import React from 'react'
-import { Row, Col, Card, Statistic, Skeleton } from 'antd'
+import { Card, Statistic, Skeleton } from 'antd'
 import { 
   CloudServerOutlined, 
   ExperimentOutlined, 
@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons'
 
 import type { DashboardOverview } from '@/store'
+import styles from '../DashboardPage.module.css'
 
 interface OverviewCardsProps {
   overview?: DashboardOverview
@@ -61,25 +62,39 @@ const OverviewCards: React.FC<OverviewCardsProps> = ({
 
   if (loading) {
     return (
-      <Row gutter={[16, 16]} className="fed-overview-cards">
+      <div className={styles['fed-overview-cards']} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
         {cards.map((_, index) => (
-          <Col xs={12} sm={12} lg={6} key={index}>
-            <Card className="fed-overview-card">
+          <div key={index} style={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
+            <Card className={styles['fed-overview-card']}>
               <Skeleton active paragraph={{ rows: 2 }} />
             </Card>
-          </Col>
+          </div>
         ))}
-      </Row>
+      </div>
     )
   }
 
   return (
-    <Row gutter={[16, 16]} className="fed-overview-cards">
+    <div className={styles['fed-overview-cards']} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
       {cards.map((card, index) => (
-        <Col xs={12} sm={12} lg={6} key={index}>
+        <div key={index} style={{ flex: '1 1 calc(25% - 12px)', minWidth: '200px' }}>
           <Card 
-            className={`fed-overview-card fed-overview-card--${card.type}`}
-            styles={{ body: { textAlign: 'center' } }}
+            className={`${styles['fed-overview-card']} ${styles[`fed-overview-card--${card.type}`]}`}
+            styles={{ 
+              body: { 
+                textAlign: 'center',
+                background: 'white',
+                padding: '20px 16px'
+              },
+              header: {
+                background: 'white'
+              }
+            }}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              border: 'none'
+            }}
           >
             {card.icon}
             <Statistic
@@ -88,14 +103,14 @@ const OverviewCards: React.FC<OverviewCardsProps> = ({
               suffix={card.suffix}
               valueStyle={{ 
                 color: 'inherit',
-                fontSize: '28px',
+                fontSize: '24px',
                 fontWeight: 600
               }}
             />
           </Card>
-        </Col>
+        </div>
       ))}
-    </Row>
+    </div>
   )
 }
 

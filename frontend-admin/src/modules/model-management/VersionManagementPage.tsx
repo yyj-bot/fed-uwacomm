@@ -29,6 +29,7 @@ import {
   Statistic,
   Progress
 } from 'antd'
+import './VersionManagementPage.css'
 import {
   PlusOutlined,
   UploadOutlined,
@@ -151,7 +152,7 @@ const VersionManagementPage: React.FC = () => {
       title: '模型ID',
       dataIndex: 'modelId',
       key: 'modelId',
-      width: 200,
+      width: 220,
       ellipsis: true,
       fixed: 'left',
       render: (modelId: string) => (
@@ -179,7 +180,7 @@ const VersionManagementPage: React.FC = () => {
       title: '任务ID',
       dataIndex: 'taskId',
       key: 'taskId',
-      width: 200,
+      width: 220,
       ellipsis: true,
       render: (taskId: string) => (
         <Tooltip title={`完整任务ID: ${taskId} (点击复制)`} placement="topLeft">
@@ -213,87 +214,73 @@ const VersionManagementPage: React.FC = () => {
       title: '准确率',
       dataIndex: 'accuracy',
       key: 'accuracy',
-      width: 100,
+      width: 110,
       render: (value: number | undefined) => value !== undefined ? (value * 100).toFixed(2) + '%' : '-'
     },
     {
       title: '损失',
       dataIndex: 'loss',
       key: 'loss',
-      width: 100,
+      width: 110,
       render: (value: number | undefined) => value !== undefined ? value.toFixed(6) : '-'
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 120,
       render: (status: string) => (
         <Tag color={getStatusColor(status)}>{status}</Tag>
       )
     },
     {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: 200,
-      ellipsis: true
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (time: string) => new Date(time).toLocaleString()
-    },
-    {
       title: '操作',
       key: 'action',
       fixed: 'right',
-      width: 350,
+      width: 200,
       render: (_, record) => (
-        <Space size="small" wrap>
-          <Button
-            type="link"
-            size="small"
-            icon={<FileTextOutlined />}
-            onClick={() => handleViewDetail(record.modelId)}
-          >
-            详情
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<RocketOutlined />}
-            onClick={() => handleOpenEvaluate(record.modelId)}
-          >
-            评估
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<RollbackOutlined />}
-            onClick={() => handleOpenRollback(record.modelId)}
-            disabled={record.status !== 'DEPLOYED'}
-          >
-            回滚
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<HistoryOutlined />}
-            onClick={() => handleViewRollbackHistory(record.deploymentId || record.modelId)}
-          >
-            回滚历史
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownload(record.modelId)}
-          >
-            下载
-          </Button>
+        <Space size={4} wrap>
+          <Tooltip title="详情">
+            <Button
+              type="link"
+              size="small"
+              icon={<FileTextOutlined />}
+              onClick={() => handleViewDetail(record.modelId)}
+            />
+          </Tooltip>
+          <Tooltip title="评估">
+            <Button
+              type="link"
+              size="small"
+              icon={<RocketOutlined />}
+              onClick={() => handleOpenEvaluate(record.modelId)}
+            />
+          </Tooltip>
+          <Tooltip title="回滚">
+            <Button
+              type="link"
+              size="small"
+              icon={<RollbackOutlined />}
+              onClick={() => handleOpenRollback(record.modelId)}
+              style={{ color: '#faad14' }}
+            />
+          </Tooltip>
+          <Tooltip title="回溯历史">
+            <Button
+              type="link"
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => handleViewRollbackHistory(record.deploymentId || record.modelId)}
+            />
+          </Tooltip>
+          <Tooltip title="下载">
+            <Button
+              type="link"
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={() => handleDownload(record.modelId)}
+            />
+          </Tooltip>
           <Popconfirm
             title="确定要删除此模型版本吗？"
             onConfirm={() => handleDelete(record.modelId)}
@@ -307,7 +294,7 @@ const VersionManagementPage: React.FC = () => {
                   ? (record.status === 'DEPLOYED' 
                       ? '已部署的模型无法删除，请先取消部署' 
                       : '模型正在操作中，请稍后再试')
-                  : '删除此模型版本'
+                  : '删除'
               }
             >
               <Button
@@ -316,9 +303,7 @@ const VersionManagementPage: React.FC = () => {
                 danger
                 icon={<DeleteOutlined />}
                 disabled={!canDeleteModel(record)}
-              >
-                删除
-              </Button>
+              />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -649,17 +634,56 @@ const VersionManagementPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card title="模型版本管理">
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+    <div 
+      className="version-management-page"
+      style={{ 
+        padding: '24px',
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%)',
+        minHeight: '100vh'
+      }}
+    >
+      <Card 
+        title={
+          <span style={{ fontSize: '20px', fontWeight: 600, color: '#1a1a1a' }}>
+            📦 模型版本管理
+          </span>
+        }
+        style={{
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          background: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.04)'
+        }}
+        headStyle={{
+          borderBottom: '2px solid #f0f0f0',
+          background: 'linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%)'
+        }}
+      >
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab}
+        >
           {/* 模型列表标签页 */}
           <Tabs.TabPane tab={<span><CloudUploadOutlined /> 模型列表</span>} key="models">
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ 
+              marginBottom: 16,
+              padding: '16px',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+              borderRadius: '10px',
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+            }}>
               <Space>
                 <Button
                   type="primary"
                   icon={<RocketOutlined />}
                   onClick={handleOpenBatchEvaluate}
+                  style={{
+                    background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)'
+                  }}
                 >
                   批量评估
                 </Button>
@@ -667,71 +691,109 @@ const VersionManagementPage: React.FC = () => {
                   icon={<DownloadOutlined />}
                   onClick={handleBatchDownload}
                   disabled={selectedRowKeys.length === 0}
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#52c41a',
+                    color: '#52c41a',
+                    background: '#ffffff'
+                  }}
                 >
                   批量下载
                 </Button>
                 <Button
-                  danger
                   icon={<DeleteOutlined />}
                   onClick={handleBatchDelete}
                   disabled={selectedRowKeys.length === 0}
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#ff4d4f',
+                    color: '#ff4d4f',
+                    background: '#ffffff'
+                  }}
                 >
                   批量删除
                 </Button>
               </Space>
             </div>
         {/* 搜索表单 */}
-        <Form
-          form={searchForm}
-          layout="inline"
-          style={{ marginBottom: 16 }}
-          onFinish={handleSearch}
-        >
-          <Form.Item name="taskId" label="任务ID">
-            <Input 
-              placeholder="任务ID (可点击表格中的ID复制)" 
-              style={{ width: 250 }} 
-            />
-          </Form.Item>
-          <Form.Item name="roundNumber" label="轮次">
-            <InputNumber placeholder="轮次" style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select placeholder="选择状态" style={{ width: 150 }} allowClear>
-              <Option value="UPLOADING">上传中</Option>
-              <Option value="UPLOADED">已上传</Option>
-              <Option value="VALIDATING">验证中</Option>
-              <Option value="VALIDATED">已验证</Option>
-              <Option value="DEPLOYED">已部署</Option>
-              <Option value="DEPRECATED">已废弃</Option>
-              <Option value="FAILED">失败</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="sort" label="排序">
-            <Select placeholder="排序字段" style={{ width: 150 }} allowClear>
-              <Option value="createdAt">创建时间</Option>
-              <Option value="roundNumber">轮次</Option>
-              <Option value="accuracy">准确率</Option>
-              <Option value="loss">损失</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="order">
-            <Select placeholder="排序方向" style={{ width: 100 }} allowClear>
-              <Option value="desc">降序</Option>
-              <Option value="asc">升序</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit" icon={<FileTextOutlined />}>
+        <div style={{ 
+          marginBottom: 16,
+          padding: '16px',
+          background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+          borderRadius: '10px',
+          border: '1px solid #e8e8e8',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+        }}>
+          <Form
+            form={searchForm}
+            layout="inline"
+            onFinish={handleSearch}
+          >
+            <Form.Item name="taskId" label="任务ID">
+              <Input 
+                placeholder="任务ID (可点击表格中的ID复制)" 
+                style={{ width: 250 }} 
+              />
+            </Form.Item>
+            <Form.Item name="roundNumber" label="轮次">
+              <InputNumber placeholder="轮次" style={{ width: 100 }} />
+            </Form.Item>
+            <Form.Item name="status" label="状态">
+              <Select placeholder="选择状态" style={{ width: 130 }} allowClear>
+                <Option value="UPLOADING">上传中</Option>
+                <Option value="UPLOADED">已上传</Option>
+                <Option value="VALIDATING">验证中</Option>
+                <Option value="VALIDATED">已验证</Option>
+                <Option value="DEPLOYED">已部署</Option>
+                <Option value="DEPRECATED">已废弃</Option>
+                <Option value="FAILED">失败</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="sort" label="排序">
+              <Select placeholder="排序字段" style={{ width: 110 }} allowClear>
+                <Option value="createdAt">创建时间</Option>
+                <Option value="roundNumber">轮次</Option>
+                <Option value="accuracy">准确率</Option>
+                <Option value="loss">损失</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="order">
+              <Select placeholder="排序方向" style={{ width: 100 }} allowClear>
+                <Option value="desc">降序</Option>
+                <Option value="asc">升序</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                icon={<FileTextOutlined />}
+                style={{
+                  background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)'
+                }}
+              >
                 搜索
               </Button>
-              <Button onClick={handleResetSearch} icon={<ReloadOutlined />}>
+            </Form.Item>
+            <Form.Item>
+              <Button 
+                onClick={handleResetSearch} 
+                icon={<ReloadOutlined />}
+                style={{
+                  borderRadius: '8px',
+                  borderColor: '#1890ff',
+                  color: '#1890ff',
+                  background: '#ffffff'
+                }}
+              >
                 重置
               </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            </Form.Item>
+          </Form>
+        </div>
 
         {/* 模型列表表格 */}
         <Table
@@ -740,7 +802,7 @@ const VersionManagementPage: React.FC = () => {
           dataSource={modelList}
           loading={modelListLoading}
           rowKey="modelId"
-          scroll={{ x: 1600 }}
+          scroll={{ x: 1100 }}
           pagination={{
             current: pagination.page,
             pageSize: pagination.size,
@@ -759,7 +821,7 @@ const VersionManagementPage: React.FC = () => {
               dataSource={evaluationListData}
               loading={evaluationResultsLoading}
               rowKey="key"
-              scroll={{ x: 1200 }}
+              scroll={{ x: 'max-content' }}
               pagination={{
                 showSizeChanger: true,
                 showQuickJumper: true,
@@ -770,7 +832,7 @@ const VersionManagementPage: React.FC = () => {
                   title: '评估ID',
                   dataIndex: 'evaluationId',
                   key: 'evaluationId',
-                  width: 180,
+                  width: 200,
                   ellipsis: true
                 },
                 {
@@ -828,12 +890,21 @@ const VersionManagementPage: React.FC = () => {
                   title: '状态',
                   dataIndex: 'status',
                   key: 'status',
-                  width: 100,
-                  render: (status: string) => (
-                    <Tag color={status === 'COMPLETED' ? 'success' : status === 'FAILED' ? 'error' : 'processing'}>
-                      {status}
-                    </Tag>
-                  )
+                  width: 140,
+                  render: (status: string) => {
+                    const statusMap: Record<string, { text: string; color: string }> = {
+                      'COMPLETED': { text: '已完成', color: 'success' },
+                      'IN_PROGRESS': { text: '进行中', color: 'processing' },
+                      'FAILED': { text: '失败', color: 'error' },
+                      'PENDING': { text: '待处理', color: 'default' }
+                    }
+                    const statusInfo = statusMap[status] || { text: status, color: 'default' }
+                    return (
+                      <Tag color={statusInfo.color}>
+                        {statusInfo.text}
+                      </Tag>
+                    )
+                  }
                 },
                 {
                   title: '评估时间',
@@ -846,7 +917,7 @@ const VersionManagementPage: React.FC = () => {
                   title: '测试样本数',
                   dataIndex: 'testSamples',
                   key: 'testSamples',
-                  width: 100
+                  width: 120
                 },
                 {
                   title: '创建时间',
@@ -860,6 +931,7 @@ const VersionManagementPage: React.FC = () => {
                   key: 'action',
                   fixed: 'right',
                   width: 100,
+                  align: 'center',
                   render: (_, record) => (
                     <Button
                       type="link"
@@ -878,7 +950,14 @@ const VersionManagementPage: React.FC = () => {
           {/* 统计分析标签页 */}
           <Tabs.TabPane tab={<span><BarChartOutlined /> 统计分析</span>} key="statistics">
             {/* 筛选条件 */}
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ 
+              marginBottom: 16,
+              padding: '16px',
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+              borderRadius: '10px',
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+            }}>
               <Space size="large" wrap>
                 <Space>
                   <span>统计类型:</span>
@@ -921,30 +1000,47 @@ const VersionManagementPage: React.FC = () => {
                   </Select>
                   <span style={{ color: '#999', fontSize: '12px' }}>(仅在模型统计模式下可用)</span>
                 </Space>
-                <Button type="primary" onClick={() => {
-                  if (statisticsMode === 'task') {
-                    // 使用10.2接口：任务模型统计
-                    if (!statisticsTaskId) {
-                      message.warning('任务进度统计需要输入任务ID')
-                      return
+                <Button 
+                  type="primary" 
+                  onClick={() => {
+                    if (statisticsMode === 'task') {
+                      // 使用10.2接口：任务模型统计
+                      if (!statisticsTaskId) {
+                        message.warning('任务进度统计需要输入任务ID')
+                        return
+                      }
+                      fetchTaskStatistics(statisticsTaskId)
+                    } else {
+                      // 使用10.1接口：模型统计（支持taskId和timeRange筛选）
+                      fetchModelStatistics({ 
+                        taskId: statisticsTaskId || undefined,
+                        timeRange: statisticsTimeRange as '7d' | '30d' | '90d' 
+                      })
                     }
-                    fetchTaskStatistics(statisticsTaskId)
-                  } else {
-                    // 使用10.1接口：模型统计（支持taskId和timeRange筛选）
-                    fetchModelStatistics({ 
-                      taskId: statisticsTaskId || undefined,
-                      timeRange: statisticsTimeRange as '7d' | '30d' | '90d' 
-                    })
-                  }
-                }}>
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)'
+                  }}
+                >
                   查询
                 </Button>
-                <Button onClick={() => {
-                  setStatisticsTaskId('')
-                  setStatisticsTimeRange('7d')
-                  setStatisticsMode('model')
-                  fetchModelStatistics({ timeRange: '7d' })
-                }}>
+                <Button 
+                  onClick={() => {
+                    setStatisticsTaskId('')
+                    setStatisticsTimeRange('7d')
+                    setStatisticsMode('model')
+                    fetchModelStatistics({ timeRange: '7d' })
+                  }}
+                  style={{
+                    borderRadius: '8px',
+                    borderColor: '#1890ff',
+                    color: '#1890ff',
+                    background: '#ffffff'
+                  }}
+                >
                   重置
                 </Button>
               </Space>
@@ -955,42 +1051,63 @@ const VersionManagementPage: React.FC = () => {
               <>
                 <Row gutter={[16, 16]}>
                   <Col span={6}>
-                    <Card>
+                    <Card style={{
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                    }}>
                       <Statistic
                         title="模型总数"
                         value={modelStatistics?.totalModels || 0}
-                        prefix={<CheckCircleOutlined />}
+                        valueStyle={{ color: '#1890ff' }}
+                        prefix={<CheckCircleOutlined style={{ color: '#1890ff' }} />}
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
-                    <Card>
+                    <Card style={{
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                    }}>
                       <Statistic
                         title="平均准确率"
                         value={modelStatistics?.averageAccuracy ? (modelStatistics.averageAccuracy * 100).toFixed(2) : 0}
                         suffix="%"
-                        valueStyle={{ color: '#3f8600' }}
-                        prefix={<LineChartOutlined />}
+                        valueStyle={{ color: '#52c41a' }}
+                        prefix={<LineChartOutlined style={{ color: '#52c41a' }} />}
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
-                    <Card>
+                    <Card style={{
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                    }}>
                       <Statistic
                         title="平均损失"
                         value={modelStatistics?.averageLoss?.toFixed(4) || 0}
                         valueStyle={{ color: '#cf1322' }}
-                        prefix={<CloseCircleOutlined />}
+                        prefix={<CloseCircleOutlined style={{ color: '#cf1322' }} />}
                       />
                     </Card>
                   </Col>
                   <Col span={6}>
-                    <Card>
+                    <Card style={{
+                      borderRadius: '12px',
+                      background: '#ffffff',
+                      border: '1px solid #e8e8e8',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                    }}>
                       <Statistic
                         title="最高准确率"
                         value={modelStatistics?.accuracyTrend?.[0] ? (Math.max(...modelStatistics.accuracyTrend.map(t => t.accuracy)) * 100).toFixed(2) : 0}
                         suffix="%"
-                        valueStyle={{ color: '#3f8600' }}
+                        valueStyle={{ color: '#52c41a' }}
                       />
                     </Card>
                   </Col>
@@ -998,7 +1115,16 @@ const VersionManagementPage: React.FC = () => {
 
                 <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                   <Col span={12}>
-                    <Card title="准确率趋势" loading={statisticsLoading}>
+                    <Card 
+                      title="📈 准确率趋势" 
+                      loading={statisticsLoading}
+                      style={{
+                        borderRadius: '12px',
+                        background: '#ffffff',
+                        border: '1px solid #e8e8e8',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      }}
+                    >
                       {modelStatistics?.accuracyTrend && modelStatistics.accuracyTrend.length > 0 ? (
                         <Line {...accuracyTrendConfig} />
                       ) : (
@@ -1009,12 +1135,21 @@ const VersionManagementPage: React.FC = () => {
                     </Card>
                   </Col>
                   <Col span={12}>
-                    <Card title="模型上传趋势" loading={statisticsLoading}>
+                    <Card 
+                      title="📊 模型上传趋势" 
+                      loading={statisticsLoading}
+                      style={{
+                        borderRadius: '12px',
+                        background: '#ffffff',
+                        border: '1px solid #e8e8e8',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      }}
+                    >
                       {modelStatistics?.uploadTrend && modelStatistics.uploadTrend.length > 0 ? (
                         <Column {...uploadTrendConfig} />
                       ) : (
                         <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                          暂无数据
+                          📭 暂无数据
                         </div>
                       )}
                     </Card>
@@ -1027,8 +1162,16 @@ const VersionManagementPage: React.FC = () => {
                 {currentTaskStatistics ? (
                   <>
                     {/* 任务基本信息 */}
-                    <Card style={{ marginBottom: 16 }}>
-                      <Descriptions title="任务信息" bordered column={2}>
+                    <Card 
+                      style={{ 
+                        marginBottom: 16,
+                        borderRadius: '12px',
+                        background: '#ffffff',
+                        border: '1px solid #e8e8e8',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      }}
+                    >
+                      <Descriptions title="📋 任务信息" bordered column={2}>
                         <Descriptions.Item label="任务ID">{currentTaskStatistics.taskId}</Descriptions.Item>
                         <Descriptions.Item label="任务名称">{currentTaskStatistics.taskName}</Descriptions.Item>
                         <Descriptions.Item label="计划总轮次">{currentTaskStatistics.totalRounds}</Descriptions.Item>
@@ -1043,7 +1186,15 @@ const VersionManagementPage: React.FC = () => {
                     {/* 训练进度 */}
                     <Row gutter={[16, 16]}>
                       <Col span={24}>
-                        <Card title="训练进度">
+                        <Card 
+                          title="🚀 训练进度"
+                          style={{
+                            borderRadius: '12px',
+                            background: '#ffffff',
+                            border: '1px solid #e8e8e8',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                          }}
+                        >
                           <div style={{ marginBottom: 16 }}>
                             <Progress 
                               percent={Number(((currentTaskStatistics.completedRounds / currentTaskStatistics.totalRounds) * 100).toFixed(1))}
@@ -1085,29 +1236,44 @@ const VersionManagementPage: React.FC = () => {
                     {/* 性能指标 */}
                     <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                       <Col span={6}>
-                        <Card>
+                        <Card style={{
+                          borderRadius: '12px',
+                          background: '#ffffff',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}>
                           <Statistic
                             title="平均准确率"
                             value={(currentTaskStatistics.performanceMetrics.averageAccuracy * 100).toFixed(2)}
                             suffix="%"
-                            valueStyle={{ color: '#3f8600' }}
-                            prefix={<LineChartOutlined />}
+                            valueStyle={{ color: '#52c41a' }}
+                            prefix={<LineChartOutlined style={{ color: '#52c41a' }} />}
                           />
                         </Card>
                       </Col>
                       <Col span={6}>
-                        <Card>
+                        <Card style={{
+                          borderRadius: '12px',
+                          background: '#ffffff',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}>
                           <Statistic
                             title="最高准确率"
                             value={(currentTaskStatistics.performanceMetrics.bestAccuracy * 100).toFixed(2)}
                             suffix="%"
                             valueStyle={{ color: '#52c41a' }}
-                            prefix={<CheckCircleOutlined />}
+                            prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
                           />
                         </Card>
                       </Col>
                       <Col span={6}>
-                        <Card>
+                        <Card style={{
+                          borderRadius: '12px',
+                          background: '#ffffff',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}>
                           <Statistic
                             title="最佳轮次"
                             value={currentTaskStatistics.performanceMetrics.bestRound}
@@ -1117,13 +1283,18 @@ const VersionManagementPage: React.FC = () => {
                         </Card>
                       </Col>
                       <Col span={6}>
-                        <Card>
+                        <Card style={{
+                          borderRadius: '12px',
+                          background: '#ffffff',
+                          border: '1px solid #e8e8e8',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}>
                           <Statistic
                             title="准确率提升"
                             value={(currentTaskStatistics.performanceMetrics.accuracyImprovement * 100).toFixed(2)}
                             suffix="%"
                             valueStyle={{ color: '#faad14' }}
-                            prefix={<RocketOutlined />}
+                            prefix={<RocketOutlined style={{ color: '#faad14' }} />}
                           />
                         </Card>
                       </Col>
@@ -1132,25 +1303,33 @@ const VersionManagementPage: React.FC = () => {
                     {/* 性能摘要 */}
                     <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                       <Col span={24}>
-                        <Card title="性能分析">
+                        <Card 
+                          title="📊 性能分析"
+                          style={{
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                            border: '1px solid #e8e8e8',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                          }}
+                        >
                           <div style={{ padding: '20px 0' }}>
                             <p style={{ fontSize: '16px', marginBottom: 16 }}>
-                              <strong>训练效果总结：</strong>
+                              <strong>📈 训练效果总结：</strong>
                             </p>
                             <ul style={{ fontSize: '14px', lineHeight: '2' }}>
                               <li>
-                                任务已完成 <strong style={{ color: '#3f8600' }}>{currentTaskStatistics.completedRounds}</strong> 轮训练，
+                                ✅ 任务已完成 <strong style={{ color: '#3f8600' }}>{currentTaskStatistics.completedRounds}</strong> 轮训练，
                                 占计划总轮次的 <strong>{((currentTaskStatistics.completedRounds / currentTaskStatistics.totalRounds) * 100).toFixed(1)}%</strong>
                               </li>
                               <li>
-                                平均准确率达到 <strong style={{ color: '#3f8600' }}>{(currentTaskStatistics.performanceMetrics.averageAccuracy * 100).toFixed(2)}%</strong>，
+                                📊 平均准确率达到 <strong style={{ color: '#3f8600' }}>{(currentTaskStatistics.performanceMetrics.averageAccuracy * 100).toFixed(2)}%</strong>，
                                 最高准确率为 <strong style={{ color: '#52c41a' }}>{(currentTaskStatistics.performanceMetrics.bestAccuracy * 100).toFixed(2)}%</strong>
                               </li>
                               <li>
-                                第 <strong style={{ color: '#1890ff' }}>{currentTaskStatistics.performanceMetrics.bestRound}</strong> 轮达到最佳性能
+                                🎯 第 <strong style={{ color: '#1890ff' }}>{currentTaskStatistics.performanceMetrics.bestRound}</strong> 轮达到最佳性能
                               </li>
                               <li>
-                                相比初始轮次，准确率提升了 <strong style={{ color: '#faad14' }}>{(currentTaskStatistics.performanceMetrics.accuracyImprovement * 100).toFixed(2)}%</strong>
+                                🚀 相比初始轮次，准确率提升了 <strong style={{ color: '#faad14' }}>{(currentTaskStatistics.performanceMetrics.accuracyImprovement * 100).toFixed(2)}%</strong>
                               </li>
                             </ul>
                           </div>
@@ -1159,10 +1338,20 @@ const VersionManagementPage: React.FC = () => {
                     </Row>
                   </>
                 ) : (
-                  <Card>
-                    <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
-                      <p style={{ fontSize: '16px', marginBottom: 8 }}>请输入任务ID查看训练进度</p>
-                      <p style={{ fontSize: '14px' }}>任务进度统计提供详细的训练状态和性能指标</p>
+                  <Card style={{
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                    border: '1px solid #e8e8e8',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                  }}>
+                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                      <p style={{ fontSize: '18px', marginBottom: 8, color: '#1a1a1a', fontWeight: 500 }}>
+                        请输入任务ID查看训练进度
+                      </p>
+                      <p style={{ fontSize: '14px', color: '#666' }}>
+                        任务进度统计提供详细的训练状态和性能指标
+                      </p>
                     </div>
                   </Card>
                 )}
@@ -1184,6 +1373,8 @@ const VersionManagementPage: React.FC = () => {
           </Button>
         ]}
         width={800}
+        centered
+        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         {currentModel && (
           <Descriptions bordered column={2}>
@@ -1274,6 +1465,8 @@ const VersionManagementPage: React.FC = () => {
           </Button>
         ]}
         width={1000}
+        centered
+        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         {currentTaskModels && (
           <>
@@ -1347,6 +1540,9 @@ const VersionManagementPage: React.FC = () => {
           evaluateForm.resetFields()
         }}
         width={600}
+        centered
+        okText="确定"
+        cancelText="取消"
       >
         <Form form={evaluateForm} layout="vertical">
           <Form.Item
@@ -1405,6 +1601,9 @@ const VersionManagementPage: React.FC = () => {
           rollbackForm.resetFields()
         }}
         width={600}
+        centered
+        okText="确定"
+        cancelText="取消"
       >
         <Form form={rollbackForm} layout="vertical">
           <Form.Item
@@ -1444,6 +1643,8 @@ const VersionManagementPage: React.FC = () => {
           </Button>
         ]}
         width={900}
+        centered
+        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         <Table
           dataSource={currentRollbackHistory}
@@ -1518,6 +1719,9 @@ const VersionManagementPage: React.FC = () => {
           batchEvaluateForm.resetFields()
         }}
         width={600}
+        centered
+        okText="确定"
+        cancelText="取消"
       >
         <Form form={batchEvaluateForm} layout="vertical">
           <Form.Item
@@ -1580,11 +1784,13 @@ const VersionManagementPage: React.FC = () => {
             关闭
           </Button>
         ]}
-        width={700}
+        width={650}
+        centered
+        bodyStyle={{ maxHeight: '60vh', overflowY: 'auto', padding: '20px' }}
       >
         {currentEvaluationDetail && (
-          <div style={{ padding: '16px 0' }}>
-            <Descriptions column={2} bordered size="small">
+          <div>
+            <Descriptions column={2} bordered size="small" style={{ fontSize: '13px' }}>
               <Descriptions.Item label="评估ID" span={2}>
                 {currentEvaluationDetail.evaluationId}
               </Descriptions.Item>

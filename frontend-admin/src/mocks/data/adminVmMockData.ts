@@ -121,8 +121,8 @@ export const mockVmAssignments: Record<string, any> = {
     assignments: [],
     totalAssignments: 0
   },
-  'c3d4e5f67890123456789012345678901': {
-    vmId: 'c3d4e5f67890123456789012345678901',
+  'c3d4e5f678901234567890123456789a': {
+    vmId: 'c3d4e5f678901234567890123456789a',
     vmName: '水声联邦学习节点-003',
     assignments: [],
     totalAssignments: 0
@@ -137,7 +137,7 @@ export const mockVmAssignments: Record<string, any> = {
  * 过滤条件：未分配的VM
  */
 export const mockUnassignedVms = baseVmList.filter(vm => {
-  const unassignedVmIds = ['b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901']
+  const unassignedVmIds = ['b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
   return unassignedVmIds.includes(vm.vmId)
 })
 
@@ -153,7 +153,7 @@ export const mockAllAdminVms = baseVmList.map(vm => {
   const assignmentInfo = {
     'a1b2c3d4e5f678901234567890123456': { isAssigned: true, assignedUserCount: 4 },
     'b2c3d4e5f67890123456789012345678': { isAssigned: false, assignedUserCount: 0 },
-    'c3d4e5f67890123456789012345678901': { isAssigned: false, assignedUserCount: 0 }
+    'c3d4e5f678901234567890123456789a': { isAssigned: false, assignedUserCount: 0 }
   }
   
   const info = assignmentInfo[vm.vmId as keyof typeof assignmentInfo] || { isAssigned: false, assignedUserCount: 0 }

@@ -247,11 +247,11 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
             批量分配
           </Button>
           <Button
-            danger
             icon={<DeleteOutlined />}
             onClick={handleBatchRemove}
             disabled={selectedRowKeys.length === 0}
             loading={isVmOperating('', `batch-remove-${userId}`)}
+            style={{ color: '#ff4d4f', borderColor: '#ff4d4f' }}
           >
             批量移除
           </Button>
@@ -282,6 +282,7 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
           form.resetFields()
         }}
         width={600}
+        centered
         okText="确定"
         cancelText="取消"
       >

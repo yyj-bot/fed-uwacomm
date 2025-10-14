@@ -26,17 +26,23 @@ import {
   Modal,
   message,
   Popconfirm,
-  Badge
+  Badge,
+  Typography
 } from 'antd'
 import { 
   SearchOutlined, 
   ReloadOutlined, 
   EyeOutlined,
-  BarChartOutlined
+  BarChartOutlined,
+  CloudServerOutlined,
+  ThunderboltOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons'
 import { useVM } from '@/store/vm'
 import type { VirtualMachine } from '@/api/vm'
 import type { ColumnsType } from 'antd/es/table'
+
+const { Text } = Typography
 
 const { Search } = Input
 const { Option } = Select
@@ -151,13 +157,20 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       width: 200,
       ellipsis: true,
       render: (text: string, record: VirtualMachine) => (
-        <Button 
-          type="link" 
-          onClick={() => onSelectVM(record)}
-          style={{ padding: 0, height: 'auto' }}
-        >
-          {text}
-        </Button>
+        <Space>
+          <CloudServerOutlined style={{ fontSize: '18px', color: '#1890ff' }} />
+          <Button 
+            type="link" 
+            onClick={() => onSelectVM(record)}
+            style={{ 
+              padding: 0, 
+              height: 'auto',
+              fontWeight: 600
+            }}
+          >
+            {text}
+          </Button>
+        </Space>
       )
     },
     {
@@ -184,11 +197,20 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       key: 'resources',
       width: 150,
       render: (_, record: VirtualMachine) => (
-        <div>
-          <div>CPU: {record.cpuCores}核</div>
-          <div>内存: {(record.memoryMb / 1024).toFixed(1)}GB</div>
-          <div>磁盘: {record.diskGb}GB</div>
-        </div>
+        <Space direction="vertical" size={2}>
+          <Text style={{ fontSize: '13px' }}>
+            <ThunderboltOutlined style={{ color: '#faad14', marginRight: 4 }} />
+            CPU: {record.cpuCores}核
+          </Text>
+          <Text style={{ fontSize: '13px' }}>
+            <SafetyCertificateOutlined style={{ color: '#52c41a', marginRight: 4 }} />
+            内存: {(record.memoryMb / 1024).toFixed(1)}GB
+          </Text>
+          <Text style={{ fontSize: '13px' }}>
+            <CloudServerOutlined style={{ color: '#1890ff', marginRight: 4 }} />
+            磁盘: {record.diskGb}GB
+          </Text>
+        </Space>
       )
     },
     {
@@ -242,40 +264,71 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
 
   return (
     <div className="vm-list">
+      {/* 页面标题 */}
+      <div className="vm-page-header">
+        <div className="vm-page-title">
+          <h2>虚拟机列表</h2>
+          <span className="vm-page-description">查看和管理所有可用的虚拟机节点</span>
+        </div>
+        <div className="vm-page-actions">
+          <Button 
+            type="primary"
+            icon={<ReloadOutlined />} 
+            onClick={() => fetchVMList()}
+            loading={vmListLoading}
+            size="large"
+          >
+            刷新数据
+          </Button>
+        </div>
+      </div>
+
       {/* 搜索和筛选 */}
-      <Card className="vm-list-filters" style={{ marginBottom: 16 }}>
-        <Space size="middle" wrap>
+      <Card 
+        className="vm-list-filters" 
+        style={{ 
+          marginBottom: 20,
+          marginLeft: 24,
+          marginRight: 24
+        }}
+      >
+        <Space size="middle" wrap style={{ width: '100%' }}>
           <Search
-            placeholder="搜索虚拟机名称或IP地址"
+            placeholder="🔍 搜索虚拟机名称或IP地址"
             allowClear
             onSearch={handleSearch}
-            style={{ width: 300 }}
+            style={{ 
+              width: 320,
+            }}
+            size="large"
           />
           
           <Select
             placeholder="筛选状态"
             allowClear
-            style={{ width: 120 }}
+            style={{ width: 140 }}
             value={statusFilter}
             onChange={handleStatusFilter}
+            size="large"
           >
-            <Option value="RUNNING">运行中</Option>
-            <Option value="STOPPED">已停止</Option>
-            <Option value="STARTING">启动中</Option>
-            <Option value="STOPPING">停止中</Option>
-            <Option value="ERROR">异常</Option>
-            <Option value="OFFLINE">离线</Option>
+            <Option value="RUNNING">🟢 运行中</Option>
+            <Option value="STOPPED">⚪ 已停止</Option>
+            <Option value="STARTING">🔵 启动中</Option>
+            <Option value="STOPPING">🟠 停止中</Option>
+            <Option value="ERROR">🔴 异常</Option>
+            <Option value="OFFLINE">⚫ 离线</Option>
           </Select>
           
           <Select
             placeholder="筛选操作系统"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: 160 }}
             value={osTypeFilter}
             onChange={handleOsTypeFilter}
+            size="large"
           >
             {osTypes.map(osType => (
-              <Option key={osType} value={osType}>{osType}</Option>
+              <Option key={osType} value={osType}>💻 {osType}</Option>
             ))}
           </Select>
           
@@ -283,6 +336,11 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
             icon={<ReloadOutlined />} 
             onClick={() => fetchVMList()}
             loading={vmListLoading}
+            size="large"
+            style={{
+              borderRadius: '8px',
+              fontWeight: 500
+            }}
           >
             刷新
           </Button>
@@ -290,25 +348,40 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       </Card>
 
       {/* 虚拟机列表表格 */}
-      <Table
-        columns={columns}
-        dataSource={vmList}
-        rowKey="vmId"
-        loading={vmListLoading}
-        pagination={{
-          current: pagination.page,
-          pageSize: pagination.size,
-          total: pagination.total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => 
-            `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
-          onChange: handleTableChange,
-          onShowSizeChange: handleTableChange
+      <Card 
+        style={{ 
+          borderRadius: '12px',
+          overflow: 'hidden',
+          marginLeft: 24,
+          marginRight: 24,
+          marginBottom: 24
         }}
-        scroll={{ x: 1200 }}
-        size="middle"
-      />
+        bodyStyle={{ padding: 0 }}
+      >
+        <Table
+          columns={columns}
+          dataSource={vmList}
+          rowKey="vmId"
+          loading={vmListLoading}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.size,
+            total: pagination.total,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => 
+              `📊 第 ${range[0]}-${range[1]} 条，共 ${total} 条记录`,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
+            pageSizeOptions: ['10', '20', '50', '100']
+          }}
+          scroll={{ x: 1200 }}
+          size="middle"
+          style={{
+            background: 'transparent'
+          }}
+        />
+      </Card>
     </div>
   )
 }

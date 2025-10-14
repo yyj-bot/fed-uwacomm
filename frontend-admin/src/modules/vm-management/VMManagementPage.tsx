@@ -18,6 +18,7 @@ import VMDetail from './components/VMDetail'
 import VMModels from './components/VMModels'
 import type { VirtualMachine } from '@/api/vm'
 import './VMManagementPage.css'
+import './vm-common.css'
 
 const VMManagementPage: React.FC = () => {
   const [selectedVM, setSelectedVM] = useState<VirtualMachine | null>(null)
@@ -90,8 +91,7 @@ const VMManagementPage: React.FC = () => {
 
   return (
     <div className="vm-management-page">
-      
-      <Card className="vm-content-card">
+      <Card className="vm-content-card" bodyStyle={{ padding: 0 }}>
         {/* 只保留虚拟机列表 */}
         <VMList 
           onSelectVM={handleSelectVM}

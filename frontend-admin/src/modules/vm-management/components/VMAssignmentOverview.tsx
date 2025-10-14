@@ -117,7 +117,14 @@ const VMAssignmentOverview: React.FC = () => {
       {/* 统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="总虚拟机数"
               value={summary.totalVms}
@@ -127,7 +134,14 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="已分配"
               value={summary.assignedVms}
@@ -137,7 +151,14 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="未分配"
               value={summary.unassignedVms}
@@ -147,7 +168,14 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="总用户数"
               value={summary.totalUsers}
@@ -156,7 +184,14 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="拥有VM的用户"
               value={summary.usersWithVms}
@@ -166,7 +201,14 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={4}>
-          <Card>
+          <Card 
+            bordered={true} 
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <Statistic
               title="分配率"
               value={summary.totalVms > 0 ? ((summary.assignedVms / summary.totalVms) * 100).toFixed(1) : 0}
@@ -180,7 +222,15 @@ const VMAssignmentOverview: React.FC = () => {
       <Row gutter={[16, 16]}>
         {/* 状态分布 */}
         <Col xs={24} lg={8}>
-          <Card title="虚拟机状态分布" bordered={false}>
+          <Card 
+            title="虚拟机状态分布" 
+            bordered={true}
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <List
               dataSource={Object.entries(statusDistribution)}
               renderItem={([status, count]) => (
@@ -197,7 +247,15 @@ const VMAssignmentOverview: React.FC = () => {
 
         {/* 热门虚拟机 */}
         <Col xs={24} lg={8}>
-          <Card title="热门虚拟机 (分配最多)" bordered={false}>
+          <Card 
+            title="热门虚拟机 (分配最多)" 
+            bordered={true}
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             {topAssignedVms && topAssignedVms.length > 0 ? (
               <Table
                 dataSource={topAssignedVms}
@@ -214,7 +272,15 @@ const VMAssignmentOverview: React.FC = () => {
 
         {/* 最近分配记录 */}
         <Col xs={24} lg={8}>
-          <Card title="最近分配记录" bordered={false}>
+          <Card 
+            title="最近分配记录" 
+            bordered={true}
+            style={{ 
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             {recentAssignments && recentAssignments.length > 0 ? (
               <List
                 dataSource={recentAssignments}

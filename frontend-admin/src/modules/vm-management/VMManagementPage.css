@@ -1,12 +1,88 @@
 /* VM管理页面样式 */
 .vm-management-page {
   padding: 24px;
-  background: #f0f2f5;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
   min-height: 100vh;
+}
+
+/* 页面标题区域 */
+.vm-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 12px 12px 0 0;
+  border-bottom: 2px solid #f0f0f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.vm-page-title h2 {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.vm-page-description {
+  color: #595959;
+  font-size: 14px;
+  margin-top: 8px;
+  display: block;
+  font-weight: 400;
+}
+
+.vm-page-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.vm-page-actions .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+  height: 40px;
+  padding: 0 24px;
+  font-weight: 600;
+}
+
+.vm-page-actions .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.vm-page-actions .ant-btn:not(.ant-btn-primary) {
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  transition: all 0.3s ease;
+  height: 40px;
+}
+
+.vm-page-actions .ant-btn:not(.ant-btn-primary):hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
 }
 
 .vm-header-card {
   margin-bottom: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.vm-header-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .vm-header {
@@ -16,10 +92,22 @@
 }
 
 .vm-header-left h2 {
-  margin: 0 0 16px 0;
-  color: #1890ff;
-  font-size: 24px;
-  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #1a1a1a;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.vm-header-description {
+  color: #595959;
+  font-size: 14px;
+  margin-top: 8px;
+  display: block;
+  font-weight: 400;
 }
 
 .vm-stats {
@@ -31,37 +119,46 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 16px;
+  padding: 12px 20px;
   border-radius: 8px;
-  background: #f8f9fa;
-  min-width: 80px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  min-width: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .stat-item.online {
-  background: #f6ffed;
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
   border: 1px solid #b7eb8f;
 }
 
 .stat-item.offline {
-  background: #fff2e8;
+  background: linear-gradient(135deg, #fff2e8 0%, #ffd591 100%);
   border: 1px solid #ffbb96;
 }
 
 .stat-item.error {
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
+  background: linear-gradient(135deg, #fff2f0 0%, #ffccc7 100%);
+  border: 1px solid #ffa39e;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 13px;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .stat-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1890ff;
+  font-size: 24px;
+  font-weight: 700;
+  color: #262626;
 }
 
 .stat-item.online .stat-value {
@@ -77,9 +174,279 @@
 }
 
 .vm-content-card {
-  background: white;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.vm-content-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* 虚拟机列表容器 */
+.vm-list {
+  padding: 0;
+}
+
+/* 虚拟机列表表格样式 */
+.vm-list .ant-table {
+  background: #ffffff !important;
+}
+
+.vm-list .ant-table-container {
+  background: #ffffff !important;
+}
+
+.vm-list .ant-table-content {
+  background: #ffffff !important;
+}
+
+.vm-list .ant-table-tbody > tr {
+  background: #ffffff !important;
+}
+
+.vm-list .ant-table-tbody > tr:hover {
+  background: linear-gradient(90deg, #f0f7ff 0%, #e6f4ff 50%, #f0f7ff 100%) !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+}
+
+.vm-list .ant-table-tbody > tr:hover > td {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.vm-list .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+  background: transparent;
+}
+
+/* 固定列样式 - 确保固定列有正确的背景 */
+.vm-list .ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.vm-list .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  background: #ffffff !important;
+}
+
+.vm-list .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.vm-list .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #e6f4ff !important;
+}
+
+/* 固定列的阴影效果 */
+.vm-list .ant-table-cell-fix-left {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.vm-list .ant-table-cell-fix-right {
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 虚拟机名称按钮样式 - 去除边框 */
+.vm-list .ant-table-tbody .ant-btn-link {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0;
+  height: auto;
+}
+
+.vm-list .ant-table-tbody .ant-btn-link:hover,
+.vm-list .ant-table-tbody .ant-btn-link:focus {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 搜索筛选区域 */
+.vm-content-card .vm-list-filters {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.vm-content-card .vm-list-filters .ant-card-body {
+  padding: 20px;
+}
+
+.vm-list .vm-list-filters {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* 表格样式 */
+.vm-content-card .ant-table {
+  background: #ffffff !important;
+}
+
+.vm-content-card .ant-table-container {
+  background: #ffffff !important;
+}
+
+.vm-content-card .ant-table-content {
+  background: #ffffff !important;
+}
+
+.vm-content-card .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
+  padding: 16px;
+  font-size: 14px;
+}
+
+.vm-content-card .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.vm-content-card .ant-table-tbody > tr {
+  background: #ffffff !important;
+}
+
+.vm-content-card .ant-table-tbody > tr:hover {
+  background: linear-gradient(90deg, #f0f7ff 0%, #e6f4ff 50%, #f0f7ff 100%) !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+}
+
+.vm-content-card .ant-table-tbody > tr:hover > td {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+}
+
+.vm-content-card .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+  background: transparent;
+}
+
+/* 固定列样式 - 确保固定列有正确的背景 */
+.vm-content-card .ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.vm-content-card .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  background: #ffffff !important;
+}
+
+.vm-content-card .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.vm-content-card .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #e6f4ff !important;
+}
+
+/* 固定列的阴影效果 */
+.vm-content-card .ant-table-cell-fix-left {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.vm-content-card .ant-table-cell-fix-right {
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 虚拟机名称按钮样式 - 去除边框 */
+.vm-content-card .ant-table-tbody .ant-btn-link {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0;
+  height: auto;
+}
+
+.vm-content-card .ant-table-tbody .ant-btn-link:hover,
+.vm-content-card .ant-table-tbody .ant-btn-link:focus {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 按钮样式 */
+.vm-content-card .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.vm-content-card .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.vm-content-card .ant-btn:not(.ant-btn-primary) {
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.vm-content-card .ant-btn:not(.ant-btn-primary):hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.vm-content-card .ant-btn-text:hover {
+  background: rgba(24, 144, 255, 0.08);
+  transform: scale(1.1);
+}
+
+.vm-content-card .ant-btn-link {
+  font-weight: 600;
+  color: #1890ff;
+  transition: all 0.3s ease;
+}
+
+.vm-content-card .ant-btn-link:hover {
+  color: #096dd9;
+  transform: translateX(4px);
+}
+
+/* 输入框和选择器样式 */
+.vm-content-card .ant-input,
+.vm-content-card .ant-select-selector {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff !important;
+  transition: all 0.3s ease;
+}
+
+.vm-content-card .ant-input:hover,
+.vm-content-card .ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.vm-content-card .ant-select-selector {
+  border-radius: 8px !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+.vm-content-card .ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+/* 标签样式 */
+.vm-content-card .ant-tag {
+  margin: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.vm-content-card .ant-badge-status-dot {
+  width: 8px;
+  height: 8px;
 }
 
 .vm-tabs .ant-tabs-nav {
@@ -89,28 +456,84 @@
 .vm-tabs .ant-tabs-tab {
   padding: 12px 24px;
   font-size: 14px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.vm-tabs .ant-tabs-tab:hover {
+  background: rgba(24, 144, 255, 0.08);
 }
 
 .vm-tabs .ant-tabs-tab-active {
-  background: #e6f7ff;
-  border-radius: 6px 6px 0 0;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  color: #fff;
+  border-radius: 8px;
+}
+
+.vm-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #fff;
 }
 
 .error-state {
   text-align: center;
   padding: 60px 20px;
+  background: #fff2f0;
+  border-radius: 12px;
+  border: 2px dashed #ffccc7;
 }
 
 .error-state p {
   color: #ff4d4f;
   font-size: 16px;
   margin-bottom: 16px;
+  font-weight: 500;
+}
+
+/* 分页器样式 */
+.vm-content-card .ant-pagination {
+  margin-top: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 8px;
+}
+
+.vm-content-card .ant-pagination-item {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.vm-content-card .ant-pagination-item:hover {
+  border-color: #1890ff;
+  transform: translateY(-2px);
+}
+
+.vm-content-card .ant-pagination-item-active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border-color: #1890ff;
+  font-weight: 600;
+}
+
+.vm-content-card .ant-pagination-item-active a {
+  color: #ffffff;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .vm-management-page {
     padding: 16px;
+  }
+  
+  .vm-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  .vm-page-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
   
   .vm-header {
@@ -122,17 +545,75 @@
   .vm-stats {
     flex-wrap: wrap;
     gap: 12px;
+    width: 100%;
   }
   
   .stat-item {
-    min-width: 60px;
-    padding: 6px 12px;
+    min-width: calc(50% - 6px);
+    padding: 10px 16px;
   }
   
   .vm-tabs .ant-tabs-tab {
     padding: 8px 16px;
     font-size: 12px;
   }
+
+  .vm-content-card {
+    border-radius: 12px;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vm-page-header {
+  animation: fadeInDown 0.4s ease-out;
+}
+
+.vm-content-card {
+  animation: fadeInUp 0.5s ease-out 0.1s both;
+}
+
+/* 加载状态样式 */
+.vm-content-card .ant-spin-dot-item {
+  background-color: #1890ff;
+}
+
+/* 空状态样式 */
+.vm-content-card .ant-empty-description {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* Drawer 样式优化 */
+.ant-drawer-header {
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.ant-drawer-title {
+  color: #1a1a1a;
+  font-weight: 600;
 }
 
 

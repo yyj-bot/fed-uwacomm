@@ -32,6 +32,7 @@ import {
 import { AdminVMList, UnassignedVMList } from './components'
 
 import './VMManagementPage.css'
+import './vm-common.css'
 
 const { TabPane } = Tabs
 

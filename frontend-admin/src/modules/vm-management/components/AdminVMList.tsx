@@ -44,6 +44,7 @@ import {
 import { vmService } from '@/services/vm/vmService'
 
 import type { ColumnsType } from 'antd/es/table'
+import './AdminVMList.css'
 
 const { Option } = Select
 
@@ -287,15 +288,20 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               <Tooltip title="启动虚拟机">
                 <Popconfirm
                   title="确认启动虚拟机？"
+                  description="虚拟机将开始运行"
                   onConfirm={() => handleStartVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
                 >
                   <Button
-                    type="link"
                     size="small"
                     icon={<PlayCircleOutlined />}
                     loading={isLoading}
+                    style={{
+                      color: '#52c41a',
+                      borderColor: '#b7eb8f',
+                      backgroundColor: '#f6ffed'
+                    }}
                   >
                     启动
                   </Button>
@@ -307,17 +313,21 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               <Tooltip title="停止虚拟机">
                 <Popconfirm
                   title="确认停止虚拟机？"
+                  description="虚拟机将被安全停止"
                   onConfirm={() => handleStopVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
                 >
                   <Button
-                    type="link"
                     size="small"
                     icon={<PoweroffOutlined />}
                     loading={isLoading}
                     disabled={!isConnected}
-                    danger
+                    style={{
+                      color: '#fa8c16',
+                      borderColor: '#ffd591',
+                      backgroundColor: '#fff7e6'
+                    }}
                   >
                     停止
                   </Button>
@@ -329,16 +339,21 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               <Tooltip title="重启虚拟机">
                 <Popconfirm
                   title="确认重启虚拟机？"
+                  description="虚拟机将重新启动"
                   onConfirm={() => handleRestartVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
                 >
                   <Button
-                    type="link"
                     size="small"
                     icon={<ReloadOutlined />}
                     loading={isLoading}
                     disabled={!isConnected}
+                    style={{
+                      color: '#1890ff',
+                      borderColor: '#91d5ff',
+                      backgroundColor: '#e6f7ff'
+                    }}
                   >
                     重启
                   </Button>
@@ -379,25 +394,28 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               </Button>
             </Tooltip>
 
-                  <Tooltip title="删除虚拟机">
-                    <Popconfirm
-                      title={`确认删除虚拟机 "${record.name}"？`}
-                      description="此操作不可恢复！请确认删除。"
-                      onConfirm={() => handleDeleteVM(record.vmId, record.name)}
-                      okText="确认删除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                    >
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        danger
-                      >
-                        删除
-                      </Button>
-                    </Popconfirm>
-                  </Tooltip>
+            <Tooltip title="删除虚拟机">
+              <Popconfirm
+                title={`确认删除虚拟机 "${record.name}"？`}
+                description="此操作不可恢复！请确认删除。"
+                onConfirm={() => handleDeleteVM(record.vmId, record.name)}
+                okText="确认删除"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+              >
+                <Button
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  style={{
+                    color: '#ff4d4f',
+                    borderColor: '#ffccc7',
+                    backgroundColor: '#fff2f0'
+                  }}
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            </Tooltip>
           </Space>
         )
       }

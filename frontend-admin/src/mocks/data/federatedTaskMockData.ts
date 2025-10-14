@@ -153,7 +153,7 @@ const taskDetailsExtensions: Record<string, any> = {
         }
       },
       {
-        vmId: 'c3d4e5f67890123456789012345678901',
+        vmId: 'c3d4e5f678901234567890123456789a',
         role: 'PARTICIPANT',
         status: 'COMPLETED',
         lastHeartbeat: generateTimestamp(0, -3),
@@ -219,7 +219,7 @@ const taskDetailsExtensions: Record<string, any> = {
         }
       },
       {
-        vmId: 'c3d4e5f67890123456789012345678901',
+        vmId: 'c3d4e5f678901234567890123456789a',
         role: 'PARTICIPANT',
         status: 'PAUSED',
         lastHeartbeat: generateTimestamp(0, -2),
@@ -352,7 +352,7 @@ const taskDetailsExtensions: Record<string, any> = {
         }
       },
       {
-        vmId: 'c3d4e5f67890123456789012345678901',
+        vmId: 'c3d4e5f678901234567890123456789a',
         role: 'PARTICIPANT',
         status: 'READY',
         lastHeartbeat: generateTimestamp(0, -1),
@@ -610,19 +610,19 @@ export const mockTaskResults = [
         round: 1,
         accuracy: 0.720,
         loss: 0.280,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
       },
       {
         round: 6,
         accuracy: 0.845,
         loss: 0.155,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
       },
       {
         round: 12,
         accuracy: 0.892,
         loss: 0.092,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
       }
     ],
     participantResults: [
@@ -653,7 +653,7 @@ export const mockTaskResults = [
         }
       },
       {
-        vmId: 'c3d4e5f67890123456789012345678901',
+        vmId: 'c3d4e5f678901234567890123456789a',
         finalAccuracy: 0.885,
         finalLoss: 0.098,
         trainingTime: 9000,
@@ -689,19 +689,19 @@ export const mockTaskResults = [
         round: 1,
         accuracy: 0.680,
         loss: 0.420,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901', 'd4e5f678901234567890123456789012']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f678901234567890123456789012']
       },
       {
         round: 2,
         accuracy: 0.735,
         loss: 0.385,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901', 'd4e5f678901234567890123456789012']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f678901234567890123456789012']
       },
       {
         round: 3,
         accuracy: 0.763,
         loss: 0.360,
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901', 'd4e5f678901234567890123456789012']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f678901234567890123456789012']
       }
     ],
     participantResults: [
@@ -732,7 +732,7 @@ export const mockTaskResults = [
         }
       },
       {
-        vmId: 'c3d4e5f67890123456789012345678901',
+        vmId: 'c3d4e5f678901234567890123456789a',
         finalAccuracy: 0.756,
         finalLoss: 0.367,
         trainingTime: 3600,
@@ -823,7 +823,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       message: '声学传播回归分析任务启动成功',
       source: 'TASK_MANAGER',
       details: {
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
       }
     },
     {
@@ -866,7 +866,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       message: '水下异常检测任务启动成功',
       source: 'TASK_MANAGER',
       details: {
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901', 'd4e5f678901234567890123456789012']
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f678901234567890123456789012']
       }
     },
     {
@@ -919,7 +919,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       message: '任务配置完成，等待启动',
       source: 'TASK_MANAGER',
       details: {
-        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f67890123456789012345678901', 'd4e5f678901234567890123456789012', 'e5f67890123456789012345678901234'],
+        participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f678901234567890123456789012', 'e5f67890123456789012345678901234'],
         totalRounds: 20
       }
     }
@@ -948,7 +948,7 @@ export const mockAvailableVMs = baseVmList.map(vm => {
       currentUsage: { cpuUsage: 32.1, memoryUsage: 48.5, networkUsage: 8.7 },
       reliability: { uptime: 97.8, avgResponseTime: 180, taskSuccessRate: 0.95 }
     },
-    'c3d4e5f67890123456789012345678901': {
+    'c3d4e5f678901234567890123456789a': {
       gpuCount: 0,
       gpuMemoryMb: 0,
       capabilities: ['TRAINING'],
@@ -958,7 +958,7 @@ export const mockAvailableVMs = baseVmList.map(vm => {
     }
   }
   
-  const config = taskConfigs[vm.vmId] || taskConfigs['c3d4e5f67890123456789012345678901']
+  const config = taskConfigs[vm.vmId] || taskConfigs['c3d4e5f678901234567890123456789a']
   
   return {
     vmId: vm.vmId,

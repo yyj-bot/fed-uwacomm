@@ -356,41 +356,49 @@ const TaskDetailPage: React.FC = () => {
   return (
     <div className="task-detail-page">
       {/* 页面头部 */}
-      <Card className="page-header">
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Space>
-              <Button 
-                icon={<ArrowLeftOutlined />} 
-                onClick={() => navigate('/federated-learning/tasks')}
-              >
-                返回
-              </Button>
-              <div>
-                <h2 style={{ margin: 0 }}>{currentTask.taskName}</h2>
-                <Space style={{ marginTop: 4 }}>
-                  {statusConfig?.icon}
-                  <Tag color={statusConfig?.color}>{statusConfig?.text}</Tag>
-                  <span className="task-id">ID: {currentTask.taskId}</span>
-                </Space>
+      <Card className="header-card" bordered={false}>
+        <div className="page-header">
+          <div className="header-left">
+            <Button 
+              icon={<ArrowLeftOutlined />} 
+              onClick={() => navigate('/federated-learning/tasks')}
+              size="large"
+              style={{ marginRight: 16 }}
+            >
+              返回
+            </Button>
+            <div className="task-title">
+              <h2>{currentTask.taskName}</h2>
+              <div className="task-meta">
+                {statusConfig?.icon}
+                <Tag color={statusConfig?.color} style={{ 
+                  padding: '4px 12px', 
+                  borderRadius: '6px',
+                  fontWeight: 500 
+                }}>
+                  {statusConfig?.text}
+                </Tag>
+                <span className="task-id">ID: {currentTask.taskId}</span>
               </div>
-            </Space>
-          </Col>
-          <Col>
-            <Space>
-              <Tooltip title="自动刷新">
+            </div>
+          </div>
+          <div className="header-actions">
+            <Space size="middle">
+              <Tooltip title="启用后每10秒自动刷新">
                 <Button
                   type={autoRefresh ? 'primary' : 'default'}
-                  icon={<ReloadOutlined />}
+                  icon={<ReloadOutlined spin={autoRefresh} />}
                   onClick={() => setAutoRefresh(!autoRefresh)}
+                  size="large"
                 >
-                  {autoRefresh ? '停止刷新' : '自动刷新'}
+                  自动刷新
                 </Button>
               </Tooltip>
               <Button
                 icon={<ReloadOutlined />}
                 onClick={handleRefresh}
                 loading={currentTaskLoading}
+                size="large"
               >
                 刷新
               </Button>
@@ -400,6 +408,11 @@ const TaskDetailPage: React.FC = () => {
                   icon={<PlayCircleOutlined />}
                   onClick={handleStartTask}
                   loading={isOperating}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+                    border: 'none'
+                  }}
                 >
                   启动任务
                 </Button>
@@ -409,6 +422,12 @@ const TaskDetailPage: React.FC = () => {
                   icon={<PauseCircleOutlined />}
                   onClick={handlePauseTask}
                   loading={isOperating}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
+                    border: 'none',
+                    color: 'white'
+                  }}
                 >
                   暂停任务
                 </Button>
@@ -419,48 +438,85 @@ const TaskDetailPage: React.FC = () => {
                   icon={<PlayCircleOutlined />}
                   onClick={handleResumeTask}
                   loading={isOperating}
+                  size="large"
                 >
                   恢复任务
                 </Button>
               )}
               {canStopTask && canStopTask(currentTask) && (
                 <Button
-                  danger
                   icon={<StopOutlined />}
                   onClick={handleStopTask}
                   loading={isOperating}
+                  size="large"
+                  style={{
+                    background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+                    border: 'none',
+                    color: 'white'
+                  }}
                 >
                   停止任务
                 </Button>
               )}
             </Space>
-          </Col>
-        </Row>
+          </div>
+        </div>
       </Card>
 
       {/* 主要内容 */}
-      <Card>
+      <Card bordered={false} style={{ 
+        background: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)'
+      }}>
         <Tabs activeKey={activeTab} onChange={setActiveTab} size="large">
           {/* 概览 */}
           <TabPane tab="概览" key="overview">
             <Row gutter={[24, 24]}>
               {/* 基本信息 */}
               <Col xs={24} lg={16}>
-                <Card title="基本信息" size="small">
-                  <Descriptions column={2} size="small">
-                    <Descriptions.Item label="任务名称">{currentTask.taskName}</Descriptions.Item>
-                    <Descriptions.Item label="任务ID">{currentTask.taskId}</Descriptions.Item>
-                    <Descriptions.Item label="创建时间">
+                <Card 
+                  title={<span style={{ fontSize: '16px', fontWeight: 600 }}>基本信息</span>}
+                  bordered={false}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                  }}
+                  headStyle={{
+                    borderBottom: '2px solid #f0f0f0',
+                    background: 'transparent'
+                  }}
+                >
+                  <Descriptions column={2} size="middle" bordered>
+                    <Descriptions.Item label="任务名称" labelStyle={{ fontWeight: 600 }}>
+                      {currentTask.taskName}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="任务ID" labelStyle={{ fontWeight: 600 }}>
+                      <code style={{ 
+                        background: '#f5f5f5', 
+                        padding: '2px 8px', 
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}>
+                        {currentTask.taskId}
+                      </code>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="创建时间" labelStyle={{ fontWeight: 600 }}>
                       {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
-                    <Descriptions.Item label="更新时间">
+                    <Descriptions.Item label="更新时间" labelStyle={{ fontWeight: 600 }}>
                       {new Date(currentTask.createdAt).toLocaleString('zh-CN')}
                     </Descriptions.Item>
-                    <Descriptions.Item label="算法">
-                      {currentTask.algorithm}
+                    <Descriptions.Item label="算法" labelStyle={{ fontWeight: 600 }}>
+                      <Tag color="blue" style={{ borderRadius: '6px' }}>
+                        {currentTask.algorithm}
+                      </Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="参与者数量">
-                      {currentTask.participantCount || 0}个
+                    <Descriptions.Item label="参与者数量" labelStyle={{ fontWeight: 600 }}>
+                      <Tag color="geekblue" style={{ borderRadius: '6px', fontSize: '14px' }}>
+                        {currentTask.participantCount || 0}个
+                      </Tag>
                     </Descriptions.Item>
                   </Descriptions>
                 </Card>
@@ -468,30 +524,82 @@ const TaskDetailPage: React.FC = () => {
 
               {/* 进度统计 */}
               <Col xs={24} lg={8}>
-                <Card title="进度统计" size="small">
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                <Card 
+                  title={<span style={{ fontSize: '16px', fontWeight: 600 }}>进度统计</span>}
+                  bordered={false}
+                  style={{ 
+                    background: 'linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%)',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)'
+                  }}
+                  headStyle={{
+                    borderBottom: '2px solid #91d5ff',
+                    background: 'transparent'
+                  }}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }} size="large">
                     <div>
-                      <div style={{ marginBottom: 8 }}>整体进度</div>
+                      <div style={{ 
+                        marginBottom: 12, 
+                        fontSize: '14px', 
+                        color: '#595959',
+                        fontWeight: 500 
+                      }}>
+                        整体进度
+                      </div>
                       <Progress 
                         percent={progress.overallProgress || 0}
-                        strokeColor="#52c41a"
+                        strokeColor={{
+                          '0%': '#1890ff',
+                          '100%': '#52c41a'
+                        }}
+                        strokeWidth={12}
                         trailColor="#f0f0f0"
+                        format={(percent) => (
+                          <span style={{ fontSize: '16px', fontWeight: 600, color: '#1890ff' }}>
+                            {percent}%
+                          </span>
+                        )}
                       />
                     </div>
                     <Row gutter={16}>
                       <Col span={12}>
-                        <Statistic 
-                          title="当前轮次" 
-                          value={progress.currentRound || 0}
-                          suffix={`/ ${progress.totalRounds || 0}`}
-                        />
+                        <div style={{ 
+                          background: '#ffffff', 
+                          padding: '16px', 
+                          borderRadius: '8px',
+                          border: '1px solid #f0f0f0',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ color: '#8c8c8c', fontSize: '12px', marginBottom: 8 }}>
+                            当前轮次
+                          </div>
+                          <div style={{ fontSize: '24px', fontWeight: 600, color: '#1890ff' }}>
+                            {progress.currentRound || 0}
+                          </div>
+                          <div style={{ color: '#8c8c8c', fontSize: '12px', marginTop: 4 }}>
+                            / {progress.totalRounds || 0}
+                          </div>
+                        </div>
                       </Col>
                       <Col span={12}>
-                        <Statistic 
-                          title="参与节点" 
-                          value={currentTask.participantCount || 0}
-                          suffix="个"
-                        />
+                        <div style={{ 
+                          background: '#ffffff', 
+                          padding: '16px', 
+                          borderRadius: '8px',
+                          border: '1px solid #f0f0f0',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{ color: '#8c8c8c', fontSize: '12px', marginBottom: 8 }}>
+                            参与节点
+                          </div>
+                          <div style={{ fontSize: '24px', fontWeight: 600, color: '#52c41a' }}>
+                            {currentTask.participantCount || 0}
+                          </div>
+                          <div style={{ color: '#8c8c8c', fontSize: '12px', marginTop: 4 }}>
+                            个
+                          </div>
+                        </div>
                       </Col>
                     </Row>
                   </Space>

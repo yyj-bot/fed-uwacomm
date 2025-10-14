@@ -113,23 +113,25 @@ const DashboardPage: React.FC = () => {
       />
 
       {/* 主要内容区域 */}
-      <Row gutter={[24, 24]} className={styles['fed-dashboard-content']}>
+      <div className={styles['fed-dashboard-content']} style={{ display: 'flex', gap: '16px', alignItems: 'stretch', flexWrap: 'wrap' }}>
         {/* 左侧列 - 监控面板 */}
-        <Col xs={24} xl={16}>
+        <div style={{ flex: '1 1 calc(66.666% - 8px)', minWidth: '600px', display: 'flex', flexDirection: 'column' }}>
           {/* 系统状态监控 */}
           <SystemStatus />
 
           {/* 资源状态 */}
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
+          <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 calc(50% - 8px)', minWidth: '300px' }}>
               {/* 运行中的虚拟机 */}
               <Card 
                 title="运行中的虚拟机" 
                 size="small"
-                className={styles['fed-dashboard-card']}
+                className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
                 extra={<Text type="secondary">{runningVMs}/{totalVMs}</Text>}
-                style={{ height: '100%', minHeight: '320px' }}
-                bodyStyle={{ height: 'calc(100% - 57px)', overflowY: 'auto' }}
+                style={{ height: '100%', minHeight: '320px', background: 'white', marginBottom: 0 }}
+                styles={{ 
+                  body: { height: 'calc(100% - 57px)', overflowY: 'auto', background: 'white' }
+                }}
               >
                 {vms?.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
@@ -167,17 +169,19 @@ const DashboardPage: React.FC = () => {
                   />
                 )}
               </Card>
-            </Col>
+            </div>
 
-            <Col xs={24} lg={12}>
+            <div style={{ flex: '1 1 calc(50% - 8px)', minWidth: '300px' }}>
               {/* 活跃任务 */}
               <Card 
                 title="活跃任务" 
                 size="small"
-                className={styles['fed-dashboard-card']}
+                className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
                 extra={<Text type="secondary">{activeTasks?.length || 0}</Text>}
-                style={{ height: '100%', minHeight: '320px' }}
-                bodyStyle={{ height: 'calc(100% - 57px)', overflowY: 'auto' }}
+                style={{ height: '100%', minHeight: '320px', background: 'white', marginBottom: 0 }}
+                styles={{ 
+                  body: { height: 'calc(100% - 57px)', overflowY: 'auto', background: 'white' }
+                }}
               >
                 {activeTasks?.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
@@ -217,22 +221,26 @@ const DashboardPage: React.FC = () => {
                   />
                 )}
               </Card>
-            </Col>
-          </Row>
+            </div>
+          </div>
           
           {/* 任务进度监控 */}
-          <TaskProgress tasks={tasks} />
-        </Col>
+          <div style={{ marginTop: '24px' }}>
+            <TaskProgress tasks={tasks} />
+          </div>
+        </div>
 
         {/* 右侧列 - 信息面板 */}
-        <Col xs={24} xl={8}>
+        <div style={{ flex: '1 1 calc(33.333% - 8px)', minWidth: '320px', display: 'flex', flexDirection: 'column' }}>
           {/* 最近活动 */}
-          <RecentActivities 
-            activities={recentActivities}
-            loading={overviewLoading}
-          />
-        </Col>
-      </Row>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <RecentActivities 
+              activities={recentActivities}
+              loading={overviewLoading}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

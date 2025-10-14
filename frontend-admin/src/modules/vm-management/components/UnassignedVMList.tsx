@@ -117,8 +117,9 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
             <Button
               type="primary"
               size="small"
-              icon={<TeamOutlined />}
+              icon={<TeamOutlined style={{ color: '#ffffff' }} />}
               onClick={() => onViewAssignment(record)}
+              style={{ color: '#ffffff' }}
             >
               分配
             </Button>

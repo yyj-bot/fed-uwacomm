@@ -32,6 +32,7 @@ import {
   Spin,
   Checkbox
 } from 'antd'
+import './InitialModelPage.css'
 import {
   PlusOutlined,
   UploadOutlined,
@@ -261,34 +262,48 @@ const InitialModelPage: React.FC = () => {
       title: '任务ID',
       dataIndex: 'taskId',
       key: 'taskId',
-      width: 200,
-      ellipsis: true
+      width: 160,
+      ellipsis: {
+        showTitle: true
+      },
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span>{text}</span>
+        </Tooltip>
+      )
     },
     {
       title: '模型ID',
       dataIndex: 'modelId',
       key: 'modelId',
-      width: 200,
+      width: 140,
       ellipsis: true
     },
     {
       title: '模型类型',
       dataIndex: 'modelType',
       key: 'modelType',
-      width: 120
+      width: 140,
+      render: (type: string) => {
+        const typeMap: Record<string, string> = {
+          'RANDOM_FOREST': '随机森林',
+          'NEURAL_NETWORK': '神经网络'
+        }
+        return typeMap[type] || type
+      }
     },
     {
-      title: '模型大小',
+      title: '大小',
       dataIndex: 'modelSize',
       key: 'modelSize',
-      width: 120,
-      render: (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`
+      width: 90,
+      render: (size: number) => `${(size / 1024 / 1024).toFixed(2)}MB`
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 110,
       render: (status: string) => (
         <Tag color={getStatusColor(status)}>{status}</Tag>
       )
@@ -296,88 +311,121 @@ const InitialModelPage: React.FC = () => {
     {
       title: '分发状态',
       key: 'distribution',
-      width: 150,
-      render: (_, record) => (
-        <Space direction="vertical" size="small">
-          <div>总VM: {record.distributionStatus?.totalVms || 0}</div>
-          <div>已分发: {record.distributionStatus?.distributedVms || 0}</div>
-          <div>失败: {record.distributionStatus?.failedVms || 0}</div>
-        </Space>
-      )
+      width: 100,
+      render: (_, record) => {
+        const total = record.distributionStatus?.totalVms || 0
+        const distributed = record.distributionStatus?.distributedVms || 0
+        const failed = record.distributionStatus?.failedVms || 0
+        return (
+          <Tooltip title={`总VM: ${total} | 已分发: ${distributed} | 失败: ${failed}`}>
+            <div style={{ fontSize: '12px', textAlign: 'center' }}>
+              <div>{distributed}/{total}</div>
+              {failed > 0 && <div style={{ color: '#ff4d4f' }}>失败:{failed}</div>}
+            </div>
+          </Tooltip>
+        )
+      }
     },
     {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 180,
-      render: (time: string) => new Date(time).toLocaleString()
+      width: 135,
+      render: (time: string) => {
+        const date = new Date(time)
+        return (
+          <div style={{ fontSize: '12px' }}>
+            <div>{date.toLocaleDateString('zh-CN')}</div>
+            <div style={{ color: '#999' }}>{date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        )
+      }
     },
     {
       title: '操作',
       key: 'action',
-      fixed: 'right',
-      width: 250,
+      width: 280,
       render: (_, record) => (
-        <Space size="small" wrap>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'nowrap' }}>
           <Button
-            type="link"
             size="small"
             icon={<FileTextOutlined />}
             onClick={() => handleViewDetail(record.taskId)}
+            style={{
+              border: '1px solid #d9d9d9',
+              borderRadius: '4px'
+            }}
           >
             详情
           </Button>
           <Tooltip title={getDistributeTooltip(record.taskId)}>
             <Button
-              type="link"
               size="small"
               icon={<SendOutlined />}
               disabled={!canDistributeInitialModel(record.taskId)}
               onClick={() => handleOpenDistribute(record.taskId)}
+              style={{
+                border: '1px solid #d9d9d9',
+                borderRadius: '4px'
+              }}
             >
               分发
             </Button>
           </Tooltip>
           <Button
-            type="link"
             size="small"
             icon={<DownloadOutlined />}
             onClick={() => handleDownload(record.taskId)}
+            style={{
+              border: '1px solid #d9d9d9',
+              borderRadius: '4px'
+            }}
           >
             下载
           </Button>
-          <Tooltip 
+          <Popconfirm
             title={
-              !canDeleteInitialModel(record.taskId) 
-                ? '模型正在分发中，请稍后再试'
-                : (['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status) 
-                    ? '该模型已分发，删除时将强制执行' 
-                    : '删除此初始模型')
+              ['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status)
+                ? "该模型已分发，删除可能影响联邦学习任务，确定要删除吗？"
+                : "确定要删除此初始模型吗？"
             }
-          >
-            <Popconfirm
-              title={
-                ['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status)
-                  ? "该模型已分发，删除可能影响联邦学习任务，确定要删除吗？"
-                  : "确定要删除此初始模型吗？"
+            onConfirm={() => handleDelete(record.taskId)}
+            okText="确定"
+            cancelText="取消"
+            disabled={!canDeleteInitialModel(record.taskId)}
+            okButtonProps={{ 
+              danger: true,
+              style: { 
+                color: '#fff',
+                backgroundColor: '#ff4d4f',
+                borderColor: '#ff4d4f'
               }
-              onConfirm={() => handleDelete(record.taskId)}
-              okText="确定"
-              cancelText="取消"
-              disabled={!canDeleteInitialModel(record.taskId)}
+            }}
+          >
+            <Tooltip 
+              title={
+                !canDeleteInitialModel(record.taskId) 
+                  ? '模型正在分发中，请稍后再试'
+                  : (['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status) 
+                      ? '该模型已分发，删除时将强制执行' 
+                      : '删除此初始模型')
+              }
             >
               <Button
-                type="link"
                 size="small"
-                danger
                 icon={<DeleteOutlined />}
                 disabled={!canDeleteInitialModel(record.taskId)}
+                style={{
+                  border: '1px solid #d9d9d9',
+                  borderRadius: '4px',
+                  color: '#ff4d4f'
+                }}
               >
                 删除
               </Button>
-            </Popconfirm>
-          </Tooltip>
-        </Space>
+            </Tooltip>
+          </Popconfirm>
+        </div>
       )
     }
   ]
@@ -626,9 +674,20 @@ const InitialModelPage: React.FC = () => {
   const currentDistribution = selectedDistributionId ? getDistributionStatus(selectedDistributionId) : null
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div 
+      className="initial-model-page"
+      style={{ 
+        padding: '24px',
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%)',
+        minHeight: '100vh'
+      }}
+    >
       <Card
-        title="初始模型管理"
+        title={
+          <span style={{ fontSize: '20px', fontWeight: 600, color: '#1a1a1a' }}>
+            🎯 初始模型管理
+          </span>
+        }
         extra={
           <Space>
             <Button
@@ -642,6 +701,13 @@ const InitialModelPage: React.FC = () => {
                 }
               }}
               loading={generationLoading}
+              style={{
+                background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(24, 144, 255, 0.3)',
+                color: '#ffffff'
+              }}
             >
               生成初始模型
             </Button>
@@ -655,27 +721,49 @@ const InitialModelPage: React.FC = () => {
                 }
               }}
               loading={initialUploadLoading}
+              style={{
+                borderRadius: '8px',
+                borderColor: '#1890ff',
+                color: '#1890ff',
+                background: '#ffffff'
+              }}
             >
               上传自定义模型
             </Button>
           </Space>
         }
+        style={{
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          background: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.04)'
+        }}
+        headStyle={{
+          borderBottom: '2px solid #f0f0f0',
+          background: 'linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%)'
+        }}
       >
         {/* 筛选区域 */}
-        <Card size="small" style={{ marginBottom: 16 }}>
-          <Alert
-            message="使用说明"
-            description="初始模型管理会自动遍历所有联邦学习任务并显示相应的初始模型。你可以使用搜索框快速查找特定任务的模型，或点击刷新按钮更新列表。"
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
+        <Card 
+          size="small" 
+          style={{ 
+            marginBottom: 16,
+            borderRadius: '10px',
+            border: '1px solid #e8e8e8',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+          }}
+        >
           <Space wrap>
             <Input
               placeholder="搜索任务ID或模型ID"
               value={queryTaskId}
               onChange={(e) => setQueryTaskId(e.target.value)}
-              style={{ width: 300 }}
+              style={{ 
+                width: 300,
+                borderRadius: '8px',
+                background: '#ffffff'
+              }}
               prefix={<SearchOutlined />}
               allowClear
             />
@@ -683,13 +771,28 @@ const InitialModelPage: React.FC = () => {
               icon={<ReloadOutlined />}
               onClick={loadAllInitialModels}
               loading={Object.values(initialModelLoading).some(Boolean)}
+              style={{
+                borderRadius: '8px',
+                borderColor: '#1890ff',
+                color: '#1890ff',
+                background: '#ffffff'
+              }}
             >
               刷新模型列表
             </Button>
           </Space>
           {federatedTasks.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: '12px', color: '#666' }}>
-              💡 当前系统中有 <strong>{federatedTasks.length}</strong> 个联邦学习任务可供选择
+            <div style={{ 
+              marginTop: 12, 
+              fontSize: '13px', 
+              color: '#595959',
+              background: '#ffffff',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              display: 'inline-block',
+              border: '1px solid #e8e8e8'
+            }}>
+              💡 当前系统中有 <strong style={{ color: '#1890ff' }}>{federatedTasks.length}</strong> 个联邦学习任务可供选择
             </div>
           )}
         </Card>
@@ -698,17 +801,18 @@ const InitialModelPage: React.FC = () => {
           columns={modelColumns}
           dataSource={modelListData}
           loading={Object.values(initialModelLoading).some(Boolean)}
-          scroll={{ x: 1400 }}
           pagination={{
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`,
-            pageSize: 10
+            pageSize: 10,
+            showQuickJumper: true
           }}
           locale={{
             emptyText: queryTaskId ? 
-              '搜索无结果，请尝试其他关键词' : 
-              '暂无初始模型数据，请先创建联邦学习任务并生成或上传初始模型'
+              '🔍 搜索无结果，请尝试其他关键词' : 
+              '📭 暂无初始模型数据，请先创建联邦学习任务并生成或上传初始模型'
           }}
+          size="middle"
         />
       </Card>
 
@@ -722,8 +826,9 @@ const InitialModelPage: React.FC = () => {
           generateForm.resetFields()
           setSelectedModelType('RANDOM_FOREST')
         }}
-        width={800}
+        width={650}
         confirmLoading={generationLoading}
+        style={{ top: 60 }}
       >
         <Form
           form={generateForm}
@@ -952,8 +1057,9 @@ const InitialModelPage: React.FC = () => {
           setJsonValidationStatus('')
           setJsonValidationMessage('')
         }}
-        width={600}
+        width={550}
         confirmLoading={initialUploadLoading}
+        style={{ top: 60 }}
       >
         <Form form={uploadForm} layout="vertical">
           <Form.Item
@@ -1106,6 +1212,7 @@ const InitialModelPage: React.FC = () => {
         }}
         width={600}
         confirmLoading={isDistributing(selectedTaskId)}
+        style={{ top: 60 }}
       >
         <Form
           form={distributeForm}
@@ -1229,6 +1336,7 @@ const InitialModelPage: React.FC = () => {
           </Button>
         ]}
         width={800}
+        style={{ top: 60 }}
       >
         {currentModel && (
           <Descriptions bordered column={2}>
@@ -1303,6 +1411,7 @@ const InitialModelPage: React.FC = () => {
           </Button>
         ]}
         width={900}
+        style={{ top: 60 }}
       >
         {currentDistribution && (
           <>
@@ -1420,6 +1529,7 @@ const InitialModelPage: React.FC = () => {
         onCancel={() => setTaskSelectModalVisible(false)}
         footer={null}
         width={1000}
+        style={{ top: 60 }}
       >
         <div style={{ marginBottom: 16 }}>
           <Alert

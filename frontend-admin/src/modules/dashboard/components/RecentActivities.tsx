@@ -18,6 +18,8 @@ import {
   ClockCircleOutlined
 } from '@ant-design/icons'
 
+import styles from '../DashboardPage.module.css'
+
 const { Text } = Typography
 
 interface Activity {
@@ -127,7 +129,11 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
       <Card 
         title="最近活动" 
         size="small"
-        className="fed-dashboard-card"
+        className={styles['fed-dashboard-card']}
+        style={{ background: 'white' }}
+        styles={{ 
+          body: { background: 'white' }
+        }}
       >
         <List
           dataSource={Array(5).fill(0)}
@@ -145,7 +151,11 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
     <Card 
       title="最近活动" 
       size="small"
-      className="fed-dashboard-card"
+      className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
+      style={{ background: 'white', height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ 
+        body: { background: 'white', overflowY: 'auto', flex: 1 }
+      }}
       extra={
         <Button 
           type="link" 
@@ -163,7 +173,7 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
         </div>
       ) : (
         <List
-          className="fed-activity-list"
+          className={styles['fed-activity-list']}
           dataSource={activities.slice(0, 10)}
           renderItem={(activity) => (
             <List.Item>

@@ -11,11 +11,13 @@ import {
   message,
   Typography,
   Space,
-  Alert
+  Alert,
+  Divider
 } from 'antd'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { LockOutlined, UserOutlined, SafetyCertificateOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useAdmin } from '@/store'
 import type { User } from '@/types'
+import './SystemManagementModals.css'
 
 const { Password } = Input
 const { Text } = Typography
@@ -99,14 +101,15 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
     <Modal
       title={
         <Space>
-          <LockOutlined />
-          重置用户密码
+          <SafetyCertificateOutlined style={{ color: '#faad14', fontSize: '20px' }} />
+          <span style={{ fontSize: '18px', fontWeight: 600 }}>重置用户密码</span>
         </Space>
       }
       open={visible}
       onCancel={handleCancel}
+      centered
       footer={[
-        <Button key="cancel" onClick={handleCancel}>
+        <Button key="cancel" onClick={handleCancel} size="large">
           取消
         </Button>,
         <Button 
@@ -115,30 +118,49 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           danger
           loading={isLoading}
           onClick={handleOk}
+          size="large"
+          icon={<CheckCircleOutlined />}
+          style={{
+            background: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
+            border: 'none',
+            boxShadow: '0 2px 8px rgba(250, 173, 20, 0.4)'
+          }}
         >
-          重置密码
+          确认重置
         </Button>
       ]}
       destroyOnHidden
-      width={500}
+      width={540}
     >
       {user && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 24 }}>
           <Alert
-            message="重置密码操作"
+            message={
+              <span style={{ fontSize: '15px', fontWeight: 600 }}>
+                ⚠️ 安全操作提示
+              </span>
+            }
             description={
-              <div>
+              <div style={{ fontSize: '14px', lineHeight: '24px' }}>
                 <Text>您将要为用户 </Text>
-                <Text strong>
-                  <UserOutlined /> {user.username} ({user.email})
+                <Text strong style={{ color: '#1890ff', fontSize: '15px' }}>
+                  <UserOutlined /> {user.username}
                 </Text>
-                <Text> 重置密码。</Text>
+                <Text> ({user.email}) 重置密码。</Text>
                 <br />
-                <Text type="warning">重置后，用户需要使用新密码重新登录。</Text>
+                <br />
+                <Text type="warning" strong>
+                  ⚠️ 重置后，用户需要使用新密码重新登录，原密码将立即失效。
+                </Text>
               </div>
             }
             type="warning"
             showIcon
+            style={{
+              borderRadius: '12px',
+              border: '2px solid #ffe7ba',
+              background: 'linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%)'
+            }}
           />
         </div>
       )}
@@ -156,11 +178,13 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             { min: 6, message: '密码至少6个字符' },
             { max: 50, message: '密码不能超过50个字符' }
           ]}
+          extra="建议使用字母、数字和特殊字符的组合，提高安全性"
         >
           <Password 
-            prefix={<LockOutlined />}
-            placeholder="请输入新密码"
+            prefix={<LockOutlined style={{ color: '#1890ff' }} />}
+            placeholder="请输入新密码（至少6位）"
             autoComplete="new-password"
+            size="large"
           />
         </Form.Item>
 
@@ -181,9 +205,10 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           ]}
         >
           <Password 
-            prefix={<LockOutlined />}
-            placeholder="请确认新密码"
+            prefix={<SafetyCertificateOutlined style={{ color: '#1890ff' }} />}
+            placeholder="请再次输入新密码"
             autoComplete="new-password"
+            size="large"
           />
         </Form.Item>
       </Form>

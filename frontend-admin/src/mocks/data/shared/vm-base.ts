@@ -151,7 +151,7 @@ export const baseVmList: BaseVM[] = [
     }
   },
   {
-    vmId: 'c3d4e5f67890123456789012345678901',
+    vmId: 'c3d4e5f678901234567890123456789a',
     name: '水声联邦学习节点-003',
     ipAddress: '192.168.1.102',
     port: 22,

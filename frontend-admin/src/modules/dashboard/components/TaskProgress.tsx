@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 
 import { StatusIndicator, Table } from '@/components'
+import styles from '../DashboardPage.module.css'
 // 移除类型导入，使用 any 类型
 
 const { Text, Title } = Typography
@@ -67,7 +68,11 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
   return (
     <Card 
       title="任务进度监控" 
-      className="fed-dashboard-card"
+      className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
+      style={{ background: 'white', maxHeight: '600px' }}
+      styles={{ 
+        body: { background: 'white', overflowY: 'auto', maxHeight: '500px' }
+      }}
       extra={
         <Space>
           <Text type="secondary">运行中: {runningTasks.length}</Text>

@@ -279,7 +279,8 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       title: '时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 160,
+      width: 180,
+      fixed: 'left',
       render: (createdAt: string) => (
         <Text code>{formatDateTime(createdAt)}</Text>
       ),
@@ -289,7 +290,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       title: '级别',
       dataIndex: 'level',
       key: 'level',
-      width: 80,
+      width: 100,
       render: (level: keyof typeof LOG_LEVEL_COLORS) => (
         <Tag color={LOG_LEVEL_COLORS[level] || 'default'}>
           {level}
@@ -300,7 +301,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       title: '类别',
       dataIndex: 'category',
       key: 'category',
-      width: 100,
+      width: 120,
       render: (category: keyof typeof LOG_CATEGORY_COLORS) => (
         <Tag color={LOG_CATEGORY_COLORS[category] || 'default'}>
           {category}
@@ -324,7 +325,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       title: 'VM ID',
       dataIndex: 'vmId',
       key: 'vmId',
-      width: 120,
+      width: 140,
       render: (vmId: string) => vmId ? (
         <Text code>{vmId.substring(0, 8)}...</Text>
       ) : '-'
@@ -333,7 +334,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
       title: '任务ID',
       dataIndex: 'taskId', 
       key: 'taskId',
-      width: 120,
+      width: 140,
       render: (taskId: string) => taskId ? (
         <Text code>{taskId.substring(0, 8)}...</Text>
       ) : '-'
@@ -393,7 +394,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
         dataSource={logList}
         loading={logListLoading}
         rowKey="logId"
-        scroll={{ x: 1200, y: height - 120 }}
+        scroll={{ x: 960, y: height - 120 }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -406,6 +407,7 @@ export const LogList: React.FC<LogListProps> = ({ height = 600 }) => {
           onShowSizeChange: handleTableChange
         }}
         size="small"
+        tableLayout="fixed"
       />
 
       {/* 日志详情模态框 */}

@@ -1,0 +1,373 @@
+.initial-model-page {
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  min-height: 100vh;
+}
+
+.initial-model-page .ant-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.initial-model-page .ant-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* 强制覆盖所有可能的黑色背景 */
+.initial-model-page .ant-table-wrapper,
+.initial-model-page .ant-table,
+.initial-model-page .ant-table-container,
+.initial-model-page .ant-table-content,
+.initial-model-page .ant-table-body,
+.initial-model-page .ant-table-tbody,
+.initial-model-page table {
+  background: #ffffff !important;
+}
+
+/* 彻底隐藏所有滚动条 */
+.initial-model-page .ant-table-wrapper {
+  overflow: hidden !important;
+}
+
+.initial-model-page .ant-table-container {
+  overflow: hidden !important;
+}
+
+.initial-model-page .ant-table-body {
+  overflow: hidden !important;
+}
+
+.initial-model-page .ant-table-content {
+  overflow: hidden !important;
+}
+
+/* 隐藏滚动条样式（兼容所有浏览器） */
+.initial-model-page .ant-table-body::-webkit-scrollbar,
+.initial-model-page .ant-table-content::-webkit-scrollbar,
+.initial-model-page .ant-table-wrapper::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.initial-model-page .ant-table-body,
+.initial-model-page .ant-table-content,
+.initial-model-page .ant-table-wrapper {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.initial-model-page .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%) !important;
+  font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
+  padding: 10px 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* 表格行样式优化 */
+.initial-model-page .ant-table-tbody > tr {
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.initial-model-page .ant-table-tbody > tr:hover > td {
+  background: #f0f7ff !important;
+}
+
+.initial-model-page .ant-table-tbody > tr > td {
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent !important;
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+/* 操作列特殊样式 */
+.initial-model-page .ant-table-tbody > tr > td:last-child {
+  padding: 8px 4px;
+}
+
+/* 确保操作按钮排列整齐并在一行 */
+.initial-model-page .ant-table-tbody > tr > td:last-child .ant-btn {
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 0 6px;
+  height: 26px;
+  line-height: 24px;
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+/* 按钮hover效果 */
+.initial-model-page .ant-table-tbody > tr > td:last-child .ant-btn:hover:not(:disabled) {
+  border-color: #1890ff;
+  background: #f0f7ff;
+}
+
+/* 删除按钮保持红色文字 */
+.initial-model-page .ant-table-tbody > tr > td:last-child .ant-btn:hover:not(:disabled):has(.anticon-delete) {
+  border-color: #ff4d4f;
+  color: #ff4d4f;
+  background: #fff1f0;
+}
+
+/* 删除按钮图标也保持红色 */
+.initial-model-page .ant-table-tbody > tr > td:last-child .ant-btn .anticon-delete {
+  color: #ff4d4f;
+}
+
+/* 操作列容器 */
+.initial-model-page .ant-table-tbody > tr > td:last-child > div {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+/* 确保所有输入框和选择器都是白色背景 */
+.initial-model-page .ant-input,
+.initial-model-page .ant-select-selector,
+.initial-model-page .ant-picker {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* 按钮样式 */
+.initial-model-page .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.initial-model-page .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.initial-model-page .ant-btn:not(.ant-btn-primary) {
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.initial-model-page .ant-btn:not(.ant-btn-primary):hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-2px);
+}
+
+/* Modal 强制白色背景 */
+.initial-model-page .ant-modal-content {
+  background: #ffffff !important;
+}
+
+.initial-model-page .ant-modal-body {
+  background: #ffffff !important;
+}
+
+/* Select 下拉菜单强制白色背景 */
+.ant-select-dropdown {
+  background: #ffffff !important;
+}
+
+.ant-select-item {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.ant-select-item-option-selected {
+  background: #e6f7ff !important;
+}
+
+.ant-select-item-option-active {
+  background: #f0f7ff !important;
+}
+
+/* 日期选择器强制白色背景 */
+.ant-picker-panel-container {
+  background: #ffffff !important;
+}
+
+.ant-picker-panel {
+  background: #ffffff !important;
+}
+
+.ant-picker-dropdown {
+  background: #ffffff !important;
+}
+
+/* Form 表单项背景 */
+.initial-model-page .ant-form-item {
+  background: transparent !important;
+}
+
+/* 分页样式 */
+.initial-model-page .ant-pagination {
+  margin-top: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 8px;
+}
+
+.initial-model-page .ant-pagination-item {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.initial-model-page .ant-pagination-item:hover {
+  border-color: #1890ff;
+  transform: translateY(-2px);
+}
+
+.initial-model-page .ant-pagination-item-active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%) !important;
+  border-color: #1890ff;
+  font-weight: 600;
+}
+
+.initial-model-page .ant-pagination-item-active a {
+  color: #ffffff !important;
+}
+
+/* 状态标签样式 */
+.initial-model-page .ant-tag {
+  margin: 0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 表格内的小文本优化 */
+.initial-model-page .ant-table-tbody > tr > td > div {
+  line-height: 1.4;
+}
+
+/* 链接按钮样式 */
+.initial-model-page .ant-btn-link {
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.initial-model-page .ant-btn-link:hover {
+  transform: translateX(4px);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .initial-model-page {
+    padding: 16px;
+  }
+}
+
+/* 确保 TextArea 也是白色背景 */
+.initial-model-page .ant-input-textarea,
+.initial-model-page .ant-input-textarea textarea {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* Upload 组件背景 */
+.initial-model-page .ant-upload {
+  background: #ffffff !important;
+}
+
+/* Checkbox 组件 */
+.initial-model-page .ant-checkbox-wrapper {
+  background: transparent !important;
+  color: #262626 !important;
+}
+
+/* Switch 组件 */
+.initial-model-page .ant-switch {
+  background: #bfbfbf !important;
+}
+
+.initial-model-page .ant-switch-checked {
+  background: #1890ff !important;
+}
+
+/* Spin 加载动画 */
+.initial-model-page .ant-spin-dot-item {
+  background-color: #1890ff !important;
+}
+
+/* Alert 组件 */
+.initial-model-page .ant-alert {
+  background: #e6f7ff !important;
+  border: 1px solid #91d5ff !important;
+}
+
+/* Descriptions 描述列表 */
+.initial-model-page .ant-descriptions-item-label {
+  background: #fafafa !important;
+  color: #262626 !important;
+}
+
+.initial-model-page .ant-descriptions-item-content {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* 确保所有文本颜色正确 */
+.initial-model-page {
+  color: #262626;
+}
+
+.initial-model-page .ant-table-tbody > tr > td {
+  color: #262626 !important;
+}
+
+/* InputNumber 组件 */
+.initial-model-page .ant-input-number {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.initial-model-page .ant-input-number-input {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* Popconfirm 按钮样式修复 - 确保删除按钮文字可见 */
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous span,
+.ant-popover .ant-popconfirm-buttons button.ant-btn-primary.ant-btn-dangerous {
+  background-color: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: #ffffff !important;
+}
+
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active span,
+.ant-popover .ant-popconfirm-buttons button.ant-btn-primary.ant-btn-dangerous:hover,
+.ant-popover .ant-popconfirm-buttons button.ant-btn-primary.ant-btn-dangerous:focus,
+.ant-popover .ant-popconfirm-buttons button.ant-btn-primary.ant-btn-dangerous:active {
+  background-color: #d9363e !important;
+  border-color: #d9363e !important;
+  color: #ffffff !important;
+}
+
+/* 确保取消按钮文字可见 */
+.ant-popover .ant-popconfirm-buttons .ant-btn:not(.ant-btn-primary),
+.ant-popover .ant-popconfirm-buttons .ant-btn:not(.ant-btn-primary) span,
+.ant-popover .ant-popconfirm-buttons button.ant-btn:not(.ant-btn-primary) {
+  color: #262626 !important;
+  background-color: #ffffff !important;
+}
+

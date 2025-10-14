@@ -328,9 +328,18 @@ const TaskListPage: React.FC = () => {
               size="small" 
               status={isRunning ? 'active' : 'normal'}
               format={(percent) => `${percent}%`}
+              strokeColor={{
+                '0%': '#1890ff',
+                '100%': '#52c41a',
+              }}
             />
             {record.currentRound && record.totalRounds && (
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#595959', 
+                marginTop: '4px',
+                fontWeight: 500
+              }}>
                 轮次: {record.currentRound}/{record.totalRounds}
               </div>
             )}
