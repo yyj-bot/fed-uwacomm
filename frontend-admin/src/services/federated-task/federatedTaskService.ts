@@ -968,8 +968,9 @@ export class FederatedTaskService {
       finalAccuracy: task.finalAccuracy,
       algorithm: task.algorithm,
       participants: task.participants,
-      metrics: task.metrics
-    }
+      metrics: task.metrics,
+      trainingHistory: task.trainingHistory // 添加训练历史数据
+    } as any // 使用 as any 因为 FederatedTaskDetails 类型中可能没有定义 trainingHistory
   }
 
   /**

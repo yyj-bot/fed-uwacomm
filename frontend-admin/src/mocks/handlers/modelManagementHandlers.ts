@@ -796,11 +796,21 @@ export const modelManagementHandlers = [
     const page = parseInt(url.searchParams.get('page') || '1')
     const size = parseInt(url.searchParams.get('size') || '10')
 
+    console.log('🔍 回滚历史查询:', {
+      deploymentId,
+      总记录数: mockRollbackRecords.length,
+      记录示例: mockRollbackRecords.slice(0, 3).map(r => ({
+        rollbackId: r.rollbackId,
+        deploymentId: r.deploymentId
+      }))
+    })
+
     let filteredRecords = mockRollbackRecords
     if (deploymentId) {
       filteredRecords = mockRollbackRecords.filter(record => 
         record.deploymentId === deploymentId
       )
+      console.log(`✅ 过滤后记录数: ${filteredRecords.length}`)
     }
 
     const paginatedData = paginate(filteredRecords, page, size)

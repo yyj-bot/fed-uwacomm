@@ -8,6 +8,7 @@
 
 import React from 'react'
 import { Card, List, Avatar, Typography, Tag, Skeleton, Button } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import { 
   UserOutlined, 
   CloudServerOutlined, 
@@ -38,6 +39,8 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
   activities = [], 
   loading = false 
 }) => {
+  const navigate = useNavigate()
+  
   // 获取活动类型图标
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -144,7 +147,11 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
       size="small"
       className="fed-dashboard-card"
       extra={
-        <Button type="link" size="small">
+        <Button 
+          type="link" 
+          size="small"
+          onClick={() => navigate('/logs')}
+        >
           查看全部
         </Button>
       }

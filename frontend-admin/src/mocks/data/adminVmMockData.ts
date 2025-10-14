@@ -186,6 +186,50 @@ export const mockUserVms: Record<string, any[]> = {
       permissions: ['READ', 'WRITE'] as VmPermission[],
       assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
     }
+  ],
+  // admin用户的VM列表（userId: a1b2c3d4e5f678901234567890123456）
+  'a1b2c3d4e5f678901234567890123456': [
+    {
+      vmId: 'a1b2c3d4e5f678901234567890123456',
+      vmName: '水声联邦学习节点-001',
+      ipAddress: '192.168.1.100',
+      status: 'RUNNING' as VmStatus,
+      permissions: ['READ', 'WRITE', 'EXECUTE', 'ADMIN'] as VmPermission[],
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
+    }
+  ],
+  // researcher01用户的VM列表（userId: researcher-001）
+  'researcher-001': [
+    {
+      vmId: 'a1b2c3d4e5f678901234567890123456',
+      vmName: '水声联邦学习节点-001',
+      ipAddress: '192.168.1.100',
+      status: 'RUNNING' as VmStatus,
+      permissions: ['READ', 'WRITE', 'EXECUTE'] as VmPermission[],
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
+    }
+  ],
+  // researcher02用户的VM列表（userId: researcher-002）
+  'researcher-002': [
+    {
+      vmId: 'a1b2c3d4e5f678901234567890123456',
+      vmName: '水声联邦学习节点-001',
+      ipAddress: '192.168.1.100',
+      status: 'RUNNING' as VmStatus,
+      permissions: ['READ', 'WRITE'] as VmPermission[],
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
+    }
+  ],
+  // operator01用户的VM列表（userId: operator-001）
+  'operator-001': [
+    {
+      vmId: 'a1b2c3d4e5f678901234567890123456',
+      vmName: '水声联邦学习节点-001',
+      ipAddress: '192.168.1.100',
+      status: 'RUNNING' as VmStatus,
+      permissions: ['READ', 'EXECUTE'] as VmPermission[],
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+    }
   ]
 }
 

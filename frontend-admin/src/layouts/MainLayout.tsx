@@ -83,21 +83,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       ]
     },
     {
-      key: '/training-data',
-      icon: <FolderOutlined />,
-      label: '训练数据'
-    },
-    {
-      key: '/underwater-optimization',
-      icon: <CloudServerOutlined />,
-      label: '水声优化',
-      children: [
-        { key: '/underwater-optimization/environment', label: '环境参数' },
-        { key: '/underwater-optimization/simulation', label: '仿真测试' },
-        { key: '/underwater-optimization/analysis', label: '结果分析' }
-      ]
-    },
-    {
       key: '/logs',
       icon: <FileTextOutlined />,
       label: '系统日志'

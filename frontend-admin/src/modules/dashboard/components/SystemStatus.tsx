@@ -28,12 +28,12 @@ const SystemStatus: React.FC = () => {
   const [engineStatus, setEngineStatus] = useState<any>(null)
   const [engineError, setEngineError] = useState<string | null>(null)
 
-  // 模拟系统指标数据
+  // 系统指标数据 - 从聚合引擎状态获取
   const systemMetrics = {
-    cpu: Math.floor(Math.random() * 30) + 20,
-    memory: Math.floor(Math.random() * 25) + 40,
-    network: Math.floor(Math.random() * 40) + 10,
-    storage: Math.floor(Math.random() * 20) + 30
+    cpu: engineStatus?.systemMetrics?.cpuUsage || 0,
+    memory: engineStatus?.systemMetrics?.memoryUsage || 0,
+    network: 0, // 聚合引擎状态不包含网络指标，需要从系统监控API获取
+    storage: engineStatus?.systemMetrics?.diskUsage || 0
   }
 
   // 获取聚合引擎状态 - v1.4 新增
@@ -44,24 +44,9 @@ const SystemStatus: React.FC = () => {
       const status = await federatedTask.getAggregationEngineStatus()
       setEngineStatus(status)
     } catch (error) {
-      console.warn('获取聚合引擎状态失败，使用模拟数据:', error)
-      setEngineError('无法获取聚合引擎状态')
-      // 使用模拟数据作为降级
-      setEngineStatus({
-        engineStatus: 'RUNNING',
-        currentTasks: [],
-        systemMetrics: {
-          cpuUsage: Math.floor(Math.random() * 30) + 20,
-          memoryUsage: Math.floor(Math.random() * 25) + 40,
-          diskUsage: Math.floor(Math.random() * 20) + 30
-        },
-        aggregationMetrics: {
-          totalAggregations: Math.floor(Math.random() * 100) + 50,
-          successRate: 0.95 + Math.random() * 0.04,
-          averageAggregationTime: 2.0 + Math.random() * 1.0
-        },
-        supportedAlgorithms: ['FEDERATED_AVERAGING', 'FEDERATED_PROXIMAL']
-      })
+      console.error('获取聚合引擎状态失败:', error)
+      setEngineError('无法获取聚合引擎状态，请检查后端服务')
+      setEngineStatus(null)
     } finally {
       setLoading(false)
     }

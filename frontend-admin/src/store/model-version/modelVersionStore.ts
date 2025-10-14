@@ -83,7 +83,7 @@ interface ModelState {
   evaluationResultsLoading: boolean
   
   // 回滚历史
-  rollbackHistory: RollbackInfo[]
+  rollbackHistory: Record<string, RollbackInfo[]>
   rollbackLoading: boolean
   
   
@@ -214,7 +214,7 @@ const initialState: ModelState = {
   evaluationLoading: {},
   evaluationResultsLoading: false,
   
-  rollbackHistory: [],
+  rollbackHistory: {},
   rollbackLoading: false,
 
   modelStatistics: null,
@@ -831,8 +831,14 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     try {
       const response = await modelVersionService.getRollbackHistory(params)
       
+      // 按 deploymentId 存储回滚历史
+      const deploymentId = params?.deploymentId || 'default'
+      
       set((state) => ({
-        rollbackHistory: response.records
+        rollbackHistory: {
+          ...state.rollbackHistory,
+          [deploymentId]: response.records
+        }
       }))
     } catch (error) {
       console.error('获取回滚历史失败:', error)

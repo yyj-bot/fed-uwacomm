@@ -8,6 +8,7 @@
 
 import React from 'react'
 import { Card, Progress, List, Typography, Space, Tag, Button } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import { 
   PlayCircleOutlined, 
   PauseCircleOutlined, 
@@ -26,19 +27,21 @@ interface TaskProgressProps {
 }
 
 const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
+  const navigate = useNavigate()
+  
   // 筛选运行中的任务
   const runningTasks = tasks.filter(task => task.status === 'RUNNING')
   
   // 获取任务状态图标
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'running':
+      case 'RUNNING':
         return <PlayCircleOutlined style={{ color: '#1890ff' }} />
-      case 'paused':
+      case 'PAUSED':
         return <PauseCircleOutlined style={{ color: '#faad14' }} />
-      case 'completed':
+      case 'COMPLETED':
         return <CheckCircleOutlined style={{ color: '#52c41a' }} />
-      case 'error':
+      case 'FAILED':
         return <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
       default:
         return <ClockCircleOutlined style={{ color: '#d9d9d9' }} />
@@ -48,13 +51,13 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
   // 获取状态标签颜色
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running':
+      case 'RUNNING':
         return 'processing'
-      case 'paused':
+      case 'PAUSED':
         return 'warning'
-      case 'completed':
+      case 'COMPLETED':
         return 'success'
-      case 'error':
+      case 'FAILED':
         return 'error'
       default:
         return 'default'
@@ -68,7 +71,11 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
       extra={
         <Space>
           <Text type="secondary">运行中: {runningTasks.length}</Text>
-          <Button size="small" type="link">
+          <Button 
+            size="small" 
+            type="link"
+            onClick={() => navigate('/federated-learning/tasks')}
+          >
             查看全部
           </Button>
         </Space>
@@ -89,6 +96,7 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
                   type="link" 
                   size="small"
                   key="detail"
+                  onClick={() => navigate(`/federated-learning/tasks/${task.taskId}`)}
                 >
                   查看详情
                 </Button>
@@ -98,12 +106,12 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
                 avatar={getStatusIcon(task.status)}
                 title={
                   <Space>
-                    <Text strong>{task.name}</Text>
+                    <Text strong>{task.taskName}</Text>
                     <Tag color={getStatusColor(task.status)}>
-                      {task.status === 'running' ? '运行中' : 
-                       task.status === 'paused' ? '已暂停' :
-                       task.status === 'completed' ? '已完成' :
-                       task.status === 'error' ? '错误' : '等待中'}
+                      {task.status === 'RUNNING' ? '运行中' : 
+                       task.status === 'PAUSED' ? '已暂停' :
+                       task.status === 'COMPLETED' ? '已完成' :
+                       task.status === 'FAILED' ? '失败' : '等待中'}
                     </Tag>
                   </Space>
                 }
@@ -111,14 +119,14 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div>
                       <Text type="secondary">
-                        参与者: {task.participants?.length || 0} | 
+                        参与者: {task.participantCount || 0} | 
                         轮次: {task.currentRound || 0}/{task.totalRounds || 0}
                       </Text>
                     </div>
                     <Progress
                       percent={task.progress || 0}
                       size="small"
-                      status={task.status === 'error' ? 'exception' : 'active'}
+                      status={task.status === 'FAILED' ? 'exception' : 'active'}
                       format={(percent) => (
                         <Text style={{ fontSize: '12px' }}>
                           {percent}%
@@ -128,11 +136,11 @@ const TaskProgress: React.FC<TaskProgressProps> = ({ tasks = [] }) => {
                     <div>
                       <Space>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                          开始时间: {task.startTime ? new Date(task.startTime).toLocaleString() : '-'}
+                          开始时间: {task.startedAt ? new Date(task.startedAt).toLocaleString() : '-'}
                         </Text>
-                        {task.estimatedEndTime && (
+                        {task.completedAt && task.status === 'COMPLETED' && (
                           <Text type="secondary" style={{ fontSize: '12px' }}>
-                            预计完成: {new Date(task.estimatedEndTime).toLocaleString()}
+                            完成时间: {new Date(task.completedAt).toLocaleString()}
                           </Text>
                         )}
                       </Space>

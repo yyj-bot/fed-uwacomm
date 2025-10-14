@@ -776,27 +776,48 @@ export const generateTaskModelStatistics = (taskId: string): TaskModelStatistics
 }
 
 // 生成回滚记录
-export const generateRollbackRecords = (count: number = 15): RollbackRecord[] =>
-  Array.from({ length: count }, (_, index) => {
-    const rollbackId = createMockRollbackId()
-    const deploymentId = `deployment_${String(Math.floor(Math.random() * 20) + 1).padStart(3, '0')}`
-    const fromModelId = `model_${String(Math.floor(Math.random() * 50) + 1).padStart(3, '0')}`
-    const toModelId = `model_${String(Math.floor(Math.random() * 50) + 1).padStart(3, '0')}`
-    const status = randomChoice(Object.values(RollbackStatus))
-    const hasReason = Math.random() > 0.3
-    const hasRollbackTime = status === RollbackStatus.COMPLETED
+export const generateRollbackRecords = (count: number = 15, modelVersions: ModelVersionInfo[] = []): RollbackRecord[] => {
+  // 从已部署的模型中选择
+  const availableModels = modelVersions.filter(m => m.status === ModelVersionStatus.DEPLOYED)
+  
+  if (availableModels.length === 0) {
+    // 如果没有已部署的模型，返回空数组
+    return []
+  }
+  
+  const records: RollbackRecord[] = []
+  
+  // 为每个已部署的模型生成1-3条回滚记录
+  availableModels.forEach(model => {
+    const recordCount = Math.floor(Math.random() * 3) + 1 // 1-3条
     
-    return {
-      rollbackId,
-      deploymentId,
-      fromModelId,
-      toModelId,
-      status,
-      rollbackReason: hasReason ? randomChoice(rollbackReasons) : undefined,
-      rollbackTime: hasRollbackTime ? Math.floor(Math.random() * 300000) + 10000 : undefined, // 10s-5min
-      createdAt: generateTimestamp(Math.floor(Math.random() * 30))
+    for (let i = 0; i < recordCount && records.length < count; i++) {
+      const rollbackId = createMockRollbackId()
+      
+      // 使用模型ID作为deploymentId，确保能够查询到
+      const deploymentId = model.modelId
+      const fromModelId = createMockModelId()
+      const toModelId = model.modelId
+      
+      const status = randomChoice(Object.values(RollbackStatus))
+      const hasReason = Math.random() > 0.3
+      const hasRollbackTime = status === RollbackStatus.COMPLETED
+      
+      records.push({
+        rollbackId,
+        deploymentId,
+        fromModelId,
+        toModelId,
+        status,
+        rollbackReason: hasReason ? randomChoice(rollbackReasons) : undefined,
+        rollbackTime: hasRollbackTime ? Math.floor(Math.random() * 300000) + 10000 : undefined, // 10s-5min
+        createdAt: generateTimestamp(Math.floor(Math.random() * 30))
+      })
     }
   })
+  
+  return records.slice(0, count)
+}
 
 // ============= 导出Mock数据实例 =============
 
@@ -804,7 +825,18 @@ export const mockInitialModels = generateInitialModels(20)
 export const mockDistributionProgress = generateDistributionProgress(10)
 export const mockModelVersions = generateModelVersions(50)
 export const mockEvaluationResults = generateEvaluationResults(30)
-export const mockRollbackRecords = generateRollbackRecords(15)
+export const mockRollbackRecords = generateRollbackRecords(50, mockModelVersions)
+
+// 调试日志
+console.log('📊 Mock回滚记录生成:', {
+  总数: mockRollbackRecords.length,
+  已部署模型数: mockModelVersions.filter(m => m.status === 'DEPLOYED').length,
+  示例记录: mockRollbackRecords.slice(0, 3).map(r => ({
+    rollbackId: r.rollbackId,
+    deploymentId: r.deploymentId,
+    status: r.status
+  }))
+})
 export const mockModelStatistics = generateModelStatistics()
 export const mockTaskModelStatistics = taskIds.map(taskId => generateTaskModelStatistics(taskId))
 

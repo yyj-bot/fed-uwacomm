@@ -10,9 +10,7 @@ import React, { useEffect } from 'react'
 import { Row, Col, Card, Typography, Space, Button, Tabs, Statistic } from 'antd'
 import { 
   UserOutlined, 
-  SettingOutlined, 
   SafetyOutlined,
-  DatabaseOutlined,
   TeamOutlined,
   SecurityScanOutlined
 } from '@ant-design/icons'
@@ -39,7 +37,13 @@ const SystemManagementPage: React.FC = () => {
   }, [fetchUserList, fetchUserStatistics])
 
   // 统计数据
-  const stats = [
+  const stats: Array<{
+    title: string
+    value: number | string
+    icon: React.ReactNode
+    color: string
+    suffix?: string
+  }> = [
     {
       title: '总用户数',
       value: userStatistics?.totalUsers || userListTotal,
@@ -53,15 +57,14 @@ const SystemManagementPage: React.FC = () => {
       color: '#52c41a'
     },
     {
-      title: '系统模块',
-      value: 8,
-      icon: <DatabaseOutlined />,
+      title: '管理员',
+      value: userStatistics?.adminUsers || userList?.filter(user => user.role === 'ADMIN').length || 0,
+      icon: <SafetyOutlined />,
       color: '#722ed1'
     },
     {
-      title: '安全等级',
-      value: 'A',
-      suffix: '级',
+      title: '锁定用户',
+      value: userStatistics?.lockedUsers || userList?.filter(user => user.status === 'LOCKED').length || 0,
       icon: <SecurityScanOutlined />,
       color: '#fa8c16'
     }

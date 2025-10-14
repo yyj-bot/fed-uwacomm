@@ -24,11 +24,7 @@ import {
 } from 'antd'
 import { 
   ArrowLeftOutlined,
-  ReloadOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
-  RedoOutlined,
-  EditOutlined
+  ReloadOutlined
 } from '@ant-design/icons'
 import { useVM } from '@/store/vm'
 import type { VirtualMachine } from '@/api/vm'
@@ -44,14 +40,7 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
   const {
     fetchVMDetail,
     fetchVMStatus,
-    startVM,
-    stopVM,
-    restartVM,
-    getVMStatus,
-    isVMOperating,
-    canStartVM,
-    canStopVM,
-    canRestartVM
+    getVMStatus
   } = useVM()
 
   // 获取实时状态
@@ -76,45 +65,6 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
     }
   }
 
-  // VM操作处理
-  const handleStartVM = async () => {
-    const result = await startVM(vm.vmId)
-    if (result.success) {
-      message.success('虚拟机启动成功')
-      // 延迟刷新状态，等待虚拟机完成启动
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 1500)
-    } else {
-      message.error(`启动失败: ${result.error || '未知错误'}`)
-    }
-  }
-
-  const handleStopVM = async () => {
-    const result = await stopVM(vm.vmId)
-    if (result.success) {
-      message.success('虚拟机停止成功')
-      // 延迟刷新状态，等待虚拟机完成停止
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 1500)
-    } else {
-      message.error(`停止失败: ${result.error || '未知错误'}`)
-    }
-  }
-
-  const handleRestartVM = async () => {
-    const result = await restartVM(vm.vmId)
-    if (result.success) {
-      message.success('虚拟机重启成功')
-      // 延迟刷新状态，等待虚拟机完成重启
-      setTimeout(() => {
-        fetchVMStatus(vm.vmId)
-      }, 2000)
-    } else {
-      message.error(`重启失败: ${result.error || '未知错误'}`)
-    }
-  }
 
   // 渲染状态标签
   const renderStatus = () => {
@@ -218,39 +168,6 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
               >
                 刷新
               </Button>
-              
-              {canStartVM(vm) && (
-                <Button 
-                  type="primary"
-                  icon={<PlayCircleOutlined />} 
-                  onClick={handleStartVM}
-                  loading={isVMOperating(vm.vmId, 'start')}
-                  style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                >
-                  启动
-                </Button>
-              )}
-              
-              {canStopVM(vm) && (
-                <Button 
-                  icon={<PauseCircleOutlined />} 
-                  onClick={handleStopVM}
-                  loading={isVMOperating(vm.vmId, 'stop')}
-                  style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
-                >
-                  停止
-                </Button>
-              )}
-              
-              {canRestartVM(vm) && (
-                <Button 
-                  icon={<RedoOutlined />} 
-                  onClick={handleRestartVM}
-                  loading={isVMOperating(vm.vmId, 'restart')}
-                >
-                  重启
-                </Button>
-              )}
             </Space>
           </div>
         </Card>

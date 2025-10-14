@@ -334,10 +334,16 @@ const TaskDetailPage: React.FC = () => {
   const logs = taskId ? taskLogs[taskId] : null
   
   // 调试信息
+  const trainingData = getTrainingRoundsData()
   console.log('TaskDetailPage Debug:', {
     taskId,
     currentTask: currentTask?.taskName,
     status: currentTask?.status,
+    hasTrainingHistory: 'trainingHistory' in (currentTask || {}),
+    trainingHistoryLength: (currentTask as any)?.trainingHistory?.length || 0,
+    trainingHistory: (currentTask as any)?.trainingHistory,
+    trainingDataLength: trainingData.length,
+    trainingData,
     taskResults,
     taskLogs,
     results,
@@ -346,7 +352,6 @@ const TaskDetailPage: React.FC = () => {
     hasLogs: !!logs,
     finalResults: results ? (results as any).finalResults : null
   })
-  const trainingData = getTrainingRoundsData()
 
   return (
     <div className="task-detail-page">
@@ -556,14 +561,14 @@ const TaskDetailPage: React.FC = () => {
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <Statistic
                       title="最佳准确率"
-                      value={Math.max(...trainingData.map(d => d.accuracy)) * 100}
+                      value={trainingData.length > 0 ? Math.max(...trainingData.map(d => d.accuracy)) * 100 : 0}
                       precision={2}
                       suffix="%"
                       valueStyle={{ color: '#3f8600' }}
                     />
                     <Statistic
                       title="最低损失"
-                      value={Math.min(...trainingData.map(d => d.loss))}
+                      value={trainingData.length > 0 ? Math.min(...trainingData.map(d => d.loss)) : 0}
                       precision={4}
                       valueStyle={{ color: '#cf1322' }}
                     />

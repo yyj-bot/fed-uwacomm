@@ -39,6 +39,7 @@ import {
   CloudUploadOutlined,
   RocketOutlined,
   RollbackOutlined,
+  HistoryOutlined,
   BarChartOutlined,
   LineChartOutlined,
   CheckCircleOutlined,
@@ -276,6 +277,14 @@ const VersionManagementPage: React.FC = () => {
             disabled={record.status !== 'DEPLOYED'}
           >
             回滚
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<HistoryOutlined />}
+            onClick={() => handleViewRollbackHistory(record.deploymentId || record.modelId)}
+          >
+            回滚历史
           </Button>
           <Button
             type="link"

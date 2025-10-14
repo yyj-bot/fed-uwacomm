@@ -68,20 +68,17 @@ const generateLoss = (): number => {
  */
 export const mockFederatedTasks = baseTaskList
 
-// 联邦学习任务详情数据
-export const mockFederatedTaskDetails = [
-  {
-    taskId: 'c3d4e5f6789012345678901234567890',
-    taskName: '水声传播特征分类任务',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'RUNNING' as const,
+// ==================== 任务详情扩展数据 ====================
+// 只存储任务的扩展信息，基础信息从 baseTaskList 继承
+
+/**
+ * 任务详情扩展信息（不包含基础字段）
+ * 基础字段包括：taskId, taskName, taskType, status, createdAt, startedAt, completedAt, 
+ *               participantCount, currentRound, totalRounds, progress, finalAccuracy
+ */
+const taskDetailsExtensions: Record<string, any> = {
+  'c3d4e5f6789012345678901234567890': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T09:00:00.000Z',
-    startedAt: '2024-01-01T10:00:00.000Z',
-    currentRound: 5,
-    totalRounds: 15,
-    progress: 33.33,
-    participantCount: 2,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -131,19 +128,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'd4e5f678901234567890123456789012',
-    taskName: '声学传播回归分析',
-    taskType: 'REGRESSION' as const,
-    status: 'COMPLETED' as const,
+  'd4e5f678901234567890123456789012': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T08:00:00.000Z',
-    startedAt: '2024-01-01T08:30:00.000Z',
-    completedAt: '2024-01-01T11:00:00.000Z',
-    currentRound: 12,
-    totalRounds: 12,
-    progress: 100,
-    participantCount: 3,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -208,18 +194,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'e5f67890123456789012345678901234',
-    taskName: '水下异常检测任务',
-    taskType: 'ANOMALY_DETECTION' as const,
-    status: 'PAUSED' as const,
+  'e5f67890123456789012345678901234': {
     algorithm: 'FEDERATED_PROXIMAL',
-    createdAt: '2024-01-01T07:00:00.000Z',
-    startedAt: '2024-01-01T07:30:00.000Z',
-    currentRound: 3,
-    totalRounds: 12,
-    progress: 25.0,
-    participantCount: 4,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -299,17 +275,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'a1b2c3d4e5f678901234567890123456',
-    taskName: '深海声学模式识别',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'CREATED' as const,
+  'a1b2c3d4e5f678901234567890123456': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T05:00:00.000Z',
-    currentRound: 0,
-    totalRounds: 10,
-    progress: 0,
-    participantCount: 3,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -360,17 +327,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'f6789012345678901234567890123456',
-    taskName: '海洋声学聚类分析',
-    taskType: 'CLUSTERING' as const,
-    status: 'CONFIGURED' as const,
+  'f6789012345678901234567890123456': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T06:00:00.000Z',
-    currentRound: 0,
-    totalRounds: 20,
-    progress: 0,
-    participantCount: 5,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -465,18 +423,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'b2c3d4e5f67890123456789012345678',
-    taskName: '海底地形声学分析',
-    taskType: 'REGRESSION' as const,
-    status: 'FAILED' as const,
+  'b2c3d4e5f67890123456789012345678': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T04:00:00.000Z',
-    startedAt: '2024-01-01T04:30:00.000Z',
-    currentRound: 2,
-    totalRounds: 15,
-    progress: 13.33,
-    participantCount: 4,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -524,17 +472,8 @@ export const mockFederatedTaskDetails = [
       }
     }
   },
-  {
-    taskId: 'c4d5e6f7890123456789012345678901',
-    taskName: '水声通信优化',
-    taskType: 'CLASSIFICATION' as const,
-    status: 'CONFIGURED' as const,
+  'c4d5e6f7890123456789012345678901': {
     algorithm: 'FEDERATED_AVERAGING',
-    createdAt: '2024-01-01T03:00:00.000Z',
-    currentRound: 0,
-    totalRounds: 8,
-    progress: 0,
-    participantCount: 2,
     participants: [
       {
         vmId: 'a1b2c3d4e5f678901234567890123456',
@@ -582,7 +521,16 @@ export const mockFederatedTaskDetails = [
       }
     }
   }
-]
+}
+
+/**
+ * 联邦学习任务详情数据
+ * 通过合并 baseTaskList 和 taskDetailsExtensions 生成
+ */
+export const mockFederatedTaskDetails = baseTaskList.map(task => ({
+  ...task,
+  ...taskDetailsExtensions[task.taskId]
+}))
 
 // 任务结果数据
 export const mockTaskResults = [
@@ -922,7 +870,7 @@ export const mockTaskLogs: Record<string, any[]> = {
   ],
   'e5f67890123456789012345678901234': [
     {
-      timestamp: '2024-01-01T07:30:00.000Z',
+      timestamp: '2024-01-02T07:30:00.000Z',
       level: 'INFO',
       message: '水下异常检测任务启动成功',
       source: 'TASK_MANAGER',
@@ -931,7 +879,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       }
     },
     {
-      timestamp: '2024-01-01T07:35:00.000Z',
+      timestamp: '2024-01-02T07:35:00.000Z',
       level: 'INFO',
       message: '开始第1轮联邦训练',
       source: 'TRAINING_COORDINATOR',
@@ -941,7 +889,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       }
     },
     {
-      timestamp: '2024-01-01T08:35:00.000Z',
+      timestamp: '2024-01-02T08:35:00.000Z',
       level: 'INFO',
       message: '第3轮训练完成',
       source: 'TRAINING_COORDINATOR',
@@ -952,7 +900,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       }
     },
     {
-      timestamp: '2024-01-01T08:40:00.000Z',
+      timestamp: '2024-01-02T08:40:00.000Z',
       level: 'WARN',
       message: '用户主动暂停任务',
       source: 'TASK_MANAGER',
@@ -965,7 +913,7 @@ export const mockTaskLogs: Record<string, any[]> = {
   ],
   'f6789012345678901234567890123456': [
     {
-      timestamp: '2024-01-01T06:00:00.000Z',
+      timestamp: '2024-01-03T06:00:00.000Z',
       level: 'INFO',
       message: '海洋声学聚类分析任务创建成功',
       source: 'TASK_MANAGER',
@@ -975,7 +923,7 @@ export const mockTaskLogs: Record<string, any[]> = {
       }
     },
     {
-      timestamp: '2024-01-01T06:05:00.000Z',
+      timestamp: '2024-01-03T06:05:00.000Z',
       level: 'INFO',
       message: '任务配置完成，等待启动',
       source: 'TASK_MANAGER',

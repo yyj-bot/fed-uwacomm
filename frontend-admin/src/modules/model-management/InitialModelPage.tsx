@@ -24,7 +24,6 @@ import {
   Statistic,
   Row,
   Col,
-  Tabs,
   InputNumber,
   Switch,
   Tooltip,
@@ -125,20 +124,23 @@ const InitialModelPage: React.FC = () => {
   const [uploadForm] = Form.useForm()
   const [distributeForm] = Form.useForm()
 
-  // 模型列表数据 - 显示当前查询任务的初始模型（一个任务对应一个初始模型）
-  const modelListData = queryTaskId && initialModels[queryTaskId] ? 
-    [{
-      key: queryTaskId,
-      taskId: queryTaskId,
-      ...initialModels[queryTaskId]
-    }] : []
+  // 模型列表数据 - 显示所有任务的初始模型
+  const modelListData = Object.entries(initialModels)
+    .map(([taskId, model]) => ({
+      key: taskId,
+      taskId: taskId,
+      ...model
+    }))
+    .filter(model => {
+      // 如果有搜索关键词，则进行筛选
+      if (!queryTaskId.trim()) return true
+      const searchKey = queryTaskId.toLowerCase()
+      return (
+        model.taskId?.toLowerCase().includes(searchKey) ||
+        model.modelId?.toLowerCase().includes(searchKey)
+      )
+    })
 
-  // 分发列表数据
-  const distributionListData = Object.entries(distributions).map(([id, dist]) => ({
-    key: id,
-    distributionId: id,
-    ...dist
-  }))
 
   // 获取联邦学习任务列表
   const loadFederatedTasks = async () => {
@@ -177,10 +179,34 @@ const InitialModelPage: React.FC = () => {
     }
   }
 
-  // 组件挂载时加载任务列表
+  // 组件挂载时加载任务列表并自动获取所有任务的初始模型
   useEffect(() => {
     loadFederatedTasks()
+    loadAllInitialModels()
   }, [])
+
+  // 加载所有任务的初始模型
+  const loadAllInitialModels = async () => {
+    try {
+      const result = await federatedTaskService.getTaskList({
+        page: 1,
+        size: 100 // 获取前100个任务
+      })
+      
+      // 并发获取所有任务的初始模型
+      const promises = result.tasks.map(task => 
+        fetchTaskInitialModel(task.taskId).catch(err => {
+          console.warn(`获取任务 ${task.taskId} 的初始模型失败:`, err)
+          return null
+        })
+      )
+      
+      await Promise.all(promises)
+    } catch (error) {
+      console.error('加载初始模型列表失败:', error)
+      message.error('加载初始模型列表失败')
+    }
+  }
 
   // 查询初始模型
   const handleQueryModel = async () => {
@@ -356,91 +382,6 @@ const InitialModelPage: React.FC = () => {
     }
   ]
 
-  // 分发列表表格列定义
-  const distributionColumns: ColumnsType<any> = [
-    {
-      title: '分发ID',
-      dataIndex: 'distributionId',
-      key: 'distributionId',
-      width: 200,
-      ellipsis: true
-    },
-    {
-      title: '任务ID',
-      dataIndex: 'taskId',
-      key: 'taskId',
-      width: 200,
-      ellipsis: true
-    },
-    {
-      title: '模型ID',
-      dataIndex: 'modelId',
-      key: 'modelId',
-      width: 200,
-      ellipsis: true
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status: string) => (
-        <Tag color={getDistributionStatusColor(status)}>{status}</Tag>
-      )
-    },
-    {
-      title: '进度',
-      dataIndex: 'progress',
-      key: 'progress',
-      width: 200,
-      render: (progress: any) => (
-        <div>
-          <Progress
-            percent={progress ? Math.round((progress.completed / progress.total) * 100) : 0}
-            size="small"
-            status={progress?.failed > 0 ? 'exception' : 'active'}
-          />
-          <div style={{ fontSize: '12px', marginTop: '4px' }}>
-            {progress?.completed || 0}/{progress?.total || 0}
-            {progress?.failed > 0 && ` (失败: ${progress.failed})`}
-          </div>
-        </div>
-      )
-    },
-    {
-      title: '开始时间',
-      dataIndex: 'startedAt',
-      key: 'startedAt',
-      width: 180,
-      render: (time: string) => time ? new Date(time).toLocaleString() : '-'
-    },
-    {
-      title: '操作',
-      key: 'action',
-      fixed: 'right',
-      width: 150,
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<FileTextOutlined />}
-            onClick={() => handleViewDistributionDetail(record.distributionId)}
-          >
-            详情
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={() => handleRefreshDistribution(record.distributionId)}
-          >
-            刷新
-          </Button>
-        </Space>
-      )
-    }
-  ]
 
   // 处理生成初始模型
   const handleGenerate = async () => {
@@ -720,50 +661,30 @@ const InitialModelPage: React.FC = () => {
           </Space>
         }
       >
-        {/* 查询区域 */}
+        {/* 筛选区域 */}
         <Card size="small" style={{ marginBottom: 16 }}>
           <Alert
             message="使用说明"
-            description="初始模型管理需要基于联邦学习任务。请先从任务列表中选择一个任务，或直接输入任务ID来查询对应的初始模型。"
+            description="初始模型管理会自动遍历所有联邦学习任务并显示相应的初始模型。你可以使用搜索框快速查找特定任务的模型，或点击刷新按钮更新列表。"
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
           />
           <Space wrap>
             <Input
-              placeholder="请输入任务ID查询初始模型"
+              placeholder="搜索任务ID或模型ID"
               value={queryTaskId}
               onChange={(e) => setQueryTaskId(e.target.value)}
               style={{ width: 300 }}
-              onPressEnter={handleQueryModel}
               prefix={<SearchOutlined />}
+              allowClear
             />
             <Button 
-              type="primary" 
-              onClick={handleQueryModel}
+              icon={<ReloadOutlined />}
+              onClick={loadAllInitialModels}
               loading={Object.values(initialModelLoading).some(Boolean)}
             >
-              查询
-            </Button>
-            <Button 
-              onClick={handleSelectFromTasks}
-              loading={tasksLoading}
-            >
-              从任务列表选择
-            </Button>
-            <Button onClick={() => {
-              setQueryTaskId('')
-              // 这里可以选择是否要清除已查询的模型数据
-              // 如果想要清除，可以调用store的清理方法
-            }}>
-              清空
-            </Button>
-            <Button 
-              icon={<ReloadOutlined />}
-              onClick={loadFederatedTasks}
-              loading={tasksLoading}
-            >
-              刷新任务列表
+              刷新模型列表
             </Button>
           </Space>
           {federatedTasks.length > 0 && (
@@ -773,52 +694,21 @@ const InitialModelPage: React.FC = () => {
           )}
         </Card>
 
-        <Tabs 
-          defaultActiveKey="models"
-          items={[
-            {
-              key: 'models',
-              label: `初始模型列表 ${modelListData.length > 0 ? `(${modelListData.length})` : ''}`,
-              children: (
-                <Table
-                  columns={modelColumns}
-                  dataSource={modelListData}
-                  loading={Object.values(initialModelLoading).some(Boolean)}
-                  scroll={{ x: 1400 }}
-                  pagination={{
-                    showSizeChanger: true,
-                    showTotal: (total) => `共 ${total} 条`,
-                    pageSize: 10
-                  }}
-                  locale={{
-                    emptyText: queryTaskId ? 
-                      `任务 ${queryTaskId} 暂无初始模型数据` : 
-                      '请先选择或输入任务ID进行查询'
-                  }}
-                />
-              )
-            },
-            {
-              key: 'distributions',
-              label: `分发记录 ${distributionListData.length > 0 ? `(${distributionListData.length})` : ''}`,
-              children: (
-                <Table
-                  columns={distributionColumns}
-                  dataSource={distributionListData}
-                  loading={Object.values(distributionLoading).some(Boolean)}
-                  scroll={{ x: 1200 }}
-                  pagination={{
-                    showSizeChanger: true,
-                    showTotal: (total) => `共 ${total} 条`,
-                    pageSize: 10
-                  }}
-                  locale={{
-                    emptyText: '暂无分发记录'
-                  }}
-                />
-              )
-            }
-          ]}
+        <Table
+          columns={modelColumns}
+          dataSource={modelListData}
+          loading={Object.values(initialModelLoading).some(Boolean)}
+          scroll={{ x: 1400 }}
+          pagination={{
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            pageSize: 10
+          }}
+          locale={{
+            emptyText: queryTaskId ? 
+              '搜索无结果，请尝试其他关键词' : 
+              '暂无初始模型数据，请先创建联邦学习任务并生成或上传初始模型'
+          }}
         />
       </Card>
 

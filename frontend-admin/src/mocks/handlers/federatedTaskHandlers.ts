@@ -377,12 +377,31 @@ export const federatedTaskHandlers = [
     // 查找对应的任务详情
     const taskDetail = mockFederatedTaskDetails.find(task => task.taskId === taskId) || mockFederatedTaskDetails[0]
     
+    // 查找对应的任务结果，用于获取训练历史
+    const taskResults = mockTaskResults.find(result => result.taskId === taskId)
+    
+    // 从 roundResults 生成训练历史数据
+    const trainingHistory = taskResults?.roundResults?.map(round => ({
+      round: round.round,
+      accuracy: round.accuracy,
+      loss: round.loss
+    })) || []
+    
+    console.log('🔍 [Mock] 任务详情查询:', {
+      taskId,
+      hasTaskResults: !!taskResults,
+      roundResultsCount: taskResults?.roundResults?.length || 0,
+      trainingHistoryCount: trainingHistory.length,
+      trainingHistory
+    })
+    
     return HttpResponse.json({
       code: 200,
       message: '查询成功',
       data: {
         ...taskDetail,
-        taskId // 确保使用请求的taskId
+        taskId, // 确保使用请求的taskId
+        trainingHistory // 添加训练历史数据
       }
     })
   }),
@@ -398,7 +417,8 @@ export const federatedTaskHandlers = [
     const startDate = url.searchParams.get('startDate')
     const endDate = url.searchParams.get('endDate')
     
-    let filteredTasks = [...mockFederatedTasks]
+    // 使用 mockFederatedTaskDetails 而不是 mockFederatedTasks，以包含 participants 信息
+    let filteredTasks = [...mockFederatedTaskDetails]
     
     // 应用过滤条件
     if (status) {
@@ -413,14 +433,20 @@ export const federatedTaskHandlers = [
       )
     }
     if (startDate) {
-      filteredTasks = filteredTasks.filter(task => 
-        new Date(task.createdAt) >= new Date(startDate)
-      )
+      filteredTasks = filteredTasks.filter(task => {
+        const taskDate = new Date(task.createdAt)
+        const filterStartDate = new Date(startDate)
+        return taskDate >= filterStartDate
+      })
     }
     if (endDate) {
-      filteredTasks = filteredTasks.filter(task => 
-        new Date(task.createdAt) <= new Date(endDate)
-      )
+      filteredTasks = filteredTasks.filter(task => {
+        const taskDate = new Date(task.createdAt)
+        // 将结束日期设为当天的23:59:59
+        const filterEndDate = new Date(endDate)
+        filterEndDate.setHours(23, 59, 59, 999)
+        return taskDate <= filterEndDate
+      })
     }
     
     // 分页
@@ -604,7 +630,7 @@ export const federatedTaskHandlers = [
   }),
 
   // 3.14 聚合引擎状态查询接口 (v1.4 新增)
-  http.get('/api/federated/engine/status', async ({ request }) => {
+  http.get('http://localhost:5173/api/federated/engine/status', async ({ request }) => {
     const url = new URL(request.url)
     const taskId = url.searchParams.get('taskId')
     const engineId = url.searchParams.get('engineId')
