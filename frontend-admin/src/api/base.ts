@@ -158,8 +158,8 @@ function setupResponseInterceptor(instance: AxiosInstance): void {
         console.log(`📥 Response Data:`, response.data)
       }
       
-      // 检查业务状态码
-      if (response.data && response.data.code !== 200) {
+      // 检查业务状态码（跳过blob响应）
+      if (response.data && typeof response.data === 'object' && !(response.data instanceof Blob) && response.data.code !== 200) {
         // 特殊处理认证失败
         if (response.data.code === 401) {
           console.warn('🚨 API返回401认证失败:', {

@@ -1,19 +1,31 @@
 .task-detail-page {
   padding: 24px;
-  background: #f0f2f5;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
   min-height: 100vh;
 }
 
 .header-card {
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.header-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  padding: 20px;
+  margin: -24px -24px 0 -24px;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 .header-left {
@@ -24,9 +36,13 @@
 
 .task-title h2 {
   margin: 0;
-  color: #262626;
+  color: #1a1a1a;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .task-meta {
@@ -47,64 +63,154 @@
 }
 
 /* 统计卡片样式 */
-.ant-statistic-title {
+.task-detail-page .ant-statistic-title {
   color: #8c8c8c;
   font-size: 14px;
   margin-bottom: 4px;
+  font-weight: 500;
 }
 
-.ant-statistic-content {
+.task-detail-page .ant-statistic-content {
   color: #262626;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 700;
 }
 
-.ant-statistic-content-prefix {
+.task-detail-page .ant-statistic-content-prefix {
   color: #1890ff;
   margin-right: 8px;
 }
 
-/* 标签页样式 */
-.ant-tabs > .ant-tabs-nav {
-  margin-bottom: 24px;
-}
-
-.ant-tabs-tab {
+/* 按钮美化 */
+.task-detail-page .ant-btn-lg {
+  height: 40px;
+  padding: 8px 24px;
+  font-size: 14px;
+  border-radius: 8px;
   font-weight: 500;
+  transition: all 0.3s ease;
 }
 
-.ant-tabs-tab-active .ant-tabs-tab-btn {
+.task-detail-page .ant-btn-lg:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.task-detail-page .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.task-detail-page .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.4);
+}
+
+/* 标签页样式 */
+.task-detail-page .ant-tabs > .ant-tabs-nav {
+  margin-bottom: 24px;
+  padding: 0 8px;
+}
+
+.task-detail-page .ant-tabs-tab {
+  font-weight: 500;
+  font-size: 15px;
+  padding: 12px 20px;
+  transition: all 0.3s ease;
+}
+
+.task-detail-page .ant-tabs-tab:hover {
+  color: #1890ff;
+}
+
+.task-detail-page .ant-tabs-tab-active {
+  background: transparent;
+  border-radius: 8px 8px 0 0;
+}
+
+.task-detail-page .ant-tabs-tab-active .ant-tabs-tab-btn {
   color: #1890ff;
   font-weight: 600;
 }
 
-/* 描述列表样式 */
-.ant-descriptions-item-label {
-  color: #8c8c8c;
-  font-weight: 500;
+.task-detail-page .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%);
+  height: 3px;
 }
 
-.ant-descriptions-item-content {
+/* 描述列表样式 */
+.task-detail-page .ant-descriptions-item-label {
+  color: #595959;
+  font-weight: 600;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%) !important;
+  font-size: 14px;
+}
+
+.task-detail-page .ant-descriptions-item-content {
   color: #262626;
+  font-size: 14px;
+  background: #ffffff !important;
+}
+
+.task-detail-page .ant-descriptions-bordered .ant-descriptions-view {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+}
+
+.task-detail-page .ant-descriptions-bordered .ant-descriptions-item-label,
+.task-detail-page .ant-descriptions-bordered .ant-descriptions-item-content {
+  border-color: #f0f0f0;
 }
 
 /* 表格样式 */
-.ant-table-thead > tr > th {
-  background: #fafafa;
+.task-detail-page .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
   font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
 }
 
-.ant-table-tbody > tr:hover > td {
-  background: #f5f5f5;
+.task-detail-page .ant-table-tbody > tr {
+  transition: all 0.3s ease;
+}
+
+.task-detail-page .ant-table-tbody > tr:hover > td {
+  background: rgba(230, 244, 255, 0.6) !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.task-detail-page .ant-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.task-detail-page .ant-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 /* 进度条样式 */
-.ant-progress-line {
+.task-detail-page .ant-progress-line {
   margin-bottom: 0;
 }
 
-.ant-progress-text {
-  font-size: 12px;
+.task-detail-page .ant-progress-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.task-detail-page .ant-progress-bg {
+  border-radius: 100px;
+}
+
+.task-detail-page .ant-progress-inner {
+  background: #f0f0f0;
+  border-radius: 100px;
 }
 
 /* 图表容器样式 */
@@ -288,45 +394,60 @@
   }
 }
 
-/* 深色主题支持 */
+/* 禁用深色主题 - 强制使用明亮主题 */
 @media (prefers-color-scheme: dark) {
   .task-detail-page {
-    background: #141414;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%) !important;
   }
   
   .header-card,
   .ant-card {
-    background: #1f1f1f;
-    border-color: #303030;
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.04) !important;
   }
   
   .task-title h2 {
-    color: #fff;
+    color: #1a1a1a !important;
   }
   
   .task-id {
-    color: #8c8c8c;
+    color: #8c8c8c !important;
   }
   
   .ant-descriptions-item-label {
-    color: #8c8c8c;
+    color: #8c8c8c !important;
   }
   
   .ant-descriptions-item-content {
-    color: #fff;
+    color: #262626 !important;
   }
   
   .log-message {
-    color: #fff;
+    color: #262626 !important;
   }
   
   .log-details {
-    background: #262626;
-    border-left-color: #1890ff;
+    background: #f5f5f5 !important;
+    border-left-color: #1890ff !important;
   }
   
   .log-details pre {
-    color: #d9d9d9;
+    color: #595959 !important;
+  }
+  
+  .ant-table-tbody > tr {
+    background: #ffffff !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    background: transparent !important;
+    color: #262626 !important;
+  }
+  
+  .ant-table-tbody > tr:hover > td {
+    background: rgba(230, 244, 255, 0.6) !important;
   }
 }
+
+
 

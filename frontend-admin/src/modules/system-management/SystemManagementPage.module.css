@@ -1,90 +1,168 @@
 /**
- * 系统管理页面样式
+ * 系统管理页面样式 - 现代美化版
  */
 
 .fed-system-management-page {
   background: transparent;
   min-height: auto;
+  padding: 24px 24px 24px 24px;
 }
 
+/* 确保 Row 容器与下方卡片对齐 */
+.fed-system-management-page :global(.ant-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 页面标题区域 - 仿照仪表盘布局 */
 .fed-system-management-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  padding: 0 4px;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  margin-bottom: 24px !important;
+  padding: 0 4px !important;
 }
 
 .fed-system-management-title {
-  flex: 1;
+  flex: 0 0 auto !important;
+}
+
+.fed-system-management-title h2 {
+  margin-bottom: 0 !important;
 }
 
 .fed-system-management-title .ant-typography {
-  margin-bottom: 0;
+  margin-bottom: 0 !important;
 }
 
 .fed-system-management-title .ant-typography + .ant-typography {
-  margin-top: 4px;
+  margin-top: 4px !important;
+  display: block !important;
 }
 
-.fed-system-management-actions {
-  flex-shrink: 0;
-  margin-left: 24px;
+/* 系统状态指示器 - 右上角 */
+.fed-system-management-status {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  margin-left: auto !important;
+  padding-top: 4px !important;
 }
 
 .fed-system-management-stats {
   margin-bottom: 24px;
+  padding: 0 !important;
 }
 
-.fed-stat-card {
-  text-align: center;
-  border-radius: 8px;
-  transition: all 0.3s;
+/* 紧凑型统计卡片 */
+.fed-stat-card-compact {
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white !important;
+  border: 1px solid #f0f0f0 !important;
+  overflow: hidden;
+  position: relative;
 }
 
-.fed-stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.fed-stat-card-compact:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(24, 144, 255, 0.15);
+  border-color: #1890ff !important;
 }
 
-.fed-stat-icon {
-  font-size: 24px;
-  margin-bottom: 8px;
+.fed-stat-card-compact .ant-card-body {
+  padding: 16px !important;
+}
+
+.fed-stat-icon-compact {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fed-stat-card-compact:hover .fed-stat-icon-compact {
+  transform: scale(1.1);
+}
+
+/* 呼吸灯动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
 }
 
 .fed-system-management-content {
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  background: white !important;
+  overflow: hidden;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .fed-system-management-content .ant-tabs-nav {
   margin-bottom: 0;
   padding: 0 24px;
-  background: #fafafa;
-  border-radius: 8px 8px 0 0;
+  background: linear-gradient(to bottom, #fafafa, #ffffff);
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.fed-system-management-content .ant-tabs-tab {
+  padding: 16px 0;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.fed-system-management-content .ant-tabs-tab:hover {
+  color: #1890ff !important;
+}
+
+.fed-system-management-content .ant-tabs-tab-active {
+  font-weight: 600;
+}
+
+.fed-system-management-content .ant-tabs-ink-bar {
+  height: 3px;
+  background: linear-gradient(90deg, #1890ff 0%, #722ed1 100%);
+  border-radius: 3px 3px 0 0;
 }
 
 .fed-system-management-content .ant-tabs-content-holder {
-  padding: 24px;
+  padding: 32px 24px;
+  background: white;
 }
 
 /* 响应式样式 */
 @media (max-width: 768px) {
+  .fed-system-management-page {
+    padding: 16px;
+  }
+
   .fed-system-management-header {
     flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
+    align-items: flex-start;
+    gap: 12px;
   }
-  
-  .fed-system-management-actions {
+
+  .fed-system-management-status {
     margin-left: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    padding-top: 0;
   }
   
   .fed-system-management-content .ant-tabs-content-holder {
-    padding: 16px;
+    padding: 20px 16px;
+  }
+
+  .fed-stat-card-compact:hover {
+    transform: translateY(-4px);
+  }
+  
+  .fed-system-management-stats {
+    margin-bottom: 32px;
   }
 }
 
@@ -98,7 +176,196 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding: 16px 0;
+  margin-top: 0;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+:global(.fed-user-toolbar .ant-btn-primary) {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s;
+}
+
+:global(.fed-user-toolbar .ant-btn-primary:hover) {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+/* 权限管理样式优化 */
+:global(.fed-permission-management) {
   background: transparent;
+}
+
+:global(.fed-permission-management .ant-card) {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e8e8e8;
+  transition: all 0.3s;
+}
+
+:global(.fed-permission-management .ant-card:hover) {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: #1890ff;
+}
+
+:global(.fed-permission-management .ant-card-head) {
+  background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+  border-bottom: 2px solid #f0f0f0;
+  font-weight: 600;
+}
+
+:global(.fed-permission-management .ant-alert) {
+  border-radius: 12px;
+  border: 1px solid #e6f7ff;
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%);
+}
+
+/* 表格样式优化 */
+:global(.fed-user-management .ant-table) {
+  border-radius: 12px;
+  overflow: hidden;
+  background: white !important;
+}
+
+:global(.fed-user-management .ant-table-container) {
+  background: white !important;
+}
+
+:global(.fed-user-management .ant-table-content) {
+  background: white !important;
+}
+
+:global(.fed-user-management .ant-table-thead > tr > th) {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%) !important;
+  font-weight: 600;
+  color: #262626 !important;
+  border-bottom: 2px solid #e8e8e8;
+}
+
+:global(.fed-user-management .ant-table-tbody) {
+  background: white !important;
+}
+
+:global(.fed-user-management .ant-table-tbody > tr) {
+  background: white !important;
+}
+
+:global(.fed-user-management .ant-table-tbody > tr > td) {
+  background: white !important;
+  color: #262626 !important;
+  transition: background 0.3s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+:global(.fed-user-management .ant-table-tbody > tr:hover > td) {
+  background: #f0f9ff !important;
+}
+
+:global(.fed-user-management .ant-table-tbody > tr.ant-table-row:hover) {
+  background: #f0f9ff !important;
+}
+
+/* 按钮悬停效果 */
+:global(.fed-user-management .ant-btn) {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:global(.fed-user-management .ant-btn:hover) {
+  transform: translateY(-2px);
+}
+
+:global(.fed-user-management .ant-btn-text:hover) {
+  background: rgba(24, 144, 255, 0.1);
+  border-radius: 6px;
+}
+
+/* 删除按钮美化 - 与编辑按钮保持一致 */
+:global(.fed-user-management .ant-btn-text.ant-btn-dangerous) {
+  color: #ff4d4f !important;
+  background: transparent !important;
+  border: none !important;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+:global(.fed-user-management .ant-btn-text.ant-btn-dangerous:hover) {
+  background: rgba(24, 144, 255, 0.1) !important;
+  color: #ff4d4f !important;
+  border-radius: 6px;
+  border: none !important;
+}
+
+:global(.fed-user-management .ant-btn-text.ant-btn-dangerous:active) {
+  transform: scale(0.96);
+  background: rgba(24, 144, 255, 0.15) !important;
+}
+
+:global(.fed-user-management .ant-btn-text.ant-btn-dangerous:focus) {
+  background: transparent !important;
+}
+
+/* 特别针对带有danger属性的text按钮 */
+:global(.fed-user-management .ant-btn.ant-btn-text.ant-btn-dangerous) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+:global(.fed-user-management .ant-btn.ant-btn-text.ant-btn-dangerous:hover) {
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  background: rgba(24, 144, 255, 0.1) !important;
+}
+
+/* Popconfirm 删除确认框美化 */
+:global(.ant-popover-inner) {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+:global(.ant-popconfirm-message) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+:global(.ant-popconfirm-message-icon) {
+  color: #faad14;
+  font-size: 18px;
+}
+
+:global(.ant-popconfirm-message-title) {
+  font-weight: 500;
+  color: #262626;
+}
+
+:global(.ant-popconfirm-description) {
+  color: #8c8c8c;
+  font-size: 13px;
+  margin-left: 26px;
+}
+
+:global(.ant-popconfirm-buttons) {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+:global(.ant-popconfirm .ant-btn-primary) {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.3);
+}
+
+:global(.ant-popconfirm .ant-btn-primary:hover) {
+  background: linear-gradient(135deg, #ff7875 0%, #ff4d4f 100%);
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.4);
 }

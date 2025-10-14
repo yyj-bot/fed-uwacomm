@@ -10,19 +10,17 @@ import React, { useEffect } from 'react'
 import { Row, Col, Card, Typography, Space, Button, Tabs, Statistic } from 'antd'
 import { 
   UserOutlined, 
-  SettingOutlined, 
   SafetyOutlined,
-  DatabaseOutlined,
   TeamOutlined,
   SecurityScanOutlined
 } from '@ant-design/icons'
 
+const { Title, Text, Paragraph } = Typography
+
 import { useAdmin } from '@/store'
 import { Table, StatusIndicator } from '@/components'
 import { UserManagement, PermissionManagement } from './components'
-import './SystemManagementPage.module.css'
-
-const { Title, Text } = Typography
+import styles from './SystemManagementPage.module.css'
 
 const SystemManagementPage: React.FC = () => {
   const { 
@@ -39,7 +37,13 @@ const SystemManagementPage: React.FC = () => {
   }, [fetchUserList, fetchUserStatistics])
 
   // 统计数据
-  const stats = [
+  const stats: Array<{
+    title: string
+    value: number | string
+    icon: React.ReactNode
+    color: string
+    suffix?: string
+  }> = [
     {
       title: '总用户数',
       value: userStatistics?.totalUsers || userListTotal,
@@ -53,65 +57,111 @@ const SystemManagementPage: React.FC = () => {
       color: '#52c41a'
     },
     {
-      title: '系统模块',
-      value: 8,
-      icon: <DatabaseOutlined />,
+      title: '管理员',
+      value: userStatistics?.adminUsers || userList?.filter(user => user.role === 'ADMIN').length || 0,
+      icon: <SafetyOutlined />,
       color: '#722ed1'
     },
     {
-      title: '安全等级',
-      value: 'A',
-      suffix: '级',
+      title: '锁定用户',
+      value: userStatistics?.lockedUsers || userList?.filter(user => user.status === 'LOCKED').length || 0,
       icon: <SecurityScanOutlined />,
       color: '#fa8c16'
     }
   ]
 
   return (
-    <div className="fed-system-management-page">
-      {/* 页面标题 */}
-      <div className="fed-system-management-header">
-        <div className="fed-system-management-title">
-          <Title level={2}>系统管理</Title>
-          <Text type="secondary">管理用户和权限</Text>
+    <div className={styles['fed-system-management-page']}>
+      {/* 页面标题 - 参考联邦学习样式 */}
+      <div className={styles['fed-system-management-header']}>
+        <div className={styles['fed-system-management-title']}>
+          <Title level={2} style={{ 
+            margin: 0,
+            fontSize: '26px',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            系统管理
+          </Title>
+          <Paragraph style={{ 
+            margin: '8px 0 0 0', 
+            color: '#595959',
+            fontSize: '14px',
+            fontWeight: 400
+          }}>
+            管理用户和权限
+          </Paragraph>
         </div>
-        <div className="fed-system-management-actions">
-          <Space>
-            <StatusIndicator
-              status="running"
-              text="系统正常"
-              variant="badge"
-            />
-          </Space>
+        <div className={styles['fed-system-management-status']}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#52c41a',
+              boxShadow: '0 0 8px rgba(82, 196, 26, 0.6)',
+              animation: 'pulse 2s ease-in-out infinite'
+            }} />
+            <span style={{ 
+              color: '#262626', 
+              fontWeight: 500,
+              fontSize: '14px'
+            }}>系统正常运行</span>
+          </div>
         </div>
       </div>
 
-      {/* 统计卡片 */}
-      <Row gutter={[16, 16]} className="fed-system-management-stats">
+      {/* 统计卡片 - 精简版 */}
+      <Row gutter={[16, 16]} className={styles['fed-system-management-stats']}>
         {stats.map((stat, index) => (
-          <Col xs={12} sm={6} key={index}>
-            <Card className="fed-stat-card">
-              <Statistic
-                title={stat.title}
-                value={stat.value}
-                suffix={stat.suffix}
-                prefix={
-                  <div 
-                    className="fed-stat-icon" 
-                    style={{ color: stat.color }}
-                  >
-                    {stat.icon}
+          <Col xs={12} sm={6} md={6} key={index}>
+            <Card 
+              className={styles['fed-stat-card-compact']}
+              bordered={false}
+              hoverable
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div 
+                  className={styles['fed-stat-icon-compact']} 
+                  style={{ 
+                    color: stat.color,
+                    fontSize: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: `linear-gradient(135deg, ${stat.color}18 0%, ${stat.color}08 100%)`,
+                    flexShrink: 0
+                  }}
+                >
+                  {stat.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '11px', color: '#8c8c8c', marginBottom: '4px', fontWeight: 500 }}>
+                    {stat.title}
                   </div>
-                }
-                valueStyle={{ color: stat.color }}
-              />
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: stat.color, lineHeight: 1 }}>
+                    {stat.value}
+                    {stat.suffix && <span style={{ fontSize: '14px', marginLeft: '2px' }}>{stat.suffix}</span>}
+                  </div>
+                </div>
+              </div>
             </Card>
           </Col>
         ))}
       </Row>
 
       {/* 管理功能选项卡 */}
-      <Card className="fed-system-management-content">
+      <Card className={styles['fed-system-management-content']}>
         <Tabs 
           defaultActiveKey="users" 
           size="large"

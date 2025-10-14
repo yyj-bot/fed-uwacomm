@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
   readonly VITE_BACKEND_URL: string
   readonly VITE_ENABLE_API_LOGS: string
+  readonly VITE_ENABLE_MOCK: string
   // 更多环境变量...
 }
 

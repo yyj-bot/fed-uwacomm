@@ -8,26 +8,36 @@
 
 import { useCallback } from 'react'
 import { useModelStore } from './modelVersionStore'
+import useFederatedTaskStore from '../federated-task/useFederatedTaskStore'
 import type { 
   ModelVersionDetail,
   TaskModelVersions,
   EvaluationResult,
-  DeploymentStatus,
   RollbackInfo,
   ModelStatistics,
   TaskStatistics,
   ModelVersionListParams,
   EvaluationRequest,
-  DeploymentRequest,
+  BatchEvaluationRequest,
   RollbackRequest,
   DownloadRequest,
   DeleteModelRequest,
-  StatisticsParams
+  StatisticsParams,
+  // 初始模型管理相关类型
+  InitialModelInfo,
+  InitialModelGenerationRequest,
+  InitialModelUploadRequest,
+  ModelDistributionRequest,
+  DistributionStatusDetail,
+  InitialModelDeleteRequest
 } from '@/services'
 
 // ==================== Hook 实现 ====================
 
 export const useModel = () => {
+  // 获取联邦学习任务相关状态和方法
+  const { taskList, fetchTaskDetail, currentTask } = useFederatedTaskStore()
+  
   // 获取状态
   const modelList = useModelStore((state) => state.modelList)
   const modelListTotal = useModelStore((state) => state.modelListTotal)
@@ -41,18 +51,14 @@ export const useModel = () => {
   const taskModels = useModelStore((state) => state.taskModels)
   const taskModelsLoading = useModelStore((state) => state.taskModelsLoading)
   
-  const uploadLoading = useModelStore((state) => state.uploadLoading)
-  const uploadError = useModelStore((state) => state.uploadError)
-  const uploadProgress = useModelStore((state) => state.uploadProgress)
   
   const evaluationResults = useModelStore((state) => state.evaluationResults)
   const evaluationLoading = useModelStore((state) => state.evaluationLoading)
-  
-  const deployments = useModelStore((state) => state.deployments)
-  const deploymentLoading = useModelStore((state) => state.deploymentLoading)
+  const evaluationResultsLoading = useModelStore((state) => state.evaluationResultsLoading)
   
   const rollbackHistory = useModelStore((state) => state.rollbackHistory)
-  
+  const rollbackLoading = useModelStore((state) => state.rollbackLoading)
+
   const modelStatistics = useModelStore((state) => state.modelStatistics)
   const taskStatistics = useModelStore((state) => state.taskStatistics)
   const statisticsLoading = useModelStore((state) => state.statisticsLoading)
@@ -62,20 +68,33 @@ export const useModel = () => {
   
   const pagination = useModelStore((state) => state.pagination)
   const queryParams = useModelStore((state) => state.queryParams)
+  
+  // ==================== 初始模型管理状态 ====================
+  
+  const initialModels = useModelStore((state) => state.initialModels)
+  const initialModelLoading = useModelStore((state) => state.initialModelLoading)
+  const initialModelError = useModelStore((state) => state.initialModelError)
+  
+  const generationLoading = useModelStore((state) => state.generationLoading)
+  const generationError = useModelStore((state) => state.generationError)
+  
+  const initialUploadLoading = useModelStore((state) => state.initialUploadLoading)
+  const initialUploadError = useModelStore((state) => state.initialUploadError)
+  const initialUploadProgress = useModelStore((state) => state.initialUploadProgress)
+  
+  const distributions = useModelStore((state) => state.distributions)
+  const distributionLoading = useModelStore((state) => state.distributionLoading)
+  const distributionError = useModelStore((state) => state.distributionError)
 
   // 获取操作方法
   const fetchModelListAction = useModelStore((state) => state.fetchModelList)
   const refreshModelListAction = useModelStore((state) => state.refreshModelList)
   const fetchModelDetailAction = useModelStore((state) => state.fetchModelDetail)
   const setCurrentModelAction = useModelStore((state) => state.setCurrentModel)
-  const uploadModelAction = useModelStore((state) => state.uploadModel)
-  const uploadModelBatchAction = useModelStore((state) => state.uploadModelBatch)
   const fetchTaskModelsAction = useModelStore((state) => state.fetchTaskModels)
   const evaluateModelAction = useModelStore((state) => state.evaluateModel)
+  const batchEvaluateModelsAction = useModelStore((state) => state.batchEvaluateModels)
   const fetchEvaluationResultsAction = useModelStore((state) => state.fetchEvaluationResults)
-  const deployModelAction = useModelStore((state) => state.deployModel)
-  const fetchDeploymentStatusAction = useModelStore((state) => state.fetchDeploymentStatus)
-  const fetchDeploymentListAction = useModelStore((state) => state.fetchDeploymentList)
   const rollbackModelAction = useModelStore((state) => state.rollbackModel)
   const fetchRollbackHistoryAction = useModelStore((state) => state.fetchRollbackHistory)
   const downloadModelAction = useModelStore((state) => state.downloadModel)
@@ -90,6 +109,16 @@ export const useModel = () => {
   const clearErrorAction = useModelStore((state) => state.clearError)
   const clearModelErrorAction = useModelStore((state) => state.clearModelError)
   const resetStateAction = useModelStore((state) => state.resetState)
+  
+  // ==================== 初始模型管理操作方法 ====================
+  
+  const generateInitialModelAction = useModelStore((state) => state.generateInitialModel)
+  const uploadCustomInitialModelAction = useModelStore((state) => state.uploadCustomInitialModel)
+  const fetchTaskInitialModelAction = useModelStore((state) => state.fetchTaskInitialModel)
+  const distributeInitialModelAction = useModelStore((state) => state.distributeInitialModel)
+  const fetchDistributionStatusAction = useModelStore((state) => state.fetchDistributionStatus)
+  const downloadInitialModelAction = useModelStore((state) => state.downloadInitialModel)
+  const deleteInitialModelAction = useModelStore((state) => state.deleteInitialModel)
 
   // ==================== 封装操作方法 ====================
 
@@ -139,31 +168,6 @@ export const useModel = () => {
     setCurrentModelAction(model)
   }, [setCurrentModelAction])
 
-  /**
-   * 上传模型
-   */
-  const uploadModel = useCallback(async (formData: FormData) => {
-    try {
-      const modelId = await uploadModelAction(formData)
-      return { success: true, error: null, data: modelId }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '模型上传失败'
-      return { success: false, error: errorMessage, data: null }
-    }
-  }, [uploadModelAction])
-
-  /**
-   * 批量上传模型
-   */
-  const uploadModelBatch = useCallback(async (models: { file: File; roundNumber: number; description?: string }[], taskId: string) => {
-    try {
-      await uploadModelBatchAction(models, taskId)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '批量上传失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [uploadModelBatchAction])
 
   /**
    * 获取任务模型版本
@@ -192,9 +196,22 @@ export const useModel = () => {
   }, [evaluateModelAction])
 
   /**
+   * 批量评估模型
+   */
+  const batchEvaluateModels = useCallback(async (request: BatchEvaluationRequest) => {
+    try {
+      await batchEvaluateModelsAction(request)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '批量评估失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [batchEvaluateModelsAction])
+
+  /**
    * 获取评估结果
    */
-  const fetchEvaluationResults = useCallback(async (modelId: string) => {
+  const fetchEvaluationResults = useCallback(async (modelId?: string) => {
     try {
       await fetchEvaluationResultsAction(modelId)
       return { success: true, error: null }
@@ -205,50 +222,11 @@ export const useModel = () => {
   }, [fetchEvaluationResultsAction])
 
   /**
-   * 部署模型
-   */
-  const deployModel = useCallback(async (modelId: string, request: DeploymentRequest) => {
-    try {
-      const deploymentId = await deployModelAction(modelId, request)
-      return { success: true, error: null, data: deploymentId }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '模型部署失败'
-      return { success: false, error: errorMessage, data: null }
-    }
-  }, [deployModelAction])
-
-  /**
-   * 获取部署状态
-   */
-  const fetchDeploymentStatus = useCallback(async (deploymentId: string) => {
-    try {
-      await fetchDeploymentStatusAction(deploymentId)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取部署状态失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [fetchDeploymentStatusAction])
-
-  /**
-   * 获取部署列表
-   */
-  const fetchDeploymentList = useCallback(async (params?: any) => {
-    try {
-      await fetchDeploymentListAction(params)
-      return { success: true, error: null }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取部署列表失败'
-      return { success: false, error: errorMessage }
-    }
-  }, [fetchDeploymentListAction])
-
-  /**
    * 回滚模型
    */
-  const rollbackModel = useCallback(async (deploymentId: string, request: RollbackRequest) => {
+  const rollbackModel = useCallback(async (rollbackData: RollbackRequest) => {
     try {
-      await rollbackModelAction(deploymentId, request)
+      await rollbackModelAction(rollbackData)
       return { success: true, error: null }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '模型回滚失败'
@@ -259,9 +237,9 @@ export const useModel = () => {
   /**
    * 获取回滚历史
    */
-  const fetchRollbackHistory = useCallback(async (deploymentId: string) => {
+  const fetchRollbackHistory = useCallback(async (params?: { deploymentId?: string; page?: number; size?: number }) => {
     try {
-      await fetchRollbackHistoryAction(deploymentId)
+      await fetchRollbackHistoryAction(params)
       return { success: true, error: null }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '获取回滚历史失败'
@@ -389,6 +367,99 @@ export const useModel = () => {
     resetStateAction()
   }, [resetStateAction])
 
+  // ==================== 初始模型管理封装操作方法 ====================
+
+  /**
+   * 生成随机初始模型
+   */
+  const generateInitialModel = useCallback(async (generationData: InitialModelGenerationRequest) => {
+    try {
+      const modelId = await generateInitialModelAction(generationData)
+      return { success: true, error: null, data: modelId }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '初始模型生成失败'
+      return { success: false, error: errorMessage, data: null }
+    }
+  }, [generateInitialModelAction])
+
+  /**
+   * 上传自定义初始模型
+   */
+  const uploadCustomInitialModel = useCallback(async (uploadData: InitialModelUploadRequest) => {
+    try {
+      const modelId = await uploadCustomInitialModelAction(uploadData)
+      return { success: true, error: null, data: modelId }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '自定义初始模型上传失败'
+      return { success: false, error: errorMessage, data: null }
+    }
+  }, [uploadCustomInitialModelAction])
+
+  /**
+   * 获取任务初始模型
+   */
+  const fetchTaskInitialModel = useCallback(async (taskId: string, params?: { includeParameters?: boolean; format?: 'json' | 'binary' }) => {
+    try {
+      await fetchTaskInitialModelAction(taskId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取初始模型失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchTaskInitialModelAction])
+
+  /**
+   * 分发初始模型
+   */
+  const distributeInitialModel = useCallback(async (taskId: string, distributionData: ModelDistributionRequest) => {
+    try {
+      const distributionId = await distributeInitialModelAction(taskId, distributionData)
+      return { success: true, error: null, data: distributionId }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '模型分发失败'
+      return { success: false, error: errorMessage, data: null }
+    }
+  }, [distributeInitialModelAction])
+
+  /**
+   * 获取分发状态
+   */
+  const fetchDistributionStatus = useCallback(async (distributionId: string) => {
+    try {
+      await fetchDistributionStatusAction(distributionId)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '获取分发状态失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [fetchDistributionStatusAction])
+
+  /**
+   * 下载初始模型
+   */
+  const downloadInitialModel = useCallback(async (taskId: string, params?: { format?: 'binary' | 'json', modelId?: string }) => {
+    try {
+      await downloadInitialModelAction(taskId, params)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '下载初始模型失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [downloadInitialModelAction])
+
+  /**
+   * 删除初始模型
+   */
+  const deleteInitialModel = useCallback(async (taskId: string, deleteData?: InitialModelDeleteRequest) => {
+    try {
+      await deleteInitialModelAction(taskId, deleteData)
+      return { success: true, error: null }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '删除初始模型失败'
+      return { success: false, error: errorMessage }
+    }
+  }, [deleteInitialModelAction])
+
   // ==================== 计算属性 ====================
 
   /**
@@ -419,19 +490,6 @@ export const useModel = () => {
     return !!evaluationLoading[modelId]
   }, [evaluationLoading])
 
-  /**
-   * 获取部署状态
-   */
-  const getDeploymentStatus = useCallback((deploymentId: string): DeploymentStatus | null => {
-    return deployments[deploymentId] || null
-  }, [deployments])
-
-  /**
-   * 检查是否正在部署
-   */
-  const isDeploying = useCallback((modelId: string): boolean => {
-    return !!deploymentLoading[modelId]
-  }, [deploymentLoading])
 
   /**
    * 获取回滚历史
@@ -467,13 +525,6 @@ export const useModel = () => {
     return operationError[`${operation}-${modelId}`] || null
   }, [operationError])
 
-  /**
-   * 检查模型是否可以部署
-   */
-  const canDeployModel = useCallback((model: any): boolean => {
-    if (!model) return false
-    return model.status === 'VALIDATED' && !isModelOperating(model.modelId)
-  }, [isModelOperating])
 
   /**
    * 检查模型是否可以评估
@@ -498,15 +549,116 @@ export const useModel = () => {
     return modelList.filter(model => model.status === status).length
   }, [modelList])
 
-  /**
-   * 检查是否有任何上传操作正在进行
-   */
-  const isUploading = uploadLoading
 
   /**
    * 检查是否有任何批量操作正在进行
    */
   const isBatchOperating = !!(operationLoading['batch-download'] || operationLoading['batch-delete'])
+
+  // ==================== 初始模型管理计算属性 ====================
+
+  /**
+   * 获取任务初始模型
+   */
+  const getTaskInitialModel = useCallback((taskId: string): InitialModelInfo | null => {
+    return initialModels[taskId] || null
+  }, [initialModels])
+
+  /**
+   * 检查任务初始模型是否正在加载
+   */
+  const isTaskInitialModelLoading = useCallback((taskId: string): boolean => {
+    return !!initialModelLoading[taskId]
+  }, [initialModelLoading])
+
+  /**
+   * 获取任务初始模型错误
+   */
+  const getTaskInitialModelError = useCallback((taskId: string): string | null => {
+    return initialModelError[taskId] || null
+  }, [initialModelError])
+
+  /**
+   * 获取分发状态详情
+   */
+  const getDistributionStatus = useCallback((distributionId: string): DistributionStatusDetail | null => {
+    return distributions[distributionId] || null
+  }, [distributions])
+
+  /**
+   * 检查分发是否正在进行
+   */
+  const isDistributing = useCallback((taskId: string): boolean => {
+    return !!distributionLoading[taskId]
+  }, [distributionLoading])
+
+  /**
+   * 获取分发错误
+   */
+  const getDistributionError = useCallback((taskId: string): string | null => {
+    return distributionError[taskId] || null
+  }, [distributionError])
+
+  /**
+   * 获取任务信息
+   */
+  const getTaskInfo = useCallback((taskId: string) => {
+    // 首先从任务列表中查找
+    const taskFromList = taskList.find(task => task.taskId === taskId)
+    if (taskFromList) return taskFromList
+    
+    // 如果当前任务匹配，返回当前任务
+    if (currentTask && currentTask.taskId === taskId) return currentTask
+    
+    return null
+  }, [taskList, currentTask])
+
+  /**
+   * 检查初始模型是否可以分发
+   */
+  const canDistributeInitialModel = useCallback((taskId: string): boolean => {
+    const initialModel = getTaskInitialModel(taskId)
+    if (!initialModel) return false
+    
+    // 根据接口文档，只检查模型状态和分发状态
+    // 接口文档没有明确要求检查任务状态
+    return initialModel.status === 'READY' && !isDistributing(taskId)
+  }, [getTaskInitialModel, isDistributing])
+
+  /**
+   * 检查初始模型是否可以删除
+   */
+  const canDeleteInitialModel = useCallback((taskId: string): boolean => {
+    const initialModel = getTaskInitialModel(taskId)
+    if (!initialModel) return false
+    // 根据接口文档，所有状态都可以删除，DISTRIBUTING/DISTRIBUTED需要force=true
+    // 前端不再限制这些状态的删除，而是在删除时自动添加force参数
+    return !isDistributing(taskId) // 只检查是否有分发操作正在进行
+  }, [getTaskInitialModel, isDistributing])
+
+  /**
+   * 检查是否有初始模型生成操作正在进行
+   */
+  const isGenerating = generationLoading
+
+  /**
+   * 检查是否有初始模型上传操作正在进行
+   */
+  const isInitialUploading = initialUploadLoading
+
+  /**
+   * 检查任务是否有初始模型
+   */
+  const hasInitialModel = useCallback((taskId: string): boolean => {
+    return !!getTaskInitialModel(taskId)
+  }, [getTaskInitialModel])
+
+  /**
+   * 获取初始模型上传进度
+   */
+  const getInitialUploadProgress = useCallback((taskId: string): number => {
+    return initialUploadProgress[taskId] || 0
+  }, [initialUploadProgress])
 
   // ==================== 返回接口 ====================
 
@@ -521,14 +673,11 @@ export const useModel = () => {
     currentModelError,
     taskModels,
     taskModelsLoading,
-    uploadLoading,
-    uploadError,
-    uploadProgress,
     evaluationResults,
     evaluationLoading,
-    deployments,
-    deploymentLoading,
+    evaluationResultsLoading,
     rollbackHistory,
+    rollbackLoading,
     modelStatistics,
     taskStatistics,
     statisticsLoading,
@@ -537,19 +686,28 @@ export const useModel = () => {
     pagination,
     queryParams,
     
+    // 初始模型管理状态
+    initialModels,
+    initialModelLoading,
+    initialModelError,
+    generationLoading,
+    generationError,
+    initialUploadLoading,
+    initialUploadError,
+    initialUploadProgress,
+    distributions,
+    distributionLoading,
+    distributionError,
+    
     // 操作方法
     fetchModelList,
     refreshModelList,
     fetchModelDetail,
     setCurrentModel,
-    uploadModel,
-    uploadModelBatch,
     fetchTaskModels,
     evaluateModel,
+    batchEvaluateModels,
     fetchEvaluationResults,
-    deployModel,
-    fetchDeploymentStatus,
-    fetchDeploymentList,
     rollbackModel,
     fetchRollbackHistory,
     downloadModel,
@@ -565,23 +723,43 @@ export const useModel = () => {
     clearModelError,
     resetState,
     
+    // 初始模型管理操作方法
+    generateInitialModel,
+    uploadCustomInitialModel,
+    fetchTaskInitialModel,
+    distributeInitialModel,
+    fetchDistributionStatus,
+    downloadInitialModel,
+    deleteInitialModel,
+    
     // 计算属性和工具方法
     getTaskModels,
     isTaskModelsLoading,
     getEvaluationResults,
     isModelEvaluating,
-    getDeploymentStatus,
-    isDeploying,
     getRollbackHistory,
     getTaskStatistics,
     isModelOperating,
     getModelOperationError,
-    canDeployModel,
     canEvaluateModel,
     canDeleteModel,
     getModelCountByStatus,
-    isUploading,
-    isBatchOperating
+    isBatchOperating,
+    
+    // 初始模型管理计算属性和工具方法
+    getTaskInitialModel,
+    isTaskInitialModelLoading,
+    getTaskInitialModelError,
+    getDistributionStatus,
+    isDistributing,
+    getDistributionError,
+    getTaskInfo,
+    canDistributeInitialModel,
+    canDeleteInitialModel,
+    isGenerating,
+    isInitialUploading,
+    hasInitialModel,
+    getInitialUploadProgress
   }
 }
 

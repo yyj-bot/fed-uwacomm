@@ -370,7 +370,7 @@ const UserManagement: React.FC = () => {
                            operationLoading[`unlock-${record.userId}`]
 
         return (
-          <Space size={4}>
+          <Space size="small" style={{ display: 'flex', flexWrap: 'nowrap' }}>
             <Tooltip title="查看详情">
               <Button 
                 type="text" 
@@ -404,22 +404,24 @@ const UserManagement: React.FC = () => {
                   <Button 
                     type="text" 
                     size="small" 
-                    danger
                     icon={<DeleteOutlined />}
                     loading={operationLoading[`delete-${record.userId}`]}
+                    style={{ color: '#ff4d4f' }}
                   />
                 </Tooltip>
               </Popconfirm>
             )}
 
-            <Dropdown menu={actionMenu} trigger={['click']} placement="bottomRight">
-              <Button 
-                type="text" 
-                size="small" 
-                icon={<MoreOutlined />}
-                loading={isOperating}
-              />
-            </Dropdown>
+            <Tooltip title="更多操作">
+              <Dropdown menu={actionMenu} trigger={['click']} placement="bottomRight">
+                <Button 
+                  type="text" 
+                  size="small" 
+                  icon={<MoreOutlined />}
+                  loading={isOperating}
+                />
+              </Dropdown>
+            </Tooltip>
           </Space>
         )
       }

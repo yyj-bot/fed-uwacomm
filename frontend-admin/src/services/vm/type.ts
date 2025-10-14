@@ -389,8 +389,6 @@ export interface VMServiceConfig {
   readonly maxRetries: number
   /** 重试延迟（毫秒） */
   readonly retryDelay: number
-  /** WebSocket连接超时时间（毫秒） */
-  readonly websocketTimeout: number
   /** 心跳检测间隔（毫秒） */
   readonly heartbeatInterval: number
 }
@@ -412,6 +410,144 @@ export interface VMDefaultConfig {
   /** 支持的算法类型 */
   readonly supportedAlgorithms: string[]
 }
+
+// ==================== VM本地模型相关类型 ====================
+
+/**
+ * VM本地模型专用分页响应类型（符合 vm-round-models-api-reference.md）
+ */
+export interface VMRoundModelPaginatedResponse<T> {
+  readonly total: number
+  readonly current: number  // 使用 current 而不是 page
+  readonly size: number
+  readonly pages: number
+  readonly records: T[]
+}
+
+/**
+ * VM本地模型结果类型
+ */
+export interface VMRoundModel {
+  /** VM本地模型ID */
+  readonly vmRoundModelId: string
+  /** 任务ID */
+  readonly taskId: string
+  /** 训练轮数 */
+  readonly roundNumber: number
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 模型JSON数据（可选） */
+  readonly modelJson?: Record<string, unknown>
+  /** 评估指标 */
+  readonly metrics: {
+    readonly accuracy: number
+    readonly loss: number
+    readonly [key: string]: number
+  }
+  /** 创建时间 */
+  readonly createdAt: string
+}
+
+/**
+ * VM本地模型训练指标趋势类型
+ */
+export interface VMModelTrend {
+  /** 任务ID */
+  readonly taskId: string
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 指标名称 */
+  readonly metric: string
+  /** 趋势数据 */
+  readonly trend: Array<{
+    readonly roundNumber: number
+    readonly value: number
+  }>
+}
+
+/**
+ * VM本地模型最佳/离群查询结果类型
+ */
+export interface VMModelBest {
+  /** 任务ID */
+  readonly taskId: string
+  /** 指标名称 */
+  readonly metric: string
+  /** 查询类型 */
+  readonly type: 'best' | 'outlier'
+  /** 查询结果 */
+  readonly result: {
+    readonly vmRoundModelId: string
+    readonly roundNumber: number
+    readonly vmId: string
+    readonly value: number
+  }
+}
+
+/**
+ * VM本地模型列表查询参数
+ */
+export interface VMRoundModelListParams extends PaginationParams {
+  /** 任务ID过滤 */
+  readonly taskId?: string
+  /** 训练轮数过滤 */
+  readonly roundNumber?: number
+  /** 虚拟机ID过滤 */
+  readonly vmId?: string
+}
+
+/**
+ * VM模型趋势查询参数
+ */
+export interface VMModelTrendParams {
+  /** 任务ID */
+  readonly taskId: string
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 指标名称 */
+  readonly metric: string
+}
+
+/**
+ * VM模型最佳/离群查询参数
+ */
+export interface VMModelBestParams {
+  /** 任务ID */
+  readonly taskId: string
+  /** 指标名称 */
+  readonly metric: string
+  /** 查询类型 */
+  readonly type: 'best' | 'outlier'
+}
+
+/**
+ * 支持的指标类型
+ */
+export type MetricType = 'accuracy' | 'loss' | 'precision' | 'recall' | 'f1'
+
+/**
+ * 查询类型
+ */
+export type QueryType = 'best' | 'outlier'
+
+/**
+ * 支持的指标常量
+ */
+export const SUPPORTED_METRICS = {
+  ACCURACY: 'accuracy',
+  LOSS: 'loss',
+  PRECISION: 'precision',
+  RECALL: 'recall',
+  F1: 'f1'
+} as const
+
+/**
+ * 查询类型常量
+ */
+export const QUERY_TYPES = {
+  BEST: 'best',
+  OUTLIER: 'outlier'
+} as const
 
 // ==================== 重新导出基础类型 ====================
 // 注：工具类型已从 @/types 统一导入，不再重复定义

@@ -1,0 +1,287 @@
+/**
+ * 管理员虚拟机列表样式
+ */
+
+.vm-list-container,
+.unassigned-vm-list-container {
+  padding: 0;
+}
+
+.vm-list-filters {
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 10px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* 按钮样式优化 */
+.vm-list-container .ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+/* 启动按钮 - 绿色成功样式 */
+.vm-list-container .ant-btn[style*="52c41a"] {
+  transition: all 0.3s ease;
+}
+
+.vm-list-container .ant-btn[style*="52c41a"]:hover:not(:disabled) {
+  color: #52c41a !important;
+  border-color: #52c41a !important;
+  background-color: #e6ffe6 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(82, 196, 26, 0.2);
+}
+
+.vm-list-container .ant-btn[style*="52c41a"]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 重启按钮 - 蓝色信息样式 */
+.vm-list-container .ant-btn[style*="1890ff"] {
+  transition: all 0.3s ease;
+}
+
+.vm-list-container .ant-btn[style*="1890ff"]:hover:not(:disabled) {
+  color: #1890ff !important;
+  border-color: #1890ff !important;
+  background-color: #d6efff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.vm-list-container .ant-btn[style*="1890ff"]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 停止按钮 - 橙色警告样式 */
+.vm-list-container .ant-btn[style*="fa8c16"] {
+  transition: all 0.3s ease;
+}
+
+.vm-list-container .ant-btn[style*="fa8c16"]:hover:not(:disabled) {
+  color: #fa8c16 !important;
+  border-color: #fa8c16 !important;
+  background-color: #fff1e6 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(250, 140, 22, 0.2);
+}
+
+.vm-list-container .ant-btn[style*="fa8c16"]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 删除按钮 - 红色危险样式 */
+.vm-list-container .ant-btn[style*="ff4d4f"] {
+  transition: all 0.3s ease;
+}
+
+.vm-list-container .ant-btn[style*="ff4d4f"]:hover:not(:disabled) {
+  color: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  background-color: #ffe6e6 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.2);
+}
+
+.vm-list-container .ant-btn[style*="ff4d4f"]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* 禁用状态 */
+.vm-list-container .ant-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 链接按钮通用样式 */
+.vm-list-container .ant-btn-link {
+  padding: 4px 8px;
+  height: auto;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.vm-list-container .ant-btn-link:hover:not(:disabled) {
+  background: rgba(24, 144, 255, 0.08);
+  transform: translateX(2px);
+}
+
+/* 表格样式 */
+.vm-list-container .ant-table,
+.unassigned-vm-list-container .ant-table {
+  background: #ffffff !important;
+}
+
+.vm-list-container .ant-table-thead > tr > th,
+.unassigned-vm-list-container .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
+  padding: 16px;
+  font-size: 14px;
+}
+
+.vm-list-container .ant-table-thead > tr > th::before,
+.unassigned-vm-list-container .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.vm-list-container .ant-table-tbody > tr,
+.unassigned-vm-list-container .ant-table-tbody > tr {
+  background: #ffffff !important;
+}
+
+.vm-list-container .ant-table-tbody > tr:hover,
+.unassigned-vm-list-container .ant-table-tbody > tr:hover {
+  background: linear-gradient(90deg, #f0f7ff 0%, #e6f4ff 50%, #f0f7ff 100%) !important;
+}
+
+.vm-list-container .ant-table-tbody > tr:hover > td,
+.unassigned-vm-list-container .ant-table-tbody > tr:hover > td {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none;
+}
+
+.vm-list-container .ant-table-tbody > tr > td,
+.unassigned-vm-list-container .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+  background: transparent;
+}
+
+/* 固定列样式 - 确保固定列有正确的背景 */
+.vm-list-container .ant-table-tbody > tr > td.ant-table-cell-fix-right,
+.unassigned-vm-list-container .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  background: #ffffff !important;
+}
+
+.vm-list-container .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right,
+.unassigned-vm-list-container .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #e6f4ff !important;
+}
+
+/* 固定列的阴影效果 */
+.vm-list-container .ant-table-cell-fix-right,
+.unassigned-vm-list-container .ant-table-cell-fix-right {
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 标签样式 */
+.vm-list-container .ant-tag {
+  margin: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Badge 样式 */
+.vm-list-container .ant-badge-status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.vm-list-container .ant-badge-status-text {
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+/* 输入框和选择器样式 */
+.vm-list-filters .ant-input,
+.vm-list-filters .ant-select-selector {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff !important;
+  transition: all 0.3s ease;
+}
+
+.vm-list-filters .ant-input:hover,
+.vm-list-filters .ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.vm-list-filters .ant-select-selector {
+  border-radius: 8px !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+.vm-list-filters .ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+/* 按钮组间距 */
+.vm-list-container .ant-space-item {
+  margin-bottom: 4px;
+}
+
+/* 加载状态 */
+.vm-list-container .ant-spin-dot-item {
+  background-color: #1890ff;
+}
+
+/* 图标颜色 */
+.vm-list-container .anticon {
+  transition: all 0.3s ease;
+}
+
+/* Popconfirm 样式优化 */
+.ant-popconfirm-inner {
+  border-radius: 8px;
+}
+
+.ant-popconfirm-message {
+  font-size: 14px;
+  color: #262626;
+}
+
+.ant-popconfirm-description {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 8px;
+}
+
+.ant-popconfirm-buttons {
+  margin-top: 12px;
+}
+
+.ant-popconfirm-buttons .ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .vm-list-filters {
+    padding: 12px;
+  }
+
+  .vm-list-container .ant-space {
+    gap: 8px !important;
+  }
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vm-list-container {
+  animation: fadeIn 0.3s ease-out;
+}
+

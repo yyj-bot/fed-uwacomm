@@ -268,7 +268,43 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       const completedTasks = taskList.filter((task: any) => task.status === 'COMPLETED').length
       const failedTasks = taskList.filter((task: any) => task.status === 'FAILED').length
       
-      // 构建概览数据（仅使用真实API数据，其他设为0）
+      // 计算今日任务数（过去24小时）
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      const tasksToday = taskList.filter((task: any) => 
+        new Date(task.createdAt) >= oneDayAgo
+      ).length
+      
+      // 计算在线参与者数量（从所有运行中的任务统计）
+      const activeParticipants = new Set()
+      taskList.filter((task: any) => task.status === 'RUNNING').forEach((task: any) => {
+        task.participants?.forEach((p: any) => {
+          if (p.status === 'TRAINING' || p.status === 'CONNECTED') {
+            activeParticipants.add(p.vmId)
+          }
+        })
+      })
+      const onlineParticipants = activeParticipants.size
+      
+      // 获取数据集统计
+      let totalDatasets = 0
+      try {
+        const federatedTaskModule = await import('../../api/federated-task')
+        const datasetsResult = await federatedTaskModule.federatedTask.getAvailableDatasets({})
+        totalDatasets = datasetsResult.total || 0
+      } catch (error) {
+        console.warn('获取数据集统计失败:', error)
+      }
+      
+      // 获取系统监控数据
+      let systemMetrics: any = null
+      try {
+        const federatedTaskModule = await import('../../api/federated-task')
+        systemMetrics = await federatedTaskModule.federatedTask.getAggregationEngineStatus()
+      } catch (error) {
+        console.warn('获取系统监控数据失败:', error)
+      }
+      
+      // 构建概览数据
       const overview: DashboardOverview = {
         userStats: {
           totalUsers: 0, // 需要用户API支持
@@ -281,21 +317,21 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           runningVMs,
           stoppedVMs,
           errorVMs,
-          cpuUsage: 0, // 需要系统监控API支持
-          memoryUsage: 0,
-          diskUsage: 0
+          cpuUsage: systemMetrics?.systemMetrics?.cpuUsage || 0,
+          memoryUsage: systemMetrics?.systemMetrics?.memoryUsage || 0,
+          diskUsage: systemMetrics?.systemMetrics?.diskUsage || 0
         },
         taskStats: {
           totalTasks,
           runningTasks,
           completedTasks,
           failedTasks,
-          tasksToday: 0, // 需要根据创建时间计算
-          averageTrainingTime: 0
+          tasksToday,
+          averageTrainingTime: 0 // 需要从任务详情计算
         },
         dataStats: {
-          totalDatasets: 0, // 需要训练数据API支持
-          totalDataSize: 0,
+          totalDatasets,
+          totalDataSize: 0, // 需要训练数据API支持
           processedData: 0,
           pendingData: 0,
           uploadedToday: 0
@@ -308,9 +344,9 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           modelsToday: 0
         },
         participantStats: {
-          totalParticipants: 0, // 需要参与者API支持
-          onlineParticipants: 0,
-          activeParticipants: 0,
+          totalParticipants: totalVMs, // 总参与者 = 总虚拟机数
+          onlineParticipants,
+          activeParticipants: onlineParticipants, // 活跃参与者 = 在线参与者
           newParticipantsToday: 0
         },
         systemStats: {
@@ -318,7 +354,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           totalLogs: 0,
           errorLogsToday: 0,
           warningLogsToday: 0,
-          systemLoad: 0,
+          systemLoad: systemMetrics?.systemMetrics?.cpuUsage || 0,
           networkTraffic: 0
         }
       }
@@ -410,16 +446,39 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ recentActivitiesLoading: true })
     
     try {
-      // 空的最近活动数据，需要真实API支持
-      const recentActivities: any[] = []
+      // 从系统日志API获取最近活动
+      const { log: logApi } = await import('../../api/system-log')
+      
+      const logsResult = await logApi.getLogList({
+        page: 1,
+        size: 10,
+        sort: 'createdAt',
+        order: 'desc'
+      })
+      
+      // 将日志数据转换为活动格式
+      const recentActivities = logsResult.records.map((log: any) => ({
+        id: log.logId,
+        type: log.category?.toLowerCase() || 'system',
+        title: log.message,
+        description: log.details?.errorMessage || log.message,
+        timestamp: log.createdAt,
+        user: log.details?.userId || 'system',
+        status: log.level === 'ERROR' ? 'error' : 
+                log.level === 'WARN' ? 'warning' : 
+                log.level === 'INFO' ? 'success' : 'info'
+      }))
       
       set({
         recentActivities,
         recentActivitiesLoading: false
       })
     } catch (error) {
-      set({ recentActivitiesLoading: false })
-      throw error
+      console.warn('获取最近活动失败:', error)
+      set({ 
+        recentActivities: [],
+        recentActivitiesLoading: false 
+      })
     }
   },
 

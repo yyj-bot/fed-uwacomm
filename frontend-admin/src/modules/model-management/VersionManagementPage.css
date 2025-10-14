@@ -1,0 +1,779 @@
+.version-management-page {
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  min-height: 100vh;
+}
+
+.version-management-page .ant-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.02);
+  transition: box-shadow 0.3s ease;
+}
+
+.version-management-page .ant-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* 强制覆盖所有可能的黑色背景 */
+.version-management-page .ant-table-wrapper,
+.version-management-page .ant-table,
+.version-management-page .ant-table-container,
+.version-management-page .ant-table-content,
+.version-management-page .ant-table-body,
+.version-management-page .ant-table-tbody,
+.version-management-page table {
+  background: #ffffff !important;
+}
+
+/* 移除表格wrapper的边框 */
+.version-management-page .ant-table-wrapper {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 强制移除所有表格相关的边框 */
+.version-management-page .ant-table,
+.version-management-page .ant-table table,
+.version-management-page .ant-table-container,
+.version-management-page .ant-table-content,
+.version-management-page .ant-table-header,
+.version-management-page .ant-table-body {
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+}
+
+/* 消除表头和表体之间的间隙 - 终极方案 */
+.version-management-page .ant-table {
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table table {
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+}
+
+/* 移除表格头部和主体之间的所有可能间隙 */
+.version-management-page .ant-table-header {
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table-body {
+  margin: 0 !important;
+  margin-top: 0 !important;
+  padding: 0 !important;
+  padding-top: 0 !important;
+  line-height: 0 !important;
+}
+
+/* 针对sticky表格的特殊处理 */
+.version-management-page .ant-table-sticky-holder {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.version-management-page .ant-table-sticky-scroll {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 移除表格容器的所有间距 - 彻底隐藏measure-row */
+.version-management-page .ant-table-measure-row {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  line-height: 0 !important;
+  visibility: hidden !important;
+}
+
+.version-management-page .ant-table-measure-row td {
+  display: none !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  line-height: 0 !important;
+  visibility: hidden !important;
+}
+
+/* 强制隐藏所有可能造成间隙的测量行 */
+.version-management-page tr.ant-table-measure-row {
+  display: none !important;
+}
+
+.version-management-page .ant-table tbody tr[style*="height: 0"] {
+  display: none !important;
+}
+
+.version-management-page .ant-table-container {
+  border-spacing: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table-container table {
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table-container table > thead > tr,
+.version-management-page .ant-table-container table > tbody > tr {
+  display: table-row !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.version-management-page .ant-table-container table > thead,
+.version-management-page .ant-table-container table > tbody {
+  display: table-row-group !important;
+  vertical-align: top !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-spacing: 0 !important;
+}
+
+/* 移除thead和tbody之间的colgroup或其他元素造成的间隙 */
+.version-management-page .ant-table colgroup {
+  height: 0 !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table colgroup col {
+  height: 0 !important;
+  line-height: 0 !important;
+}
+
+/* 强制表头无底部间距 */
+.version-management-page .ant-table-thead {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-bottom: none !important;
+  line-height: 1 !important;
+}
+
+.version-management-page .ant-table-thead > tr {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  line-height: 1 !important;
+}
+
+/* 表头单元格 - 完全无边框消除间隙 */
+.version-management-page .ant-table-thead > tr > th {
+  border: none !important;
+  border-bottom: none !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.01) !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  line-height: 1.5715 !important;
+  padding-bottom: 12px !important;
+  vertical-align: middle !important;
+}
+
+.version-management-page .ant-table-thead > tr > th:last-child {
+  border-right: none !important;
+}
+
+/* 第一列左边框样式 */
+.version-management-page .ant-table-thead > tr > th:first-child,
+.version-management-page .ant-table-tbody > tr > td:first-child {
+  border-left: none !important;
+}
+
+/* 确保thead没有伪元素造成间隙 */
+.version-management-page .ant-table-thead::after,
+.version-management-page .ant-table-thead::before {
+  content: none !important;
+  display: none !important;
+  height: 0 !important;
+  line-height: 0 !important;
+}
+
+/* 强制tbody紧贴thead - 使用负margin消除间隙 */
+.version-management-page .ant-table-tbody {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-top: none !important;
+  margin-top: -1px !important;
+  display: table-row-group !important;
+}
+
+/* 确保tbody没有伪元素造成间隙 */
+.version-management-page .ant-table-tbody::before,
+.version-management-page .ant-table-tbody::after {
+  content: none !important;
+  display: none !important;
+  height: 0 !important;
+  line-height: 0 !important;
+}
+
+.version-management-page .ant-table-tbody > tr:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-top: none !important;
+  line-height: normal !important;
+}
+
+.version-management-page .ant-table-tbody > tr:first-child > td {
+  border-top: none !important;
+  border-left: none !important;
+  margin-top: 0 !important;
+  padding: 12px 16px !important;
+  padding-top: 12px !important;
+  line-height: 1.5715 !important;
+  vertical-align: middle !important;
+}
+
+/* 强制tbody的tr没有额外间距 */
+.version-management-page .ant-table-tbody > tr {
+  line-height: normal !important;
+}
+
+/* 确保所有表格行没有额外间距 */
+.version-management-page .ant-table-thead tr,
+.version-management-page .ant-table-tbody tr {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 确保表格能正确显示所有列 */
+.version-management-page .ant-table {
+  overflow-x: auto !important;
+  border: none !important;
+  border-radius: 8px;
+}
+
+.version-management-page .ant-table-content {
+  overflow-x: auto !important;
+}
+
+/* 表格容器边框 */
+.version-management-page .ant-table-container {
+  border: none !important;
+  border-radius: 8px;
+}
+
+/* 确保固定列有正确的层级和白色背景 */
+.version-management-page .ant-table-cell-fix-right {
+  z-index: 10 !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  position: sticky !important;
+  box-shadow: none !important;
+}
+
+.version-management-page .ant-table-cell-fix-left {
+  z-index: 10 !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  position: sticky !important;
+  box-shadow: none !important;
+}
+
+/* 表头固定列 */
+.version-management-page .ant-table-thead .ant-table-cell-fix-right {
+  background-color: #fafafa !important;
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%) !important;
+  z-index: 11 !important;
+}
+
+.version-management-page .ant-table-thead .ant-table-cell-fix-left {
+  background-color: #fafafa !important;
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%) !important;
+  z-index: 11 !important;
+}
+
+/* 强制表体固定列为白色背景 */
+.version-management-page .ant-table-tbody .ant-table-cell-fix-right {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-table-tbody .ant-table-cell-fix-left {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+/* hover状态下固定列保持白色背景 */
+.version-management-page .ant-table-tbody > tr:hover .ant-table-cell-fix-right {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-table-tbody > tr:hover .ant-table-cell-fix-left {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%) !important;
+  font-weight: 600;
+  color: #262626;
+  border: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.01) !important;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 12px 16px !important;
+  padding-bottom: 12px !important;
+  font-size: 14px;
+}
+
+.version-management-page .ant-table-thead > tr > th:last-child {
+  border-right: none !important;
+}
+
+.version-management-page .ant-table-thead > tr > th:first-child {
+  border-left: none !important;
+}
+
+.version-management-page .ant-table-tbody > tr {
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-table-tbody > tr:hover > td {
+  background: #ffffff !important;
+  box-shadow: none;
+}
+
+/* 确保操作列单元格也有白色背景 */
+.version-management-page .ant-table-tbody > tr > td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.02);
+  border-right: 1px solid rgba(0, 0, 0, 0.01) !important;
+  border-left: none !important;
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.version-management-page .ant-table-tbody > tr > td:last-child {
+  border-right: none !important;
+}
+
+.version-management-page .ant-table-tbody > tr > td:first-child {
+  border-left: none !important;
+}
+
+/* 特别强制固定列单元格为白色 */
+.version-management-page .ant-table-tbody > tr > td.ant-table-cell-fix-right,
+.version-management-page .ant-table-tbody > tr > td.ant-table-cell-fix-left {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+/* 确保固定列在滚动时正确显示阴影 */
+.version-management-page .ant-table-cell-fix-right-first::after {
+  display: none !important;
+}
+
+.version-management-page .ant-table-cell-fix-left-last::after {
+  display: none !important;
+}
+
+/* 固定列的伪元素也要有白色背景 */
+.version-management-page .ant-table-cell-fix-right::before,
+.version-management-page .ant-table-cell-fix-left::before {
+  background-color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.version-management-page .ant-table-cell-fix-right::after,
+.version-management-page .ant-table-cell-fix-left::after {
+  box-shadow: none !important;
+  display: none !important;
+}
+
+/* Tabs 样式 */
+.version-management-page .ant-tabs {
+  background: transparent;
+}
+
+.version-management-page .ant-tabs-nav {
+  background: #ffffff;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.version-management-page .ant-tabs-tab {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.version-management-page .ant-tabs-tab:hover {
+  background: transparent;
+}
+
+.version-management-page .ant-tabs-tab-active {
+  background: transparent;
+}
+
+/* 确保所有输入框和选择器都是白色背景 */
+.version-management-page .ant-input,
+.version-management-page .ant-select-selector,
+.version-management-page .ant-picker {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.version-management-page .ant-input-number {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.version-management-page .ant-input-number-input {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* 按钮样式 */
+.version-management-page .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.version-management-page .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%) !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+  transform: none;
+}
+
+.version-management-page .ant-btn:not(.ant-btn-primary) {
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.version-management-page .ant-btn:not(.ant-btn-primary):hover {
+  background: #ffffff !important;
+  transform: none;
+}
+
+/* Modal 强制白色背景 */
+.version-management-page .ant-modal-content {
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-modal-body {
+  background: #ffffff !important;
+}
+
+/* Select 下拉菜单强制白色背景 */
+.ant-select-dropdown {
+  background: #ffffff !important;
+}
+
+.ant-select-item {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+.ant-select-item-option-selected {
+  background: #ffffff !important;
+}
+
+.ant-select-item-option-active {
+  background: #ffffff !important;
+}
+
+/* 日期选择器强制白色背景 */
+.ant-picker-panel-container {
+  background: #ffffff !important;
+}
+
+.ant-picker-panel {
+  background: #ffffff !important;
+}
+
+.ant-picker-dropdown {
+  background: #ffffff !important;
+}
+
+/* Form 表单项背景 */
+.version-management-page .ant-form-item {
+  background: transparent !important;
+}
+
+/* 分页样式 */
+.version-management-page .ant-pagination {
+  margin-top: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 8px;
+}
+
+.version-management-page .ant-pagination-item {
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.version-management-page .ant-pagination-item:hover {
+  border-color: #1890ff;
+  transform: none;
+}
+
+.version-management-page .ant-pagination-item-active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%) !important;
+  border-color: #1890ff;
+  font-weight: 600;
+}
+
+.version-management-page .ant-pagination-item-active a {
+  color: #ffffff !important;
+}
+
+/* 状态标签样式 */
+.version-management-page .ant-tag {
+  margin: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 500;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.02);
+}
+
+/* 链接按钮样式 */
+.version-management-page .ant-btn-link {
+  font-weight: 600;
+  transition: all 0.3s ease;
+  padding: 4px 8px !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+  height: auto !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+}
+
+.version-management-page .ant-btn-link:hover {
+  transform: none;
+  border: none !important;
+  background: #f0f5ff !important;
+  color: #1890ff !important;
+}
+
+/* 图标按钮样式 */
+.version-management-page .ant-btn-icon-only {
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: none !important;
+}
+
+/* 统一删除按钮样式，与其他按钮一致 */
+.version-management-page .ant-btn-link.ant-btn-dangerous,
+.version-management-page .ant-btn-dangerous[type="link"] {
+  border: none !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  color: #ff4d4f !important;
+  padding: 4px 8px !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: auto !important;
+  font-size: 16px !important;
+  box-shadow: none !important;
+}
+
+.version-management-page .ant-btn-link.ant-btn-dangerous:hover:not(:disabled),
+.version-management-page .ant-btn-dangerous[type="link"]:hover:not(:disabled) {
+  border: none !important;
+  background: #fff1f0 !important;
+  color: #ff4d4f !important;
+  transform: none;
+  box-shadow: none !important;
+}
+
+.version-management-page .ant-btn-link.ant-btn-dangerous:disabled,
+.version-management-page .ant-btn-dangerous[type="link"]:disabled {
+  border: none !important;
+  background: transparent !important;
+  color: rgba(0, 0, 0, 0.25) !important;
+  cursor: not-allowed;
+  box-shadow: none !important;
+}
+
+/* 确保删除按钮内只显示图标 */
+.version-management-page .ant-btn-link.ant-btn-dangerous .anticon,
+.version-management-page .ant-btn-dangerous[type="link"] .anticon {
+  font-size: 16px !important;
+}
+
+/* 操作列容器布局 */
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-space {
+  display: inline-flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-space-item {
+  margin: 0 !important;
+  display: inline-flex !important;
+}
+
+/* 确保操作列有足够的空间 */
+.version-management-page .ant-table-tbody > tr > td:last-child {
+  padding: 12px 16px !important;
+  vertical-align: middle !important;
+  overflow: visible !important;
+}
+
+/* 操作列中的按钮样式 */
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-btn {
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+}
+
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-btn:hover {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 特别强制操作列中的危险按钮样式 */
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-btn-dangerous {
+  background: transparent !important;
+  color: #ff4d4f !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+}
+
+.version-management-page .ant-table-tbody > tr > td:last-child .ant-btn-dangerous:hover:not(:disabled) {
+  background: #fff1f0 !important;
+  color: #ff4d4f !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .version-management-page {
+    padding: 16px;
+  }
+}
+
+/* 确保 TextArea 也是白色背景 */
+.version-management-page .ant-input-textarea,
+.version-management-page .ant-input-textarea textarea {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* Upload 组件背景 */
+.version-management-page .ant-upload {
+  background: #ffffff !important;
+}
+
+/* Checkbox 组件 */
+.version-management-page .ant-checkbox-wrapper {
+  background: transparent !important;
+  color: #262626 !important;
+}
+
+/* Switch 组件 */
+.version-management-page .ant-switch {
+  background: #bfbfbf !important;
+}
+
+.version-management-page .ant-switch-checked {
+  background: #1890ff !important;
+}
+
+/* Spin 加载动画 */
+.version-management-page .ant-spin-dot-item {
+  background-color: #1890ff !important;
+}
+
+/* Descriptions 描述列表 */
+.version-management-page .ant-descriptions-item-label {
+  background: #fafafa !important;
+  color: #262626 !important;
+}
+
+.version-management-page .ant-descriptions-item-content {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* Progress 进度条 */
+.version-management-page .ant-progress-bg {
+  background: linear-gradient(90deg, #1890ff 0%, #52c41a 100%);
+}
+
+/* Statistic 统计数值 */
+.version-management-page .ant-statistic {
+  color: #262626;
+}
+
+.version-management-page .ant-statistic-title {
+  color: #595959;
+}
+
+/* 确保图表容器也是白色背景 */
+.version-management-page .ant-card .ant-card-body {
+  background: #ffffff;
+  color: #262626;
+}
+
+/* 评估详情弹窗样式优化 */
+.version-management-page .ant-descriptions-small .ant-descriptions-item-label,
+.version-management-page .ant-descriptions-small .ant-descriptions-item-content {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+}
+
+.version-management-page .ant-descriptions-small .ant-descriptions-item-label {
+  font-weight: 500;
+  background: #fafafa;
+  width: 120px;
+}
+
+.version-management-page .ant-descriptions-bordered .ant-descriptions-item-label {
+  background: #fafafa !important;
+}
+
+.version-management-page .ant-descriptions-bordered .ant-descriptions-item-content {
+  background: #ffffff !important;
+}
+
