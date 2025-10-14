@@ -28,10 +28,6 @@ import {
 import TaskListPage from '@/modules/federated-learning/TaskListPage'
 import TaskDetailPage from '@/modules/federated-learning/TaskDetailPage'
 import TaskCreatePage from '@/modules/federated-learning/TaskCreatePage'
-import OrchestrationListPage from '@/modules/federated-learning/OrchestrationListPage'
-import OrchestrationDetailPage from '@/modules/federated-learning/OrchestrationDetailPage'
-import OrchestrationTimelinePage from '@/modules/federated-learning/OrchestrationTimelinePage'
-import OrchestrationAnalyticsPage from '@/modules/federated-learning/OrchestrationAnalyticsPage'
 
 import { userService } from '@/services'
 import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
@@ -157,12 +153,6 @@ const App: React.FC = () => {
                       <Route path="/federated-learning/tasks" element={<TaskListPage />} />
                       <Route path="/federated-learning/tasks/create" element={<TaskCreatePage />} />
                       <Route path="/federated-learning/tasks/:taskId" element={<TaskDetailPage />} />
-                      
-                      {/* 工作流编排路由 */}
-                      <Route path="/federated-learning/orchestrations" element={<OrchestrationListPage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId" element={<OrchestrationDetailPage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId/timeline" element={<OrchestrationTimelinePage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId/analytics" element={<OrchestrationAnalyticsPage />} />
                       
                       {/* 模型管理路由 */}
                       <Route path="/models" element={<Navigate to="/models/initial" replace />} />

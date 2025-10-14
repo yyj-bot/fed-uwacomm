@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务状态管理 Store
+ * 联邦学习任务状态管�?Store
  * 管理联邦学习任务的创建、配置、控制、监控等相关状态和操作
  * 
  * @author FedUWAComm Team
@@ -26,26 +26,19 @@ import type {
   DistributionPreview,
   ParticipantValidation,
   ConfigStatus,
-  ResourceUsage,
-  // v1.4 新增：联邦学习流程编排类型
-  WorkflowConfig,
-  SchedulingOptions,
-  OrchestrationWorkflow,
-  WorkflowTimeline,
-  WorkflowPerformanceAnalysis,
-  StateSnapshot
+  ResourceUsage
 } from '@/api/federated-task'
 
-// ==================== 状态类型定义 ====================
+// ==================== 状态类型定�?====================
 
 interface TaskState {
-  // 任务列表状态
+  // 任务列表状�?
   taskList: FederatedTask[]
   taskListTotal: number
   taskListLoading: boolean
   taskListError: string | null
   
-  // 当前选中的任务
+  // 当前选中的任�?
   currentTask: FederatedTaskDetails | null
   currentTaskLoading: boolean
   currentTaskError: string | null
@@ -57,11 +50,11 @@ interface TaskState {
   taskLogs: Record<string, any[]>
   taskLogsLoading: Record<string, boolean>
   
-  // 操作状态
+  // 操作状�?
   operationLoading: Record<string, boolean>
   operationError: Record<string, string | null>
   
-  // 创建任务状态
+  // 创建任务状�?
   createTaskLoading: boolean
   createTaskError: string | null
   
@@ -75,7 +68,7 @@ interface TaskState {
   // 查询参数
   queryParams: TaskListParams
   
-  // 实时状态
+  // 实时状�?
   realtimeData: Record<string, any>
   
   // 🆕 v1.3 新增：预配置数据
@@ -95,7 +88,7 @@ interface TaskState {
   algorithmTemplatesLoading: boolean
   algorithmTemplatesError: string | null
   
-  // 🆕 v1.3 新增：智能配置状态
+  // 🆕 v1.3 新增：智能配置状�?
   distributionPreview: DistributionPreview | null
   distributionPreviewLoading: boolean
   distributionPreviewError: string | null
@@ -104,75 +97,16 @@ interface TaskState {
   participantValidationLoading: boolean
   participantValidationError: string | null
   
-  // 🆕 v1.3 新增：增强监控状态
+  // 🆕 v1.3 新增：增强监控状�?
   configStatus: Record<string, ConfigStatus>
   configStatusLoading: Record<string, boolean>
   
   resourceUsage: Record<string, ResourceUsage>
   resourceUsageLoading: Record<string, boolean>
   
-  // 🆕 v1.3 新增：废弃警告
+  // 🆕 v1.3 新增：废弃警�?
   deprecationWarnings: string[]
   
-  // 🆕 v1.4 新增：联邦学习流程编排状态
-  orchestrationList: Array<{
-    orchestrationId: string
-    taskId: string
-    status: string
-    startedAt: string
-    completedAt?: string
-    currentStage: string
-    progress: number
-    duration: string
-    participatingVms: number
-    completedRounds: number
-    totalRounds: number
-    finalAccuracy?: number
-    success?: boolean
-  }>
-  orchestrationListTotal: number
-  orchestrationListLoading: boolean
-  orchestrationListError: string | null
-  
-  // 当前选中的编排
-  currentOrchestration: OrchestrationWorkflow | null
-  currentOrchestrationLoading: boolean
-  currentOrchestrationError: string | null
-  
-  // 编排时间线
-  orchestrationTimelines: Record<string, WorkflowTimeline>
-  orchestrationTimelinesLoading: Record<string, boolean>
-  orchestrationTimelinesError: Record<string, string | null>
-  
-  // 编排性能分析
-  orchestrationAnalytics: Record<string, WorkflowPerformanceAnalysis>
-  orchestrationAnalyticsLoading: Record<string, boolean>
-  orchestrationAnalyticsError: Record<string, string | null>
-  
-  // 编排操作状态
-  orchestrationOperationLoading: Record<string, boolean>
-  orchestrationOperationError: Record<string, string | null>
-  
-  // 创建编排状态
-  createOrchestrationLoading: boolean
-  createOrchestrationError: string | null
-  
-  // 编排查询参数
-  orchestrationQueryParams: {
-    taskId?: string
-    status?: string
-    page?: number
-    size?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-  }
-  
-  // 编排分页参数
-  orchestrationPagination: {
-    page: number
-    size: number
-    total: number
-  }
 }
 
 interface TaskActions {
@@ -184,7 +118,7 @@ interface TaskActions {
   fetchTaskDetail: (taskId: string) => Promise<void>
   setCurrentTask: (task: FederatedTaskDetails | null) => void
   
-  // 任务创建和配置
+  // 任务创建和配�?
   createTask: (taskData: CreateTaskRequest) => Promise<string>
   configTask: (taskId: string, config: ConfigTaskRequest) => Promise<void>
   
@@ -196,7 +130,7 @@ interface TaskActions {
   cancelTask: (taskId: string, cancelData?: CancelTaskRequest) => Promise<void>
   deleteTask: (taskId: string, deleteOptions?: DeleteTaskRequest) => Promise<void>
   
-  // 任务结果和日志
+  // 任务结果和日�?
   fetchTaskResults: (taskId: string) => Promise<void>
   fetchTaskLogs: (taskId: string, params?: TaskLogsParams) => Promise<void>
   
@@ -214,7 +148,7 @@ interface TaskActions {
   clearError: () => void
   clearTaskError: (taskId: string) => void
   
-  // 状态重置
+  // 状态重�?
   resetState: () => void
   
   // 🆕 v1.3 新增：预配置接口
@@ -237,7 +171,7 @@ interface TaskActions {
   fetchRoleConfigs: () => Promise<void>
   fetchAlgorithmTemplates: () => Promise<void>
   
-  // 🆕 v1.3 新增：智能配置接口
+  // 🆕 v1.3 新增：智能配置接�?
   previewDataDistribution: (data: {
     datasetId: string
     distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
@@ -256,90 +190,18 @@ interface TaskActions {
     }>
   }) => Promise<void>
   
-  // 🆕 v1.3 新增：增强监控接口
+  // 🆕 v1.3 新增：增强监控接�?
   fetchConfigStatus: (taskId: string) => Promise<void>
   fetchResourceUsage: (taskId: string) => Promise<void>
   
-  // 🆕 v1.3 新增：废弃警告处理
+  // 🆕 v1.3 新增：废弃警告处�?
   addDeprecationWarning: (warning: string) => void
   clearDeprecationWarnings: () => void
-  
-  // 🆕 v1.4 新增：联邦学习流程编排操作
-  // 编排列表操作
-  fetchOrchestrationList: (params?: {
-    taskId?: string
-    status?: string
-    page?: number
-    size?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-  }) => Promise<void>
-  refreshOrchestrationList: () => Promise<void>
-  
-  // 编排详情操作
-  fetchOrchestrationStatus: (orchestrationId: string, params?: {
-    includeDetails?: boolean
-    includeMetrics?: boolean
-    refresh?: boolean
-  }) => Promise<void>
-  setCurrentOrchestration: (orchestration: OrchestrationWorkflow | null) => void
-  
-  // 编排创建和控制
-  startOrchestration: (orchestrationData: {
-    taskId: string
-    workflowConfig: WorkflowConfig
-    schedulingOptions?: SchedulingOptions
-  }) => Promise<string>
-  pauseOrchestration: (orchestrationId: string, pauseData?: {
-    reason?: string
-    pauseMode?: 'GRACEFUL' | 'IMMEDIATE'
-    waitForCurrentRound?: boolean
-    preserveState?: boolean
-    notifyParticipants?: boolean
-  }) => Promise<void>
-  resumeOrchestration: (orchestrationId: string, resumeData?: {
-    resumeFromSnapshot?: boolean
-    snapshotId?: string
-    validateState?: boolean
-    notifyParticipants?: boolean
-  }) => Promise<void>
-  terminateOrchestration: (orchestrationId: string, params?: {
-    force?: boolean
-    cleanup?: boolean
-    saveResults?: boolean
-  }) => Promise<void>
-  
-  // 编排时间线和分析
-  fetchOrchestrationTimeline: (orchestrationId: string, params?: {
-    includeEvents?: boolean
-    eventLevel?: 'ALL' | 'MAJOR' | 'ERROR'
-    timeRange?: string
-  }) => Promise<void>
-  fetchOrchestrationAnalytics: (orchestrationId: string, params?: {
-    includeRecommendations?: boolean
-    metricsLevel?: 'BASIC' | 'DETAILED' | 'FULL'
-  }) => Promise<void>
-  
-  // 编排参数操作
-  setOrchestrationQueryParams: (params: {
-    taskId?: string
-    status?: string
-    page?: number
-    size?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-  }) => void
-  resetOrchestrationQueryParams: () => void
-  setOrchestrationPagination: (page: number, size?: number) => void
-  
-  // 编排错误处理
-  clearOrchestrationError: () => void
-  clearOrchestrationOperationError: (orchestrationId: string) => void
 }
 
 type TaskStore = TaskState & TaskActions
 
-// ==================== 初始状态 ====================
+// ==================== 初始状�?====================
 
 const initialState: TaskState = {
   taskList: [],
@@ -370,7 +232,7 @@ const initialState: TaskState = {
   queryParams: {},
   realtimeData: {},
   
-  // 🆕 v1.3 新增状态
+  // 🆕 v1.3 新增状�?
   availableVMs: [],
   availableVMsLoading: false,
   availableVMsError: null,
@@ -401,39 +263,7 @@ const initialState: TaskState = {
   resourceUsage: {},
   resourceUsageLoading: {},
   
-  deprecationWarnings: [],
-  
-  // 🆕 v1.4 新增：联邦学习流程编排初始状态
-  orchestrationList: [],
-  orchestrationListTotal: 0,
-  orchestrationListLoading: false,
-  orchestrationListError: null,
-  
-  currentOrchestration: null,
-  currentOrchestrationLoading: false,
-  currentOrchestrationError: null,
-  
-  orchestrationTimelines: {},
-  orchestrationTimelinesLoading: {},
-  orchestrationTimelinesError: {},
-  
-  orchestrationAnalytics: {},
-  orchestrationAnalyticsLoading: {},
-  orchestrationAnalyticsError: {},
-  
-  orchestrationOperationLoading: {},
-  orchestrationOperationError: {},
-  
-  createOrchestrationLoading: false,
-  createOrchestrationError: null,
-  
-  orchestrationQueryParams: {},
-  
-  orchestrationPagination: {
-    page: 1,
-    size: 20,
-    total: 0
-  }
+  deprecationWarnings: []
 }
 
 // ==================== Store 实现 ====================
@@ -526,7 +356,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ currentTask: task })
   },
 
-  // ==================== 任务创建和配置 ====================
+  // ==================== 任务创建和配�?====================
   
   /**
    * 创建任务
@@ -626,7 +456,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
       }))
       
-      // 更新任务状态
+      // 更新任务状�?
       await get().fetchTaskDetail(taskId)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '启动任务失败'
@@ -669,7 +499,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
       }))
       
-      // 更新任务状态
+      // 更新任务状�?
       await get().fetchTaskDetail(taskId)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '暂停任务失败'
@@ -712,7 +542,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
       }))
       
-      // 更新任务状态
+      // 更新任务状�?
       await get().fetchTaskDetail(taskId)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '恢复任务失败'
@@ -755,7 +585,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
       }))
       
-      // 更新任务状态
+      // 更新任务状�?
       await get().fetchTaskDetail(taskId)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '停止任务失败'
@@ -798,7 +628,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
       }))
       
-      // 更新任务状态
+      // 更新任务状�?
       await get().fetchTaskDetail(taskId)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '取消任务失败'
@@ -880,7 +710,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 
-  // ==================== 任务结果和日志 ====================
+  // ==================== 任务结果和日�?====================
   
   /**
    * 获取任务结果
@@ -1001,7 +831,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   /**
-   * 清除特定任务的错误信息
+   * 清除特定任务的错误信�?
    */
   clearTaskError: (taskId: string) => {
     set((state) => {
@@ -1015,10 +845,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     })
   },
 
-  // ==================== 状态重置 ====================
+  // ==================== 状态重�?====================
   
   /**
-   * 重置状态
+   * 重置状�?
    */
   resetState: () => {
     set(initialState)
@@ -1026,10 +856,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   // ==================== v1.3 新增操作 ====================
   
-  // ==================== 预配置接口 ====================
+  // ==================== 预配置接�?====================
   
   /**
-   * 获取可用虚拟机列表
+   * 获取可用虚拟机列�?
    */
   fetchAvailableVMs: async (params?: {
     algorithm?: string
@@ -1059,7 +889,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   /**
-   * 获取可用数据集列表
+   * 获取可用数据集列�?
    */
   fetchAvailableDatasets: async (params?: {
     dataType?: string
@@ -1170,7 +1000,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   /**
-   * 参与者验证
+   * 参与者验�?
    */
   validateParticipants: async (data: {
     algorithm: string
@@ -1203,7 +1033,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   // ==================== 增强监控接口 ====================
   
   /**
-   * 获取配置状态监控
+   * 获取配置状态监�?
    */
   fetchConfigStatus: async (taskId: string) => {
     set((state) => ({
@@ -1233,7 +1063,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           [taskId]: false
         }
       }))
-      console.error(`获取配置状态监控失败 (${taskId}):`, error)
+      console.error(`获取配置状态监控失�?(${taskId}):`, error)
       throw error
     }
   },
@@ -1290,428 +1120,6 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
    */
   clearDeprecationWarnings: () => {
     set({ deprecationWarnings: [] })
-  },
-
-  // ==================== v1.4 新增：联邦学习流程编排操作 ====================
-
-  /**
-   * 获取编排列表
-   */
-  fetchOrchestrationList: async (params?: {
-    taskId?: string
-    status?: string
-    page?: number
-    size?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-  }) => {
-    const { orchestrationPagination, orchestrationQueryParams } = get()
-    const finalParams = {
-      page: orchestrationPagination.page,
-      size: orchestrationPagination.size,
-      ...orchestrationQueryParams,
-      ...params
-    }
-
-    set({ orchestrationListLoading: true, orchestrationListError: null })
-
-    try {
-      const response = await federatedTaskService.getOrchestrationList(finalParams)
-
-      set({
-        orchestrationList: response.items,
-        orchestrationListTotal: response.total,
-        orchestrationListLoading: false,
-        orchestrationListError: null,
-        orchestrationPagination: {
-          page: response.page,
-          size: response.size,
-          total: response.total
-        }
-      })
-    } catch (error) {
-      set({ 
-        orchestrationListLoading: false,
-        orchestrationListError: error instanceof Error ? error.message : '获取编排列表失败'
-      })
-      console.error('获取编排列表失败:', error)
-      throw error
-    }
-  },
-
-  /**
-   * 刷新编排列表
-   */
-  refreshOrchestrationList: async () => {
-    const { orchestrationQueryParams, orchestrationPagination } = get()
-    await get().fetchOrchestrationList({
-      ...orchestrationQueryParams,
-      page: orchestrationPagination.page,
-      size: orchestrationPagination.size
-    })
-  },
-
-  /**
-   * 获取编排状态
-   */
-  fetchOrchestrationStatus: async (orchestrationId: string, params?: {
-    includeDetails?: boolean
-    includeMetrics?: boolean
-    refresh?: boolean
-  }) => {
-    set({ currentOrchestrationLoading: true, currentOrchestrationError: null })
-
-    try {
-      const response = await federatedTaskService.getOrchestrationStatus(orchestrationId, params)
-
-      set({
-        currentOrchestration: response,
-        currentOrchestrationLoading: false,
-        currentOrchestrationError: null
-      })
-    } catch (error) {
-      set({
-        currentOrchestrationLoading: false,
-        currentOrchestrationError: error instanceof Error ? error.message : '获取编排状态失败'
-      })
-      console.error(`获取编排状态失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 设置当前编排
-   */
-  setCurrentOrchestration: (orchestration: OrchestrationWorkflow | null) => {
-    set({ currentOrchestration: orchestration })
-  },
-
-  /**
-   * 启动编排
-   */
-  startOrchestration: async (orchestrationData: {
-    taskId: string
-    workflowConfig: WorkflowConfig
-    schedulingOptions?: SchedulingOptions
-  }) => {
-    set({ createOrchestrationLoading: true, createOrchestrationError: null })
-
-    try {
-      const response = await federatedTaskService.startOrchestration(orchestrationData)
-
-      set({
-        createOrchestrationLoading: false,
-        createOrchestrationError: null
-      })
-
-      // 刷新编排列表
-      await get().refreshOrchestrationList()
-
-      return response.orchestrationId
-    } catch (error) {
-      set({
-        createOrchestrationLoading: false,
-        createOrchestrationError: error instanceof Error ? error.message : '启动编排失败'
-      })
-      console.error('启动编排失败:', error)
-      throw error
-    }
-  },
-
-  /**
-   * 暂停编排
-   */
-  pauseOrchestration: async (orchestrationId: string, pauseData?: {
-    reason?: string
-    pauseMode?: 'GRACEFUL' | 'IMMEDIATE'
-    waitForCurrentRound?: boolean
-    preserveState?: boolean
-    notifyParticipants?: boolean
-  }) => {
-    set((state) => ({
-      orchestrationOperationLoading: {
-        ...state.orchestrationOperationLoading,
-        [orchestrationId]: true
-      },
-      orchestrationOperationError: {
-        ...state.orchestrationOperationError,
-        [orchestrationId]: null
-      }
-    }))
-
-    try {
-      await federatedTaskService.pauseOrchestration(orchestrationId, pauseData)
-
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        }
-      }))
-
-      // 刷新编排状态
-      await get().fetchOrchestrationStatus(orchestrationId)
-    } catch (error) {
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        },
-        orchestrationOperationError: {
-          ...state.orchestrationOperationError,
-          [orchestrationId]: error instanceof Error ? error.message : '暂停编排失败'
-        }
-      }))
-      console.error(`暂停编排失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 恢复编排
-   */
-  resumeOrchestration: async (orchestrationId: string, resumeData?: {
-    resumeFromSnapshot?: boolean
-    snapshotId?: string
-    validateState?: boolean
-    notifyParticipants?: boolean
-  }) => {
-    set((state) => ({
-      orchestrationOperationLoading: {
-        ...state.orchestrationOperationLoading,
-        [orchestrationId]: true
-      },
-      orchestrationOperationError: {
-        ...state.orchestrationOperationError,
-        [orchestrationId]: null
-      }
-    }))
-
-    try {
-      await federatedTaskService.resumeOrchestration(orchestrationId, resumeData)
-
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        }
-      }))
-
-      // 刷新编排状态
-      await get().fetchOrchestrationStatus(orchestrationId)
-    } catch (error) {
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        },
-        orchestrationOperationError: {
-          ...state.orchestrationOperationError,
-          [orchestrationId]: error instanceof Error ? error.message : '恢复编排失败'
-        }
-      }))
-      console.error(`恢复编排失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 终止编排
-   */
-  terminateOrchestration: async (orchestrationId: string, params?: {
-    force?: boolean
-    cleanup?: boolean
-    saveResults?: boolean
-  }) => {
-    set((state) => ({
-      orchestrationOperationLoading: {
-        ...state.orchestrationOperationLoading,
-        [orchestrationId]: true
-      },
-      orchestrationOperationError: {
-        ...state.orchestrationOperationError,
-        [orchestrationId]: null
-      }
-    }))
-
-    try {
-      await federatedTaskService.terminateOrchestration(orchestrationId, params)
-
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        }
-      }))
-
-      // 刷新编排状态
-      await get().fetchOrchestrationStatus(orchestrationId)
-    } catch (error) {
-      set((state) => ({
-        orchestrationOperationLoading: {
-          ...state.orchestrationOperationLoading,
-          [orchestrationId]: false
-        },
-        orchestrationOperationError: {
-          ...state.orchestrationOperationError,
-          [orchestrationId]: error instanceof Error ? error.message : '终止编排失败'
-        }
-      }))
-      console.error(`终止编排失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 获取编排时间线
-   */
-  fetchOrchestrationTimeline: async (orchestrationId: string, params?: {
-    includeEvents?: boolean
-    eventLevel?: 'ALL' | 'MAJOR' | 'ERROR'
-    timeRange?: string
-  }) => {
-    set((state) => ({
-      orchestrationTimelinesLoading: {
-        ...state.orchestrationTimelinesLoading,
-        [orchestrationId]: true
-      },
-      orchestrationTimelinesError: {
-        ...state.orchestrationTimelinesError,
-        [orchestrationId]: null
-      }
-    }))
-
-    try {
-      const response = await federatedTaskService.getOrchestrationTimeline(orchestrationId, params)
-
-      set((state) => ({
-        orchestrationTimelines: {
-          ...state.orchestrationTimelines,
-          [orchestrationId]: response
-        },
-        orchestrationTimelinesLoading: {
-          ...state.orchestrationTimelinesLoading,
-          [orchestrationId]: false
-        }
-      }))
-    } catch (error) {
-      set((state) => ({
-        orchestrationTimelinesLoading: {
-          ...state.orchestrationTimelinesLoading,
-          [orchestrationId]: false
-        },
-        orchestrationTimelinesError: {
-          ...state.orchestrationTimelinesError,
-          [orchestrationId]: error instanceof Error ? error.message : '获取编排时间线失败'
-        }
-      }))
-      console.error(`获取编排时间线失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 获取编排性能分析
-   */
-  fetchOrchestrationAnalytics: async (orchestrationId: string, params?: {
-    includeRecommendations?: boolean
-    metricsLevel?: 'BASIC' | 'DETAILED' | 'FULL'
-  }) => {
-    set((state) => ({
-      orchestrationAnalyticsLoading: {
-        ...state.orchestrationAnalyticsLoading,
-        [orchestrationId]: true
-      },
-      orchestrationAnalyticsError: {
-        ...state.orchestrationAnalyticsError,
-        [orchestrationId]: null
-      }
-    }))
-
-    try {
-      const response = await federatedTaskService.getOrchestrationAnalytics(orchestrationId, params)
-
-      set((state) => ({
-        orchestrationAnalytics: {
-          ...state.orchestrationAnalytics,
-          [orchestrationId]: response
-        },
-        orchestrationAnalyticsLoading: {
-          ...state.orchestrationAnalyticsLoading,
-          [orchestrationId]: false
-        }
-      }))
-    } catch (error) {
-      set((state) => ({
-        orchestrationAnalyticsLoading: {
-          ...state.orchestrationAnalyticsLoading,
-          [orchestrationId]: false
-        },
-        orchestrationAnalyticsError: {
-          ...state.orchestrationAnalyticsError,
-          [orchestrationId]: error instanceof Error ? error.message : '获取编排性能分析失败'
-        }
-      }))
-      console.error(`获取编排性能分析失败 (${orchestrationId}):`, error)
-      throw error
-    }
-  },
-
-  /**
-   * 设置编排查询参数
-   */
-  setOrchestrationQueryParams: (params: {
-    taskId?: string
-    status?: string
-    page?: number
-    size?: number
-    sortBy?: string
-    sortOrder?: 'asc' | 'desc'
-  }) => {
-    set({ orchestrationQueryParams: params })
-  },
-
-  /**
-   * 重置编排查询参数
-   */
-  resetOrchestrationQueryParams: () => {
-    set({ orchestrationQueryParams: {} })
-  },
-
-  /**
-   * 设置编排分页
-   */
-  setOrchestrationPagination: (page: number, size?: number) => {
-    set((state) => ({
-      orchestrationPagination: {
-        ...state.orchestrationPagination,
-        page,
-        size: size || state.orchestrationPagination.size
-      }
-    }))
-  },
-
-  /**
-   * 清除编排错误
-   */
-  clearOrchestrationError: () => {
-    set({
-      orchestrationListError: null,
-      currentOrchestrationError: null,
-      createOrchestrationError: null
-    })
-  },
-
-  /**
-   * 清除编排操作错误
-   */
-  clearOrchestrationOperationError: (orchestrationId: string) => {
-    set((state) => ({
-      orchestrationOperationError: {
-        ...state.orchestrationOperationError,
-        [orchestrationId]: null
-      }
-    }))
   }
 }))
 
