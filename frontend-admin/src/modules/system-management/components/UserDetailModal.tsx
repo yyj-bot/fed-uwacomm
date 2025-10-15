@@ -11,7 +11,9 @@ import {
   Space, 
   Spin,
   message,
-  Typography 
+  Typography,
+  Divider,
+  Card 
 } from 'antd'
 import { 
   UserOutlined, 
@@ -21,11 +23,13 @@ import {
   EditOutlined,
   LockOutlined,
   UnlockOutlined,
-  KeyOutlined
+  KeyOutlined,
+  IdcardOutlined
 } from '@ant-design/icons'
 import { StatusIndicator } from '@/components'
 import { useAdmin } from '@/store'
 import type { User } from '@/types'
+import './SystemManagementModals.css'
 
 const { Text } = Typography
 
@@ -121,14 +125,15 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
     <Modal
       title={
         <Space>
-          <UserOutlined />
-          用户详情
+          <IdcardOutlined style={{ color: '#1890ff', fontSize: '20px' }} />
+          <span style={{ fontSize: '18px', fontWeight: 600 }}>用户详细信息</span>
         </Space>
       }
       open={visible}
       onCancel={onCancel}
+      centered
       footer={[
-        <Button key="cancel" onClick={onCancel}>
+        <Button key="cancel" onClick={onCancel} size="large">
           关闭
         </Button>,
         <Button 
@@ -137,21 +142,31 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
           icon={<EditOutlined />}
           onClick={handleEdit}
           disabled={!currentUser}
+          size="large"
         >
-          编辑
+          编辑用户
         </Button>
       ]}
-      width={700}
+      width={750}
       destroyOnHidden
     >
       <Spin spinning={isLoading}>
         {currentUser ? (
-          <div style={{ padding: '16px 0' }}>
+          <div style={{ padding: '8px 0' }}>
             <Descriptions 
               column={2} 
               bordered
-              size="small"
-              labelStyle={{ width: '120px', fontWeight: 'bold' }}
+              size="middle"
+              labelStyle={{ 
+                width: '140px', 
+                fontWeight: 600,
+                fontSize: '14px',
+                background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)'
+              }}
+              contentStyle={{
+                fontSize: '14px',
+                padding: '12px 16px'
+              }}
             >
               <Descriptions.Item 
                 label={
@@ -249,43 +264,82 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
             </Descriptions>
 
             {/* 操作按钮区域 */}
-            <div style={{ marginTop: 24, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
-              <Space>
-                <Text strong>快速操作：</Text>
+            <Card 
+              className="user-quick-actions"
+              style={{ 
+                marginTop: 24, 
+                background: '#ffffff',
+                border: '1px solid #e8e8e8',
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+              }}
+              bodyStyle={{ padding: '16px 20px' }}
+            >
+              <Space size="middle" className="quick-action-buttons">
+                <Text strong style={{ color: '#262626', fontSize: '15px' }}>快速操作：</Text>
                 {isLocked ? (
                   <Button 
                     type="primary" 
-                    icon={<UnlockOutlined />}
                     loading={unlockLoading}
                     onClick={handleUnlockUser}
-                    size="small"
+                    style={{
+                      minWidth: '110px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
+                      border: 'none',
+                      boxShadow: '0 2px 8px rgba(82, 196, 26, 0.3)'
+                    }}
                   >
-                    解锁用户
+                    <UnlockOutlined />
+                    <span>解锁用户</span>
                   </Button>
                 ) : (
                   <Button 
                     danger 
-                    icon={<LockOutlined />}
                     loading={lockLoading}
                     onClick={handleLockUser}
-                    size="small"
+                    style={{
+                      minWidth: '110px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+                      border: 'none',
+                      color: 'white',
+                      boxShadow: '0 2px 8px rgba(255, 77, 79, 0.3)'
+                    }}
                   >
-                    锁定用户
+                    <LockOutlined />
+                    <span>锁定用户</span>
                   </Button>
                 )}
                 <Button 
-                  icon={<KeyOutlined />}
                   onClick={() => {
                     if (currentUser) {
                       onResetPassword?.(currentUser)
                     }
                   }}
-                  size="small"
+                  style={{
+                    minWidth: '110px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
+                    border: 'none',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(250, 173, 20, 0.3)'
+                  }}
                 >
-                  重置密码
+                  <KeyOutlined />
+                  <span>重置密码</span>
                 </Button>
               </Space>
-            </div>
+            </Card>
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>

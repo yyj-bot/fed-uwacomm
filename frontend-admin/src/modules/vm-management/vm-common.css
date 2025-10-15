@@ -1,0 +1,488 @@
+/**
+ * 虚拟机管理通用样式
+ * 应用于所有虚拟机管理相关组件，包括列表、详情、模型管理等
+ */
+
+/* 全局样式优化 */
+.ant-drawer-body {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  padding: 24px;
+}
+
+/* 卡片样式美化 */
+.ant-drawer .ant-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  margin-bottom: 16px;
+}
+
+.ant-drawer .ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* 卡片标题美化 */
+.ant-drawer .ant-card-head {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  border-bottom: 2px solid #e8e8e8;
+  border-radius: 12px 12px 0 0;
+}
+
+.ant-drawer .ant-card-head-title {
+  color: #262626;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 16px 0;
+}
+
+/* 描述列表美化 */
+.ant-drawer .ant-descriptions {
+  background: transparent;
+}
+
+.ant-drawer .ant-descriptions-item-label {
+  font-weight: 600;
+  color: #1890ff;
+  background: rgba(24, 144, 255, 0.1);
+  padding: 12px 16px;
+  border-radius: 8px 0 0 8px;
+}
+
+.ant-drawer .ant-descriptions-item-content {
+  padding: 12px 16px;
+  background: #ffffff;
+  border-radius: 0 8px 8px 0;
+}
+
+.ant-drawer .ant-descriptions-row {
+  border: none;
+  margin-bottom: 8px;
+}
+
+/* 统计卡片美化 */
+.ant-drawer .ant-statistic {
+  background: linear-gradient(135deg, #f0f9ff 0%, #d6f0ff 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(24, 144, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.08);
+}
+
+.ant-drawer .ant-statistic-title {
+  color: #4a4a4a;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.ant-drawer .ant-statistic-content {
+  color: #0066cc;
+  font-weight: 700;
+}
+
+/* 进度条美化 */
+.ant-drawer .ant-progress-bg {
+  background: linear-gradient(90deg, #1890ff 0%, #52c41a 100%);
+}
+
+.ant-drawer .ant-progress-outer {
+  background: #f0f0f0;
+  border-radius: 10px;
+}
+
+/* 标签美化 */
+.ant-drawer .ant-tag {
+  margin: 0;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮美化 */
+.ant-drawer .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  font-weight: 500;
+  transition: all 0.3s ease;
+  height: 40px;
+  padding: 0 24px;
+}
+
+.ant-drawer .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+.ant-drawer .ant-btn-default {
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  height: 40px;
+}
+
+.ant-drawer .ant-btn-default:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+/* 表格美化 */
+.ant-drawer .ant-table {
+  background: #ffffff !important;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-drawer .ant-table-container {
+  background: #ffffff !important;
+}
+
+.ant-drawer .ant-table-content {
+  background: #ffffff !important;
+}
+
+.ant-drawer .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
+  font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
+  padding: 16px;
+  font-size: 14px;
+}
+
+.ant-drawer .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.ant-drawer .ant-table-tbody > tr {
+  background: #ffffff !important;
+}
+
+.ant-drawer .ant-table-tbody > tr:hover {
+  background: linear-gradient(90deg, #f0f7ff 0%, #e6f4ff 50%, #f0f7ff 100%) !important;
+}
+
+.ant-drawer .ant-table-tbody > tr:hover > td {
+  background: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none;
+}
+
+.ant-drawer .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+  background: transparent;
+}
+
+/* 固定列样式 - 确保固定列有正确的背景 */
+.ant-drawer .ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.ant-drawer .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  background: #ffffff !important;
+}
+
+.ant-drawer .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-drawer .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #e6f4ff !important;
+}
+
+/* 固定列的阴影效果 */
+.ant-drawer .ant-table-cell-fix-left {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.ant-drawer .ant-table-cell-fix-right {
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 选项卡美化 */
+.ant-drawer .ant-tabs-nav {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #f0f0f0;
+}
+
+.ant-drawer .ant-tabs-tab {
+  border-radius: 8px;
+  padding: 12px 24px;
+  transition: all 0.3s ease;
+  margin: 0 4px;
+  color: #595959;
+}
+
+.ant-drawer .ant-tabs-tab:hover {
+  background: rgba(24, 144, 255, 0.08);
+  color: #1890ff;
+}
+
+.ant-drawer .ant-tabs-tab-active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.ant-drawer .ant-tabs-tab-active:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+.ant-drawer .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #fff !important;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+}
+
+.ant-drawer .ant-tabs-tab-active:hover .ant-tabs-tab-btn {
+  color: #fff !important;
+}
+
+.ant-drawer .ant-tabs-tab-active .anticon {
+  color: #fff !important;
+}
+
+.ant-drawer .ant-tabs-tab-active:hover .anticon {
+  color: #fff !important;
+}
+
+.ant-drawer .ant-tabs-ink-bar {
+  display: none;
+}
+
+/* 空状态美化 */
+.ant-drawer .ant-empty {
+  padding: 60px 20px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 2px dashed #d9d9d9;
+}
+
+.ant-drawer .ant-empty-description {
+  color: #8c8c8c;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* 输入框和选择器美化 */
+.ant-drawer .ant-input,
+.ant-drawer .ant-select-selector,
+.ant-drawer .ant-input-affix-wrapper {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.ant-drawer .ant-input:hover,
+.ant-drawer .ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.ant-drawer .ant-select-selector {
+  border-radius: 8px !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+.ant-drawer .ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+.ant-drawer .ant-input-affix-wrapper:hover,
+.ant-drawer .ant-input-affix-wrapper:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* 模态框美化 */
+.ant-modal .ant-modal-header {
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  border-bottom: 2px solid #f0f0f0;
+  border-radius: 12px 12px 0 0;
+}
+
+.ant-modal .ant-modal-title {
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.ant-modal .ant-modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.ant-modal .ant-modal-body {
+  background: #ffffff;
+  padding: 24px;
+}
+
+/* 加载状态美化 */
+.ant-drawer .ant-spin-dot-item {
+  background-color: #1890ff;
+}
+
+.ant-drawer .ant-spin-text {
+  color: #1890ff;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* Badge 美化 */
+.ant-drawer .ant-badge-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.ant-drawer .ant-badge-status-text {
+  margin-left: 12px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* 图表容器美化 */
+.ant-drawer .chart-container {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f0f0f0;
+  margin: 16px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .ant-drawer-body {
+    padding: 16px;
+  }
+
+  .ant-drawer .ant-card {
+    margin-bottom: 12px;
+  }
+
+  .ant-drawer .ant-statistic {
+    padding: 16px;
+  }
+
+  .ant-drawer .ant-btn-primary,
+  .ant-drawer .ant-btn-default {
+    height: 36px;
+    padding: 0 16px;
+  }
+}
+
+/* 动画效果 */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.ant-drawer .ant-card {
+  animation: slideInRight 0.4s ease-out;
+}
+
+/* 图标美化 */
+.ant-drawer .anticon {
+  transition: all 0.3s ease;
+}
+
+.ant-drawer .anticon:hover {
+  transform: scale(1.1);
+  color: #1890ff;
+}
+
+/* 分割线美化 */
+.ant-drawer .ant-divider {
+  border-color: #f0f0f0;
+  margin: 20px 0;
+}
+
+.ant-drawer .ant-divider-horizontal.ant-divider-with-text {
+  color: #1890ff;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* 文本样式 */
+.ant-drawer strong {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.ant-drawer .text-highlight {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+}
+
+/* 成功/错误状态样式 */
+.ant-drawer .success-message {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.ant-drawer .error-message {
+  background: #fff2f0;
+  color: #ff4d4f;
+  border: 1px solid #ffccc7;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.ant-drawer .warning-message {
+  background: #fff7e6;
+  color: #fa8c16;
+  border: 1px solid #ffd591;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+/* 代码块样式 */
+.ant-drawer pre,
+.ant-drawer code {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  color: #1890ff;
+}
+
+.ant-drawer pre {
+  padding: 12px 16px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+

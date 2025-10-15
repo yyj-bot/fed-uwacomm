@@ -7,6 +7,7 @@
 
 // 导出服务类和实例
 export { AdminUserService, adminUserService } from './adminService'
+export { AdminVmService, adminVmService } from './adminVmService'
 
 // 导出类型定义
 // export type {

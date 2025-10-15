@@ -8,6 +8,7 @@
 
 import React from 'react'
 import { Card, List, Avatar, Typography, Tag, Skeleton, Button } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import { 
   UserOutlined, 
   CloudServerOutlined, 
@@ -16,6 +17,8 @@ import {
   FileTextOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons'
+
+import styles from '../DashboardPage.module.css'
 
 const { Text } = Typography
 
@@ -38,6 +41,8 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
   activities = [], 
   loading = false 
 }) => {
+  const navigate = useNavigate()
+  
   // 获取活动类型图标
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -124,7 +129,11 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
       <Card 
         title="最近活动" 
         size="small"
-        className="fed-dashboard-card"
+        className={styles['fed-dashboard-card']}
+        style={{ background: 'white' }}
+        styles={{ 
+          body: { background: 'white' }
+        }}
       >
         <List
           dataSource={Array(5).fill(0)}
@@ -142,9 +151,17 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
     <Card 
       title="最近活动" 
       size="small"
-      className="fed-dashboard-card"
+      className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
+      style={{ background: 'white', height: '100%', display: 'flex', flexDirection: 'column' }}
+      styles={{ 
+        body: { background: 'white', overflowY: 'auto', flex: 1 }
+      }}
       extra={
-        <Button type="link" size="small">
+        <Button 
+          type="link" 
+          size="small"
+          onClick={() => navigate('/logs')}
+        >
           查看全部
         </Button>
       }
@@ -156,7 +173,7 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
         </div>
       ) : (
         <List
-          className="fed-activity-list"
+          className={styles['fed-activity-list']}
           dataSource={activities.slice(0, 10)}
           renderItem={(activity) => (
             <List.Item>

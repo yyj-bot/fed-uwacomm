@@ -254,3 +254,4 @@ node_modules/
 # tasks.json
 # tasks/ 
 AGENTS.md
+.m2/

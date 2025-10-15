@@ -54,7 +54,7 @@ import './TaskCreatePage.css'
 const { Step } = Steps
 const { Option } = Select
 const { TextArea } = Input
-const { Title, Paragraph } = Typography
+const { Title, Paragraph, Text } = Typography
 
 interface CreateTaskForm {
   // 基本信息
@@ -66,9 +66,9 @@ interface CreateTaskForm {
   // 数据集配置
   datasetConfig: {
     datasetId: string
-    distributionStrategy: 'BALANCED' | 'RANDOM' | 'CUSTOM'
-    validationSplit: number
+    distributionStrategy: 'BALANCED' | 'CUSTOM'
     testSplit: number
+    trainSplit: number
   }
   
   // 参与者配置
@@ -140,11 +140,49 @@ const TaskCreatePage: React.FC = () => {
   const [selectedVMs, setSelectedVMs] = useState<string[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [validationLoading, setValidationLoading] = useState(false)
+  const [distributionStrategy, setDistributionStrategy] = useState<string>('BALANCED')
+  const [testSplit, setTestSplit] = useState<number>(20)
+  const [trainSplit, setTrainSplit] = useState<number>(80)
 
   // 初始化数据
   useEffect(() => {
     loadInitialData()
+    // v1.4 新增：加载可用策略
+    loadAvailableStrategies()
   }, [])
+
+  // 监听分配策略变化
+  useEffect(() => {
+    const strategy = form.getFieldValue(['datasetConfig', 'distributionStrategy'])
+    if (strategy) {
+      setDistributionStrategy(strategy)
+    }
+  }, [form])
+
+  // 初始化数据集划分状态
+  useEffect(() => {
+    const testSplitValue = form.getFieldValue(['datasetConfig', 'testSplit']) || 20
+    const trainSplitValue = form.getFieldValue(['datasetConfig', 'trainSplit']) || 80
+    setTestSplit(testSplitValue)
+    setTrainSplit(trainSplitValue)
+  }, [])
+
+  // v1.4 新增：加载可用聚合策略
+  const loadAvailableStrategies = async () => {
+    try {
+      const { federatedTask } = await import('@/api/federated-task')
+      const strategiesResponse = await federatedTask.getAvailableStrategies()
+      
+      console.log('✅ 成功加载聚合策略:', strategiesResponse.total, '个策略')
+      console.log('策略详情:', strategiesResponse.strategies)
+      
+      // 可以在这里处理策略数据，例如更新算法模板
+      // 暂时只记录日志，不影响现有逻辑
+    } catch (error) {
+      console.warn('⚠️ 获取聚合策略失败，使用默认算法模板:', error)
+      // 失败时不影响现有功能
+    }
+  }
 
   // 从数据集中获取特征列信息的辅助函数
   const getFeatureColumnsFromDataset = useCallback((datasetId?: string): string[] => {
@@ -172,89 +210,36 @@ const TaskCreatePage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      // 🔧 修复：使用真实API获取VM列表，而不是模拟数据
-      const { vmApi } = await import('@/api/vm')
-      console.log('🔄 开始获取VM列表...')
+      // ✅ 修复：使用联邦学习专用接口获取可用VM列表
+      const { federatedTask } = await import('@/api/federated-task')
+      console.log('🔄 开始获取联邦学习可用VM列表...')
       
-      let vmListResponse = await vmApi.getVMList({ 
-        page: 1, 
-        size: 100,  // 获取所有可用的VM
+      const vmListResponse = await federatedTask.getAvailableVMs({ 
         status: 'RUNNING'  // 只获取运行中的VM
       })
       
-      console.log('📋 VM API原始响应:', vmListResponse)
-      console.log('📋 响应数据类型:', typeof vmListResponse)
-      console.log('📋 list字段:', vmListResponse?.list)
-      console.log('📋 list是否为数组:', Array.isArray(vmListResponse?.list))
+      console.log('📋 联邦学习VM API原始响应:', vmListResponse)
+      console.log('📋 响应数据:', vmListResponse?.availableVms)
+      console.log('📋 VM总数:', vmListResponse?.total)
       
       // 检查返回数据格式
-      if (!vmListResponse || !vmListResponse.list || !Array.isArray(vmListResponse.list)) {
-        console.warn('⚠️ VM API返回数据格式错误，尝试直接使用响应数据')
-        
-        // 如果vmListResponse本身就是数组，直接使用
-        if (Array.isArray(vmListResponse)) {
-          console.log('📋 检测到vmListResponse本身是数组，直接使用')
-          vmListResponse = { 
-            total: vmListResponse.length,
-            page: 1,
-            size: vmListResponse.length,
-            pages: 1,
-            list: vmListResponse 
-          }
-        } else {
-          throw new Error(`VM API返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
-        }
+      if (!vmListResponse || !Array.isArray(vmListResponse.availableVms)) {
+        throw new Error(`联邦学习VM API返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
       }
       
       // 检查是否有VM数据
-      if (vmListResponse.list.length === 0) {
-        console.warn('⚠️ 后端VM表为空，没有可用的虚拟机')
-        throw new Error('后端没有可用的虚拟机数据，请先添加虚拟机')
+      if (vmListResponse.availableVms.length === 0) {
+        console.warn('⚠️ 没有可用于联邦学习的虚拟机')
+        throw new Error('没有可用于联邦学习的虚拟机，请先添加并启动虚拟机')
       }
       
-      // 转换API数据格式为前端需要的格式
-      const convertedVMs: AvailableVM[] = vmListResponse.list.map(vm => ({
-        vmId: vm.vmId,  // 🎯 使用真实的VM ID（32位UUID格式）
-        name: vm.name,
-        ipAddress: vm.ipAddress,
-        status: vm.status === 'STARTING' || vm.status === 'STOPPING' || vm.status === 'OFFLINE' ? 'STOPPED' : vm.status as 'RUNNING' | 'STOPPED' | 'ERROR' | 'PAUSED',
-        connectionStatus: vm.connectionStatus,
-        osType: vm.osType,
-        supportedAlgorithms: vm.capabilities?.supportedAlgorithms || ['FEDERATED_AVERAGING'],
-        currentUsage: { 
-          cpuUsage: Math.random() * 50 + 10,  // 模拟当前使用率
-          memoryUsage: Math.random() * 60 + 20, 
-          networkUsage: Math.random() * 30 + 10 
-        },
-        resources: { 
-          cpuCores: vm.cpuCores, 
-          memoryMb: vm.memoryMb, 
-          diskGb: vm.diskGb, 
-          gpuCount: vm.capabilities?.gpuMemory ? 1 : 0,
-          gpuMemoryMb: vm.capabilities?.gpuMemory || 0
-        },
-        capabilities: vm.capabilities?.gpuMemory ? ['GPU'] : ['CPU_ONLY'],
-        networkInfo: { 
-          bandwidth: vm.networkConfig?.bandwidth || 1000,
-          latency: vm.networkConfig?.latency || 10,
-          uploadSpeed: vm.networkConfig?.uploadSpeed || 800,
-          downloadSpeed: vm.networkConfig?.downloadSpeed || 1000
-        },
-        reliability: { 
-          uptime: 99.0 + Math.random() * 1,  // 模拟可靠性数据
-          avgResponseTime: 100 + Math.random() * 100,
-          taskSuccessRate: 95 + Math.random() * 5
-        },
-        lastHeartbeat: vm.lastHeartbeat || new Date().toISOString()
-      }))
+      // 直接使用后端返回的数据（已经是 AvailableVM 格式）
+      setAvailableVMs(vmListResponse.availableVms)
       
-      setAvailableVMs(convertedVMs)
+      console.log('✅ 成功加载联邦学习可用VM数据:', vmListResponse.availableVms.length, '个VM')
+      console.log('VM IDs:', vmListResponse.availableVms.map(vm => vm.vmId))
       
-      console.log('✅ 成功加载真实VM数据:', convertedVMs.length, '个VM')
-      console.log('VM IDs:', convertedVMs.map(vm => vm.vmId))
-      
-      // 🔧 修复：使用真实API获取数据集列表，而不是模拟数据
-      const { federatedTask } = await import('@/api/federated-task')
+      // ✅ 使用联邦学习API获取数据集列表
       console.log('🔄 开始获取数据集列表...')
       
       let datasetsResponse = await federatedTask.getAvailableDatasets({
@@ -282,14 +267,16 @@ const TaskCreatePage: React.FC = () => {
       
       // 检查是否有数据集数据
       if (datasetsResponse.availableDatasets.length === 0) {
-        console.warn('⚠️ 后端没有可用的数据集')
-        throw new Error('后端没有可用的数据集数据，请先上传数据集')
+        console.warn('⚠️ 后端没有可用的数据集，但接口调用成功')
+        setAvailableDatasets([])  // 设置空数组，前端显示"暂无数据"
+      } else {
+        setAvailableDatasets(datasetsResponse.availableDatasets)
       }
       
-      setAvailableDatasets(datasetsResponse.availableDatasets)
-      
       console.log('✅ 成功加载真实数据集数据:', datasetsResponse.availableDatasets.length, '个数据集')
-      console.log('数据集 IDs:', datasetsResponse.availableDatasets.map(ds => ds.datasetId))
+      if (datasetsResponse.availableDatasets.length > 0) {
+        console.log('数据集 IDs:', datasetsResponse.availableDatasets.map(ds => ds.datasetId))
+      }
 
       // 🔧 修复：使用真实API获取算法模板，而不是模拟数据
       console.log('🔄 开始获取算法模板...')
@@ -316,88 +303,32 @@ const TaskCreatePage: React.FC = () => {
       
       // 检查是否有算法模板数据
       if (algorithmsResponse.templates.length === 0) {
-        console.warn('⚠️ 后端没有可用的算法模板')
-        throw new Error('后端没有可用的算法模板数据，请先配置算法模板')
+        console.warn('⚠️ 后端没有可用的算法模板，但接口调用成功')
+        setAlgorithmTemplates([])  // 设置空数组，前端显示"暂无数据"
+      } else {
+        setAlgorithmTemplates(algorithmsResponse.templates)
       }
       
-      setAlgorithmTemplates(algorithmsResponse.templates)
-      
       console.log('✅ 成功加载真实算法模板数据:', algorithmsResponse.templates.length, '个算法')
-      console.log('算法列表:', algorithmsResponse.templates.map(alg => alg.algorithm))
+      if (algorithmsResponse.templates.length > 0) {
+        console.log('算法列表:', algorithmsResponse.templates.map(alg => alg.algorithm))
+      }
       
     } catch (error) {
-      console.error('❌ 加载数据失败，使用备用模拟数据:', error)
+      console.error('❌ 加载数据失败:', error)
+      console.error('❌ 错误详情:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: typeof error
+      })
       
-      // 🚨 备用方案：如果API失败，使用模拟数据（但使用更真实的UUID格式）
-      setAvailableVMs([
-        {
-          vmId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',  // 32位UUID格式
-          name: '备用水声联邦学习节点-001',
-          ipAddress: '192.168.1.100',
-          status: 'RUNNING' as const,
-          connectionStatus: 'CONNECTED',
-          osType: 'Linux',
-          supportedAlgorithms: ['FEDERATED_AVERAGING'],
-          currentUsage: { cpuUsage: 25.5, memoryUsage: 42.3, networkUsage: 15.8 },
-          resources: { cpuCores: 8, memoryMb: 16384, diskGb: 500, gpuCount: 1, gpuMemoryMb: 8192 },
-          capabilities: ['GPU'],
-          networkInfo: { bandwidth: 1000, latency: 5, uploadSpeed: 800, downloadSpeed: 1000 },
-          reliability: { uptime: 99.9, avgResponseTime: 120, taskSuccessRate: 98.5 },
-          lastHeartbeat: new Date().toISOString()
-        }
-      ])
+      // API失败时显示空列表
+      console.warn('⚠️ 无法获取数据，请检查后端API接口或网络连接')
+      setAvailableVMs([])
+      setAvailableDatasets([])
+      setAlgorithmTemplates([])
       
-      // 备用数据集数据
-      setAvailableDatasets([
-        {
-          datasetId: 'backup-dataset-001',
-          name: '备用水声数据集',
-          description: '备用数据集，用于API失败时的降级处理',
-          dataType: 'ACOUSTIC',
-          features: { 
-            featureColumns: ['depth', 'temperature', 'salinity'], 
-            targetColumn: 'transmission_loss',
-            numericFeatures: 3,
-            categoricalFeatures: 0
-          },
-          quality: { 
-            completeness: 0.90, 
-            consistency: 0.85, 
-            accuracy: 0.80,
-            missingValues: 0.10,
-            duplicates: 0.05,
-            outliers: 0.05
-          },
-          status: 'READY',
-          statistics: { totalRows: 1000, totalColumns: 10, fileSize: 1048576, fileSizeFormatted: '1MB' },
-          metadata: { source: 'Backup', version: 'v1.0', sampleRate: 44100, frequency: '1-5kHz', environment: 'Test' },
-          uploadTime: new Date().toISOString(),
-          uploadedBy: 'system',
-          tags: ['backup', 'test']
-        }
-      ])
-      
-      // 备用算法模板
-      setAlgorithmTemplates([
-        {
-          algorithm: 'FEDERATED_AVERAGING',
-          name: '联邦平均算法（备用）',
-          description: '备用算法模板',
-          applicableTaskTypes: ['CLASSIFICATION', 'REGRESSION'],
-          parameterRanges: {
-            learningRate: { min: 0.001, max: 0.1, recommended: [0.01] },
-            batchSize: { min: 8, max: 128, recommended: [32] }
-          },
-          defaultHyperparameters: {
-            learningRate: 0.01,
-            batchSize: 32,
-            epochs: 10,
-            rounds: 20,
-            minParticipants: 2,
-            aggregationMethod: 'WEIGHTED_AVERAGE'
-          }
-        }
-      ])
+      message.error('加载初始数据失败，请检查网络连接或联系管理员')
     }
   }
 
@@ -478,15 +409,67 @@ const TaskCreatePage: React.FC = () => {
     }
   }, [form, algorithmTemplates])
 
+  // 处理分配策略变化
+  const handleDistributionStrategyChange = useCallback((strategy: string) => {
+    setDistributionStrategy(strategy)
+    
+    // 如果是均衡分配，自动设置均等占比
+    if (strategy === 'BALANCED' && selectedVMs.length > 0) {
+      const equalRatio = parseFloat((100 / selectedVMs.length).toFixed(1))
+      const participants = selectedVMs.map((vmId) => ({
+        vmId,
+        role: 'PARTICIPANT' as const,
+        dataRatio: equalRatio,
+        capabilities: [],
+        constraints: {
+          maxCpuUsage: 80,
+          maxMemoryUsage: 75
+        }
+      }))
+      
+      form.setFieldsValue({
+        participantConfig: {
+          ...form.getFieldValue('participantConfig'),
+          participants
+        }
+      })
+    }
+  }, [form, selectedVMs])
+
+  // 处理测试集比例变化
+  const handleTestSplitChange = useCallback((value: number | null) => {
+    if (value !== null && value >= 1 && value <= 99) {
+      setTestSplit(value)
+      const newTrainSplit = parseFloat((100 - value).toFixed(1))
+      setTrainSplit(newTrainSplit)
+      // 同步更新表单中的训练集比例
+      form.setFieldValue(['datasetConfig', 'trainSplit'], newTrainSplit)
+    }
+  }, [form])
+
+  // 处理训练集比例变化
+  const handleTrainSplitChange = useCallback((value: number | null) => {
+    if (value !== null && value >= 1 && value <= 99) {
+      setTrainSplit(value)
+      const newTestSplit = parseFloat((100 - value).toFixed(1))
+      setTestSplit(newTestSplit)
+      // 同步更新表单中的测试集比例
+      form.setFieldValue(['datasetConfig', 'testSplit'], newTestSplit)
+    }
+  }, [form])
+
   // 处理VM选择
   const handleVMSelection = useCallback((selectedRowKeys: React.Key[]) => {
     setSelectedVMs(selectedRowKeys as string[])
     
     // 自动设置参与者配置
-    const participants = selectedRowKeys.map(vmId => ({
+    const currentStrategy = form.getFieldValue(['datasetConfig', 'distributionStrategy']) || 'BALANCED'
+    const equalRatio = selectedRowKeys.length > 0 ? parseFloat((100 / selectedRowKeys.length).toFixed(1)) : 0
+    
+    const participants = selectedRowKeys.map((vmId) => ({
       vmId: vmId as string,
       role: 'PARTICIPANT' as const,
-      dataRatio: 1 / selectedRowKeys.length,
+      dataRatio: equalRatio,
       capabilities: [],
       constraints: {
         maxCpuUsage: 80,
@@ -500,6 +483,22 @@ const TaskCreatePage: React.FC = () => {
         participants
       }
     })
+  }, [form])
+
+  // 验证数据占比总和
+  const validateDataRatioSum = useCallback(() => {
+    const participants = form.getFieldValue(['participantConfig', 'participants']) || []
+    const totalRatio = participants.reduce((sum: number, p: any) => sum + (p.dataRatio || 0), 0)
+    
+    // 对于均衡分配，允许更大的误差范围（因为小数精度问题）
+    const currentStrategy = form.getFieldValue(['datasetConfig', 'distributionStrategy']) || 'BALANCED'
+    const tolerance = currentStrategy === 'BALANCED' ? 1.0 : 0.01 // 均衡分配允许1%误差，自定义分配要求更精确
+    
+    if (Math.abs(totalRatio - 100) > tolerance) {
+      message.error(`虚拟机数据占比总和应为100%，当前为${totalRatio.toFixed(1)}%`)
+      return false
+    }
+    return true
   }, [form])
 
   // 提交表单
@@ -518,6 +517,11 @@ const TaskCreatePage: React.FC = () => {
       await form.validateFields()
       console.log('✅ 表单验证完成')
       
+      // 验证数据占比总和
+      if (!validateDataRatioSum()) {
+        return
+      }
+      
       // 由于分步表单的限制，使用getFieldValue逐个获取字段值
       const values = {
         // 基本信息
@@ -527,16 +531,28 @@ const TaskCreatePage: React.FC = () => {
         algorithm: form.getFieldValue('algorithm'),
         
         // 数据集配置
-        datasetConfig: form.getFieldValue('datasetConfig') || {
-          distributionStrategy: 'BALANCED',
-          validationSplit: 0.2,
-          testSplit: 0.1
+        datasetConfig: {
+          ...(form.getFieldValue('datasetConfig') || {
+            distributionStrategy: 'BALANCED',
+            testSplit: 20,
+            trainSplit: 80
+          }),
+          // 将百分比转换为小数
+          testSplit: (form.getFieldValue(['datasetConfig', 'testSplit']) || 20) / 100
+          // 注意：trainSplit不需要发送给后端，因为后端只需要testSplit
         },
         
         // 参与者配置
-        participantConfig: form.getFieldValue('participantConfig') || {
-          selectionMode: 'MANUAL',
-          participants: []
+        participantConfig: {
+          ...(form.getFieldValue('participantConfig') || {
+            selectionMode: 'MANUAL',
+            participants: []
+          }),
+          // 将参与者数据占比从百分比转换为小数
+          participants: (form.getFieldValue(['participantConfig', 'participants']) || []).map((p: any) => ({
+            ...p,
+            dataRatio: (p.dataRatio || 0) / 100
+          }))
         },
         
         // 超参数配置
@@ -569,7 +585,7 @@ const TaskCreatePage: React.FC = () => {
       
       if (!hasSelectedVMs && !hasParticipantsInForm) {
         message.error('请至少选择一个参与者虚拟机')
-        setCurrentStep(2) // 跳转到参与者配置步骤
+        setCurrentStep(1) // 跳转到参与者配置步骤
         return
       }
       
@@ -578,7 +594,7 @@ const TaskCreatePage: React.FC = () => {
         const participants = selectedVMs.map(vmId => ({
           vmId,
           role: 'PARTICIPANT' as const,
-          dataRatio: 1 / selectedVMs.length,
+          dataRatio: parseFloat((100 / selectedVMs.length).toFixed(1)),
           capabilities: [],
           constraints: {
             maxCpuUsage: 80,
@@ -658,7 +674,7 @@ const TaskCreatePage: React.FC = () => {
         participants = selectedVMs.map(vmId => ({
           vmId,
           role: 'PARTICIPANT' as const,
-          dataRatio: 1 / selectedVMs.length,
+          dataRatio: parseFloat((100 / selectedVMs.length).toFixed(1)),
           capabilities: [],
           constraints: {
             maxCpuUsage: 80,
@@ -808,11 +824,11 @@ const TaskCreatePage: React.FC = () => {
       dataIndex: 'capabilities',
       key: 'capabilities',
       render: (capabilities: string[]) => (
-                        <Space wrap>
-                          {capabilities.map(cap => (
-                            <Tag key={cap}>{cap}</Tag>
-                          ))}
-                        </Space>
+        <Space wrap>
+          {capabilities.map(cap => (
+            <Tag key={cap}>{cap}</Tag>
+          ))}
+        </Space>
       )
     }
   ]
@@ -824,12 +840,12 @@ const TaskCreatePage: React.FC = () => {
       description: '配置任务基本信息'
     },
     {
-      title: '数据集配置',
-      description: '选择和配置数据集'
-    },
-    {
       title: '参与者配置',
       description: '选择参与的虚拟机'
+    },
+    {
+      title: '数据集配置',
+      description: '选择和配置数据集'
     },
     {
       title: '算法配置',
@@ -884,8 +900,8 @@ const TaskCreatePage: React.FC = () => {
             algorithm: '',
             datasetConfig: {
               distributionStrategy: 'BALANCED',
-              validationSplit: 0.2,
-              testSplit: 0.1
+              testSplit: 20,
+              trainSplit: 80
             },
             participantConfig: {
               selectionMode: 'MANUAL',
@@ -959,118 +975,10 @@ const TaskCreatePage: React.FC = () => {
             </div>
           )}
 
-          {/* 步骤2: 数据集配置 */}
+          {/* 步骤2: 参与者配置 */}
           {currentStep === 1 && (
             <div className="step-content">
-              <Title level={4}>数据集配置</Title>
-              <Row gutter={[24, 16]}>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name={['datasetConfig', 'datasetId']}
-                    label="选择数据集"
-                    rules={[{ required: true, message: '请选择数据集' }]}
-                  >
-                    <Select placeholder="请选择数据集">
-                      {availableDatasets.map(dataset => (
-                        <Option key={dataset.datasetId} value={dataset.datasetId}>
-                          <div>
-                            <div>{dataset.name}</div>
-                            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
-                              {dataset.statistics.totalRows}行 × {dataset.statistics.totalColumns}列 
-                              ({dataset.statistics.fileSizeFormatted})
-                            </div>
-                          </div>
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name={['datasetConfig', 'distributionStrategy']}
-                    label="分配策略"
-                    rules={[{ required: true, message: '请选择分配策略' }]}
-                  >
-                    <Select placeholder="请选择分配策略">
-                      <Option value="BALANCED">均衡分配</Option>
-                      <Option value="RANDOM">随机分配</Option>
-                      <Option value="CUSTOM">自定义分配</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name={['datasetConfig', 'validationSplit']}
-                    label="验证集比例"
-                    rules={[{ required: true, message: '请输入验证集比例' }]}
-                  >
-                    <InputNumber 
-                      min={0} 
-                      max={0.5} 
-                      step={0.1} 
-                      placeholder="0.2"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name={['datasetConfig', 'testSplit']}
-                    label="测试集比例"
-                    rules={[{ required: true, message: '请输入测试集比例' }]}
-                  >
-                    <InputNumber 
-                      min={0} 
-                      max={0.3} 
-                      step={0.05} 
-                      placeholder="0.1"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-              
-              {/* 数据分配预览 */}
-              <Divider>数据分配预览</Divider>
-              <div style={{ marginBottom: 16 }}>
-                <Button 
-                  type="primary" 
-                  icon={<EyeOutlined />}
-                  onClick={handlePreviewDistribution}
-                  loading={previewLoading}
-                >
-                  预览数据分配
-                </Button>
-              </div>
-              
-              {distributionPreview && (
-                <Alert
-                  message="数据分配预览"
-                  description={
-                    <div>
-                      <div>IID评分: {(distributionPreview.qualityMetrics.iidScore * 100).toFixed(1)}%</div>
-                      <div>平衡评分: {(distributionPreview.qualityMetrics.balanceScore * 100).toFixed(1)}%</div>
-                      <div style={{ marginTop: 8 }}>
-                        {distributionPreview.distributionResult.participants.map(p => (
-                          <div key={p.vmId} style={{ fontSize: '12px' }}>
-                            {p.vmId}: {(p.allocatedRatio * 100).toFixed(1)}% ({p.allocatedRows}行)
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  }
-                  type="info"
-                  showIcon
-                />
-              )}
-            </div>
-          )}
-
-          {/* 步骤3: 参与者配置 */}
-          {currentStep === 2 && (
-            <div className="step-content">
               <Title level={4}>参与者配置</Title>
-              
               <div style={{ marginBottom: 16 }}>
                 <Alert
                   message="选择参与训练的虚拟机节点"
@@ -1116,14 +1024,8 @@ const TaskCreatePage: React.FC = () => {
                       message="参与者验证通过"
                       description={
                         <div>
-                          <div>验证通过: {participantValidation.participantValidations.length}个节点</div>
-                          <div style={{ marginTop: 8 }}>
-                            <strong>建议:</strong>
-                            <ul style={{ margin: '4px 0 0 16px' }}>
-                              <li>建议增加GPU节点以提高训练速度</li>
-                              <li>数据分布较为均衡，预期训练效果良好</li>
-                            </ul>
-                          </div>
+                          <div>验证通过的参与者: {participantValidation.participantValidations.filter(p => p.isValid).length}</div>
+                          <div>总参与者数量: {participantValidation.participantValidations.length}</div>
                         </div>
                       }
                       type="success"
@@ -1131,6 +1033,188 @@ const TaskCreatePage: React.FC = () => {
                     />
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {/* 步骤3: 数据集配置 */}
+          {currentStep === 2 && (
+            <div className="step-content">
+              <Title level={4}>数据集配置</Title>
+              
+              {/* 数据集选择 */}
+              <Row gutter={[24, 16]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name={['datasetConfig', 'datasetId']}
+                    label="选择数据集"
+                    rules={[{ required: true, message: '请选择数据集' }]}
+                  >
+                    <Select placeholder="请选择数据集">
+                      {availableDatasets.map(dataset => (
+                        <Option key={dataset.datasetId} value={dataset.datasetId}>
+                          <div>
+                            <div>{dataset.name}</div>
+                            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                              {dataset.statistics.totalRows}行 × {dataset.statistics.totalColumns}列 
+                              ({dataset.statistics.fileSizeFormatted})
+                            </div>
+                          </div>
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name={['datasetConfig', 'distributionStrategy']}
+                    label="分配策略"
+                    rules={[{ required: true, message: '请选择分配策略' }]}
+                  >
+                    <Select 
+                      placeholder="请选择分配策略"
+                      onChange={handleDistributionStrategyChange}
+                    >
+                      <Option value="BALANCED">均衡分配</Option>
+                      <Option value="CUSTOM">自定义分配</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* 参与者数据分配 */}
+              {selectedVMs.length > 0 && (
+                <>
+                  <Divider>参与者数据分配</Divider>
+                  <div style={{ marginBottom: 16 }}>
+                    <Alert
+                      message="配置每个参与者的数据占比"
+                      description={`已选择 ${selectedVMs.length} 个参与者，请为每个参与者分配数据占比（总和应为100%）`}
+                      type="info"
+                      showIcon
+                    />
+                  </div>
+                  
+                  <Row gutter={[16, 16]}>
+                    {selectedVMs.map((vmId, index) => {
+                      const vm = availableVMs.find(v => v.vmId === vmId)
+                      return (
+                        <Col xs={24} md={12} key={vmId}>
+                          <Card size="small" style={{ marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ fontWeight: 'bold' }}>{vm?.name || vmId}</div>
+                                <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                                  {vm?.resources.cpuCores}核 | {vm?.resources.memoryMb}MB | {vm?.capabilities.join(', ')}
+                                </div>
+                              </div>
+                              <Form.Item
+                                name={['participantConfig', 'participants', index, 'dataRatio']}
+                                style={{ margin: 0, width: 120 }}
+                                rules={[
+                                  { required: true, message: '请输入占比' },
+                                  { type: 'number', min: 0.1, max: 100, message: '占比范围：0.1%-100%' }
+                                ]}
+                              >
+                                <InputNumber
+                                  min={0.1}
+                                  max={100}
+                                  step={0.1}
+                                  precision={1}
+                                  placeholder="33.3"
+                                  addonAfter="%"
+                                  style={{ width: '100%' }}
+                                  disabled={distributionStrategy === 'BALANCED'}
+                                />
+                              </Form.Item>
+                            </div>
+                          </Card>
+                        </Col>
+                      )
+                    })}
+                  </Row>
+                </>
+              )}
+
+              {/* 数据集划分配置 */}
+              <Divider>全局数据集划分</Divider>
+              <Row gutter={[24, 16]}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name={['datasetConfig', 'testSplit']}
+                    label="测试集比例"
+                    rules={[
+                      { required: true, message: '请输入测试集比例' },
+                      { type: 'number', min: 1, max: 50, message: '测试集比例范围：1%-50%' }
+                    ]}
+                  >
+                    <InputNumber 
+                      min={1} 
+                      max={50} 
+                      step={0.1} 
+                      precision={1}
+                      placeholder="20.0"
+                      addonAfter="%"
+                      style={{ width: '100%' }}
+                      onChange={handleTestSplitChange}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name={['datasetConfig', 'trainSplit']}
+                    label="训练集比例"
+                    rules={[
+                      { required: true, message: '请输入训练集比例' },
+                      { type: 'number', min: 50, max: 99, message: '训练集比例范围：50%-99%' }
+                    ]}
+                  >
+                    <InputNumber 
+                      min={50} 
+                      max={99} 
+                      step={0.1} 
+                      precision={1}
+                      placeholder="80.0"
+                      addonAfter="%"
+                      style={{ width: '100%' }}
+                      onChange={handleTrainSplitChange}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* 数据分配预览 */}
+              <Divider>数据分配预览</Divider>
+              <div style={{ marginBottom: 16 }}>
+                <Button 
+                  type="primary" 
+                  icon={<EyeOutlined />}
+                  onClick={handlePreviewDistribution}
+                  loading={previewLoading}
+                >
+                  预览数据分配
+                </Button>
+              </div>
+              
+              {distributionPreview && (
+                <Alert
+                  message="数据分配预览"
+                  description={
+                    <div>
+                      <div>IID评分: {(distributionPreview.qualityMetrics.iidScore * 100).toFixed(1)}%</div>
+                      <div>平衡评分: {(distributionPreview.qualityMetrics.balanceScore * 100).toFixed(1)}%</div>
+                      <div style={{ marginTop: 8 }}>
+                        {distributionPreview.distributionResult.participants.map(p => (
+                          <div key={p.vmId} style={{ fontSize: '12px' }}>
+                            {p.vmId}: {(p.allocatedRatio * 100).toFixed(1)}% ({p.allocatedRows}行)
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  }
+                  type="info"
+                  showIcon
+                />
               )}
             </div>
           )}
@@ -1254,17 +1338,15 @@ const TaskCreatePage: React.FC = () => {
                   >
                     <Select placeholder="请选择模型类型">
                       <Option value="RANDOM_FOREST">随机森林</Option>
-                      <Option value="NEURAL_NETWORK">神经网络</Option>
-                      <Option value="SVM">支持向量机</Option>
-                      <Option value="LINEAR_REGRESSION">线性回归</Option>
                     </Select>
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={12}>
                   <Form.Item
                     name={['modelConfig', 'testSize']}
-                    label="测试集比例"
-                    rules={[{ required: true, message: '请输入测试集比例' }]}
+                    label="本地模型测试集比例"
+                    rules={[{ required: true, message: '请输入本地模型测试集比例' }]}
+                    tooltip="用于每个参与者本地模型训练时的数据划分，与前面的全局数据集划分不同"
                   >
                     <InputNumber 
                       min={0.1} 
@@ -1280,6 +1362,7 @@ const TaskCreatePage: React.FC = () => {
                     name={['modelConfig', 'randomState']}
                     label="随机种子"
                     rules={[{ required: true, message: '请输入随机种子' }]}
+                    tooltip="用于保证模型训练结果的可重现性，相同的随机种子会产生相同的结果"
                   >
                     <InputNumber 
                       min={0} 

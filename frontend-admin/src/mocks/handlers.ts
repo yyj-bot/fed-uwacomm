@@ -4,57 +4,22 @@
  */
 
 import { http, HttpResponse } from 'msw'
+import { federatedTaskHandlers } from './handlers/federatedTaskHandlers'
+import { modelManagementHandlers } from './handlers/modelManagementHandlers'
+import { vmHandlers } from './handlers/vmHandlers'
+import { userHandlers } from './handlers/userHandlers'
+import { systemLogHandlers } from './handlers/systemLogHandlers'
+import { adminVmHandlers } from './handlers/adminVmHandlers'
 
 export const handlers = [
-  // 用户登录 - 支持绝对路径和相对路径
-  http.post('http://localhost:5173/api/user/login', async ({ request }) => {
-    const body = await request.json() as any
-    
-    // 简单的登录验证
-    if (body.loginIdentifier === 'admin' && body.password === 'admin123') {
-      return HttpResponse.json({
-        code: 200,
-        message: '登录成功',
-        data: {
-          token: 'mock-jwt-token',
-          refreshToken: 'mock-refresh-token',
-          expiresIn: 3600,
-          user: {
-            userId: '1',
-            username: 'admin',
-            email: 'admin@feduwacomm.com',
-            role: 'ADMIN',
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        }
-      })
-    }
-    
-      return HttpResponse.json({
-        code: 401,
-        message: '用户名或密码错误',
-        data: null
-      }, { status: 401 })
-  }),
+  // ==================== 用户管理 API ====================
+  ...userHandlers,
 
-  // 获取用户信息
-  http.get('http://localhost:5173/api/user/profile', () => {
-    return HttpResponse.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        userId: '1',
-        username: 'admin',
-        email: 'admin@feduwacomm.com',
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    })
-  }),
+  // ==================== 系统日志管理 API ====================
+  ...systemLogHandlers,
+
+  // ==================== 管理员虚拟机管理 API ====================
+  ...adminVmHandlers,
 
   // 仪表盘概览数据
   http.get('http://localhost:5173/api/dashboard/overview', () => {
@@ -132,81 +97,6 @@ export const handlers = [
     })
   }),
 
-  // 任务列表
-  http.get('http://localhost:5173/api/tasks', () => {
-    return HttpResponse.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: [
-          {
-            taskId: '1',
-            taskName: '水声信道建模任务',
-            status: 'RUNNING',
-            progress: 75,
-            participantCount: 5,
-            createdAt: new Date().toISOString(),
-            estimatedEndTime: new Date(Date.now() + 3600000).toISOString()
-          },
-          {
-            taskId: '2',
-            taskName: '联邦学习训练',
-            status: 'RUNNING',
-            progress: 35,
-            participantCount: 8,
-            createdAt: new Date().toISOString(),
-            estimatedEndTime: new Date(Date.now() + 7200000).toISOString()
-          }
-        ],
-        total: 2,
-        page: 1,
-        size: 10
-      }
-    })
-  }),
-
-  // 管理员用户列表
-  http.get('http://localhost:5173/api/admin/user/list', () => {
-    return HttpResponse.json({
-      code: 200,
-      message: '获取成功',
-      data: {
-        items: [
-          {
-            userId: '1',
-            username: 'admin',
-            email: 'admin@feduwacomm.com',
-            role: 'ADMIN',
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            userId: '2',
-            username: 'researcher',
-            email: 'researcher@feduwacomm.com',
-            role: 'RESEARCHER',
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            userId: '3',
-            username: 'operator',
-            email: 'operator@feduwacomm.com',
-            role: 'OPERATOR',
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        ],
-        total: 3,
-        page: 1,
-        size: 10
-      }
-    })
-  }),
-
   // 系统日志
   http.get('http://localhost:5173/api/log/list', () => {
     return HttpResponse.json({
@@ -234,5 +124,14 @@ export const handlers = [
         size: 10
       }
     })
-  })
+  }),
+
+  // ==================== 虚拟机管理 API ====================
+  ...vmHandlers,
+
+  // ==================== 联邦学习任务管理 API ====================
+  ...federatedTaskHandlers,
+
+  // ==================== 模型管理 API ====================
+  ...modelManagementHandlers
 ]
