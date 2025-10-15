@@ -26,6 +26,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import org.springframework.util.StringUtils;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.Builder;
@@ -89,6 +91,13 @@ public class MockVirtualMachine {
     private final Map<String, Integer> assignedDatasetActualSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 实际接收样本数
     private final Map<String, List<Map<String, Object>>> assignedDatasetBatchRanges = new ConcurrentHashMap<>();  // assignedDatasetId -> BatchRange列表
     private String latestAssignedDatasetId;  // 最新的assignedDatasetId，用于测试
+    // 🆕 v1.5.1新增：初始模型载荷跟踪
+    private final Map<String, Map<String, Object>> initialModelPayloads = new ConcurrentHashMap<>(); // taskId -> initialModel
+    private final Map<String, Map<String, Object>> initialModelReceipts = new ConcurrentHashMap<>(); // taskId -> receipt
+    private final Map<String, Map<String, Object>> trainingPlans = new ConcurrentHashMap<>(); // taskId -> trainingPlan
+    private final Map<String, Map<String, Object>> latestGlobalModels = new ConcurrentHashMap<>(); // taskId -> globalModel
+    private final Map<String, Map<Integer, Map<String, Object>>> globalModelHistory = new ConcurrentHashMap<>(); // taskId -> (round -> globalModel)
+    private volatile String latestTaskStartId;
 
     // 协议违规和失败模拟相关字段
     private int protocolViolationCount = 0; // 协议违规计数
@@ -3256,18 +3265,42 @@ public class MockVirtualMachine {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
         Integer round = (Integer) data.get("round");
+        if (round == null) {
+            round = (Integer) data.get("roundNumber");
+        }
 
         log.info("Mock VM处理轮次开始(v1.5): vmId={}, taskId={}, round={}",
                 vmData.getVmId(), taskId, round);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> datasetContext = (Map<String, Object>) data.get("datasetContext");
+        if (datasetContext != null) {
+            String providedDatasetId = (String) datasetContext.get("assignedDatasetId");
+            if (providedDatasetId != null && !providedDatasetId.isBlank()) {
+                taskAssignedDatasetMappings.put(taskId, providedDatasetId);
+                log.info("[{}] ROUND_START 刷新 assignedDatasetId: {}",
+                        vmData.getName(), providedDatasetId);
+                Object status = datasetContext.get("datasetStatus");
+                if (status instanceof String statusText && !statusText.isBlank()) {
+                    assignedDatasetStatusMap.put(providedDatasetId, statusText);
+                }
+                Object localPath = datasetContext.get("localPath");
+                if (localPath instanceof String path && !path.isBlank()) {
+                    assignedDatasetLocalPaths.put(providedDatasetId, path);
+                }
+            }
+        }
+
+        String assignedDatasetId = null;
         if (context != null) {
             context.setCurrentRound(round);
             context.setStatus(TaskStatus.TRAINING);
             context.setLastUpdated(Instant.now());
 
             // 验证数据集分配
-            String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+            assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
             if (assignedDatasetId == null) {
                 log.warn("v1.5轮次开始但未找到assignedDatasetId: taskId={}", taskId);
                 sendErrorV15("DATASET_NOT_ASSIGNED", "No assigned dataset for task: " + taskId);
@@ -3277,6 +3310,14 @@ public class MockVirtualMachine {
 
         // 发送v1.5格式的轮次开始确认
         sendRoundStartAckV15(taskId, round);
+
+        if (round != null && round > 1) {
+            log.info("[{}] 轮次开始调度检查: round={}, contextExists={}, datasetAssigned={}",
+                    vmData.getName(), round, context != null, assignedDatasetId != null);
+            if (context != null && assignedDatasetId != null) {
+                scheduleGradientUploadV15(taskId, round, assignedDatasetId);
+            }
+        }
     }
 
     /**
@@ -3298,11 +3339,23 @@ public class MockVirtualMachine {
         log.info("Mock VM处理全局模型广播(v1.5.1): vmId={}, taskId={}, round={}",
                 vmData.getVmId(), taskId, roundNumber);
 
+        if (globalModel != null) {
+            latestGlobalModels.put(taskId, new HashMap<>(globalModel));
+            if (roundNumber != null) {
+                globalModelHistory
+                        .computeIfAbsent(taskId, k -> new ConcurrentHashMap<>())
+                        .put(roundNumber, new HashMap<>(globalModel));
+            }
+        }
+
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null && modelParameters != null) {
             // 更新本地模型参数
             context.setGlobalModelParameters(modelParameters);
             context.setLastUpdated(Instant.now());
+            if (roundNumber != null) {
+                context.setCurrentRound(roundNumber);
+            }
 
             // 验证assignedDatasetId
             String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
@@ -3377,6 +3430,8 @@ public class MockVirtualMachine {
 
         messageExecutor.schedule(() -> {
             try {
+                log.info("Mock VM准备上传梯度(v1.5): vmId={}, taskId={}, round={}, dataset={}",
+                        vmData.getVmId(), taskId, round, assignedDatasetId);
                 // 模拟本地训练延迟
                 awaitDelay(Duration.ofMillis(simulateTrainingDelay()), "scheduleGradientUploadV15:training-delay");
 
@@ -3602,6 +3657,7 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             String taskId = (String) data.get("taskId");
+            latestTaskStartId = taskId;
 
             // 🔑 关键验证：dataConfig结构和assignedDatasetId位置
             if (!data.containsKey("dataConfig")) {
@@ -3622,6 +3678,82 @@ public class MockVirtualMachine {
             String assignedDatasetId = (String) dataConfig.get("assignedDatasetId");
             String dataPath = (String) dataConfig.get("dataPath");
 
+            @SuppressWarnings("unchecked")
+            Map<String, Object> initialModel = (Map<String, Object>) data.get("initialModel");
+            if (initialModel == null || initialModel.isEmpty()) {
+                log.error("🤖 [{}] FEDERATED_TASK_START缺少initialModel字段", vmData.getName());
+                sendErrorResponseV15(messageData, "缺少initialModel字段");
+                return;
+            }
+
+            String distributionId = (String) initialModel.get("distributionId");
+            if (distributionId == null || distributionId.trim().isEmpty()) {
+                log.error("🤖 [{}] initialModel缺少distributionId", vmData.getName());
+                sendErrorResponseV15(messageData, "initialModel缺少distributionId");
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> trainingPlan = (Map<String, Object>) data.get("trainingPlan");
+            if (trainingPlan != null) {
+                trainingPlans.put(taskId, new HashMap<>(trainingPlan));
+            }
+
+            initialModelPayloads.put(taskId, new HashMap<>(initialModel));
+
+            // 🆕 创建并注册任务执行上下文
+            Integer totalRounds = null;
+            if (trainingPlan != null && trainingPlan.get("totalRounds") instanceof Number totalRoundsNumber) {
+                totalRounds = totalRoundsNumber.intValue();
+            } else if (data.get("totalRounds") instanceof Number totalRoundsFromData) {
+                totalRounds = totalRoundsFromData.intValue();
+            }
+            String federatedAlgorithm = null;
+            if (trainingPlan != null) {
+                Object algo = trainingPlan.get("algorithm");
+                if (algo instanceof String algoStr) {
+                    federatedAlgorithm = algoStr;
+                }
+            }
+            if (!StringUtils.hasText(federatedAlgorithm)) {
+                Object algo = data.get("federatedAlgorithm");
+                if (algo instanceof String algoStr) {
+                    federatedAlgorithm = algoStr;
+                }
+            }
+
+            Map<String, Object> localTrainingConfig = trainingPlan != null
+                    ? new HashMap<>(trainingPlan)
+                    : Collections.emptyMap();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> initialModelParameters = initialModel.containsKey("parameters")
+                    ? (Map<String, Object>) initialModel.get("parameters")
+                    : Collections.emptyMap();
+
+            TaskExecutionContext context = TaskExecutionContext.builder()
+                    .taskId(taskId)
+                    .federatedAlgorithm(federatedAlgorithm)
+                    .totalRounds(totalRounds)
+                    .currentRound(0)
+                    .status(TaskStatus.WAITING_FOR_INSTRUCTIONS)
+                    .localTrainingConfig(localTrainingConfig)
+                    .globalModelParameters(initialModelParameters != null
+                            ? new HashMap<>(initialModelParameters)
+                            : null)
+                    .build();
+            activeTaskContexts.put(taskId, context);
+
+            // 🆕 初始化本地模型缓存，便于后续梯度生成
+            LocalModel localModel = LocalModel.builder()
+                    .modelParameters(initialModelParameters != null
+                            ? new HashMap<>(initialModelParameters)
+                            : new HashMap<>())
+                    .algorithmType(federatedAlgorithm)
+                    .lastUpdated(Instant.now())
+                    .build();
+            taskLocalModels.put(taskId, localModel);
+
             // 🆕 保存assignedDatasetId（完全依赖后端分配）
             taskAssignedDatasetMappings.put(taskId, assignedDatasetId);
             backendAssignedDatasetIds.add(assignedDatasetId);
@@ -3635,9 +3767,13 @@ public class MockVirtualMachine {
 
             log.info("🤖 [{}] 任务数据配置完成: taskId={}, assignedDatasetId={}, localPath={}",
                      vmData.getName(), taskId, assignedDatasetId, localPath);
+            log.info("🤖 [{}] 初始模型载荷: taskId={}, modelId={}, distributionId={}",
+                    vmData.getName(),
+                    initialModel.get("modelId"),
+                    distributionId);
 
             // 发送任务启动确认
-            sendFederatedTaskStartAckV15(taskId, assignedDatasetId);
+            sendFederatedTaskStartAckV15(taskId, assignedDatasetId, distributionId, initialModel);
 
         } catch (Exception e) {
             log.error("🤖 [{}] 处理FEDERATED_TASK_START失败: {}", vmData.getName(), e.getMessage());
@@ -3829,7 +3965,10 @@ public class MockVirtualMachine {
         log.error("🤖 [{}] 发送ERROR(v1.5): code={}, message={}", vmData.getName(), errorCode, errorMessage);
     }
 
-    private void sendFederatedTaskStartAckV15(String taskId, String assignedDatasetId) throws Exception {
+    private void sendFederatedTaskStartAckV15(String taskId,
+                                             String assignedDatasetId,
+                                             String distributionId,
+                                             Map<String, Object> initialModel) throws Exception {
         Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
         Map<String, Object> data = new HashMap<>();
         data.put("vmId", vmData.getVmId());
@@ -3845,8 +3984,20 @@ public class MockVirtualMachine {
         datasetConfirmation.put("estimatedSamples", 1000); // 模拟数据样本数
         data.put("datasetConfirmation", datasetConfirmation);
 
+        Map<String, Object> initialModelReceipt = new HashMap<>();
+        initialModelReceipt.put("distributionId", distributionId);
+        if (initialModel != null) {
+            initialModelReceipt.put("modelId", initialModel.get("modelId"));
+            initialModelReceipt.put("modelType", initialModel.get("modelType"));
+            initialModelReceipt.put("checksum", initialModel.get("checksum"));
+        }
+        initialModelReceipt.put("checksumVerified", Boolean.TRUE);
+        initialModelReceipt.put("receivedAt", Instant.now().toString());
+        data.put("initialModelReceipt", initialModelReceipt);
+
         ackMessage.put("data", data);
         sendStompMessage(ackMessage);
+        initialModelReceipts.put(taskId, new HashMap<>(initialModelReceipt));
         log.info("🤖 [{}] 发送FEDERATED_TASK_START_ACK: assignedDatasetId={}",
                  vmData.getName(), assignedDatasetId);
     }
@@ -3858,6 +4009,7 @@ public class MockVirtualMachine {
         data.put("vmId", vmData.getVmId());
         data.put("taskId", taskId);
         data.put("round", round);
+        data.put("roundNumber", round); // v1.5协议要求
         data.put("assignedDatasetId", assignedDatasetId); // 🆕 v1.5必需字段
         data.put("gradientData", gradients);
         data.put("trainingMetrics", metrics);
@@ -4475,6 +4627,57 @@ public class MockVirtualMachine {
 
     public String getAccessToken() {
         return this.accessToken;
+    }
+
+    public Map<String, Object> getLatestInitialModelPayload() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return initialModelPayloads.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestInitialModelReceipt() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return initialModelReceipts.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestTrainingPlan() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return trainingPlans.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestGlobalModel(String taskId) {
+        if (!StringUtils.hasText(taskId)) {
+            return null;
+        }
+        Map<String, Object> modelSnapshot = latestGlobalModels.get(taskId);
+        return modelSnapshot != null ? new HashMap<>(modelSnapshot) : null;
+    }
+
+    public Map<Integer, Map<String, Object>> getGlobalModelHistory(String taskId) {
+        if (!StringUtils.hasText(taskId)) {
+            return null;
+        }
+        Map<Integer, Map<String, Object>> history = globalModelHistory.get(taskId);
+        if (history == null) {
+            return null;
+        }
+        Map<Integer, Map<String, Object>> copy = new HashMap<>();
+        history.forEach((round, payload) -> copy.put(round, new HashMap<>(payload)));
+        return copy;
+    }
+
+    public String getLatestInitialModelDistributionId() {
+        Map<String, Object> payload = getLatestInitialModelPayload();
+        if (payload == null) {
+            return null;
+        }
+        Object id = payload.get("distributionId");
+        return id instanceof String ? (String) id : null;
     }
 
     // 🆕 v1.5.1测试辅助方法：获取最新数据集的信息

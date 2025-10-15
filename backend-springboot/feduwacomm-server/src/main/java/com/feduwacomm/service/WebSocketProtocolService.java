@@ -31,12 +31,16 @@ import com.feduwacomm.service.cache.model.GlobalMetrics;
 import com.feduwacomm.service.cache.exception.CacheValidationException;
 import com.feduwacomm.enums.RoundState;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -44,6 +48,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -76,9 +81,11 @@ public class WebSocketProtocolService {
     private final WebSocketMessageSender messageSender;
     private final DataDistributionService dataDistributionService;  // v1.5.1: 数据分发服务
     private final SliceVerificationService sliceVerificationService;  // v1.5.1: 切片验证服务
+    private final PlatformTransactionManager transactionManager;
 
     // in-memory VM 最新状态缓存：vmId -> STATUS_RESPONSE.data（用于快速读，不作为数据源）
     private final ConcurrentHashMap<String, Map<String, Object>> statusCache = new ConcurrentHashMap<>();
+    private TransactionTemplate gradientWriteTemplate;
 
     public WebSocketProtocolService(SimpMessagingTemplate messagingTemplate,
                                     TrainingDatasetMapper trainingDatasetMapper,
@@ -100,7 +107,8 @@ public class WebSocketProtocolService {
                                     RoundLockManager roundLockManager,
                                     WebSocketMessageSender messageSender,
                                     DataDistributionService dataDistributionService,  // v1.5.1: 数据分发服务
-                                    SliceVerificationService sliceVerificationService) {  // v1.5.1: 切片验证服务
+                                    SliceVerificationService sliceVerificationService,
+                                    PlatformTransactionManager transactionManager) {
         this.messagingTemplate = messagingTemplate;
         this.trainingDatasetMapper = trainingDatasetMapper;
         this.trainingDatasetRowMapper = trainingDatasetRowMapper;
@@ -122,6 +130,15 @@ public class WebSocketProtocolService {
         this.messageSender = messageSender;
         this.dataDistributionService = dataDistributionService;  // v1.5.1
         this.sliceVerificationService = sliceVerificationService;  // v1.5.1
+        this.transactionManager = transactionManager;
+    }
+
+    @PostConstruct
+    void initGradientWriteTemplate() {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.setReadOnly(false);
+        this.gradientWriteTemplate = template;
     }
 
     public ProtocolAck handle(ProtocolMessage msg) {
@@ -388,6 +405,43 @@ public class WebSocketProtocolService {
         }
     }
 
+    private void persistGradientRecord(String recordId,
+                                       String taskId,
+                                       String vmId,
+                                       Integer round,
+                                       Double accuracy,
+                                       Double loss,
+                                       String parametersJson,
+                                       LocalDateTime timestamp) {
+        Runnable persistence = () -> {
+            vmRoundModelsMapper.upsertRoundModel(
+                    recordId,
+                    taskId,
+                    vmId,
+                    round,
+                    accuracy,
+                    loss,
+                    parametersJson
+            );
+            taskParticipantsMapper.updateParticipantWithMetrics(
+                    taskId,
+                    vmId,
+                    "COMPLETED",
+                    round,
+                    accuracy,
+                    loss,
+                    timestamp
+            );
+        };
+
+        TransactionTemplate template = this.gradientWriteTemplate;
+        if (template != null) {
+            template.executeWithoutResult(status -> persistence.run());
+        } else {
+            persistence.run();
+        }
+    }
+
     /**
      * 安全的轮次推进检查（重构版）
      * 使用轮次锁管理器防止并发问题，通过状态管理器确保严格的状态控制
@@ -520,6 +574,9 @@ public class WebSocketProtocolService {
         String vmId = msg.getVmId();
         String taskId = valueAsString(data, "taskId");
         Integer round = numberAsInt(data, "round");
+        if (round == null) {
+            round = numberAsInt(data, "roundNumber");
+        }
         String status = valueAsString(data, "status");
 
         log.info("收到梯度上传确认: vmId={}, taskId={}, round={}, status={}",
@@ -790,6 +847,19 @@ public class WebSocketProtocolService {
         String vmId = msg.getVmId();
         String taskId = valueAsString(data, "taskId");
         Integer round = numberAsInt(data, "roundNumber");  // 按WebSocket协议文档使用 roundNumber
+        if (round == null) {
+            round = numberAsInt(data, "round");
+        }
+        if (round == null) {
+            FederatedTask fallbackTask = federatedTasksMapper.selectTaskById(taskId);
+            if (fallbackTask != null) {
+                round = fallbackTask.getCurrentRound();
+                System.out.println("🔄 回退到任务当前轮次: taskId=" + taskId + ", fallbackRound=" + round);
+                log.warn("梯度上传缺少round信息，使用任务当前轮次作为回退: taskId={}, fallbackRound={}", taskId, round);
+            } else {
+                System.out.println("❌ 无法回退轮次，任务不存在: taskId=" + taskId);
+            }
+        }
 
         log.info("收到梯度上传: vmId={}, taskId={}, round={}", vmId, taskId, round);
 
@@ -800,12 +870,12 @@ public class WebSocketProtocolService {
             @SuppressWarnings("unchecked")
             Map<String, Object> trainingMetrics = (Map<String, Object>) data.get("trainingMetrics");
 
-            if (gradientData != null) {
-                // 按协议文档提取梯度参数（weights, biases等）
-                @SuppressWarnings("unchecked")
-                Map<String, Object> modelParams = gradientData;  // gradientData就是模型参数
-                @SuppressWarnings("unchecked")
-                Map<String, Object> metadata = trainingMetrics;  // trainingMetrics是训练元数据
+                if (gradientData != null) {
+                    // 按协议文档提取梯度参数（weights, biases等）
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> modelParams = gradientData;  // gradientData就是模型参数
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> metadata = trainingMetrics;  // trainingMetrics是训练元数据
 
                 // 构建存储格式
                 Map<String, Object> storeParams = new HashMap<>();
@@ -831,27 +901,35 @@ public class WebSocketProtocolService {
                 // 序列化参数
                 String parametersJson = toJsonSafe(storeParams);
 
-                // 存储到vm_round_models表
-                vmRoundModelsMapper.upsertRoundModel(
-                    uuidUtil.generateUuid(),
+                if (round != null) {
+                    roundStateManager.ensureRoundStateInitialized(taskId, round);
+                }
+
+                String recordId = uuidUtil.generateUuid();
+                LocalDateTime now = LocalDateTime.now();
+                persistGradientRecord(
+                    recordId,
                     taskId,
                     vmId,
                     round,
                     accuracy,
                     loss,
-                    parametersJson
+                    parametersJson,
+                    now
                 );
+                log.info("梯度已写入vm_round_models: id={}, taskId={}, vmId={}, round={}, accuracy={}, loss={}, payloadSize={}",
+                        recordId, taskId, vmId, round, accuracy, loss, parametersJson != null ? parametersJson.length() : 0);
 
-                // 更新参与者状态和轮次信息
-                taskParticipantsMapper.updateParticipantWithMetrics(
-                    taskId,
-                    vmId,
-                    "COMPLETED",  // 标记该VM在本轮次已完成
-                    round,        // 更新当前轮次
-                    accuracy,
-                    loss,
-                    LocalDateTime.now()
-                );
+                if (round != null) {
+                    try {
+                        roundStateManager.recordGradientUpload(taskId, round);
+                    } catch (Exception syncEx) {
+                        log.warn("轮次状态同步梯度上传进度失败: taskId={}, round={}, vmId={}, error={}",
+                                taskId, round, vmId, syncEx.getMessage(), syncEx);
+                    }
+                } else {
+                    log.warn("梯度上传缺少轮次信息，无法同步round_states: taskId={}, vmId={}", taskId, vmId);
+                }
 
                 log.debug("参与者状态已更新: vmId={}, taskId={}, round={}, status=COMPLETED",
                     vmId, taskId, round);
@@ -880,6 +958,7 @@ public class WebSocketProtocolService {
                 ));
             } else {
                 log.warn("梯度上传数据为空: vmId={}, taskId={}, round={}", vmId, taskId, round);
+                log.warn("梯度上传空payload内容: {}", data);
                 return ackFor(msg, ProtocolType.GRADIENT_UPLOAD_ACK, mapOf(
                     "status", "ERROR",
                     "errorMessage", "梯度数据为空，请检查gradientData字段",
@@ -1003,8 +1082,16 @@ public class WebSocketProtocolService {
         Integer round = numberAsInt(data, "round");
         String status = valueAsString(data, "status");
 
-        log.info("收到模型接收确认(v1.5): vmId={}, taskId={}, round={}, status={}",
-                vmId, taskId, round, status);
+        log.info("收到模型接收确认(v1.5): vmId={}, taskId={}, round={}, status={}, payload={}",
+                vmId, taskId, round, status, data);
+
+        boolean success = !"ERROR".equalsIgnoreCase(status);
+        try {
+            vmAckTracker.processInitialModelAck(taskId, vmId, data, success);
+        } catch (Exception ex) {
+            log.error("处理初始模型接收ACK失败: vmId={}, taskId={}, status={}, error={}",
+                    vmId, taskId, status, ex.getMessage(), ex);
+        }
 
         // MODEL_RECEIVE_ACK是ACK消息，不需要再次回复
         return null;
@@ -1284,17 +1371,15 @@ public class WebSocketProtocolService {
         String taskId = valueAsString(msg.getData(), "taskId");
         String status = valueAsString(msg.getData(), "status");
         String message = valueAsString(msg.getData(), "message");
-        String vmCapabilities = valueAsString(msg.getData(), "vmCapabilities");
-
         log.info("收到联邦任务启动确认: vmId={}, taskId={}, status={}", vmId, taskId, status);
 
-        if ("SUCCESS".equals(status)) {
-            // 记录VM任务启动确认
-            vmAckTracker.recordTaskStartAck(taskId, vmId, vmCapabilities);
+        boolean success = "SUCCESS".equalsIgnoreCase(status) || "READY".equalsIgnoreCase(status);
+        if (success) {
+            vmAckTracker.recordTaskStartAck(taskId, vmId, status, msg.getData());
         } else {
             log.error("VM任务启动失败: vmId={}, taskId={}, status={}, message={}",
                      vmId, taskId, status, message);
-            vmAckTracker.recordTaskStartFailure(taskId, vmId, status, message);
+            vmAckTracker.recordTaskStartFailure(taskId, vmId, status, message, msg.getData());
         }
 
         // v1.4协议: FEDERATED_TASK_START_ACK不需要再次ACK
@@ -1540,7 +1625,9 @@ public class WebSocketProtocolService {
             participant.setDatasetStatus(success ? "COMPLETED" : "FAILED");
             participant.setDatasetCompletedAt(LocalDateTime.now());
             participant.setUpdatedAt(LocalDateTime.now());
-            taskParticipantsMapper.updateParticipant(participant);
+            int updated = taskParticipantsMapper.updateParticipant(participant);
+            log.info("数据集完成状态更新: taskId={}, vmId={}, datasetId={}, success={}, updateCount={}",
+                    participant.getTaskId(), participant.getVmId(), datasetId, success, updated);
 
             String ackDataJson = null;
             @SuppressWarnings("unchecked")
@@ -3410,22 +3497,52 @@ public class WebSocketProtocolService {
      * 发送联邦任务开始消息 (v1.5标准协议)
      * 关键变更：assignedDatasetId位于dataConfig内部
      */
-    public void sendFederatedTaskStart(String vmId, String taskId, String assignedDatasetId) {
-        log.info("准备发送FEDERATED_TASK_START消息: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+    public void sendFederatedTaskStart(String vmId,
+                                       String taskId,
+                                       Map<String, Object> dataConfig,
+                                       Map<String, Object> initialModel,
+                                       Map<String, Object> trainingPlan) {
+        Map<String, Object> safeDataConfig = dataConfig != null ? new HashMap<>(dataConfig) : new HashMap<>();
+        String assignedDatasetId = (String) safeDataConfig.get("assignedDatasetId");
+        String distributionId = initialModel != null ? Objects.toString(initialModel.get("distributionId"), null) : null;
+
+        log.info("准备发送FEDERATED_TASK_START消息: vmId={}, taskId={}, assignedDatasetId={}, distributionId={}",
+                vmId, taskId, assignedDatasetId, distributionId);
+        log.info("FEDERATED_TASK_START initialModel payload: {}", initialModel);
 
         try {
-            // 🔑 标准关键变更：构建dataConfig结构，assignedDatasetId在内部
-            Map<String, Object> dataConfig = new HashMap<>();
-            dataConfig.put("assignedDatasetId", assignedDatasetId);  // 🔑 关键：位于dataConfig内部
-            dataConfig.put("dataPath", "/data/training");
-            dataConfig.put("validationSplit", 0.2);
-            dataConfig.put("shuffle", true);
+            if (!safeDataConfig.containsKey("dataPath")) {
+                safeDataConfig.put("dataPath", "/data/training");
+            }
+            if (!safeDataConfig.containsKey("validationSplit")) {
+                safeDataConfig.put("validationSplit", 0.2);
+            }
+            if (!safeDataConfig.containsKey("shuffle")) {
+                safeDataConfig.put("shuffle", Boolean.TRUE);
+            }
 
             Map<String, Object> messageData = new HashMap<>();
             messageData.put("taskId", taskId);
-            messageData.put("federatedAlgorithm", "FEDERATED_AVERAGING");
-            messageData.put("totalRounds", 10);
-            messageData.put("dataConfig", dataConfig);  // assignedDatasetId在dataConfig内部
+            messageData.put("timestamp", Instant.now().toString());
+            messageData.put("dataConfig", safeDataConfig);
+            if (initialModel != null && !initialModel.isEmpty()) {
+                messageData.put("initialModel", initialModel);
+            }
+            if (trainingPlan != null && !trainingPlan.isEmpty()) {
+                messageData.put("trainingPlan", trainingPlan);
+                Object algorithm = trainingPlan.get("algorithm");
+                if (algorithm != null) {
+                    messageData.put("federatedAlgorithm", algorithm);
+                }
+                Object totalRounds = trainingPlan.get("totalRounds");
+                if (totalRounds != null) {
+                    messageData.put("totalRounds", totalRounds);
+                }
+                Object roundNumber = trainingPlan.get("roundNumber");
+                if (roundNumber != null) {
+                    messageData.put("roundNumber", roundNumber);
+                }
+            }
 
             ProtocolMessage message = ProtocolMessage.builder()
                     .type(ProtocolType.FEDERATED_TASK_START)
@@ -3436,10 +3553,12 @@ public class WebSocketProtocolService {
                     .build();
 
             messagingTemplate.convertAndSend("/topic/vm/" + vmId, message);
-            log.info("FEDERATED_TASK_START消息发送成功: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+            log.info("FEDERATED_TASK_START消息发送成功: vmId={}, taskId={}, assignedDatasetId={}, distributionId={}",
+                    vmId, taskId, assignedDatasetId, distributionId);
 
         } catch (Exception e) {
-            log.error("发送FEDERATED_TASK_START消息失败: vmId={}, assignedDatasetId={}, error={}", vmId, assignedDatasetId, e.getMessage(), e);
+            log.error("发送FEDERATED_TASK_START消息失败: vmId={}, assignedDatasetId={}, error={}",
+                    vmId, assignedDatasetId, e.getMessage(), e);
             throw new RuntimeException("发送联邦任务开始消息失败", e);
         }
     }

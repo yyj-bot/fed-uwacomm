@@ -6,8 +6,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * 生成方法枚举
  */
 public enum GenerationMethod {
-    RANDOM("RANDOM", "随机生成"),
-    CUSTOM_UPLOAD("CUSTOM_UPLOAD", "自定义上传");
+    AUTO("AUTO", "自动生成"),
+    CUSTOM("CUSTOM", "自定义上传");
 
     private final String code;
     private final String description;
@@ -28,7 +28,7 @@ public enum GenerationMethod {
 
     public static GenerationMethod fromCode(String code) {
         if (code == null) {
-            return RANDOM;
+            return AUTO;
         }
         for (GenerationMethod method : values()) {
             if (method.code.equals(code)) {

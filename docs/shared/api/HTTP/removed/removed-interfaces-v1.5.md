@@ -3,9 +3,18 @@
 ## 移除概述
 **版本:** v1.5  
 **日期:** 2025-10-04  
-**移除类型:** 请求参数调整 / 字段废弃
+**移除类型:** 请求参数调整 / 字段废弃 / 接口删除
 
-v1.5 版本没有删除任何完整的接口端点，但为了配合“先创建初始模型和数据集，再创建联邦学习任务”的流程，对部分请求参数进行了移除与替换。下列变更需要客户端适配。
+v1.5 版本以“先创建初始模型和数据集，再创建联邦学习任务”为核心，完成请求参数精简，并正式下线前端不需调用的模型分发与数据分发接口。请前端与 SDK 及时完成适配。
+
+## 接口移除列表
+- `POST /api/model/initial/task/{taskId}/distribute`
+- `GET /api/model/initial/distribution/{distributionId}`
+- `POST /api/training-data/distribution`
+- `POST /api/training-data/distribution/{distributionId}/start`
+- `GET /api/training-data/distribution/{distributionId}`
+
+> 说明：上述接口现由后端运维入口或自动化流程封装调用，前端与开放 API 不再暴露。
 
 ## 参数移除与替换列表
 

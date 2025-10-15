@@ -38,6 +38,7 @@ public class TaskDetailVO {
     
     private List<ParticipantVO> participants;
     private MetricsVO metrics;
+    private TaskOperationVO.ConfigSummaryVO configSummary;
 
     @Data
     @Builder

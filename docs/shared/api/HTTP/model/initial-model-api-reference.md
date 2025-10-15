@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-初始模型管理API提供联邦学习任务的初始模型生成、上传、分发和管理功能。支持随机生成初始模型和用户自定义初始模型两种方式。
+初始模型管理API提供联邦学习任务的初始模型生成、上传和管理功能。支持随机生成初始模型和用户自定义初始模型两种方式。
 
 ### 1.1 基础信息
 - **模块**: 初始模型管理 (Initial Model Management)
@@ -15,7 +15,6 @@
 - 上传自定义初始模型
 - 使用初始模型ID在联邦学习任务创建时完成绑定
 - 查询任务初始模型信息
-- 分发初始模型到参与虚拟机
 - 初始模型版本管理
 
 ### 1.3 支持的模型类型
@@ -229,127 +228,18 @@ labels: ["baseline", "v1.0"] (optional)
     "modelType": "RANDOM_FOREST",
     "modelSize": 8192,
     "boundAt": "2024-09-10T09:30:00Z",
-    "status": "DISTRIBUTED",
+    "status": "READY",
     "architecture": {
       "n_estimators": 100,
       "n_features": 5,
       "task_type": "regression"
-    },
-    "distributionStatus": {
-      "totalVms": 5,
-      "distributedVms": 5,
-      "failedVms": 0,
-      "distributedAt": "2024-09-10T10:05:00Z"
     },
     "checksum": "sha256:abcd1234..."
   }
 }
 ```
 
-### 2.5 分发初始模型
-将初始模型分发到参与联邦学习的虚拟机
-
-**接口信息**
-- **URL**: `POST /api/model/initial/task/{taskId}/distribute`
-- **描述**: 分发初始模型到指定虚拟机
-- **认证**: 需要JWT Token (ADMIN或EDITOR权限)
-
-**路径参数**
-- `taskId` (string, required): 联邦学习任务ID
-
-**请求参数**
-```json
-{
-  "vmIds": ["vm_001", "vm_002", "vm_003"],
-  "distributionMode": "ASYNC",
-  "timeout": 300,
-  "retryAttempts": 3,
-  "verifyChecksum": true,
-  "notifyOnCompletion": true
-}
-```
-
-**响应示例**
-```json
-{
-  "code": 200,
-  "message": "模型分发已启动",
-  "data": {
-    "distributionId": "dist_001",
-    "taskId": "task_001",
-    "modelId": "initial_model_001",
-    "targetVms": ["vm_001", "vm_002", "vm_003"],
-    "distributionMode": "ASYNC",
-    "status": "IN_PROGRESS",
-    "startedAt": "2024-09-10T10:00:00Z",
-    "estimatedCompletion": "2024-09-10T10:05:00Z",
-    "progress": {
-      "total": 3,
-      "completed": 0,
-      "failed": 0,
-      "inProgress": 3
-    }
-  }
-}
-```
-
-### 2.6 查询分发状态
-查询初始模型分发的实时状态
-
-**接口信息**
-- **URL**: `GET /api/model/initial/distribution/{distributionId}`
-- **描述**: 查询模型分发状态详情
-- **认证**: 需要JWT Token
-
-**路径参数**
-- `distributionId` (string, required): 分发任务ID
-
-**响应示例**
-```json
-{
-  "code": 200,
-  "message": "查询成功",
-  "data": {
-    "distributionId": "dist_001",
-    "taskId": "task_001",
-    "modelId": "initial_model_001",
-    "status": "COMPLETED",
-    "startedAt": "2024-09-10T10:00:00Z",
-    "completedAt": "2024-09-10T10:04:30Z",
-    "progress": {
-      "total": 3,
-      "completed": 3,
-      "failed": 0,
-      "inProgress": 0
-    },
-    "vmDetails": [
-      {
-        "vmId": "vm_001",
-        "status": "SUCCESS",
-        "distributedAt": "2024-09-10T10:01:15Z",
-        "verificationStatus": "VERIFIED",
-        "checksum": "sha256:abcd1234..."
-      },
-      {
-        "vmId": "vm_002",
-        "status": "SUCCESS",
-        "distributedAt": "2024-09-10T10:02:30Z",
-        "verificationStatus": "VERIFIED",
-        "checksum": "sha256:abcd1234..."
-      },
-      {
-        "vmId": "vm_003",
-        "status": "SUCCESS",
-        "distributedAt": "2024-09-10T10:04:30Z",
-        "verificationStatus": "VERIFIED",
-        "checksum": "sha256:abcd1234..."
-      }
-    ]
-  }
-}
-```
-
-### 2.7 下载初始模型
+### 2.5 下载初始模型
 下载初始模型文件
 
 **接口信息**
@@ -369,7 +259,7 @@ labels: ["baseline", "v1.0"] (optional)
 - Content-Type: application/octet-stream
 - Content-Disposition: attachment; filename="initial_model_{modelId}.pth"
 
-### 2.8 删除初始模型
+### 2.6 删除初始模型
 删除指定初始模型（需确保未绑定任务或强制删除）
 
 **接口信息**
@@ -393,7 +283,7 @@ labels: ["baseline", "v1.0"] (optional)
     "deletedAt": "2024-09-10T10:00:00Z",
     "cleanupStatus": {
       "modelFileDeleted": true,
-      "distributionRecordsCleared": true,
+      "bindingRecordsCleared": true,
       "vmCachesCleared": 3
     }
   }
@@ -449,36 +339,12 @@ labels: ["baseline", "v1.0"] (optional)
 }
 ```
 
-### 3.2 DistributionProgress
-```json
-{
-  "distributionId": "string",    // 分发任务ID
-  "status": "string",           // 分发状态
-  "progress": {
-    "total": "number",          // 目标虚拟机总数
-    "completed": "number",      // 完成分发数量
-    "failed": "number",         // 失败数量
-    "inProgress": "number"      // 进行中数量
-  },
-  "vmDetails": ["VmDistributionDetail"]
-}
-```
-
-### 3.3 模型状态枚举
+### 3.2 模型状态枚举
 - `GENERATING`: 生成中
 - `READY`: 就绪
 - `UPLOADED`: 已上传
-- `DISTRIBUTING`: 分发中
-- `DISTRIBUTED`: 已分发
 - `FAILED`: 失败
 - `DELETED`: 已删除
-
-### 3.4 分发状态枚举
-- `PENDING`: 待开始
-- `IN_PROGRESS`: 进行中
-- `COMPLETED`: 已完成
-- `FAILED`: 失败
-- `CANCELLED`: 已取消
 
 ---
 
@@ -492,7 +358,6 @@ labels: ["baseline", "v1.0"] (optional)
 | INITIAL_MODEL_UPLOAD_FAILED | 400 | 模型上传失败 |
 | INITIAL_MODEL_INVALID_FORMAT | 422 | 模型格式无效 |
 | INITIAL_MODEL_ALREADY_EXISTS | 409 | 初始模型已存在 |
-| INITIAL_MODEL_DISTRIBUTION_FAILED | 500 | 模型分发失败 |
 | INITIAL_MODEL_CHECKSUM_MISMATCH | 400 | 模型校验失败 |
 | INITIAL_MODEL_SIZE_EXCEEDED | 413 | 模型文件过大 |
 
@@ -571,23 +436,7 @@ const createTaskResponse = await fetch('/api/federated/tasks', {
 });
 
 const { data: taskData } = await createTaskResponse.json();
-const taskId = taskData.taskId;
-
-// 4. 需要分发时，根据任务ID触发分发
-const distributeResponse = await fetch(`/api/model/initial/task/${taskId}/distribute`, {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    vmIds: ['vm_001', 'vm_002'],
-    distributionMode: 'ASYNC',
-    verifyChecksum: true
-  })
-});
-
-const distribution = await distributeResponse.json();
+// taskData 包含任务ID等信息，可用于后续状态展示
 ```
 
 ### 5.2 上传自定义初始模型
@@ -636,11 +485,10 @@ const uploadCustomModel = async (modelFile) => {
 ### 6.2 权限控制
 - 只有ADMIN和EDITOR权限的用户可以生成/上传初始模型
 - 任务所有者和协作者可以查看初始模型信息
-- 模型分发操作需要足够权限
 - 敏感的模型架构信息需要权限控制
 
 ### 6.3 审计日志
-- 记录所有初始模型的创建、分发、删除操作
+- 记录所有初始模型的创建、更新、删除操作
 - 跟踪模型访问和下载记录
 - 监控异常的模型操作行为
 
@@ -653,13 +501,7 @@ const uploadCustomModel = async (modelFile) => {
 - 支持模型生成进度查询
 - 缓存常用的模型架构模板
 
-### 7.2 分发优化
-- 支持并发分发到多个虚拟机
-- 使用分块传输大模型文件
-- 实现断点续传和失败重试
-- 压缩模型文件以减少传输时间
-
-### 7.3 存储优化
+### 7.2 存储优化
 - 使用对象存储管理模型文件
 - 实现模型文件的版本控制
 - 定期清理过期的模型文件

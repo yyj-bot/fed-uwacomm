@@ -1,11 +1,12 @@
 package com.feduwacomm.orchestration.handler;
 
-import com.feduwacomm.dto.InitialModelGenerationDTO;
+import com.feduwacomm.enums.GenerationMethod;
+import com.feduwacomm.model.dto.initial.InitialModelGenerateRequest;
+import com.feduwacomm.model.vo.initial.InitialModelDetailVO;
 import com.feduwacomm.orchestration.StageResult;
 import com.feduwacomm.orchestration.WorkflowContext;
 import com.feduwacomm.orchestration.WorkflowStage;
 import com.feduwacomm.service.InitialModelGenerationService;
-import com.feduwacomm.vo.InitialModelInfoVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -45,43 +46,44 @@ public class InitialModelGenerationStageHandler extends AbstractStageHandler {
             if (modelType == null) {
                 modelType = "RANDOM_FOREST";
             }
-            String generationMethod = (String) context.getVariable("generationMethod");
-            if (generationMethod == null) {
-                generationMethod = "RANDOM";
-            }
             Map<String, Object> architectureParams = getArchitectureParams(context, modelType);
             
             // 构造初始模型生成请求
-            InitialModelGenerationDTO generationDTO = InitialModelGenerationDTO.builder()
-                    .taskId(taskId)
+            InitialModelGenerateRequest generationDTO = InitialModelGenerateRequest.builder()
                     .modelType(modelType)
-                    .generationMethod(generationMethod)
-                    .architectureParams(architectureParams)
-                    .autoDistribute(false) // 后续阶段处理分发
+                    .architecture(architectureParams)
                     .build();
             
             // 调用真实的模型生成服务
-            log.info("开始真实的初始模型生成: taskId={}, modelType={}, method={}", taskId, modelType, generationMethod);
-            InitialModelInfoVO modelInfo = initialModelGenerationService.generateInitialModel(generationDTO, createdBy);
+            log.info("开始真实的初始模型生成: taskId={}, modelType={}", taskId, modelType);
+            InitialModelDetailVO modelDetail = initialModelGenerationService.generateInitialModel(generationDTO, createdBy);
+
+            // 自动绑定到当前任务
+            initialModelGenerationService.bindModelToTask(
+                    modelDetail.getModelId(),
+                    taskId,
+                    GenerationMethod.AUTO.getCode(),
+                    true,
+                    createdBy);
             
             // 保存模型信息到上下文
-            context.setVariable("initialModelId", modelInfo.getId());
-            context.setVariable("initialModelType", modelInfo.getModelType());
-            context.setVariable("initialModelStatus", modelInfo.getStatus());
-            context.setVariable("initialModelFilePath", modelInfo.getFilePath());
-            context.setVariable("initialModelChecksum", modelInfo.getChecksum());
+            context.setVariable("initialModelId", modelDetail.getModelId());
+            context.setVariable("initialModelType", modelDetail.getModelType());
+            context.setVariable("initialModelStatus", modelDetail.getStatus());
+            context.setVariable("initialModelFilePath", modelDetail.getStoragePath());
+            context.setVariable("initialModelChecksum", modelDetail.getChecksum());
             
             log.info("初始模型生成完成: orchestrationId={}, taskId={}, modelId={}, status={}", 
-                orchestrationId, taskId, modelInfo.getId(), modelInfo.getStatus());
+                orchestrationId, taskId, modelDetail.getModelId(), modelDetail.getStatus());
             
             return StageResult.success()
-                .addOutput("modelId", modelInfo.getId())
-                .addOutput("modelType", modelInfo.getModelType())
-                .addOutput("generationMethod", modelInfo.getGenerationMethod())
-                .addOutput("modelSize", modelInfo.getModelSize())
-                .addOutput("filePath", modelInfo.getFilePath())
-                .addOutput("checksum", modelInfo.getChecksum())
-                .addOutput("status", modelInfo.getStatus());
+                .addOutput("modelId", modelDetail.getModelId())
+                .addOutput("modelType", modelDetail.getModelType())
+                .addOutput("generationMethod", modelDetail.getGenerationMethod())
+                .addOutput("modelSize", modelDetail.getModelSize())
+                .addOutput("filePath", modelDetail.getStoragePath())
+                .addOutput("checksum", modelDetail.getChecksum())
+                .addOutput("status", modelDetail.getStatus());
                 
         } catch (Exception e) {
             log.error("初始模型生成阶段执行失败: orchestrationId={}, taskId={}", orchestrationId, taskId, e);

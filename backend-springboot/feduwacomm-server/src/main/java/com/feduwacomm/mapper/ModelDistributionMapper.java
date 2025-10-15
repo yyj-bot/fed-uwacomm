@@ -73,6 +73,12 @@ public interface ModelDistributionMapper {
      */
     @Select("SELECT * FROM model_distributions WHERE model_id = #{modelId} AND vm_id = #{vmId}")
     ModelDistribution selectByModelIdAndVmId(@Param("modelId") String modelId, @Param("vmId") String vmId);
+
+    /**
+     * 根据模型ID查询分发记录实体列表
+     */
+    @Select("SELECT * FROM model_distributions WHERE model_id = #{modelId}")
+    List<ModelDistribution> selectEntitiesByModelId(String modelId);
     
     /**
      * 更新分发状态

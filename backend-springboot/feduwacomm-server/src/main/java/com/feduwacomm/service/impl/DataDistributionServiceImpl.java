@@ -717,7 +717,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             // 构建VM ID列表和比例列表（按照participants顺序，保证映射关系）
             List<String> vmIds = new ArrayList<>();
             List<Integer> ratios = new ArrayList<>();
-            Map<String, Integer> vmRatioMap = new HashMap<>();
+            Map<String, Integer> vmRatioMap = new LinkedHashMap<>();
 
             // 检查是否所有dataRatio都已配置
             boolean allRatiosConfigured = participants.stream()
@@ -730,18 +730,28 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     Integer dataRatio = participant.getDataRatio();
                     vmIds.add(participant.getVmId());
                     ratios.add(dataRatio);
-                    vmRatioMap.put(participant.getVmId(), dataRatio);
                     ratioSum += dataRatio;
                 }
 
-                // 验证总和必须=1000
-                if (ratioSum != 1000) {
-                    throw new BusinessException(String.format(
-                            "数据分配权重总和必须等于1000，当前总和=%d，请调整各VM的dataRatio配置", ratioSum));
+                if (ratioSum <= 0) {
+                    throw new BusinessException("数据分配权重总和必须大于0，请检查各VM的dataRatio配置");
                 }
 
-                log.info("📊 使用配置的千分比权重: taskId={}, vmRatioMap={}, sum={}",
-                        taskId, vmRatioMap, ratioSum);
+                List<Integer> normalizedRatios = normalizeRatios(ratios);
+                for (int i = 0; i < vmIds.size(); i++) {
+                    vmRatioMap.put(vmIds.get(i), normalizedRatios.get(i));
+                }
+
+                int normalizedSum = normalizedRatios.stream().mapToInt(Integer::intValue).sum();
+                if (ratioSum != 1000) {
+                    log.info("⚠️ 数据分配权重总和不等于1000，将按归一化比例执行: taskId={}, originalSum={}, normalizedSum={}, ratios={}",
+                            taskId, ratioSum, normalizedSum, vmRatioMap);
+                } else {
+                    log.info("📊 使用配置的千分比权重: taskId={}, vmRatioMap={}, sum={}",
+                            taskId, vmRatioMap, ratioSum);
+                }
+
+                ratios = normalizedRatios;
             } else {
                 // 方案B：存在null或0的dataRatio，自动分配平均权重（总和=1000）
                 int vmCount = participants.size();
@@ -1108,6 +1118,45 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     }
                 })
                 .sum();
+    }
+
+    private List<Integer> normalizeRatios(List<Integer> ratios) {
+        if (ratios == null || ratios.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Integer> sanitized = new ArrayList<>(ratios.size());
+        for (Integer ratio : ratios) {
+            sanitized.add(ratio == null ? 0 : ratio);
+        }
+        int gcdValue = 0;
+        for (Integer ratio : sanitized) {
+            if (ratio == null || ratio <= 0) {
+                return sanitized;
+            }
+            gcdValue = gcdValue == 0 ? ratio : gcd(gcdValue, ratio);
+            if (gcdValue == 1) {
+                break;
+            }
+        }
+        if (gcdValue <= 1) {
+            return sanitized;
+        }
+        List<Integer> normalized = new ArrayList<>(sanitized.size());
+        for (Integer ratio : sanitized) {
+            normalized.add(ratio / gcdValue);
+        }
+        return normalized;
+    }
+
+    private int gcd(int a, int b) {
+        a = Math.abs(a);
+        b = Math.abs(b);
+        while (b != 0) {
+            int temp = a % b;
+            a = b;
+            b = temp;
+        }
+        return a;
     }
 
     /**

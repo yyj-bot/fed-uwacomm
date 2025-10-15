@@ -1,20 +1,24 @@
-package com.feduwacomm.dto;
+package com.feduwacomm.model.dto.federated;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import com.feduwacomm.model.dto.federated.InitialModelConfigDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
 
 /**
- * 联邦学习任务配置更新请求DTO
+ * 联邦学习任务配置更新请求（v1.5）
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskConfigDTO {
+public class FederatedTaskConfigDTO {
 
     private String algorithm;
 
@@ -22,7 +26,7 @@ public class TaskConfigDTO {
     private HyperparametersDTO hyperparameters;
 
     @Valid
-    private ModelConfigDTO modelConfig;
+    private InitialModelConfigDTO initialModelConfig;
 
     @Valid
     private DataConfigDTO dataConfig;
@@ -61,28 +65,6 @@ public class TaskConfigDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ModelConfigDTO {
-        private String modelType;
-
-        @Min(value = 10, message = "树的数量不能小于10")
-        @Max(value = 1000, message = "树的数量不能大于1000")
-        private Integer nEstimators;
-
-        @Min(value = 1, message = "最大深度不能小于1")
-        @Max(value = 50, message = "最大深度不能大于50")
-        private Integer maxDepth;
-
-        @Min(value = 2, message = "最小分割样本数不能小于2")
-        private Integer minSamplesSplit;
-
-        @Min(value = 1, message = "最小叶子样本数不能小于1")
-        private Integer minSamplesLeaf;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class DataConfigDTO {
         @Valid
         private PreprocessingDTO preprocessing;
@@ -96,8 +78,8 @@ public class TaskConfigDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PreprocessingDTO {
-        private String normalization; // STANDARD_SCALER, MIN_MAX_SCALER, ROBUST_SCALER
-        private String featureSelection; // VARIANCE_THRESHOLD, UNIVARIATE_SELECTION
+        private String normalization;
+        private String featureSelection;
         private Boolean outlierRemoval = false;
     }
 
@@ -106,12 +88,12 @@ public class TaskConfigDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ValidationDTO {
-        private String crossValidation; // K_FOLD, STRATIFIED_K_FOLD
-        
+        private String crossValidation;
+
         @Min(value = 2, message = "K折数不能小于2")
         @Max(value = 10, message = "K折数不能大于10")
         private Integer kFolds = 5;
-        
+
         private Boolean stratified = true;
     }
 
@@ -137,10 +119,11 @@ public class TaskConfigDTO {
 
         @DecimalMin(value = "0.1", message = "epsilon不能小于0.1")
         @DecimalMax(value = "10.0", message = "epsilon不能大于10.0")
-        private Double epsilon;
+            private Double epsilon;
 
         @DecimalMin(value = "0.00001", message = "delta不能小于0.00001")
         @DecimalMax(value = "0.1", message = "delta不能大于0.1")
         private Double delta;
     }
+
 }

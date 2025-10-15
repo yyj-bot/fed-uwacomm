@@ -1,8 +1,13 @@
 package com.feduwacomm.event.listener;
 
+import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.event.AckProgressChangedEvent;
 import com.feduwacomm.event.AckStatusChangedEvent;
+import com.feduwacomm.mapper.FederatedTasksMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.service.FederatedLearningOrchestrator;
 import com.feduwacomm.service.WebSocketService;
+import com.feduwacomm.entity.VmAckTracking;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -10,6 +15,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,6 +32,15 @@ public class AckEventListener {
 
     @Autowired
     private WebSocketService webSocketService;
+
+    @Autowired
+    private FederatedLearningOrchestrator learningOrchestrator;
+
+    @Autowired
+    private TaskParticipantsMapper taskParticipantsMapper;
+
+    @Autowired
+    private FederatedTasksMapper federatedTasksMapper;
 
     /**
      * 监听ACK状态变更事件
@@ -150,19 +165,17 @@ public class AckEventListener {
         try {
             // 如果所有VM都确认完成，可能需要触发下一阶段的业务逻辑
             if (event.isAllSuccess()) {
-                log.info("任务ACK全部成功完成: taskId={}, ackType={}, 可能需要触发下一阶段",
-                        event.getTaskId(), event.getAckType());
+            log.info("任务ACK全部成功完成: taskId={}, ackType={}, 可能需要触发下一阶段",
+                    event.getTaskId(), event.getAckType());
 
-                // 这里可以添加业务逻辑，如：
-                // - 更新任务状态
-                // - 触发下一轮次
-                // - 发送通知邮件
-                // - 等等
+            if (event.getAckType() == VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST) {
+                triggerNextRoundIfNeeded(event);
             }
+        }
 
-            // 如果有失败或超时，可能需要特殊处理
-            if (event.hasIssues()) {
-                log.warn("任务ACK存在问题: taskId={}, ackType={}, 问题VM数={}, 详情={}",
+        // 如果有失败或超时，可能需要特殊处理
+        if (event.hasIssues()) {
+            log.warn("任务ACK存在问题: taskId={}, ackType={}, 问题VM数={}, 详情={}",
                         event.getTaskId(), event.getAckType(), event.getIssueVmCount(),
                         event.getDetailedStatusDescription());
 
@@ -175,6 +188,46 @@ public class AckEventListener {
 
         } catch (Exception e) {
             log.error("处理关键ACK事件失败: {}", event.getSummary(), e);
+        }
+    }
+
+    private void triggerNextRoundIfNeeded(AckProgressChangedEvent event) {
+        FederatedTask task = federatedTasksMapper.selectTaskById(event.getTaskId());
+        if (task == null) {
+            log.warn("无法触发下一轮次: 任务不存在, taskId={}", event.getTaskId());
+            return;
+        }
+
+        Integer currentRound = event.getRoundNumber();
+        if (currentRound == null) {
+            currentRound = task.getCurrentRound();
+            if (currentRound == null) {
+                log.warn("无法触发下一轮次: roundNumber为空, taskId={}", event.getTaskId());
+                return;
+            }
+        }
+
+        int nextRound = currentRound + 1;
+        Integer totalRounds = task.getTotalRounds();
+        if (totalRounds == null || nextRound > totalRounds) {
+            log.info("任务已完成全部轮次，无需触发下一轮: taskId={}, currentRound={}, totalRounds={}",
+                    event.getTaskId(), currentRound, totalRounds);
+            return;
+        }
+
+        var vmIds = taskParticipantsMapper.selectVmIdsByTaskId(event.getTaskId());
+        if (vmIds == null || vmIds.isEmpty()) {
+            log.warn("无法触发下一轮次: 未找到参与的VM, taskId={}", event.getTaskId());
+            return;
+        }
+
+        try {
+            learningOrchestrator.startFederatedRound(event.getTaskId(), nextRound, List.copyOf(vmIds));
+            log.info("已触发下一轮联邦训练: taskId={}, nextRound={}, participantCount={}",
+                    event.getTaskId(), nextRound, vmIds.size());
+        } catch (Exception ex) {
+            log.error("触发下一轮联邦训练失败: taskId={}, nextRound={}, error={}",
+                    event.getTaskId(), nextRound, ex.getMessage(), ex);
         }
     }
 }

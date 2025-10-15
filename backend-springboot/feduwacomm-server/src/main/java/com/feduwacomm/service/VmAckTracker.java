@@ -1,19 +1,31 @@
 package com.feduwacomm.service;
 
+import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.entity.GlobalModel;
+import com.feduwacomm.entity.InitialModel;
 import com.feduwacomm.entity.ModelDistribution;
 import com.feduwacomm.entity.VmAckTracking;
+import com.feduwacomm.enums.InitialModelStatus;
+import com.feduwacomm.enums.ParticipantStatus;
+import com.feduwacomm.enums.RoundState;
 import com.feduwacomm.mapper.GlobalModelMapper;
+import com.feduwacomm.mapper.InitialModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.mapper.TaskParticipantsMapper;
 import com.feduwacomm.mapper.VmAckTrackingMapper;
 import com.feduwacomm.service.AckCacheService;
+import com.feduwacomm.service.RoundStateManager;
+import com.feduwacomm.service.WebSocketMessageSender;
 import com.feduwacomm.service.cache.model.AckProgress;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +54,9 @@ public class VmAckTracker {
     private GlobalModelMapper globalModelMapper;
 
     @Autowired
+    private InitialModelMapper initialModelMapper;
+
+    @Autowired
     private TaskParticipantsMapper taskParticipantsMapper;
 
     @Autowired
@@ -49,6 +64,12 @@ public class VmAckTracker {
 
     @Autowired
     private AckCacheService ackCacheService;
+
+    @Autowired
+    private RoundStateManager roundStateManager;
+
+    @Autowired
+    private WebSocketMessageSender messageSender;
 
     @org.springframework.beans.factory.annotation.Value("${federated.datasetAck.timeoutSeconds:120}")
     private int datasetAckTimeoutSeconds;
@@ -82,7 +103,11 @@ public class VmAckTracker {
                         VmAckTracking.AckStatus.SUCCESS);
 
                 // 更新进度缓存
-                ackCacheService.updateAckProgress(taskId, VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST);
+                ackCacheService.updateAckProgress(taskId, VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST, roundNumber);
+
+                if (roundNumber != null) {
+                    updateRoundStateByAckProgress(taskId, roundNumber);
+                }
 
                 log.info("VM ACK双写成功: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
                 return true;
@@ -91,6 +116,9 @@ public class VmAckTracker {
                 log.warn("缓存更新失败，但数据库操作成功: taskId={}, vmId={}, error={}",
                         taskId, vmId, cacheException.getMessage());
                 // 缓存失败不影响整体结果，因为数据库已成功
+                if (roundNumber != null) {
+                    updateRoundStateByAckProgress(taskId, roundNumber);
+                }
                 return true;
             }
 
@@ -106,6 +134,46 @@ public class VmAckTracker {
             }
 
             return false;
+        }
+    }
+
+    private AckProgress updateRoundStateByAckProgress(String taskId, Integer roundNumber) {
+        try {
+            if (roundNumber == null) {
+                return null;
+            }
+
+            AckProgress progress = ackCacheService.getAckProgress(taskId, VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST);
+            if (progress == null) {
+                return null;
+            }
+
+            List<String> activeVmIds = taskParticipantsMapper.selectParticipantsByTaskId(taskId)
+                    .stream()
+                    .filter(participant -> participant != null)
+                    .filter(participant -> StringUtils.hasText(participant.getVmId()))
+                    .filter(participant -> participant.getStatus() != ParticipantStatus.FAILED &&
+                            participant.getStatus() != ParticipantStatus.DISCONNECTED)
+                    .map(participant -> participant.getVmId())
+                    .collect(Collectors.toList());
+
+            int total = activeVmIds.size();
+            int completed = progress.getSuccessVmCount();
+
+            roundStateManager.updateDistributionProgress(taskId, roundNumber, total, completed);
+            if (total > 0 && completed >= total) {
+                boolean updated = roundStateManager.markRoundCompleted(taskId, roundNumber, total, completed);
+                log.info("轮次ACK进度触发状态更新: taskId={}, round={}, total={}, completed={}, result={}",
+                        taskId, roundNumber, total, completed, updated);
+                if (updated) {
+                    triggerRoundCompleteFallback(taskId, roundNumber);
+                }
+            }
+            return progress;
+        } catch (Exception ex) {
+            log.warn("根据ACK缓存更新轮次状态失败: taskId={}, round={}, error={}",
+                    taskId, roundNumber, ex.getMessage());
+            return null;
         }
     }
 
@@ -130,26 +198,9 @@ public class VmAckTracker {
                 .selectByModelIdAndVmId(globalModel.getId(), vmId);
 
         if (distribution == null) {
-            log.warn("未找到分发记录，创建新记录: modelId={}, vmId={}", globalModel.getId(), vmId);
-            // 创建新的分发记录
-            distribution = new ModelDistribution();
-            distribution.setId(java.util.UUID.randomUUID().toString().replace("-", ""));
-            distribution.setModelId(globalModel.getId());
-            distribution.setVmId(vmId);
-            distribution.setDistributionStatus("COMPLETED");
-            distribution.setDistributedAt(LocalDateTime.now());
-            distribution.setVerifiedAt(LocalDateTime.now());
-            distribution.setChecksumVerified(true);
-            distribution.setCreatedAt(LocalDateTime.now());
-
-            int result = modelDistributionMapper.insertModelDistribution(distribution);
-            if (result > 0) {
-                log.debug("数据库ACK记录成功: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
-                return true;
-            } else {
-                log.error("数据库ACK记录失败: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
-                return false;
-            }
+            log.debug("轮次{}未找到模型分发记录，使用缓存追踪ACK: taskId={}, vmId={}, modelId={}",
+                    roundNumber, taskId, vmId, globalModel.getId());
+            return true;
         } else {
             // 更新现有记录
             int result = modelDistributionMapper.updateDistributionStatus(
@@ -461,7 +512,7 @@ public class VmAckTracker {
      * @return 是否记录成功
      */
     @Transactional
-    public boolean recordTaskStartAck(String taskId, String vmId, String status) {
+    public boolean recordTaskStartAck(String taskId, String vmId, String status, Map<String, Object> ackData) {
         if (taskId == null || vmId == null || status == null) {
             log.error("记录任务启动ACK参数无效: taskId={}, vmId={}, status={}", taskId, vmId, status);
             return false;
@@ -470,18 +521,20 @@ public class VmAckTracker {
         log.info("记录任务启动确认: taskId={}, vmId={}, status={}", taskId, vmId, status);
 
         try {
+            boolean successStatus = "SUCCESS".equalsIgnoreCase(status) || "READY".equalsIgnoreCase(status);
+
             // 1. 数据库操作
             VmAckTracking ackTracking = VmAckTracking.builder()
                 .taskId(taskId)
                 .vmId(vmId)
                 .roundNumber(null) // 任务级别确认
                 .ackType(VmAckTracking.AckType.TASK_START)
-                .status("SUCCESS".equals(status) ? VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED)
+                .status(successStatus ? VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED)
                 .acknowledgedAt(LocalDateTime.now())
                 .build();
 
             int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
-            boolean success = result > 0 && "SUCCESS".equals(status);
+            boolean success = result > 0 && successStatus;
 
             if (!success) {
                 log.warn("任务启动确认记录失败或状态非成功: taskId={}, vmId={}, status={}", taskId, vmId, status);
@@ -490,24 +543,318 @@ public class VmAckTracker {
 
             // 2. 缓存操作
             try {
-                VmAckTracking.AckStatus ackStatus = "SUCCESS".equals(status) ?
+                VmAckTracking.AckStatus ackStatus = successStatus ?
                     VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED;
 
                 ackCacheService.updateAckStatus(taskId, vmId, VmAckTracking.AckType.TASK_START, ackStatus);
                 ackCacheService.updateAckProgress(taskId, VmAckTracking.AckType.TASK_START);
 
                 log.info("任务启动确认双写成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+
+                if (ackStatus == VmAckTracking.AckStatus.SUCCESS) {
+                    handleInitialModelAck(taskId, vmId, ackData, true);
+                }
                 return true;
 
             } catch (Exception cacheException) {
                 log.warn("缓存更新失败，但数据库操作成功: taskId={}, vmId={}, error={}",
                         taskId, vmId, cacheException.getMessage());
+                if (successStatus) {
+                    handleInitialModelAck(taskId, vmId, ackData, true);
+                }
                 return true; // 缓存失败不影响整体结果
             }
 
         } catch (Exception e) {
             log.error("记录任务启动确认失败: taskId={}, vmId={}, status={}", taskId, vmId, status, e);
             return false;
+        }
+    }
+
+    /**
+     * 处理初始模型接收ACK（v1.5协议）
+     *
+     * @param taskId 任务ID
+     * @param vmId VM ID
+     * @param ackData ACK携带的数据
+     * @param success 是否成功
+     */
+    public void processInitialModelAck(String taskId,
+                                       String vmId,
+                                       Map<String, Object> ackData,
+                                       boolean success) {
+        handleInitialModelAck(taskId, vmId, ackData, success);
+    }
+
+    private void handleInitialModelAck(String taskId,
+                                       String vmId,
+                                       Map<String, Object> ackData,
+                                       boolean success) {
+        String distributionId = extractDistributionId(ackData);
+        Integer ackRound = extractRoundNumber(ackData);
+        boolean initialFlow = ackRound == null || ackRound <= 0;
+
+        InitialModel initialModel = null;
+        GlobalModel globalModel = null;
+        String modelIdForAck = null;
+
+        if (initialFlow) {
+            initialModel = initialModelMapper.selectByTaskId(taskId);
+            if (initialModel == null) {
+                log.debug("任务未绑定初始模型，跳过分发状态更新: taskId={}", taskId);
+                return;
+            }
+            modelIdForAck = initialModel.getId();
+        } else {
+            globalModel = globalModelMapper.selectByTaskIdAndRound(taskId, ackRound);
+            if (globalModel != null) {
+                modelIdForAck = globalModel.getId();
+            } else {
+                log.warn("未找到轮次{}的全局模型，跳过ACK处理: taskId={}, vmId={}", ackRound, taskId, vmId);
+                return;
+            }
+        }
+
+        if (!StringUtils.hasText(modelIdForAck)) {
+            log.warn("ACK无法关联任何模型ID，跳过: taskId={}, vmId={}", taskId, vmId);
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        log.info("处理模型ACK: taskId={}, vmId={}, round={}, success={}, distributionId={}, modelId={}",
+                taskId, vmId, ackRound, success, distributionId, modelIdForAck);
+
+        if (!initialFlow) {
+            VmAckTracking.AckStatus ackStatus = success ?
+                    VmAckTracking.AckStatus.SUCCESS : VmAckTracking.AckStatus.FAILED;
+            try {
+                ackCacheService.updateAckStatus(taskId, vmId, VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST, ackStatus);
+                ackCacheService.updateAckProgress(taskId, VmAckTracking.AckType.GLOBAL_MODEL_BROADCAST);
+            } catch (Exception cacheEx) {
+                log.warn("更新轮次ACK缓存失败: taskId={}, vmId={}, error={}", taskId, vmId, cacheEx.getMessage());
+            }
+
+            AckProgress progress = updateRoundStateByAckProgress(taskId, ackRound);
+            int total = progress != null && progress.getTotalVms() > 0 ? progress.getTotalVms()
+                    : taskParticipantsMapper.countTotalParticipants(taskId);
+            int completed = progress != null ? progress.getSuccessVmCount() : 0;
+
+            if (success && total > 0 && completed >= total) {
+                GlobalModel persisted = globalModelMapper.selectById(modelIdForAck);
+                String distributedVmsJson = persisted != null ? persisted.getDistributedVms() : null;
+                globalModelMapper.updateDistributionStatus(
+                        modelIdForAck,
+                        "DISTRIBUTED",
+                        distributedVmsJson,
+                        now,
+                        now);
+                log.info("全局模型分发确认完成: taskId={}, round={}, modelId={}, total={}, completed={}",
+                        taskId, ackRound, modelIdForAck, total, completed);
+            } else if (!success) {
+                globalModelMapper.updateDistributionStatus(
+                        modelIdForAck,
+                        "FAILED",
+                        null,
+                        null,
+                        now);
+                log.warn("全局模型分发存在失败: taskId={}, round={}, modelId={}, vmId={}",
+                        taskId, ackRound, modelIdForAck, vmId);
+            }
+            return;
+        }
+
+        ModelDistribution distribution = null;
+        if (StringUtils.hasText(distributionId)) {
+            distribution = modelDistributionMapper.selectById(distributionId);
+        }
+        if (distribution == null) {
+            distribution = modelDistributionMapper.selectByModelIdAndVmId(modelIdForAck, vmId);
+        }
+        if (distribution == null) {
+            log.warn("未找到模型分发记录: modelId={}, vmId={}, taskId={}, distributionId={}",
+                    modelIdForAck, vmId, taskId, distributionId);
+            return;
+        }
+        log.info("匹配到模型分发记录: id={}, modelId={}, vmId={}, status={}",
+                distribution.getId(), distribution.getModelId(), distribution.getVmId(), distribution.getDistributionStatus());
+
+        String errorMessage = success ? null : extractErrorMessage(ackData);
+        Boolean checksumVerified = extractChecksumVerified(ackData);
+
+        int updatedRows = modelDistributionMapper.updateDistributionStatus(
+                distribution.getId(),
+                success ? "COMPLETED" : "FAILED",
+                now,
+                errorMessage);
+        log.info("更新模型分发状态: id={}, success={}, updatedRows={}", distribution.getId(), success, updatedRows);
+        if (success) {
+            boolean verified = checksumVerified == null || Boolean.TRUE.equals(checksumVerified);
+            int verificationUpdated = modelDistributionMapper.updateVerificationStatus(
+                    distribution.getId(),
+                    verified,
+                    verified ? now : null
+            );
+            log.info("更新模型分发校验状态: id={}, verified={}, updatedRows={}", distribution.getId(), verified, verificationUpdated);
+        } else {
+            int verificationUpdated = modelDistributionMapper.updateVerificationStatus(
+                    distribution.getId(),
+                    Boolean.FALSE,
+                    null
+            );
+            log.info("更新模型分发校验状态: id={}, verified=false, updatedRows={}", distribution.getId(), verificationUpdated);
+        }
+
+        List<ModelDistribution> rawDistributions = modelDistributionMapper.selectEntitiesByModelId(modelIdForAck);
+        if (rawDistributions != null) {
+            log.info("模型分发记录快照: taskId={}, modelId={}, statuses={}",
+                    taskId, modelIdForAck,
+                    rawDistributions.stream()
+                            .map(record -> record.getVmId() + ":" + record.getDistributionStatus())
+                            .toList());
+        }
+        long total = rawDistributions != null ? rawDistributions.size() : 0;
+        long completed = rawDistributions != null ? rawDistributions.stream()
+                .filter(record -> "COMPLETED".equalsIgnoreCase(record.getDistributionStatus()))
+                .count() : 0;
+        long failed = rawDistributions != null ? rawDistributions.stream()
+                .filter(record -> "FAILED".equalsIgnoreCase(record.getDistributionStatus()))
+                .count() : 0;
+        long inProgress = rawDistributions != null ? rawDistributions.stream()
+                .filter(record -> "IN_PROGRESS".equalsIgnoreCase(record.getDistributionStatus()))
+                .count() : 0;
+        long pending = total - completed - failed - inProgress;
+
+        Map<String, Object> progress = new HashMap<>();
+        progress.put("total", total);
+        progress.put("completed", completed);
+        progress.put("failed", failed);
+        progress.put("inProgress", inProgress);
+        progress.put("pending", pending);
+
+        List<Map<String, Object>> statusBreakdown = modelDistributionMapper.countDistributionStatusByModelId(modelIdForAck);
+        log.info("模型分发进度: taskId={}, modelId={}, progress={}, statusBreakdown={}, recordCount={}",
+                taskId, modelIdForAck, progress, statusBreakdown, total);
+
+        int totalInt = (int) Math.min(total, Integer.MAX_VALUE);
+        int completedInt = (int) Math.min(completed, Integer.MAX_VALUE);
+
+        String operator = resolveOperatorId();
+        if (success && total > 0 && completed == total) {
+            initialModelMapper.updateStatus(modelIdForAck, InitialModelStatus.DISTRIBUTED.getCode(), operator);
+            log.info("初始模型全部分发完成: modelId={}, taskId={}, total={}, completed={}", modelIdForAck, taskId, total, completed);
+        } else if (!success && total > 0) {
+            initialModelMapper.updateStatus(modelIdForAck, InitialModelStatus.READY.getCode(), operator);
+            log.warn("初始模型分发存在失败: modelId={}, taskId={}, completed={}, failed={}",
+                    modelIdForAck, taskId, completed, failed);
+        }
+    }
+
+    private String extractDistributionId(Map<String, Object> ackData) {
+        if (ackData == null) {
+            return null;
+        }
+        Object direct = ackData.get("distributionId");
+        if (direct instanceof String directId && StringUtils.hasText(directId)) {
+            return directId;
+        }
+        Map<String, Object> receipt = asMap(ackData.get("initialModelReceipt"));
+        if (receipt != null) {
+            Object receiptId = receipt.get("distributionId");
+            if (receiptId instanceof String receiptStr && StringUtils.hasText(receiptStr)) {
+                return receiptStr;
+            }
+        }
+        return null;
+    }
+
+    private Integer extractRoundNumber(Map<String, Object> ackData) {
+        if (ackData == null) {
+            return null;
+        }
+        Object roundObj = ackData.get("round");
+        if (roundObj == null) {
+            roundObj = ackData.get("roundNumber");
+        }
+        if (roundObj instanceof Number number) {
+            return number.intValue();
+        }
+        if (roundObj instanceof String roundStr && StringUtils.hasText(roundStr)) {
+            try {
+                return Integer.parseInt(roundStr);
+            } catch (NumberFormatException ignore) {
+                log.debug("无法解析轮次字段: {}", roundStr);
+            }
+        }
+        return null;
+    }
+
+    private Boolean extractChecksumVerified(Map<String, Object> ackData) {
+        Map<String, Object> receipt = ackData != null ? asMap(ackData.get("initialModelReceipt")) : null;
+        if (receipt != null && receipt.containsKey("checksumVerified")) {
+            Object value = receipt.get("checksumVerified");
+            if (value instanceof Boolean bool) {
+                return bool;
+            }
+        }
+        return null;
+    }
+
+    private String extractErrorMessage(Map<String, Object> ackData) {
+        if (ackData == null) {
+            return null;
+        }
+        Object error = ackData.get("errorMessage");
+        if (error instanceof String err && StringUtils.hasText(err)) {
+            return err;
+        }
+        Map<String, Object> receipt = asMap(ackData.get("initialModelReceipt"));
+        if (receipt != null) {
+            Object receiptError = receipt.get("errorMessage");
+            if (receiptError instanceof String receiptErr && StringUtils.hasText(receiptErr)) {
+                return receiptErr;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+        return null;
+    }
+
+    private long safeLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String str && StringUtils.hasText(str)) {
+            try {
+                return Long.parseLong(str);
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
+    }
+
+    private String resolveOperatorId() {
+        String operatorId = BaseContext.getCurrentId();
+        return StringUtils.hasText(operatorId) ? operatorId : "SYSTEM";
+    }
+
+    private void triggerRoundCompleteFallback(String taskId, int roundNumber) {
+        try {
+            Map<String, Object> roundResults = Map.of(
+                    "status", "COMPLETED",
+                    "completedAt", Instant.now().toString()
+            );
+            messageSender.broadcastRoundComplete(taskId, roundNumber, roundResults);
+            log.info("触发轮次完成兜底广播: taskId={}, round={}", taskId, roundNumber);
+        } catch (Exception e) {
+            log.warn("触发轮次完成兜底广播失败: taskId={}, round={}, error={}",
+                    taskId, roundNumber, e.getMessage());
         }
     }
 
@@ -567,7 +914,11 @@ public class VmAckTracker {
      * @param reason 失败原因
      * @return 是否记录成功
      */
-    public boolean recordTaskStartFailure(String taskId, String vmId, String status, String reason) {
+    public boolean recordTaskStartFailure(String taskId,
+                                          String vmId,
+                                          String status,
+                                          String reason,
+                                          Map<String, Object> ackData) {
         if (taskId == null || vmId == null) {
             log.error("记录任务启动失败参数无效: taskId={}, vmId={}", taskId, vmId);
             return false;
@@ -589,6 +940,7 @@ public class VmAckTracker {
             int result = vmAckTrackingMapper.insertAckTracking(ackTracking);
             if (result > 0) {
                 log.info("任务启动失败记录成功: taskId={}, vmId={}, ackId={}", taskId, vmId, ackTracking.getId());
+                handleInitialModelAck(taskId, vmId, ackData, false);
                 return true;
             } else {
                 log.error("任务启动失败记录失败: taskId={}, vmId={}", taskId, vmId);
@@ -1309,11 +1661,18 @@ public class VmAckTracker {
             if (result > 0) {
                 log.info("梯度上传成功记录完成: taskId={}, vmId={}, roundNumber={}, ackId={}",
                         taskId, vmId, roundNumber, ackTracking.getId());
-                return true;
             } else {
                 log.error("梯度上传成功记录失败: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber);
-                return false;
             }
+
+            try {
+                roundStateManager.recordGradientUpload(taskId, roundNumber);
+            } catch (Exception syncEx) {
+                log.warn("同步梯度上传进度到round_states失败: taskId={}, vmId={}, roundNumber={}, error={}",
+                        taskId, vmId, roundNumber, syncEx.getMessage(), syncEx);
+            }
+
+            return result > 0;
         } catch (Exception e) {
             log.error("记录梯度上传成功异常: taskId={}, vmId={}, roundNumber={}", taskId, vmId, roundNumber, e);
             return false;

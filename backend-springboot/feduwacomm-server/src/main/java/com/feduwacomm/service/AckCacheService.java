@@ -82,7 +82,11 @@ public interface AckCacheService {
      * @param taskId 任务ID
      * @param ackType 确认类型
      */
-    void updateAckProgress(String taskId, VmAckTracking.AckType ackType);
+    void updateAckProgress(String taskId, VmAckTracking.AckType ackType, Integer roundNumber);
+
+    default void updateAckProgress(String taskId, VmAckTracking.AckType ackType) {
+        updateAckProgress(taskId, ackType, null);
+    }
 
     /**
      * 检查是否所有VM都已确认

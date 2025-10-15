@@ -199,4 +199,16 @@ public interface VmAckTrackingMapper {
         ORDER BY task_id, ack_type, created_at DESC
     """)
     List<VmAckTracking> selectAllAckTrackings();
+
+    /**
+     * 查询任务指定ACK类型的最新轮次号
+     */
+    @Select("""
+        SELECT MAX(round_number)
+        FROM vm_ack_tracking
+        WHERE task_id = #{taskId}
+          AND ack_type = #{ackType}
+    """)
+    Integer findLatestRoundNumber(@Param("taskId") String taskId,
+                                  @Param("ackType") VmAckTracking.AckType ackType);
 }

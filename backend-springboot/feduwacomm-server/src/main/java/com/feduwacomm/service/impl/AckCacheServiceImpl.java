@@ -149,7 +149,7 @@ public class AckCacheServiceImpl implements AckCacheService {
     }
 
     @Override
-    public void updateAckProgress(String taskId, VmAckTracking.AckType ackType) {
+    public void updateAckProgress(String taskId, VmAckTracking.AckType ackType, Integer explicitRoundNumber) {
         if (taskId == null || ackType == null) {
             return;
         }
@@ -165,8 +165,11 @@ public class AckCacheServiceImpl implements AckCacheService {
 
             // 发布ACK进度变更事件
             try {
+                Integer latestRound = explicitRoundNumber != null
+                        ? explicitRoundNumber
+                        : vmAckTrackingMapper.findLatestRoundNumber(taskId, ackType);
                 AckProgressChangedEvent progressEvent = AckProgressChangedEvent.create(
-                    this, taskId, ackType, newProgress, null);
+                    this, taskId, ackType, newProgress, latestRound);
 
                 eventPublisher.publishEvent(progressEvent);
 

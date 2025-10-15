@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 模型分发阶段处理器
@@ -101,6 +102,8 @@ public class ModelDistributionStageHandler extends AbstractStageHandler {
             // 创建模型分发记录
             List<ModelDistribution> distributionRecords = createDistributionRecords(
                     initialModelId, targetVmIds, taskId);
+            Map<String, String> distributionIdByVm = distributionRecords.stream()
+                    .collect(Collectors.toMap(ModelDistribution::getVmId, ModelDistribution::getId, (existing, replacement) -> existing));
             
             // 批量插入分发记录
             if (!distributionRecords.isEmpty()) {
@@ -112,7 +115,7 @@ public class ModelDistributionStageHandler extends AbstractStageHandler {
             
             // 使用真实的全局模型分发服务进行分发
             globalModelDistributionService.distributeGlobalModel(
-                    taskId, roundNumber, initialModelId, globalMetrics, targetVmIds);
+                    taskId, roundNumber, initialModelId, globalMetrics, targetVmIds, distributionIdByVm);
             
             // 更新分发记录状态为进行中
             for (ModelDistribution record : distributionRecords) {

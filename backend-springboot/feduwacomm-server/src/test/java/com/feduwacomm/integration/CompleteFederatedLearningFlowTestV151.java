@@ -1,9 +1,6 @@
 package com.feduwacomm.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feduwacomm.common.Result;
-import com.feduwacomm.dto.*;
-import com.feduwacomm.vo.*;
 import com.feduwacomm.integration.mock.MockVirtualMachine;
 import com.feduwacomm.integration.mock.VmTestData;
 import com.feduwacomm.mapper.FederatedTasksMapper;
@@ -14,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -77,6 +73,8 @@ class CompleteFederatedLearningFlowTestV151 {
     private String adminAccessToken;
     private String taskId;
     private String originalDatasetId;
+    private String initialModelId;
+    private Map<String, Object> latestInitialModelDetail;
 
     // 测试用的5个虚拟机
     private List<VmTestData> virtualMachines = new ArrayList<>();
@@ -89,6 +87,9 @@ class CompleteFederatedLearningFlowTestV151 {
     private Map<String, Map<String, Object>> vmSliceInfo = new HashMap<>();  // vmId -> SliceInfo
     private Map<String, List<Map<String, Object>>> vmBatchRanges = new HashMap<>();  // vmId -> List<BatchRange>
     private Map<String, Map<String, Object>> vmSliceVerifications = new HashMap<>();  // vmId -> SliceVerification
+    private Map<String, String> vmInitialModelDistributionIds = new HashMap<>();
+    private Map<String, Map<String, Object>> vmInitialModelReceipts = new HashMap<>();
+    private Map<String, Map<String, Object>> vmTrainingPlanSnapshots = new HashMap<>();
 
     @BeforeAll
     void setUp() {
@@ -147,22 +148,16 @@ class CompleteFederatedLearningFlowTestV151 {
 
         HttpEntity<Map<String, String>> entity = new HttpEntity<>(loginRequest, headers);
 
-        ResponseEntity<Result<LoginResponseVO>> response = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> loginDataMap = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/user/login",
             HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<LoginResponseVO>>() {}
+            entity
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCode()).isEqualTo(200);
-
-        LoginResponseVO loginData = response.getBody().getData();
-        assertThat(loginData).isNotNull();
-        assertThat(loginData.getToken()).isNotBlank();
-
-        this.adminAccessToken = loginData.getToken();
+        assertThat(loginDataMap).isNotNull();
+        this.adminAccessToken = (String) loginDataMap.get("token");
+        assertThat(adminAccessToken).isNotBlank();
         System.out.println("✅ 管理员登录成功");
     }
 
@@ -242,12 +237,11 @@ class CompleteFederatedLearningFlowTestV151 {
         requestBody.add("file", fileResource);
 
         try {
-            TrainingDataUploadDTO uploadDTO = TrainingDataUploadDTO.builder()
-                .dataType("ACOUSTIC")
-                .datasetDescription("v1.5.1水声数据集，用于切片验证测试")
-                .tags(Arrays.asList("acoustic", "v1.5.1", "slicing-test"))
-                .metadata(Map.of("vmCount", 5, "protocolVersion", "1.5.1"))
-                .build();
+            Map<String, Object> uploadDTO = new HashMap<>();
+            uploadDTO.put("dataType", "ACOUSTIC");
+            uploadDTO.put("datasetDescription", "v1.5.1水声数据集，用于切片验证测试");
+            uploadDTO.put("tags", Arrays.asList("acoustic", "v1.5.1", "slicing-test"));
+            uploadDTO.put("metadata", Map.of("vmCount", 5, "protocolVersion", "1.5.1"));
 
             String jsonString = objectMapper.writeValueAsString(uploadDTO);
             ByteArrayResource jsonResource = new ByteArrayResource(jsonString.getBytes()) {
@@ -268,19 +262,15 @@ class CompleteFederatedLearningFlowTestV151 {
 
         HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        ResponseEntity<Result<TrainingDataUploadVO>> response = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> uploadData = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/training-data/upload",
             HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<TrainingDataUploadVO>>() {}
+            entity
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCode()).isEqualTo(200);
-
-        TrainingDataUploadVO uploadResult = response.getBody().getData();
-        this.originalDatasetId = uploadResult.getDatasetId();
+        assertThat(uploadData).isNotNull();
+        this.originalDatasetId = (String) uploadData.get("datasetId");
 
         assertThat(originalDatasetId).isNotNull();
         System.out.println("✅ 数据集上传成功 (v1.5.1)");
@@ -300,18 +290,12 @@ class CompleteFederatedLearningFlowTestV151 {
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Result<Map<String, Object>>> response = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resources = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/federated/config/available-vms",
             HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<Result<Map<String, Object>>>() {}
+            entity
         );
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCode()).isEqualTo(200);
-
-        Map<String, Object> resources = response.getBody().getData();
         assertThat(resources).isNotNull();
 
         System.out.println("✅ 可用资源查询成功");
@@ -347,6 +331,7 @@ class CompleteFederatedLearningFlowTestV151 {
 
         List<Map<String, Object>> participants = new ArrayList<>();
         // v1.5.1.1: dataRatio是千分比权重（1-1000），5个VM均等分配：每个200
+        assertThat(registeredVmIds).isNotEmpty();
         int equalRatio = 1000 / registeredVmIds.size();
         for (String vmId : registeredVmIds) {
             Map<String, Object> participant = new HashMap<>();
@@ -367,31 +352,97 @@ class CompleteFederatedLearningFlowTestV151 {
         hyperparameters.put("minParticipants", 3);
         createRequest.put("hyperparameters", hyperparameters);
 
+        // 初始模型配置 (AUTO)
+        Map<String, Object> autoGenerateConfig = new HashMap<>();
+        autoGenerateConfig.put("modelType", "RANDOM_FOREST");
+        autoGenerateConfig.put("randomSeed", 42);
+        autoGenerateConfig.put("description", "v1.5.1自动生成基线模型");
+        autoGenerateConfig.put("labels", List.of("baseline", "auto"));
+
+        Map<String, Object> architecture = new HashMap<>();
+        architecture.put("n_estimators", 100);
+        architecture.put("max_depth", 8);
+        architecture.put("min_samples_split", 2);
+        autoGenerateConfig.put("architecture", architecture);
+
+        Map<String, Object> autoMetadata = new HashMap<>();
+        autoMetadata.put("framework", "sklearn");
+        autoMetadata.put("version", "1.5.0");
+        autoGenerateConfig.put("metadata", autoMetadata);
+
+        Map<String, Object> initialModelConfig = new HashMap<>();
+        initialModelConfig.put("mode", "AUTO");
+        initialModelConfig.put("autoGenerateConfig", autoGenerateConfig);
+        createRequest.put("initialModelConfig", initialModelConfig);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(adminAccessToken);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(createRequest, headers);
 
-        ResponseEntity<Result<Map<String, Object>>> response = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> taskResultMap = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/federated/tasks",
             HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<Map<String, Object>>>() {}
+            entity
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCode()).isEqualTo(200);
+        assertThat(taskResultMap).isNotNull();
+        assertThat(taskResultMap.get("status")).as("任务创建后应处于PENDING状态").isEqualTo("PENDING");
 
-        Map<String, Object> taskResult = response.getBody().getData();
-        this.taskId = (String) taskResult.get("taskId");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resourcePreparation = (Map<String, Object>) taskResultMap.get("resourcePreparation");
+        assertThat(resourcePreparation).as("资源准备摘要").isNotNull();
+        assertThat(resourcePreparation.get("datasetPrepared")).as("数据集准备状态").isEqualTo(Boolean.TRUE);
+        assertThat(resourcePreparation.get("modelDistributed")).as("初始模型分发状态").isEqualTo(Boolean.TRUE);
+        @SuppressWarnings("unchecked")
+        List<String> pendingDatasetVmIds = (List<String>) resourcePreparation.get("pendingDatasetVmIds");
+        if (pendingDatasetVmIds != null) {
+            assertThat(pendingDatasetVmIds).as("应无待处理数据集分发").isEmpty();
+        }
+        @SuppressWarnings("unchecked")
+        List<String> pendingModelVmIds = (List<String>) resourcePreparation.get("pendingModelVmIds");
+        if (pendingModelVmIds != null) {
+            assertThat(pendingModelVmIds).as("应无待处理模型分发").isEmpty();
+        }
+        @SuppressWarnings("unchecked")
+        List<String> distributionTargets = (List<String>) resourcePreparation.get("targetVmIds");
+        assertThat(distributionTargets).as("分发目标VM列表").containsExactlyInAnyOrderElementsOf(registeredVmIds);
 
-        assertThat(taskId).isNotNull();
+        this.taskId = (String) taskResultMap.get("taskId");
+        assertThat(taskId).isNotBlank();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> configSummary = (Map<String, Object>) taskResultMap.get("configSummary");
+        assertThat(configSummary).as("任务配置摘要").isNotNull();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> initialModelSummary = (Map<String, Object>) configSummary.get("initialModel");
+        assertThat(initialModelSummary).as("初始模型摘要").isNotNull();
+
+        assertThat(((String) initialModelSummary.get("mode"))).isEqualToIgnoringCase("AUTO");
+        this.initialModelId = (String) initialModelSummary.get("initialModelId");
+        assertThat(initialModelId).isNotBlank();
+        assertThat(initialModelSummary.get("bindingStatus")).isEqualTo("BOUND");
+        assertThat(Boolean.TRUE.equals(initialModelSummary.get("autoGenerated"))).isTrue();
+
+        // 查询初始模型详情，确认状态已就绪且绑定到当前任务
+        this.latestInitialModelDetail = fetchInitialModelDetail(initialModelId);
+        assertThat(latestInitialModelDetail).isNotNull();
+        assertThat(latestInitialModelDetail.get("status")).as("初始模型状态应为READY或DISTRIBUTED")
+            .isIn("READY", "DISTRIBUTED");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> activeBinding = (Map<String, Object>) latestInitialModelDetail.get("activeBinding");
+        assertThat(activeBinding).isNotNull();
+        assertThat(activeBinding.get("taskId")).isEqualTo(taskId);
+        assertThat(Boolean.TRUE.equals(latestInitialModelDetail.get("autoGenerated"))).isTrue();
 
         System.out.println("✅ v1.5.1联邦学习任务创建成功");
         System.out.println("📋 任务ID: " + taskId);
-        System.out.println("⚠️  任务状态: CREATED (数据尚未分发)");
+        System.out.println("🧠 初始模型ID: " + initialModelId);
+        System.out.println("⚠️  任务状态: PENDING (资源已准备，等待调度)");
     }
 
     /**
@@ -402,28 +453,57 @@ class CompleteFederatedLearningFlowTestV151 {
     @Order(7)
     void test07_TaskStartFlowV151() throws InterruptedException {
         System.out.println("\n🚀 步骤7：任务启动流程测试 (v1.5.1修正版)");
-        System.out.println("🎯 此步骤将触发数据切片和分发");
+        System.out.println("🎯 此步骤将正式启动训练阶段");
+
+        assertThat(initialModelId).as("初始模型ID应已在任务创建阶段生成").isNotBlank();
+
+        System.out.println("🧠 任务资源准备已在创建阶段完成，开始确认分发结果...");
+
+        // 确认初始模型在创建阶段已分发完成
+        waitForInitialModelDistribution(initialModelId, registeredVmIds.size());
+
+        this.latestInitialModelDetail = fetchInitialModelDetail(initialModelId);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> distributionStats = (Map<String, Object>) latestInitialModelDetail.get("distributionStats");
+        System.out.println("initialModelDetail distributionStats=" + distributionStats);
+        assertThat(distributionStats).isNotNull();
+        assertThat(distributionStats.get("completed")).isNotNull();
+        int completedCount = ((Number) distributionStats.get("completed")).intValue();
+        assertThat(completedCount).isEqualTo(registeredVmIds.size());
+        assertThat(latestInitialModelDetail.get("status")).isEqualTo("DISTRIBUTED");
+
+        System.out.println("✅ 初始模型已分发到所有VM，状态: " + latestInitialModelDetail.get("status"));
+
+        // 确认数据集准备完成
+        waitForDatasetAllocation();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(adminAccessToken);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Result<TaskOperationVO>> startResponse = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> startResultMap = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/federated/tasks/" + taskId + "/start",
             HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<TaskOperationVO>>() {}
+            entity
         );
 
-        assertThat(startResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(startResponse.getBody()).isNotNull();
-        assertThat(startResponse.getBody().getCode()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> startResourcePrep = (Map<String, Object>) startResultMap.get("resourcePreparation");
+        assertThat(startResourcePrep).as("任务启动前资源摘要").isNotNull();
+        assertThat(startResourcePrep.get("datasetPrepared")).isEqualTo(Boolean.TRUE);
+        assertThat(startResourcePrep.get("modelDistributed")).isEqualTo(Boolean.TRUE);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> startConfig = (Map<String, Object>) startResultMap.get("configSummary");
+        assertThat(startConfig).isNotNull();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> startInitialModel = (Map<String, Object>) startConfig.get("initialModel");
+        assertThat(startInitialModel).isNotNull();
+        assertThat(startInitialModel.get("initialModelId")).isEqualTo(initialModelId);
 
         System.out.println("✅ 任务已启动，状态变更为 RUNNING");
-        System.out.println("🎯 等待数据切片和分发完成...");
-
-        // 等待后端完成数据切片和分发
-        waitForDatasetAllocation();
+        System.out.println("🎯 任务即将进入训练阶段...");
     }
 
     /**
@@ -470,10 +550,50 @@ class CompleteFederatedLearningFlowTestV151 {
             System.out.println("   📊 SliceInfo: startIndex=" + startIndex +
                              ", endIndex=" + endIndex +
                              ", sliceSamples=" + sliceSamples);
+
+            Map<String, Object> initialModelPayload = mockVM.getLatestInitialModelPayload();
+            assertThat(initialModelPayload).as("VM初始模型载荷").isNotNull();
+            assertThat(initialModelPayload.get("modelId")).isEqualTo(initialModelId);
+            assertThat(initialModelPayload.get("checksum")).as("初始模型校验和").isNotNull();
+            String distributionId = (String) initialModelPayload.get("distributionId");
+            assertThat(distributionId).as("初始模型分发ID").isNotBlank();
+            vmInitialModelDistributionIds.put(vmId, distributionId);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> modelParameters = (Map<String, Object>) initialModelPayload.get("parameters");
+            assertThat(modelParameters).as("初始模型参数").isNotNull();
+            assertThat(modelParameters).isNotEmpty();
+
+            Map<String, Object> initialModelReceipt = mockVM.getLatestInitialModelReceipt();
+            assertThat(initialModelReceipt).as("初始模型回执").isNotNull();
+            assertThat(initialModelReceipt.get("distributionId")).isEqualTo(distributionId);
+            assertThat(Boolean.TRUE.equals(initialModelReceipt.get("checksumVerified"))).isTrue();
+            vmInitialModelReceipts.put(vmId, initialModelReceipt);
+
+            Map<String, Object> trainingPlan = mockVM.getLatestTrainingPlan();
+            assertThat(trainingPlan).as("训练计划").isNotNull();
+            assertThat(trainingPlan.get("algorithm")).as("训练算法").isNotNull();
+            vmTrainingPlanSnapshots.put(vmId, trainingPlan);
+
+            System.out.println("   🧠 InitialModel: distributionId=" + distributionId +
+                             ", algorithm=" + trainingPlan.get("algorithm") +
+                             ", checksumVerified=" + initialModelReceipt.get("checksumVerified"));
         }
 
         // 验证切片的完整性和无重叠
         verifySliceCompleteness();
+
+        // 再次确认初始模型在后端的分发统计
+        this.latestInitialModelDetail = fetchInitialModelDetail(initialModelId);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> distributionStats = (Map<String, Object>) latestInitialModelDetail.get("distributionStats");
+        assertThat(distributionStats).isNotNull();
+        int completedDistributions = ((Number) distributionStats.getOrDefault("completed", 0)).intValue();
+        assertThat(completedDistributions).isEqualTo(mockVMs.size());
+        assertThat(latestInitialModelDetail.get("status")).isEqualTo("DISTRIBUTED");
+
+        System.out.println("🧠 初始模型分发统计: completed=" + completedDistributions +
+                         ", status=" + latestInitialModelDetail.get("status"));
 
         System.out.println("✅ 数据集分配验证完成 (v1.5.1)");
     }
@@ -704,7 +824,15 @@ class CompleteFederatedLearningFlowTestV151 {
                 System.out.println("  ⚠️  全局模型验证异常: " + e.getMessage());
             }
 
-            System.out.println("\n✅ ===== 第" + round + "轮完成（自动触发） =====");
+        System.out.println("\n✅ ===== 第" + round + "轮完成（自动触发） =====");
+    }
+
+        // 确认所有VM均已保存最新全局模型
+        for (MockVirtualMachine mockVM : mockVMs) {
+            Map<String, Object> latestModel = mockVM.getLatestGlobalModel(taskId);
+            assertThat(latestModel)
+                .as("VM应记录最新全局模型: " + mockVM.getVmId())
+                .isNotNull();
         }
 
         System.out.println("\n✅ 联邦学习执行完成（3轮）");
@@ -721,6 +849,40 @@ class CompleteFederatedLearningFlowTestV151 {
     @Order(12)
     void test12_ComprehensiveResultsVerification() {
         System.out.println("\n📊 ===== 步骤12：完整结果验证和报告生成 =====");
+
+        System.out.println("\n🔍 0. 初始模型分发结果校验");
+        assertThat(vmInitialModelDistributionIds)
+            .as("每个VM都应记录初始模型分发ID")
+            .hasSize(mockVMs.size());
+        assertThat(vmInitialModelReceipts)
+            .as("每个VM都应返回初始模型回执")
+            .hasSize(mockVMs.size());
+        assertThat(vmTrainingPlanSnapshots)
+            .as("每个VM都应缓存训练计划")
+            .hasSize(mockVMs.size());
+        vmInitialModelReceipts.forEach((vmId, receipt) -> {
+            assertThat(Boolean.TRUE.equals(receipt.get("checksumVerified")))
+                .as("VM %s 校验和确认".formatted(vmId))
+                .isTrue();
+            System.out.println("  ✅ VM " + vmId.substring(0, 8) +
+                " initialModel receipt distributionId=" + receipt.get("distributionId"));
+        });
+        vmTrainingPlanSnapshots.forEach((vmId, plan) -> {
+            if (plan != null) {
+                System.out.println("  ⚙️ VM " + vmId.substring(0, 8) +
+                    " trainingPlan.algorithm=" + plan.get("algorithm"));
+            }
+        });
+
+        mockVMs.forEach(mockVM -> {
+            Map<Integer, Map<String, Object>> history = mockVM.getGlobalModelHistory(taskId);
+            assertThat(history)
+                .as("VM %s 应记录全局模型历史".formatted(mockVM.getVmId()))
+                .isNotNull()
+                .isNotEmpty();
+            System.out.println("  📦 VM " + mockVM.getVmId().substring(0, 8) +
+                " 接收全局模型轮次: " + history.keySet());
+        });
 
         // 1. 验证所有轮次的全局模型
         System.out.println("\n🔍 1. 验证全局模型版本");
@@ -746,7 +908,7 @@ class CompleteFederatedLearningFlowTestV151 {
             finalModel = getFinalModelDetails();
             if (finalModel != null && !finalModel.isEmpty()) {
                 System.out.println("  ✅ 最终模型: modelId=" +
-                    String.valueOf(finalModel.get("model_id")).substring(0, 8) + "...");
+                    String.valueOf(finalModel.get("id")).substring(0, 8) + "...");
             } else {
                 System.out.println("  ⚠️  未找到最终模型（可能未实现聚合逻辑）");
             }
@@ -818,6 +980,17 @@ class CompleteFederatedLearningFlowTestV151 {
 
     // ========== 辅助方法 ==========
 
+    private Object exchangeForData(String url, HttpMethod method, HttpEntity<?> entity) {
+        ResponseEntity<Map> response = restTemplate.exchange(url, method, entity, Map.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> body = response.getBody();
+        assertThat(body).isNotNull();
+        Number code = body.containsKey("code") ? (Number) body.get("code") : null;
+        assertThat(code).as("响应状态码").isNotNull();
+        assertThat(code.intValue()).isEqualTo(200);
+        return body.get("data");
+    }
+
     private void registerSingleVirtualMachine(VmTestData vmData) {
         Map<String, Object> vmRequest = new HashMap<>();
         vmRequest.put("name", vmData.getName());
@@ -835,20 +1008,16 @@ class CompleteFederatedLearningFlowTestV151 {
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(vmRequest, headers);
 
-        ResponseEntity<Result<VmRegisterResponseVO>> response = restTemplate.exchange(
+        @SuppressWarnings("unchecked")
+        Map<String, Object> registerData = (Map<String, Object>) exchangeForData(
             baseUrl + "/api/v1/vm/register",
             HttpMethod.POST,
-            entity,
-            new ParameterizedTypeReference<Result<VmRegisterResponseVO>>() {}
+            entity
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCode()).isEqualTo(200);
-
-        VmRegisterResponseVO vmResult = response.getBody().getData();
-        String vmId = vmResult.getVmId();
-        String accessToken = vmResult.getAccessToken();
+        assertThat(registerData).isNotNull();
+        String vmId = (String) registerData.get("vmId");
+        String accessToken = (String) registerData.get("accessToken");
 
         vmData.setVmId(vmId);
         registeredVmIds.add(vmId);
@@ -857,17 +1026,55 @@ class CompleteFederatedLearningFlowTestV151 {
         System.out.println("✅ VM注册成功: " + vmData.getName() + " (vmId: " + vmId + ")");
     }
 
-    private void waitForDatasetAllocation() {
+    private void waitForInitialModelDistribution(String modelId, int expectedVmCount) {
         Awaitility.await()
             .atMost(Duration.ofSeconds(120))
             .pollInterval(Duration.ofSeconds(2))
             .untilAsserted(() -> {
-                Integer completed = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM task_participants WHERE task_id = ? AND dataset_status = 'COMPLETED'",
-                    Integer.class, taskId
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT id, vm_id, distribution_status FROM model_distributions WHERE model_id = ?",
+                    modelId
                 );
-                assertThat(completed).isEqualTo(mockVMs.size());
+                System.out.println("initial model distributions rows: " + rows);
+                Integer total = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM model_distributions WHERE model_id = ?",
+                    Integer.class,
+                    modelId
+                );
+                assertThat(total).isNotNull();
+                assertThat(total).isEqualTo(expectedVmCount);
+
+                Integer completed = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM model_distributions WHERE model_id = ? AND distribution_status = 'COMPLETED'",
+                    Integer.class,
+                    modelId
+                );
+                assertThat(completed).isNotNull();
+                assertThat(completed).isEqualTo(expectedVmCount);
             });
+    }
+
+    private Map<String, Object> fetchInitialModelDetail(String modelId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminAccessToken);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> detailMap = (Map<String, Object>) exchangeForData(
+            baseUrl + "/api/model/initial/" + modelId,
+            HttpMethod.GET,
+            entity
+        );
+        return detailMap;
+    }
+
+    private void waitForDatasetAllocation() {
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(120))
+            .pollInterval(Duration.ofSeconds(2))
+            .untilAsserted(() -> mockVMs.forEach(vm ->
+                assertThat(vm.getLatestAssignedDatasetId()).isNotNull()
+            ));
     }
 
     private void waitForDatasetSliceInfo() {
@@ -931,6 +1138,7 @@ class CompleteFederatedLearningFlowTestV151 {
             .pollInterval(Duration.ofSeconds(1))
             .ignoreExceptions()
             .until(() -> {
+                System.out.println("    🔎 round_states查询: taskId=" + taskId + ", round=" + round);
                 Map<String, Object> roundState = jdbcTemplate.queryForMap(
                         "SELECT state, gradient_uploads_received, completed_participants FROM round_states WHERE task_id = ? AND round_number = ?",
                         taskId, round);
@@ -1044,42 +1252,51 @@ class CompleteFederatedLearningFlowTestV151 {
             Map<String, Object> globalModel = jdbcTemplate.queryForMap(sql, taskId, round);
 
             assertThat(globalModel).isNotNull();
-            assertThat(globalModel.get("model_id")).isNotNull();
+            assertThat(globalModel.get("id")).isNotNull();
 
-            // 验证聚合方法
             String aggregationMethod = (String) globalModel.get("aggregation_method");
             if (aggregationMethod != null) {
                 System.out.println("    📊 聚合方法: " + aggregationMethod);
             }
 
-            // 验证参与者数量
-            Integer clientCount = (Integer) globalModel.get("client_count");
+            Integer clientCount = (Integer) globalModel.get("participant_count");
             if (clientCount != null) {
                 assertThat(clientCount).isGreaterThan(0);
             }
 
-            // 验证模型JSON不为空
-            String modelJson = (String) globalModel.get("model_json");
-            if (modelJson != null) {
-                assertThat(modelJson).isNotEmpty();
+            Object parametersRaw = globalModel.get("global_parameters");
+            if (parametersRaw != null) {
+                Map<String, Object> parameters = readJsonAsMap(parametersRaw);
+                if (parameters != null) {
+                    System.out.println("    📊 全局模型参数: " + parameters);
+                }
             }
 
-            // 解析并验证metrics
-            String metricsJson = (String) globalModel.get("metrics");
-            if (metricsJson != null && !metricsJson.isEmpty()) {
-                try {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> metrics = objectMapper.readValue(metricsJson, Map.class);
-                    System.out.println("    📊 全局模型指标: " + metrics);
-                } catch (Exception e) {
-                    System.out.println("    ⚠️  metrics解析失败: " + e.getMessage());
+            BigDecimal globalLoss = safeToBigDecimal(globalModel.get("global_loss"));
+            BigDecimal globalAccuracy = safeToBigDecimal(globalModel.get("global_accuracy"));
+            if (globalLoss != null || globalAccuracy != null) {
+                System.out.println("    📉 指标: loss=" + globalLoss + ", accuracy=" + globalAccuracy);
+            }
+
+            String distributionStatus = (String) globalModel.get("distribution_status");
+            assertThat(distributionStatus)
+                    .as("全局模型分发状态")
+                    .isEqualTo("DISTRIBUTED");
+
+            Object distributedVmsRaw = globalModel.get("distributed_vms");
+            if (distributedVmsRaw != null) {
+                List<String> distributedVmIds = readJsonAsList(distributedVmsRaw);
+                if (distributedVmIds != null) {
+                    assertThat(distributedVmIds)
+                            .as("全局模型分发目标列表")
+                            .containsExactlyInAnyOrderElementsOf(registeredVmIds);
                 }
             }
 
             System.out.println("    ✅ 全局模型已生成: modelId=" +
-                String.valueOf(globalModel.get("model_id")).substring(0, 8) + "..." +
+                String.valueOf(globalModel.get("id")).substring(0, 8) + "..." +
                 ", round=" + round +
-                (clientCount != null ? ", clients=" + clientCount : ""));
+                (clientCount != null ? ", participants=" + clientCount : ""));
 
         } catch (Exception e) {
             System.out.println("    ⚠️  全局模型查询异常（可能未实现聚合）: " + e.getMessage());
@@ -1121,10 +1338,11 @@ class CompleteFederatedLearningFlowTestV151 {
             Map<String, Object> model = models.get(i);
             Integer roundNumber = (Integer) model.get("round_number");
 
-            assertThat(model.get("model_id")).isNotNull();
+            assertThat(model.get("id")).isNotNull();
+            assertThat(model.get("distribution_status")).isEqualTo("DISTRIBUTED");
 
             System.out.println("    ✅ 轮次" + roundNumber + "全局模型: " +
-                "modelId=" + String.valueOf(model.get("model_id")).substring(0, 8) + "...");
+                "modelId=" + String.valueOf(model.get("id")).substring(0, 8) + "...");
         }
 
         return models;
@@ -1166,6 +1384,55 @@ class CompleteFederatedLearningFlowTestV151 {
             System.out.println("    ⚠️  最终模型查询异常: " + e.getMessage());
             return new HashMap<>();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readJsonAsMap(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            if (raw instanceof String json && !json.isEmpty()) {
+                return objectMapper.readValue(json, Map.class);
+            }
+            if (raw instanceof byte[] bytes) {
+                return objectMapper.readValue(new String(bytes), Map.class);
+            }
+        } catch (Exception e) {
+            System.out.println("    ⚠️  JSON解析失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> readJsonAsList(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            if (raw instanceof String json && !json.isEmpty()) {
+                return objectMapper.readValue(json, List.class);
+            }
+            if (raw instanceof byte[] bytes) {
+                return objectMapper.readValue(new String(bytes), List.class);
+            }
+        } catch (Exception e) {
+            System.out.println("    ⚠️  JSON列表解析失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private BigDecimal safeToBigDecimal(Object value) {
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+        if (value instanceof Double dbl) {
+            return BigDecimal.valueOf(dbl);
+        }
+        if (value instanceof Number num) {
+            return BigDecimal.valueOf(num.doubleValue());
+        }
+        return null;
     }
 
     /**
@@ -1282,7 +1549,7 @@ class CompleteFederatedLearningFlowTestV151 {
 
         if (finalModel != null && !finalModel.isEmpty()) {
             System.out.println("\n📊 最终模型:");
-            System.out.println("  - 模型ID: " + finalModel.get("model_id"));
+            System.out.println("  - 模型ID: " + finalModel.get("id"));
 
             String aggregationMethod = (String) finalModel.get("aggregation_method");
             if (aggregationMethod != null) {

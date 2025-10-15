@@ -291,7 +291,9 @@ public class MessageBuilder {
             Map<String, Object> globalModel,
             String message,
             String assignedDatasetId,
-            String dataPath) {
+            String dataPath,
+            Map<String, Object> initialModel,
+            Map<String, Object> trainingPlan) {
 
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
@@ -300,6 +302,22 @@ public class MessageBuilder {
         data.put("hyperparameters", hyperparameters);
         data.put("globalModel", globalModel);
         data.put("message", message);
+
+        if (initialModel != null && !initialModel.isEmpty()) {
+            data.put("initialModel", initialModel);
+        }
+
+        if (trainingPlan != null && !trainingPlan.isEmpty()) {
+            data.put("trainingPlan", trainingPlan);
+            Object algorithm = trainingPlan.get("algorithm");
+            if (algorithm != null) {
+                data.put("federatedAlgorithm", algorithm);
+            }
+            Object totalRounds = trainingPlan.get("totalRounds");
+            if (totalRounds != null) {
+                data.put("totalRounds", totalRounds);
+            }
+        }
 
         // v1.5.1新增：dataConfig必需字段
         Map<String, Object> dataConfig = new HashMap<>();
@@ -662,13 +680,17 @@ public class MessageBuilder {
     public ProtocolMessage buildRoundStartMessage(String vmId, String taskId, int roundNumber,
                                                   Map<String, Object> roundSpecificConfig,
                                                   Map<String, Object> targetMetrics,
-                                                  int expectedParticipants) {
+                                                  int expectedParticipants,
+                                                  Map<String, Object> datasetContext) {
         Map<String, Object> data = new HashMap<>();
         data.put("taskId", taskId);
         data.put("roundNumber", roundNumber);
         data.put("roundSpecificConfig", roundSpecificConfig);
         data.put("targetMetrics", targetMetrics);
         data.put("expectedParticipants", expectedParticipants);
+        if (datasetContext != null && !datasetContext.isEmpty()) {
+            data.put("datasetContext", datasetContext);
+        }
 
         return buildServerMessage(ProtocolType.ROUND_START, vmId, data);
     }
