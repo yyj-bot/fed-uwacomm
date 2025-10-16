@@ -6,7 +6,7 @@
 
 ### 1.1 基础信息
 - **基础URL**: `http://localhost:8080/api/federated`
-- **API版本**: v1.4
+- **API版本**: v1.5
 - **认证方式**: JWT Token
 - **数据格式**: JSON
 
@@ -217,6 +217,66 @@ Authorization: Bearer {token}
       "iidScore": 0.85,
       "balanceScore": 0.92
     }
+  }
+}
+```
+
+---
+
+#### 3.0.4 参与者验证
+**接口地址**: `POST /api/federated/tasks/validate-participants`
+
+**请求头**:
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**请求参数**:
+```json
+{
+  "algorithm": "FEDERATED_AVERAGING",
+  "taskType": "CLASSIFICATION",
+  "participants": [
+    {
+      "vmId": "a1b2c3d4e5f678901234567890123456",
+      "role": "PARTICIPANT"
+    },
+    {
+      "vmId": "b2c3d4e5f67890123456789012345678",
+      "role": "PARTICIPANT"
+    }
+  ]
+}
+```
+
+**响应示例**:
+```json
+{
+  "code": 200,
+  "message": "验证完成",
+  "data": {
+    "overallValid": true,
+    "participantValidations": [
+      {
+        "vmId": "a1b2c3d4e5f678901234567890123456",
+        "isValid": true,
+        "validationResults": {
+          "connectivity": {
+            "status": "PASS",
+            "message": "网络连接正常"
+          },
+          "resources": {
+            "status": "PASS",
+            "message": "资源满足要求"
+          },
+          "algorithm_support": {
+            "status": "PASS",
+            "message": "支持指定算法"
+          }
+        }
+      }
+    ]
   }
 }
 ```

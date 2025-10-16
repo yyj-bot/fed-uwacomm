@@ -2,7 +2,6 @@ package com.feduwacomm.controller;
 
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.common.Result;
-import com.feduwacomm.model.dto.initial.InitialModelDistributeRequest;
 import com.feduwacomm.model.dto.initial.InitialModelGenerateRequest;
 import com.feduwacomm.model.dto.initial.InitialModelUploadRequest;
 import com.feduwacomm.model.vo.initial.InitialModelBindingVO;
@@ -211,25 +210,4 @@ public class InitialModelController {
         }
     }
 
-    /**
-     * 将初始模型分发到任务参与者
-     */
-    @PostMapping("/task/{taskId}/distribute")
-    public Result<InitialModelDetailVO> distributeInitialModel(@PathVariable String taskId,
-                                                               @Valid @RequestBody(required = false) InitialModelDistributeRequest request) {
-        String operatorId = BaseContext.getCurrentId();
-        if (!StringUtils.hasText(operatorId)) {
-            operatorId = "system";
-        }
-        try {
-            InitialModelDetailVO detail = initialModelGenerationService.distributeInitialModel(taskId, request, operatorId);
-            return Result.success("初始模型分发已启动", detail);
-        } catch (IllegalArgumentException ex) {
-            log.warn("初始模型分发参数错误: taskId={}, error={}", taskId, ex.getMessage());
-            return Result.error(400, ex.getMessage());
-        } catch (Exception ex) {
-            log.error("初始模型分发失败: taskId={}", taskId, ex);
-            return Result.error("初始模型分发失败: " + ex.getMessage());
-        }
-    }
 }

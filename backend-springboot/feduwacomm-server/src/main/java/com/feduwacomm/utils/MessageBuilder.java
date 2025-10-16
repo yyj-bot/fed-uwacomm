@@ -21,7 +21,7 @@ import java.util.UUID;
  * 提供统一的消息构建接口，确保类型安全和一致性
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Slf4j
 @Component

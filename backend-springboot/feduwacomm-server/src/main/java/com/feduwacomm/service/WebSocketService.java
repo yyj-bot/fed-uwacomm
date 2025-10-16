@@ -7,7 +7,7 @@ import java.util.Map;
  * 提供WebSocket消息发送的基础能力
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 public interface WebSocketService {

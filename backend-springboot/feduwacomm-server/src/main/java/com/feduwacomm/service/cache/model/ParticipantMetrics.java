@@ -13,7 +13,7 @@ import java.util.Objects;
  * 用于缓存联邦学习参与者的实时训练指标
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Data
 @Builder

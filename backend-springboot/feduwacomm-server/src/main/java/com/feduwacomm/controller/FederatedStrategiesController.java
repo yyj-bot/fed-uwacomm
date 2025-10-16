@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * 提供可用聚合策略查询和配置信息获取功能
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Slf4j
 @RestController

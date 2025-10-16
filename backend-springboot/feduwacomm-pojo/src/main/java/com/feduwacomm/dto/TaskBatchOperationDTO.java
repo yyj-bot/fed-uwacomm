@@ -12,7 +12,7 @@ import java.util.List;
  * 支持对多个任务进行批量操作
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Data

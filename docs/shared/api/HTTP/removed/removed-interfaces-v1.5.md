@@ -15,6 +15,7 @@ v1.5 版本以“先创建初始模型和数据集，再创建联邦学习任务
 - `GET /api/training-data/distribution/{distributionId}`
 
 > 说明：上述接口现由后端运维入口或自动化流程封装调用，前端与开放 API 不再暴露。
+> 备注：联邦任务的 `POST /api/federated/tasks/preview-distribution` 与 `POST /api/federated/tasks/validate-participants` 接口在 v1.5 中仍然保留，用于任务创建前的资源校验。
 
 ## 参数移除与替换列表
 

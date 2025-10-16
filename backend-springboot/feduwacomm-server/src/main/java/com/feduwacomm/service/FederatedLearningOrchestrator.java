@@ -18,7 +18,7 @@ import java.util.Map;
  * 负责协调和管理完整的联邦学习流程，符合协议v1.4标准
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Service
 public class FederatedLearningOrchestrator {

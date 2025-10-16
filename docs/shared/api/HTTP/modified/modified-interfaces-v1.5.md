@@ -14,6 +14,7 @@
 - 废弃旧的 `modelConfig` 字段；自动生成所需的模型参数转移至 `initialModelConfig.autoGenerateConfig`
 - 任务创建示例强调必须传入已上传的 `datasetId`，响应中新增 `configSummary.initialModel`
 - `PUT /api/federated/tasks/{taskId}/config` 同步改用 `initialModelConfig`
+- `POST /api/federated/tasks/preview-distribution` 与 `POST /api/federated/tasks/validate-participants` 保持可用，用于任务提交前的数据与参与者校验，并在文档中补充示例
 
 ### 2. 初始模型 API 解耦任务绑定
 - `POST /api/model/initial/generate` 与 `upload` 移除 `taskId`，返回 `boundTaskId: null`、`bindingStatus` 字段

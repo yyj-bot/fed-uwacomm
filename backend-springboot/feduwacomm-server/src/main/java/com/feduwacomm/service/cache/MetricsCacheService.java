@@ -12,7 +12,7 @@ import java.util.Optional;
  * 提供参与者和全局度量指标的缓存操作
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 public interface MetricsCacheService {
 

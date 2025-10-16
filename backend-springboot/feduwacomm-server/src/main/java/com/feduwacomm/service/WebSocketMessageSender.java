@@ -16,7 +16,7 @@ import java.util.Map;
  * 负责实现协议v1.4中的广播和点对点消息发送机制
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Service
 public class WebSocketMessageSender {

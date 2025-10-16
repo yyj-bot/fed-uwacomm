@@ -1,6 +1,7 @@
 package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.controller.FederatedTaskController;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
@@ -29,7 +30,6 @@ import com.feduwacomm.model.dto.initial.InitialModelDistributeRequest;
 import com.feduwacomm.model.dto.initial.InitialModelGenerateRequest;
 import com.feduwacomm.model.vo.initial.InitialModelDetailVO;
 import com.feduwacomm.model.vo.initial.InitialModelBindingVO;
-import com.feduwacomm.controller.FederatedTaskController;
 import com.feduwacomm.service.cache.MetricsCacheService;
 import com.feduwacomm.service.cache.model.GlobalMetrics;
 import com.feduwacomm.service.cache.exception.CacheValidationException;
@@ -87,7 +87,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    // v1.4协议新增组件
+    // v1.5协议新增组件
     @Autowired
     private com.feduwacomm.service.RoundStateManager roundStateManager;
 
@@ -1577,25 +1577,31 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         log.info("数据分配预览: datasetId={}, strategy={}",
             requestDTO.getDatasetId(), requestDTO.getDistributionStrategy());
 
-        // 模拟数据分配计算，实际应该根据真实数据进行分配
-        List<ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO> allocations = new ArrayList<>();
+        List<FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO> participants =
+            Optional.ofNullable(requestDTO.getParticipants()).orElse(Collections.emptyList());
+        if (participants.isEmpty()) {
+            throw new UserException("参与者列表不能为空");
+        }
 
-        double totalRatio = requestDTO.getParticipants().stream()
-            .mapToDouble(FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO::getRequestedRatio)
+        double totalRatio = participants.stream()
+            .mapToDouble(participant -> Optional.ofNullable(participant.getRequestedRatio()).orElse(0.0))
             .sum();
+        if (totalRatio <= 0.0) {
+            throw new UserException("请求比例总和必须大于0");
+        }
 
-        int totalRows = 10000; // 模拟数据集行数
-        int participantIndex = 1;
-
-        for (FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO participant : requestDTO.getParticipants()) {
-            double normalizedRatio = participant.getRequestedRatio() / totalRatio;
-            int allocatedRows = (int) (totalRows * normalizedRatio);
-            int estimatedTime = (int) (allocatedRows * 0.08 + Math.random() * 100); // 模拟训练时间
+        int totalRows = 10000;
+        int index = 1;
+        List<ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO> allocations = new ArrayList<>();
+        for (FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO participant : participants) {
+            double ratio = Optional.ofNullable(participant.getRequestedRatio()).orElse(0.0) / totalRatio;
+            int allocatedRows = (int) Math.round(totalRows * ratio);
+            int estimatedTime = (int) Math.round(allocatedRows * 0.08 + Math.random() * 100);
 
             allocations.add(ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO.builder()
                 .vmId(participant.getVmId())
-                .vmName("水声联邦学习节点-" + String.format("%03d", participantIndex++))
-                .allocatedRatio(normalizedRatio)
+                .vmName(String.format("水声联邦学习节点-%03d", index++))
+                .allocatedRatio(ratio)
                 .allocatedRows(allocatedRows)
                 .estimatedTrainingTime(estimatedTime)
                 .build());
@@ -1608,8 +1614,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         ConfigPreviewVO.DistributionPreviewVO.QualityMetricsVO qualityMetrics =
             ConfigPreviewVO.DistributionPreviewVO.QualityMetricsVO.builder()
-                .iidScore(0.85 + Math.random() * 0.1) // 模拟IID分数
-                .balanceScore(0.90 + Math.random() * 0.08) // 模拟平衡分数
+                .iidScore(0.85 + Math.random() * 0.1)
+                .balanceScore(0.90 + Math.random() * 0.08)
                 .build();
 
         return ConfigPreviewVO.DistributionPreviewVO.builder()
@@ -1622,44 +1628,50 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     public ConfigPreviewVO.ParticipantValidationVO validateParticipants(
             FederatedTaskController.ParticipantValidationRequestDTO requestDTO) {
         log.info("参与者验证: algorithm={}, taskType={}, participantCount={}",
-            requestDTO.getAlgorithm(), requestDTO.getTaskType(), requestDTO.getParticipants().size());
+            requestDTO.getAlgorithm(), requestDTO.getTaskType(),
+            requestDTO.getParticipants() == null ? 0 : requestDTO.getParticipants().size());
+
+        List<FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO> participants =
+            Optional.ofNullable(requestDTO.getParticipants()).orElse(Collections.emptyList());
+        if (participants.isEmpty()) {
+            throw new UserException("参与者列表不能为空");
+        }
 
         List<ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO> validations = new ArrayList<>();
         boolean overallValid = true;
 
-        for (FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO participant :
-             requestDTO.getParticipants()) {
+        for (FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO participant : participants) {
+            Map<String, ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO> results =
+                new HashMap<>();
 
-            Map<String, ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO> results = new HashMap<>();
+            results.put("connectivity",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("网络连接正常")
+                    .build());
 
-            // 模拟验证结果
-            results.put("connectivity", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("网络连接正常")
-                .build());
+            results.put("resources",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("资源满足要求")
+                    .build());
 
-            results.put("resources", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("资源满足要求")
-                .build());
+            results.put("algorithm_support",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("支持指定算法")
+                    .build());
 
-            results.put("algorithm_support", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("支持指定算法")
-                .build());
-
-            boolean isParticipantValid = results.values().stream()
-                .allMatch(result -> "PASS".equals(result.getStatus()));
+            boolean participantValid = results.values().stream()
+                .allMatch(item -> "PASS".equals(item.getStatus()));
 
             validations.add(ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.builder()
                 .vmId(participant.getVmId())
-                .isValid(isParticipantValid)
+                .isValid(participantValid)
                 .validationResults(results)
                 .build());
 
-            if (!isParticipantValid) {
-                overallValid = false;
-            }
+            overallValid = overallValid && participantValid;
         }
 
         return ConfigPreviewVO.ParticipantValidationVO.builder()
@@ -2469,15 +2481,15 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
     }
 
-    // ====================== v1.4协议任务生命周期管理方法 ======================
+    // ====================== v1.5协议任务生命周期管理方法 ======================
 
     /**
-     * v1.4启动联邦学习任务
+     * v1.5启动联邦学习任务
      * 实现"后端大脑"集中控制，VM被动响应
      */
     @Transactional
     public TaskOperationVO startFederatedTask(String taskId) {
-        log.info("v1.4启动联邦学习任务: taskId={}", taskId);
+        log.info("v1.5启动联邦学习任务: taskId={}", taskId);
 
         // 获取轮次锁
         if (!roundLockManager.acquireRoundLock(taskId)) {
@@ -2504,8 +2516,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             task.setStartedAt(now);
             task.setUpdatedAt(now);
 
-            // 设置v1.4协议字段
-            task.setProtocolVersion("1.4");
+            // 设置v1.5协议字段
+            task.setProtocolVersion("1.5");
             task.setLifecycleStatus("ACTIVE");
 
             // 更新任务状态
@@ -2525,15 +2537,15 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             startFirstRound(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务启动成功", "TASK_LIFECYCLE", null,
-                Map.of("protocolVersion", "1.4", "participantCount", participants.size()));
+            logTask(taskId, "INFO", "v1.5任务启动成功", "TASK_LIFECYCLE", null,
+                Map.of("protocolVersion", "1.5", "participantCount", participants.size()));
 
             TaskOperationVO response = TaskOperationVO.builder()
                 .taskId(taskId)
                 .startedAt(now)
                 .build();
 
-            log.info("v1.4任务启动完成: taskId={}", taskId);
+            log.info("v1.5任务启动完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -2542,11 +2554,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4停止联邦学习任务
+     * v1.5停止联邦学习任务
      */
     @Transactional
     public TaskOperationVO stopFederatedTask(String taskId) {
-        log.info("v1.4停止联邦学习任务: taskId={}", taskId);
+        log.info("v1.5停止联邦学习任务: taskId={}", taskId);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -2587,7 +2599,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             saveRoundStateSnapshot(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务停止成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务停止成功", "TASK_LIFECYCLE", null,
                 Map.of("currentRound", task.getCurrentRound(), "acknowledged", allAcknowledged));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -2595,7 +2607,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .stoppedAt(now)
                 .build();
 
-            log.info("v1.4任务停止完成: taskId={}", taskId);
+            log.info("v1.5任务停止完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -2604,11 +2616,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4恢复联邦学习任务
+     * v1.5恢复联邦学习任务
      */
     @Transactional
     public TaskOperationVO resumeFederatedTask(String taskId) {
-        log.info("v1.4恢复联邦学习任务: taskId={}", taskId);
+        log.info("v1.5恢复联邦学习任务: taskId={}", taskId);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -2650,7 +2662,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             sendResumeCommandToAllVMs(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务恢复成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务恢复成功", "TASK_LIFECYCLE", null,
                 Map.of("resumedRound", task.getCurrentRound()));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -2658,7 +2670,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .resumedAt(now)
                 .build();
 
-            log.info("v1.4任务恢复完成: taskId={}", taskId);
+            log.info("v1.5任务恢复完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -2667,11 +2679,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4删除联邦学习任务
+     * v1.5删除联邦学习任务
      */
     @Transactional
     public TaskOperationVO deleteFederatedTask(String taskId, boolean preserveData) {
-        log.info("v1.4删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
+        log.info("v1.5删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -2689,7 +2701,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 stopFederatedTask(taskId);
             }
 
-            // 清理v1.4协议相关状态
+            // 清理v1.5协议相关状态
             roundStateManager.cleanupTask(taskId);
             vmAckTracker.cleanupTask(taskId);
 
@@ -2718,7 +2730,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             }
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务删除成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务删除成功", "TASK_LIFECYCLE", null,
                 Map.of("preserveData", preserveData));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -2727,7 +2739,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .dataDeleted(!preserveData)
                 .build();
 
-            log.info("v1.4任务删除完成: taskId={}", taskId);
+            log.info("v1.5任务删除完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -2735,7 +2747,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
     }
 
-    // ====================== v1.4协议辅助方法 ======================
+    // ====================== v1.5协议辅助方法 ======================
 
     /**
      * 启动第一轮训练
@@ -2767,7 +2779,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             message.put("type", "TASK_STOP");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("reason", "USER_REQUESTED");
             message.put("timestamp", LocalDateTime.now());
 
@@ -2790,7 +2802,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             message.put("type", "TASK_RESUME");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("currentRound", task.getCurrentRound());
             message.put("timestamp", LocalDateTime.now());
 
@@ -2810,7 +2822,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             message.put("type", "ROUND_START");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("round", round);
             message.put("timestamp", LocalDateTime.now());
 

@@ -13,7 +13,7 @@ import java.util.Map;
  * 专门用于测试场景的详情响应类
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Data

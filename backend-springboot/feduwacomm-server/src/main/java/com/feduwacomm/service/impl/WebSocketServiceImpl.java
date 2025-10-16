@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 提供基础的WebSocket消息发送功能
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Slf4j
