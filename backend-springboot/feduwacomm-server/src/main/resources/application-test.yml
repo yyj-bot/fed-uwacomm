@@ -16,6 +16,8 @@ logging:
     com.feduwacomm: INFO
     org.springframework: WARN
     com.zaxxer.hikari: WARN
+    org.springframework.jdbc.core: DEBUG
+    org.springframework.jdbc.core.StatementCreatorUtils: TRACE
   db:
     enabled: true # 测试环境启用数据库日志
 

@@ -1,33 +1,61 @@
 # Repository Guidelines
-## 项目级约束
 
-使用简体中文回复
+## 项目约束
+使用简体中文进行回复
 
-除非有我的明确要求，否则不要在代码中留下 TODO以及未完成的业务逻辑
+所有对后端数据库的修改，应该都存放在 docs/shared/database/mysql/init/init_mysql.sql中，直接对该文件进行修改
 
-如果你有任何疑问，都应该先向我发出询问，不要擅自做决定。
+项目管理员账号：admin 管理员密码：ab123456
 
-所有数据库修改都保存在 docs/shared/database/mysql/init/init_mysql.sql 中
+modified文档应该放置于docs/shared/api/xxxxx/modified/ removed文档应该存放于docs/shared/api/xxxxx/removed/ 命名参考已经存在的文档 ，版本号使用我要求的 vx.x
+### 测试运行命令
+可以跟据实际测试进行实时修改
+  JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
+  PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -pl feduwacomm-server -am \
+      -Dtest=CompleteFederatedLearningFlowTestV151 \
+      -Dsurefire.failIfNoSpecifiedTests=false \
+      test \
+      > backend-springboot/feduwacomm-server/
+  CompleteFederatedLearningFlowTestV151.log 2>&1
 
-## 后端测试约束
-通用测试命令，使用指定版本的java运行单元测试，需要跟据实际的测试用例进行修改：
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 PATH=$JAVA_HOME/bin:$PATH mvn -pl feduwacomm-server -am
-    -Dtest=CompleteFederatedLearningFlowTestV151 -Dsurefire.failIfNoSpecifiedTests=false test
+## 项目结构与模块组织
+- `backend-springboot/`：包含三模块 Maven 工程。业务代码位于 `feduwacomm-server/src/main/java`，配置文件位于 `src/main/resources`，单元测试对应该模块下的 `src/test/java`。
+- `python-vm/`：集中所有联邦学习流程脚本与 BELLHOP 适配器，源码在 `src/feduwacomm/`，自动化脚本位于 `scripts/`。
+- `frontend-admin/`：Vite/React 管理端，核心组件在 `src/components`，数据访问在 `src/services`，状态管理在 `src/store`。
+- `docs/`：跨模块文档、API 变更记录与数据库脚本（例如 `docs/shared/database/mysql/init/init_mysql.sql`）。
 
-## Project Structure & Module Organization
-FedUWAComm is a monorepo with four active modules. `python-vm/` houses the machine learning and BELLHOP adapters under `src/feduwacomm/` with automation scripts in `scripts/`. `backend-springboot/` is a tri-module Maven project (`feduwacomm-common`, `-pojo`, `-server`) with code in `feduwacomm-server/src/main/java` and config in `src/main/resources`. `frontend-admin/` delivers the Vite/React dashboard; UI primitives sit in `src/components`, data hooks in `src/services`, and state in `src/store`. MATLAB experiments remain isolated in `ofdm-underwater/`, and cross-cutting documentation lives under `docs/`.
+## 构建、测试与开发命令
+```bash
+# 后端本地启动
+cd backend-springboot && mvn -pl feduwacomm-server spring-boot:run
+# 后端指定用例
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 PATH=$JAVA_HOME/bin:$PATH mvn -pl feduwacomm-server -am \
+  -Dtest=CompleteFederatedLearningFlowTestV151 -Dsurefire.failIfNoSpecifiedTests=false test
+# 前端开发与检查
+cd frontend-admin && npm install && npm run dev
+npm run lint && npm run test:coverage
+# Python 工作流
+cd python-vm && pip install -r requirements.txt && python scripts/complete_workflow.py
+```
 
-## Build, Test, and Development Commands
-Python VM: `pip install -r requirements.txt`, then `python scripts/complete_workflow.py` for the default pipeline. Backend: from `backend-springboot/`, run `mvn -pl feduwacomm-server spring-boot:run` for local API work, `mvn clean package` for artifacts, and `mvn test` to execute the suite. Frontend: within `frontend-admin/`, run `npm install`, `npm run dev`, `npm run lint`, and `npm run test:coverage` for CI parity.
+## 编码风格与命名约定
+- Java 采用 Spring 慣例：类名 PascalCase，Bean 方法 camelCase，使用 Lombok 减少样板代码。
+- Python 必须遵循 PEP 8，四空格缩进，公开 API 需类型注解。
+- TypeScript 组件用 PascalCase，资源文件保持 kebab-case；使用 `npm run lint -- --fix` 自动格式化。
 
-## Coding Style & Naming Conventions
-Use PEP 8 in Python with four-space indents, expressive module names (for example `acoustic`, `ml`), and type hints on public APIs; keep datasets and notebooks outside `src/`. Java code follows Spring conventions: PascalCase classes, camelCase beans, Lombok for boilerplate, REST controllers grouped by resource packages. TypeScript favors strict types, PascalCase components, kebab-case asset files, and ESLint autofix via `npm run lint -- --fix` when needed.
+## 测试指引
+- Java 测试位于 `backend-springboot/feduwacomm-server/src/test/java`，使用 JUnit 与 Spring Test。命名遵循 `*Test`/`*IT`。
+- 前端依赖 Vitest 与 Testing Library，放在 `test/` 或组件旁的 `*.test.tsx`。
+- Python 使用 `pytest`，测试集中在 `python-vm/tests/`，优先 mock 外部 IO。
+- 提交前需确保关键流程（任务创建、模型分发）拥有快速回归用例。
 
-## Testing Guidelines
-Focus on quick unit checks before longer simulations. Place Python tests in a `python-vm/tests/` package using `pytest`, mocking external IO where possible. Backend tests live in `backend-springboot/feduwacomm-server/src/test/java`; mirror the main package tree and isolate database calls. Frontend specs belong in `frontend-admin/test` or alongside components as `.test.tsx`; keep coverage from `npm run test:coverage` steady.
+## 提交与 PR 准则
+- Commit 建议遵循 `type(scope): subject`，不超 72 个字符，如 `feat(server): 支持 v1.5 模型分发`。
+- PR 描述需链接关联任务，概述更改范围，并在涉及 UI 时附截图或终端输出。
+- 说明手动步骤（数据库迁移、环境变量）及新增/调整的测试命令，便于 reviewer 快速验证。
 
-## Commit & Pull Request Guidelines
-History mixes Chinese and English but leans on `type(scope): subject` (for example `docs(model): ...`). Keep commit subjects under 72 characters, use imperative verbs, and avoid touching multiple modules unless necessary. Pull requests should link an issue, spell out cross-module impacts, attach screenshots or console output for UI/UI-state changes, and list manual steps such as migrations or env updates. Tag reviewers who own the areas you edited.
-
-## Security & Configuration Tips
-Keep secrets in local `.env` files (`python-vm/.env`, backend `application-*.yml`) and never commit them. Large reference datasets like `bellhop_features_extracted.csv` should be reused rather than duplicated. When exposing services externally, confirm TLS material and JWT keys match the values shared via the secure ops channel.
+## 安全与配置提示
+- 敏感配置存放于 `.env` 或 `application-*.yml`，避免提交凭据。
+- 重用 `bellhop_features_extracted.csv` 等大体量数据集，避免仓库膨胀。
+- 对外暴露服务前确认 TLS 证书与 JWT 密钥来自安全渠道，保持与后端配置一致。

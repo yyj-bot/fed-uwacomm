@@ -81,6 +81,12 @@ function generateMessageId(prefix) {
 - `FEDERATED_TASK_DELETE` / `FEDERATED_TASK_DELETE_ACK` - 任务删除
 - `FEDERATED_TASK_STATUS_QUERY` / `FEDERATED_TASK_STATUS_RESPONSE` - 任务状态查询
 
+#### FEDERATED_TASK_START (v1.5.1 扩展字段)
+- `data.trainingPlan`：包含 `algorithm`、`totalRounds`、`hyperparameters` 等训练配置。
+- `data.initialModel`：携带初始模型摘要与载荷，包括 `modelId`、`distributionId`、`checksum`、`parameters`。
+- `data.initialModel.distributionId`：对应 `model_distributions.id`，用于 ACK 回写与重试。
+- `dataConfig.assignedDatasetId`：保持在 `dataConfig` 嵌套对象中，用于与数据切片消息对齐。
+
 ### 3.3 轮次管理消息 (9个)
 - `ROUND_START` / `ROUND_START_ACK` - 轮次开始
 - `ROUND_ABORT` - 轮次中止

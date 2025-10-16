@@ -771,6 +771,43 @@ VM-001 同时执行:
 }
 ```
 
+### 3.6.1 模型接收确认 (MODEL_RECEIVE_ACK) 🔵
+
+**消息方向**: 虚拟机 → 后端  
+**消息作用**: 虚拟机在完成初始模型或轮次全局模型的校验后返回确认结果，使后端能够更新模型分发进度、判定是否需要补发或中止任务。
+
+```json
+{
+  "type": "MODEL_RECEIVE_ACK",
+  "id": "client-1704067200000-130011",
+  "timestamp": "2024-01-01T00:00:01.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "round": 7,                        // 轮次模型可填写round/roundNumber，初始模型为空或0
+    "distributionId": "dist-uuid-001", // 后端下发时携带的分发记录ID
+    "modelId": "model-123456-r7",
+    "status": "SUCCESS",               // SUCCESS / ERROR
+    "receivedAt": "2024-01-01T00:00:00.800Z",
+    "checksumVerified": true,
+    "initialModelReceipt": {
+      "distributionId": "dist-uuid-001",
+      "sizeBytes": 10485760,
+      "checksum": "sha256:def456..."
+    },
+    "message": "模型校验通过，准备进入下一轮"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `round`/`roundNumber`: 当确认轮次模型时填写具体轮次；初始模型可省略或置为0。
+- `distributionId`: 后端跟踪模型分发状态的唯一标识，用于定位分发记录。
+- `status`: 当存在校验失败、解压异常等情况时返回`ERROR`并附带`message`说明。
+- `checksumVerified`: 虚拟机是否完成模型摘要校验。
+- `initialModelReceipt`: 建议在初始模型场景回传，包含二次确认信息（分发ID、校验和、大小）。
+
 ### 3.7 轮次完成通知 (ROUND_COMPLETE) 🟢
 
 **消息作用**: 后端通知当前轮次完成，提供轮次结果。
@@ -960,6 +997,74 @@ VM-001 同时执行:
   "signature": "base64_encoded_signature"
 }
 ```
+
+### 4.3.1 连接异常报告 (CONNECTION_ERROR) 🔴
+
+**消息方向**: 双向（虚拟机 ↔ 后端）  
+**消息作用**: 用于报告握手失败、认证过期、网络异常等连接级问题。任意一方检测到异常后应立即上报，并记录上下文便于另一端排查。
+
+```json
+{
+  "type": "CONNECTION_ERROR",
+  "id": "server-1704067200000-123473",
+  "timestamp": "2024-01-01T00:00:01.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "errorCode": "AUTH_EXPIRED",
+    "errorMessage": "AccessToken已过期，需要重新连接",
+    "severity": "CRITICAL",
+    "source": "BACKEND",               // BACKEND / VM
+    "phase": "CONNECT",
+    "context": {
+      "sessionId": "session-123456",
+      "lastHeartbeat": "2024-01-01T00:00:00.500Z"
+    },
+    "recovery": {
+      "autoReconnect": true,
+      "suggestions": ["刷新令牌后重新建立WebSocket连接"]
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `source`: 标记异常由哪一侧发现，便于日志聚合。
+- `phase`: 指明发生阶段（CONNECT/HEARTBEAT/DATA_TRANSFER等）。
+- 双方收到后均需返回带`status=SUCCESS`的ACK，并根据`recovery`指引执行补救。
+
+### 4.3.2 消息异常报告 (MESSAGE_ERROR) 🔴
+
+**消息方向**: 双向（虚拟机 ↔ 后端）  
+**消息作用**: 当收到无法解析、缺少必填字段或违反协议的消息时，用于立即反馈错误并阻止后续处理。
+
+```json
+{
+  "type": "MESSAGE_ERROR",
+  "id": "server-1704067200000-123474",
+  "timestamp": "2024-01-01T00:00:01.200Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "errorCode": "INVALID_PAYLOAD",
+    "errorMessage": "GRADIENT_UPLOAD缺少gradientData字段",
+    "severity": "HIGH",
+    "originalType": "GRADIENT_UPLOAD",
+    "invalidFields": ["gradientData"],
+    "context": {
+      "taskId": "fedtask-123456",
+      "roundNumber": 6,
+      "messageId": "client-1704067200000-130001"
+    },
+    "suggestions": ["检查本地训练输出是否为空", "确认payload字段与协议一致"]
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `originalType`: 标记触发异常的协议类型，便于快速定位。
+- `invalidFields`: 建议列出缺失或非法的字段集合。
+- 任意一方发送`MESSAGE_ERROR`后，接收方需立即停止对该消息的进一步处理并记录日志。
 
 ## 5. 虚拟机控制协议
 
@@ -1226,6 +1331,39 @@ VM-001 同时执行:
   - `IID`: 独立同分布，数据随机均匀分配
   - `NON_IID`: 非独立同分布，按特定规则分配（如按标签聚类）
 
+### 6.3.1 数据集创建确认 (DATASET_CREATE_ACK) 🔵
+
+**消息方向**: 虚拟机 → 后端  
+**消息作用**: 虚拟机确认已创建数据集容器并准备接收切片数据，后端据此更新参与方的分发状态。
+
+```json
+{
+  "type": "DATASET_CREATE_ACK",
+  "id": "client-1704067200000-200001-ack",
+  "timestamp": "2024-01-01T00:00:00.050Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend",
+    "status": "SUCCESS",                 // SUCCESS / ERROR
+    "message": "数据集容器已创建，等待数据分发",
+    "receivedAt": "2024-01-01T00:00:00.048Z",
+    "storageUsageBytes": 524288,
+    "metadata": {
+      "localPath": "/var/fed/datasets/dataset-uuid-generated-by-backend",
+      "readyForAppend": true
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `assignedDatasetId`: 必填，用于后端定位对应参与者。
+- `status`: 当容器创建失败时返回`ERROR`，并通过`message`说明原因。
+- `storageUsageBytes`: 虚拟机预留的存储空间，便于后端监控资源。
+- `metadata.readyForAppend`: 指示是否已准备好接收DATASET_APPEND_ROWS。
+
 ### 6.2 追加数据行（批量）(DATASET_APPEND_ROWS) 🔵
 
 **消息作用**: 向已创建的数据集批量添加数据行。
@@ -1298,6 +1436,42 @@ VM-001 同时执行:
 - **问题定位**: 出现数据丢失时，可以快速定位缺失的全局索引范围
 - **可追溯性**: 每行数据都可以追溯到原始数据集中的位置
 - **调试便利**: 本地索引便于虚拟机内部处理，全局索引便于跨虚拟机调试
+
+### 6.2.1 数据批次追加确认 (DATASET_APPEND_ROWS_ACK) 🔵
+
+**消息方向**: 虚拟机 → 后端  
+**消息作用**: 虚拟机确认指定批次的数据已写入本地缓存，用于后端统计分发进度与触发下一批数据下发。
+
+```json
+{
+  "type": "DATASET_APPEND_ROWS_ACK",
+  "id": "client-1704067200000-200002-ack",
+  "timestamp": "2024-01-01T00:00:05.200Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend",
+    "status": "SUCCESS",                // SUCCESS / ERROR / RETRY
+    "appendedRows": 200,
+    "batchRange": {
+      "localStartIndex": 0,
+      "localEndIndex": 199,
+      "globalStartIndex": 0,
+      "globalEndIndex": 199
+    },
+    "checksumVerified": true,
+    "retryReason": null,
+    "message": "批次#1写入完成"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `appendedRows`: 实际写入的行数，与DATASET_APPEND_ROWS中batchRange对应。
+- `status`: 返回`RETRY`时需同时提供`retryReason/message`，以便后端补发。
+- `checksumVerified`: 虚拟机是否完成批次校验。
+- `batchRange`: 建议回显批次范围，便于后端核对日志。
 
 ### 6.3 完成数据集上传 (DATASET_COMPLETE) 🔵
 
@@ -1396,6 +1570,50 @@ VM-001 同时执行:
   "verificationMessage": "数据验证失败: 缺失40个样本(2.00%)"  // 详细信息（如果失败）
 }
 ```
+
+### 6.3.2 数据集完成确认 (DATASET_COMPLETE_ACK) 🔵
+
+**消息方向**: 虚拟机 → 后端  
+**消息作用**: 虚拟机在完成所有批次接收、校验后反馈最终状态，后端依据反馈决定是否继续任务、补传数据或排除节点。
+
+```json
+{
+  "type": "DATASET_COMPLETE_ACK",
+  "id": "client-1704067200000-200003-ack",
+  "timestamp": "2024-01-01T00:00:11.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "assignedDatasetId": "dataset-uuid-generated-by-backend",
+    "status": "SUCCESS",                      // SUCCESS / ERROR / PARTIAL
+    "sliceVerification": {
+      "expectedStartIndex": 0,
+      "expectedEndIndex": 1999,
+      "expectedSamples": 2000,
+      "actualStartIndex": 0,
+      "actualEndIndex": 1999,
+      "actualSamples": 2000,
+      "isComplete": true,
+      "missingIndices": [],
+      "continuityCheck": {
+        "hasGaps": false,
+        "gapRanges": []
+      }
+    },
+    "verificationPassed": true,
+    "missingRate": 0.0,
+    "recommendedDecision": "ACCEPT",
+    "verificationMessage": "切片完整，准备启动训练"
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `status`: 当存在缺失数据但仍保留部分可用样本时可返回`PARTIAL`，便于后端采用重传或排除策略。
+- `sliceVerification`: 必须回传切片校验结果，后端据此执行缺失率判断。
+- `recommendedDecision`: 虚拟机端的建议决策，后端可结合自身策略综合评估。
+- `verificationMessage`: 针对失败场景给出详细说明，辅助排查问题。
 
 ### 6.4 数据集状态查询 (DATASET_STATUS_QUERY) 🟢
 
@@ -1519,6 +1737,37 @@ VM-001 同时执行:
   "signature": "base64_encoded_signature"
 }
 ```
+
+### 6.4.1 删除数据集确认 (DATASET_DELETE_ACK) 🔵
+
+**消息方向**: 虚拟机 → 后端  
+**消息作用**: 虚拟机确认在本地已清理指定数据集，避免残留数据影响后续任务或占用存储。
+
+```json
+{
+  "type": "DATASET_DELETE_ACK",
+  "id": "client-1704067200000-200005-ack",
+  "timestamp": "2024-01-01T00:10:05.000Z",
+  "vmId": "a1b2c3d4e5f678901234567890123456",
+  "data": {
+    "taskId": "fedtask-123456",
+    "datasetId": "dataset-uuid-generated-by-backend",
+    "status": "SUCCESS",                   // SUCCESS / ERROR
+    "deletedBytes": 524288,
+    "message": "本地缓存数据已删除",
+    "cleanupDetails": {
+      "removedFiles": 12,
+      "retainedBackups": false
+    }
+  },
+  "signature": "base64_encoded_signature"
+}
+```
+
+**字段说明**:
+- `datasetId`: 可与`assignedDatasetId`等价使用，确保后端能准确匹配参与者。
+- `deletedBytes`: 汇报释放的存储空间，便于后端统计资源恢复情况。
+- `status=ERROR` 时需补充`message`描述失败原因，例如文件占用、权限不足等。
 
 ## 7. 标准联邦学习流程
 

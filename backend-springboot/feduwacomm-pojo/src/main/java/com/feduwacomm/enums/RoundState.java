@@ -10,7 +10,7 @@ package com.feduwacomm.enums;
  * INITIALIZING → TRAINING → AGGREGATING → DISTRIBUTING → COMPLETED
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 public enum RoundState {

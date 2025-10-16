@@ -115,7 +115,8 @@ public class VmAckTracking {
         // v1.5 新增数据集相关确认类型
         DATASET_LIST_QUERY("数据集列表查询"),
         DATASET_CREATE("数据集创建"),
-        DATASET_STATUS_QUERY("数据集状态查询");
+        DATASET_STATUS_QUERY("数据集状态查询"),
+        DATASET_COMPLETE("数据集分发完成");
 
         private final String description;
 

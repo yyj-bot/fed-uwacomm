@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
  * 符合协议v1.4标准: {prefix}-{timestamp}-{random}
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Component
 public class MessageIdGenerator {

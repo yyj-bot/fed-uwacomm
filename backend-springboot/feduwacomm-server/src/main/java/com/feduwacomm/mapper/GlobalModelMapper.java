@@ -45,6 +45,15 @@ public interface GlobalModelMapper {
                                   @Param("aggregationDuration") Long aggregationDuration);
 
     /**
+     * 更新全局模型分发状态
+     */
+    int updateDistributionStatus(@Param("id") String id,
+                                 @Param("distributionStatus") String distributionStatus,
+                                 @Param("distributedVms") String distributedVms,
+                                 @Param("distributionCompletedAt") LocalDateTime distributionCompletedAt,
+                                 @Param("updatedAt") LocalDateTime updatedAt);
+
+    /**
      * 根据ID查询全局模型
      */
     GlobalModel selectById(@Param("id") String id);

@@ -116,8 +116,8 @@ public class FederatedTask {
         this.resumeInfo = resumeInfo;
     }
 
-    // v1.4新增方法 - 协议版本和生命周期管理
-    private String protocolVersion = "1.4";
+    // v1.5新增方法 - 协议版本和生命周期管理
+    private String protocolVersion = "1.5";
     private String lifecycleStatus = "CREATED";
 
     /**

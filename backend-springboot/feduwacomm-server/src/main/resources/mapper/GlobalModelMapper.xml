@@ -18,19 +18,24 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="metadata" column="metadata"/>
+        <result property="distributionStatus" column="distribution_status"/>
+        <result property="distributedVms" column="distributed_vms"/>
+        <result property="distributionCompletedAt" column="distribution_completed_at"/>
     </resultMap>
 
     <insert id="insertGlobalModel" parameterType="com.feduwacomm.entity.GlobalModel">
         INSERT INTO global_models (
             id, task_id, round_number, aggregation_method, global_parameters,
             global_loss, global_accuracy, participant_count, aggregation_duration,
-            status, started_at, completed_at, created_at, updated_at, metadata
+            status, started_at, completed_at, created_at, updated_at, metadata,
+            distribution_status, distributed_vms, distribution_completed_at
         ) VALUES (
             #{id}, #{taskId}, #{roundNumber}, #{aggregationMethod},
             CAST(#{globalParameters} AS JSON), #{globalLoss}, #{globalAccuracy},
             #{participantCount}, #{aggregationDuration}, #{status},
             #{startedAt}, #{completedAt}, #{createdAt}, #{updatedAt},
-            CAST(#{metadata} AS JSON)
+            CAST(#{metadata} AS JSON),
+            #{distributionStatus}, CAST(#{distributedVms} AS JSON), #{distributionCompletedAt}
         )
     </insert>
 
@@ -45,6 +50,12 @@
             status = #{status},
             started_at = #{startedAt},
             completed_at = #{completedAt},
+            distribution_status = #{distributionStatus},
+            distributed_vms = CASE
+                WHEN #{distributedVms} IS NULL THEN NULL
+                ELSE CAST(#{distributedVms} AS JSON)
+            END,
+            distribution_completed_at = #{distributionCompletedAt},
             updated_at = #{updatedAt},
             metadata = CAST(#{metadata} AS JSON)
         WHERE id = #{id}
@@ -67,10 +78,23 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateDistributionStatus">
+        UPDATE global_models SET
+            distribution_status = #{distributionStatus},
+            distributed_vms = CASE
+                WHEN #{distributedVms} IS NULL THEN NULL
+                ELSE CAST(#{distributedVms} AS JSON)
+            END,
+            distribution_completed_at = #{distributionCompletedAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
     <select id="selectById" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE id = #{id}
     </select>
@@ -78,7 +102,8 @@
     <select id="selectByTaskIdAndRound" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE task_id = #{taskId} AND round_number = #{roundNumber}
     </select>
@@ -86,7 +111,8 @@
     <select id="selectByTaskId" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE task_id = #{taskId}
         ORDER BY round_number DESC, created_at DESC
@@ -95,7 +121,8 @@
     <select id="selectLatestByTaskId" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE task_id = #{taskId}
         ORDER BY round_number DESC, created_at DESC
@@ -105,7 +132,8 @@
     <select id="selectPendingAggregation" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE status IN ('PENDING', 'AGGREGATING')
         ORDER BY created_at ASC
@@ -114,7 +142,8 @@
     <select id="selectByStatus" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE status = #{status}
         ORDER BY created_at DESC
@@ -139,7 +168,8 @@
     <select id="selectAggregationHistory" resultMap="GlobalModelResultMap">
         SELECT id, task_id, round_number, aggregation_method, global_parameters,
                global_loss, global_accuracy, participant_count, aggregation_duration,
-               status, started_at, completed_at, created_at, updated_at, metadata
+               status, started_at, completed_at, created_at, updated_at, metadata,
+               distribution_status, distributed_vms, distribution_completed_at
         FROM global_models
         WHERE task_id = #{taskId} AND status = 'COMPLETED'
         ORDER BY round_number DESC, completed_at DESC

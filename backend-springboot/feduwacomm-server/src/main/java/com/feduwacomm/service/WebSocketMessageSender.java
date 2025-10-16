@@ -16,7 +16,7 @@ import java.util.Map;
  * 负责实现协议v1.4中的广播和点对点消息发送机制
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Service
 public class WebSocketMessageSender {
@@ -40,9 +40,10 @@ public class WebSocketMessageSender {
     public void sendRoundStart(String vmId, String taskId, int roundNumber,
                               Map<String, Object> roundSpecificConfig,
                               Map<String, Object> targetMetrics,
-                              int expectedParticipants) {
+                              int expectedParticipants,
+                              Map<String, Object> datasetContext) {
         ProtocolMessage message = messageBuilder.buildRoundStartMessage(
-                vmId, taskId, roundNumber, roundSpecificConfig, targetMetrics, expectedParticipants);
+                vmId, taskId, roundNumber, roundSpecificConfig, targetMetrics, expectedParticipants, datasetContext);
 
         if ("broadcast".equals(vmId)) {
             broadcastToAllVMs(message);
@@ -50,8 +51,9 @@ public class WebSocketMessageSender {
             sendToVM(vmId, message);
         }
 
-        logger.info("发送ROUND_START消息 - TaskId: {}, RoundNumber: {}, VmId: {}",
-                   taskId, roundNumber, vmId);
+        Object datasetId = datasetContext != null ? datasetContext.get("assignedDatasetId") : null;
+        logger.info("发送ROUND_START消息 - TaskId: {}, RoundNumber: {}, VmId: {}, assignedDatasetId={}",
+                   taskId, roundNumber, vmId, datasetId);
     }
 
     /**

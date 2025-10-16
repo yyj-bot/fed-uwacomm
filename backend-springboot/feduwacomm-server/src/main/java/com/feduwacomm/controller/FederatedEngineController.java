@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * 提供聚合引擎状态查询和性能监控功能
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Slf4j
 @RestController

@@ -20,15 +20,21 @@ import org.springframework.web.socket.WebSocketHttpHeaders;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import org.springframework.util.StringUtils;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 
 /**
  * 模拟虚拟机类 v1.4
@@ -85,11 +91,22 @@ public class MockVirtualMachine {
     private final Map<String, Integer> assignedDatasetActualSamples = new ConcurrentHashMap<>();  // assignedDatasetId -> 实际接收样本数
     private final Map<String, List<Map<String, Object>>> assignedDatasetBatchRanges = new ConcurrentHashMap<>();  // assignedDatasetId -> BatchRange列表
     private String latestAssignedDatasetId;  // 最新的assignedDatasetId，用于测试
+    // 🆕 v1.5.1新增：初始模型载荷跟踪
+    private final Map<String, Map<String, Object>> initialModelPayloads = new ConcurrentHashMap<>(); // taskId -> initialModel
+    private final Map<String, Map<String, Object>> initialModelReceipts = new ConcurrentHashMap<>(); // taskId -> receipt
+    private final Map<String, Map<String, Object>> trainingPlans = new ConcurrentHashMap<>(); // taskId -> trainingPlan
+    private final Map<String, Map<String, Object>> latestGlobalModels = new ConcurrentHashMap<>(); // taskId -> globalModel
+    private final Map<String, Map<Integer, Map<String, Object>>> globalModelHistory = new ConcurrentHashMap<>(); // taskId -> (round -> globalModel)
+    private volatile String latestTaskStartId;
 
     // 协议违规和失败模拟相关字段
     private int protocolViolationCount = 0; // 协议违规计数
     private boolean simulateUploadFailure = false; // 是否模拟上传失败
     private double uploadFailureRate = 0.0; // 上传失败率 (0.0 - 1.0)
+
+    // ACK模拟配置
+    private final Map<ProtocolType, AckSimulationConfig> ackSimulationConfigs = new ConcurrentHashMap<>();
+    private final List<AckSimulationEvent> ackSimulationEvents = Collections.synchronizedList(new ArrayList<>());
 
     // 错误统计相关字段
     private int messageErrorCount = 0; // MESSAGE_ERROR消息计数
@@ -251,7 +268,7 @@ public class MockVirtualMachine {
 
             // 等待连接建立
             System.out.println("⏳ [" + vmData.getName() + "] 等待连接稳定...");
-            Thread.sleep(1000);
+            awaitDelay(Duration.ofSeconds(1));
 
             if (stompSession != null && stompSession.isConnected()) {
                 System.out.println("📡 [" + vmData.getName() + "] 开始订阅消息队列...");
@@ -371,6 +388,41 @@ public class MockVirtualMachine {
         }
     }
 
+    private static final Duration DEFAULT_AWAIT_TOLERANCE = Duration.ofMillis(200);
+
+    private void awaitDelay(Duration delay) {
+        awaitDelay(delay, null);
+    }
+
+    private void awaitDelay(Duration delay, String context) {
+        if (delay == null || delay.isNegative() || delay.isZero()) {
+            return;
+        }
+
+        Duration tolerance = delay.compareTo(Duration.ofSeconds(5)) > 0
+            ? Duration.ofSeconds(1)
+            : DEFAULT_AWAIT_TOLERANCE;
+
+        long pollIntervalMillis = Math.max(25L, Math.min(delay.toMillis(), 200L));
+
+        try {
+            Awaitility.await()
+                .alias("mock-vm-delay-" + (context != null ? context : "default"))
+                .pollDelay(delay)
+                .pollInterval(Duration.ofMillis(pollIntervalMillis))
+                .atMost(delay.plus(tolerance))
+                .until(() -> true);
+        } catch (ConditionTimeoutException ex) {
+            if (context != null) {
+                log.warn("⚠️ [{}] 延时等待超时: {} ms (context: {})",
+                        vmData.getName(), delay.toMillis(), context);
+            } else {
+                log.warn("⚠️ [{}] 延时等待超时: {} ms",
+                        vmData.getName(), delay.toMillis());
+            }
+        }
+    }
+
     /**
      * 模拟训练轮次 v2.0 (支持多模型类型和多算法)
      */
@@ -378,7 +430,8 @@ public class MockVirtualMachine {
         try {
             // 根据VM性能调整训练时间
             int baseTrainingTime = vmData.getBaseTrainingTime();
-            Thread.sleep(baseTrainingTime + (int)(Math.random() * 500));
+            long trainingDelay = baseTrainingTime + (int)(Math.random() * 500);
+            awaitDelay(Duration.ofMillis(trainingDelay));
 
             // 生成基于VM能力的训练结果
             TrainingMetrics metrics = generateTrainingMetrics(round);
@@ -390,7 +443,7 @@ public class MockVirtualMachine {
             uploadGradients(taskId, round);
 
             // 等待一段时间模拟梯度处理
-            Thread.sleep(500);
+            awaitDelay(Duration.ofMillis(500));
 
             // 然后上传模型参数
             Map<String, Object> modelUpload = createProtocolMessage(ProtocolType.GRADIENT_UPLOAD);
@@ -745,6 +798,83 @@ public class MockVirtualMachine {
         }
     }
 
+    private void recordAckSimulationEvent(ProtocolType protocolType, AckSimulationMode mode, String messageId, String detail) {
+        AckSimulationEvent event = new AckSimulationEvent(protocolType, mode, messageId, Instant.now(), detail);
+        ackSimulationEvents.add(event);
+    }
+
+    private boolean applyAckSimulationBeforeSend(ProtocolType protocolType, Map<String, Object> message, String messageId) {
+        if (protocolType == null) {
+            return false;
+        }
+
+        AckSimulationConfig config = ackSimulationConfigs.get(protocolType);
+        if (config == null) {
+            return false;
+        }
+
+        if (!config.shouldApply()) {
+            if (config.isDrained()) {
+                ackSimulationConfigs.remove(protocolType);
+            }
+            return false;
+        }
+
+        String contextId = messageId != null ? messageId : String.valueOf(message.getOrDefault("id", "N/A"));
+        boolean skipSend = false;
+
+        switch (config.mode) {
+            case TIMEOUT:
+                Duration timeout = config.timeout != null ? config.timeout : Duration.ofSeconds(5);
+                long delayMillis = Math.max(1L, timeout.toMillis());
+                log.warn("⏱️ [{}] 模拟 {} ACK 超时，跳过发送，延迟 {} ms (messageId={})",
+                        vmData.getName(), protocolType, delayMillis, contextId);
+                if (passiveScheduler != null && !passiveScheduler.isShutdown()) {
+                    passiveScheduler.schedule(() ->
+                                log.warn("⏱️ [{}] {} ACK 超时模拟完成 (未发送), messageId={}",
+                                        vmData.getName(), protocolType, contextId),
+                            delayMillis, TimeUnit.MILLISECONDS);
+                }
+                recordAckSimulationEvent(protocolType, AckSimulationMode.TIMEOUT, contextId,
+                        "delayMillis=" + delayMillis);
+                skipSend = true;
+                break;
+            case FAILURE:
+                Map<String, Object> data = getOrCreateAckData(message);
+                String failureStatus = config.failureStatus != null ? config.failureStatus : "FAILED";
+                String failureReason = config.failureReason != null ? config.failureReason : "模拟ACK失败";
+                data.put("status", failureStatus);
+                data.put("acknowledged", false);
+                data.put("error", failureReason);
+                data.put("simulatedFailure", true);
+                data.put("failureAt", Instant.now().toString());
+                log.warn("❗ [{}] 模拟 {} ACK 失败 (messageId={}, status={}, reason={})",
+                        vmData.getName(), protocolType, contextId, failureStatus, failureReason);
+                recordAckSimulationEvent(protocolType, AckSimulationMode.FAILURE, contextId,
+                        "status=" + failureStatus + ",reason=" + failureReason);
+                break;
+            default:
+                break;
+        }
+
+        if (config.isDrained()) {
+            ackSimulationConfigs.remove(protocolType);
+        }
+
+        return skipSend;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getOrCreateAckData(Map<String, Object> message) {
+        Object existing = message.get("data");
+        if (existing instanceof Map) {
+            return (Map<String, Object>) existing;
+        }
+        Map<String, Object> newData = new HashMap<>();
+        message.put("data", newData);
+        return newData;
+    }
+
     /**
      * 发送STOMP消息 - 确保WebSocket连接的强健性
      */
@@ -752,6 +882,20 @@ public class MockVirtualMachine {
         String messageType = (String) message.get("type");
         String messageId = (String) message.get("id");
         int maxRetries = 3;
+
+        ProtocolType protocolType = null;
+        if (messageType != null) {
+            try {
+                protocolType = ProtocolType.valueOf(messageType);
+            } catch (IllegalArgumentException ignored) {
+                // 非协议枚举定义的消息类型
+            }
+        }
+
+        if (applyAckSimulationBeforeSend(protocolType, message, messageId)) {
+            System.out.println("⏱️ [" + vmData.getName() + "] 已跳过发送 " + messageType + " (ACK超时模拟)");
+            return;
+        }
 
         System.out.println("📤 [" + vmData.getName() + "] 准备发送消息: " + messageType + " (ID: " + messageId + ")");
 
@@ -830,8 +974,9 @@ public class MockVirtualMachine {
                         // 等待后重试，增加随机延迟避免雷群效应
                         int baseDelay = 1000 * attempt;
                         int randomDelay = (int)(Math.random() * 1000);
-                        System.out.println("⏳ [" + vmData.getName() + "] 等待 " + (baseDelay + randomDelay) + "ms 后重试...");
-                        Thread.sleep(baseDelay + randomDelay);
+                        long retryDelay = baseDelay + randomDelay;
+                        System.out.println("⏳ [" + vmData.getName() + "] 等待 " + retryDelay + "ms 后重试...");
+                        awaitDelay(Duration.ofMillis(retryDelay));
                     } else {
                         // 最后一次重试失败，抛出异常
                         throw new Exception("WebSocket连接持续失败，无法发送消息: " + messageType);
@@ -852,7 +997,7 @@ public class MockVirtualMachine {
             System.out.println("🔄 " + vmData.getName() + " 模拟WebSocket连接恢复...");
 
             // 等待一段时间模拟重连过程
-            Thread.sleep(200);
+            awaitDelay(Duration.ofMillis(200));
 
             // 创建一个模拟的连接状态，确保消息发送逻辑能够继续
             connected = true;
@@ -895,7 +1040,8 @@ public class MockVirtualMachine {
                     System.out.println("📊 [" + vmData.getName() + "] 模型上传消息已发送 - 任务ID: " + taskId + ", 轮次: " + round);
 
                     // 模拟一个短暂的网络延迟
-                    Thread.sleep(50 + (int)(Math.random() * 100));
+                    long simulatedDelay = 50 + (int) (Math.random() * 100);
+                    awaitDelay(Duration.ofMillis(simulatedDelay), "simulateMessageSend:GRADIENT_UPLOAD");
                     return true;
 
 
@@ -928,18 +1074,13 @@ public class MockVirtualMachine {
                 } else {
                     System.out.println("⚠️ " + vmData.getName() + " WebSocket连接断开，尝试重连 (" + attempt + "/" + maxRetries + ")");
                     if (attempt < maxRetries) {
-                        Thread.sleep(500); // 短暂等待后重试
+                        awaitDelay(Duration.ofMillis(500), "sendStompMessageWithRetry:fixed-backoff");
                     }
                 }
             } catch (Exception e) {
                 System.err.println("⚠️ " + vmData.getName() + " 发送消息失败 (尝试 " + attempt + "/" + maxRetries + "): " + e.getMessage());
                 if (attempt < maxRetries) {
-                    try {
-                        Thread.sleep(500 * attempt); // 递增退避
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+                    awaitDelay(Duration.ofMillis(500L * attempt), "sendStompMessageWithRetry:incremental-backoff");
                 }
             }
         }
@@ -971,7 +1112,7 @@ public class MockVirtualMachine {
             }
 
             // 等待一段时间后重连
-            Thread.sleep(1000);
+            awaitDelay(Duration.ofSeconds(1), "reconnectWebSocket:cooldown");
 
             // 模拟重连成功（在实际环境中，这里应该重新建立连接）
             connected = true;
@@ -1451,7 +1592,8 @@ public class MockVirtualMachine {
                     ackMessage.put("data", ackData);
 
                     // 模拟一些ACK延迟，增加真实性
-                    Thread.sleep(50 + (int) (Math.random() * 100)); // 50-150ms随机延迟
+                    long ackDelay = 50 + (int) (Math.random() * 100); // 50-150ms随机延迟
+                    awaitDelay(Duration.ofMillis(ackDelay), "handleGlobalModelBroadcast:ack-delay");
 
                     sendStompMessage(ackMessage);
                     System.out.println("📤 " + vmData.getName() + " 已发送GLOBAL_MODEL_BROADCAST_ACK确认");
@@ -1734,10 +1876,10 @@ public class MockVirtualMachine {
     /**
      * 模拟训练过程 - v1.4协议
      */
-    private void simulateTrainingProcess(TaskExecutionContext taskContext, LocalModel localModel, int roundNumber) throws InterruptedException {
+    private void simulateTrainingProcess(TaskExecutionContext taskContext, LocalModel localModel, int roundNumber) {
         // 模拟训练时间（根据轮次变化）
         int trainingTime = 2000 + (roundNumber * 500); // 2-6秒
-        Thread.sleep(trainingTime);
+        awaitDelay(Duration.ofMillis(trainingTime), "simulateTrainingProcess:training");
 
         // 更新本地模型指标模拟结果
         double accuracy = 0.7 + (roundNumber * 0.02); // 精度逐渐提高
@@ -3123,18 +3265,42 @@ public class MockVirtualMachine {
         Map<String, Object> data = (Map<String, Object>) message.get("data");
         String taskId = (String) data.get("taskId");
         Integer round = (Integer) data.get("round");
+        if (round == null) {
+            round = (Integer) data.get("roundNumber");
+        }
 
         log.info("Mock VM处理轮次开始(v1.5): vmId={}, taskId={}, round={}",
                 vmData.getVmId(), taskId, round);
 
         TaskExecutionContext context = activeTaskContexts.get(taskId);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> datasetContext = (Map<String, Object>) data.get("datasetContext");
+        if (datasetContext != null) {
+            String providedDatasetId = (String) datasetContext.get("assignedDatasetId");
+            if (providedDatasetId != null && !providedDatasetId.isBlank()) {
+                taskAssignedDatasetMappings.put(taskId, providedDatasetId);
+                log.info("[{}] ROUND_START 刷新 assignedDatasetId: {}",
+                        vmData.getName(), providedDatasetId);
+                Object status = datasetContext.get("datasetStatus");
+                if (status instanceof String statusText && !statusText.isBlank()) {
+                    assignedDatasetStatusMap.put(providedDatasetId, statusText);
+                }
+                Object localPath = datasetContext.get("localPath");
+                if (localPath instanceof String path && !path.isBlank()) {
+                    assignedDatasetLocalPaths.put(providedDatasetId, path);
+                }
+            }
+        }
+
+        String assignedDatasetId = null;
         if (context != null) {
             context.setCurrentRound(round);
             context.setStatus(TaskStatus.TRAINING);
             context.setLastUpdated(Instant.now());
 
             // 验证数据集分配
-            String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
+            assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
             if (assignedDatasetId == null) {
                 log.warn("v1.5轮次开始但未找到assignedDatasetId: taskId={}", taskId);
                 sendErrorV15("DATASET_NOT_ASSIGNED", "No assigned dataset for task: " + taskId);
@@ -3144,6 +3310,14 @@ public class MockVirtualMachine {
 
         // 发送v1.5格式的轮次开始确认
         sendRoundStartAckV15(taskId, round);
+
+        if (round != null && round > 1) {
+            log.info("[{}] 轮次开始调度检查: round={}, contextExists={}, datasetAssigned={}",
+                    vmData.getName(), round, context != null, assignedDatasetId != null);
+            if (context != null && assignedDatasetId != null) {
+                scheduleGradientUploadV15(taskId, round, assignedDatasetId);
+            }
+        }
     }
 
     /**
@@ -3165,11 +3339,23 @@ public class MockVirtualMachine {
         log.info("Mock VM处理全局模型广播(v1.5.1): vmId={}, taskId={}, round={}",
                 vmData.getVmId(), taskId, roundNumber);
 
+        if (globalModel != null) {
+            latestGlobalModels.put(taskId, new HashMap<>(globalModel));
+            if (roundNumber != null) {
+                globalModelHistory
+                        .computeIfAbsent(taskId, k -> new ConcurrentHashMap<>())
+                        .put(roundNumber, new HashMap<>(globalModel));
+            }
+        }
+
         TaskExecutionContext context = activeTaskContexts.get(taskId);
         if (context != null && modelParameters != null) {
             // 更新本地模型参数
             context.setGlobalModelParameters(modelParameters);
             context.setLastUpdated(Instant.now());
+            if (roundNumber != null) {
+                context.setCurrentRound(roundNumber);
+            }
 
             // 验证assignedDatasetId
             String assignedDatasetId = taskAssignedDatasetMappings.get(taskId);
@@ -3244,8 +3430,10 @@ public class MockVirtualMachine {
 
         messageExecutor.schedule(() -> {
             try {
+                log.info("Mock VM准备上传梯度(v1.5): vmId={}, taskId={}, round={}, dataset={}",
+                        vmData.getVmId(), taskId, round, assignedDatasetId);
                 // 模拟本地训练延迟
-                Thread.sleep(simulateTrainingDelay());
+                awaitDelay(Duration.ofMillis(simulateTrainingDelay()), "scheduleGradientUploadV15:training-delay");
 
                 // 生成并发送梯度（包含assignedDatasetId验证）
                 double[] gradientArray = generateMockGradients();
@@ -3259,6 +3447,158 @@ public class MockVirtualMachine {
                          vmData.getVmId(), taskId, round, e.getMessage());
             }
         }, 1, TimeUnit.SECONDS);
+    }
+
+    // ==================== ACK模拟配置 ====================
+
+    public enum AckSimulationMode {
+        NONE,
+        TIMEOUT,
+        FAILURE
+    }
+
+    private static final class AckSimulationConfig {
+        private final AckSimulationMode mode;
+        private final Duration timeout;
+        private final String failureStatus;
+        private final String failureReason;
+        private final AtomicInteger remainingCount;
+
+        private AckSimulationConfig(
+                AckSimulationMode mode,
+                Duration timeout,
+                String failureStatus,
+                String failureReason,
+                int occurrences
+        ) {
+            this.mode = Objects.requireNonNull(mode, "mode");
+            this.timeout = timeout;
+            this.failureStatus = failureStatus;
+            this.failureReason = failureReason;
+            this.remainingCount = occurrences > 0 ? new AtomicInteger(occurrences) : null;
+        }
+
+        static AckSimulationConfig timeout(Duration timeout, int occurrences) {
+            return new AckSimulationConfig(AckSimulationMode.TIMEOUT, timeout, null, null, occurrences);
+        }
+
+        static AckSimulationConfig failure(String status, String reason, int occurrences) {
+            return new AckSimulationConfig(AckSimulationMode.FAILURE, null, status, reason, occurrences);
+        }
+
+        boolean shouldApply() {
+            if (remainingCount == null) {
+                return true;
+            }
+            while (true) {
+                int current = remainingCount.get();
+                if (current <= 0) {
+                    return false;
+                }
+                if (remainingCount.compareAndSet(current, current - 1)) {
+                    return true;
+                }
+            }
+        }
+
+        boolean isDrained() {
+            return remainingCount != null && remainingCount.get() <= 0;
+        }
+    }
+
+    public static final class AckSimulationEvent {
+        private final ProtocolType protocolType;
+        private final AckSimulationMode mode;
+        private final String messageId;
+        private final Instant timestamp;
+        private final String detail;
+
+        private AckSimulationEvent(ProtocolType protocolType, AckSimulationMode mode, String messageId, Instant timestamp, String detail) {
+            this.protocolType = protocolType;
+            this.mode = mode;
+            this.messageId = messageId;
+            this.timestamp = timestamp;
+            this.detail = detail;
+        }
+
+        public ProtocolType getProtocolType() {
+            return protocolType;
+        }
+
+        public AckSimulationMode getMode() {
+            return mode;
+        }
+
+        public String getMessageId() {
+            return messageId;
+        }
+
+        public Instant getTimestamp() {
+            return timestamp;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+    }
+
+    public void simulateAckTimeout(ProtocolType protocolType, Duration timeout) {
+        simulateAckTimeout(protocolType, timeout, 1);
+    }
+
+    public void simulateAckTimeout(ProtocolType protocolType, Duration timeout, int occurrences) {
+        Objects.requireNonNull(protocolType, "protocolType");
+        ackSimulationConfigs.put(protocolType, AckSimulationConfig.timeout(timeout, occurrences));
+    }
+
+    public void simulateAckFailure(ProtocolType protocolType, String failureStatus, String failureReason) {
+        simulateAckFailure(protocolType, failureStatus, failureReason, 1);
+    }
+
+    public void simulateAckFailure(ProtocolType protocolType, String failureStatus, String failureReason, int occurrences) {
+        Objects.requireNonNull(protocolType, "protocolType");
+        ackSimulationConfigs.put(protocolType, AckSimulationConfig.failure(failureStatus, failureReason, occurrences));
+    }
+
+    public void clearAckSimulation(ProtocolType protocolType) {
+        if (protocolType == null) {
+            return;
+        }
+        ackSimulationConfigs.remove(protocolType);
+    }
+
+    public void clearAllAckSimulations() {
+        ackSimulationConfigs.clear();
+    }
+
+    public List<AckSimulationEvent> getAckSimulationEvents() {
+        synchronized (ackSimulationEvents) {
+            return new ArrayList<>(ackSimulationEvents);
+        }
+    }
+
+    public void clearAckSimulationEvents() {
+        synchronized (ackSimulationEvents) {
+            ackSimulationEvents.clear();
+        }
+    }
+
+    /**
+     * 测试辅助方法：直接发送指定协议类型的ACK消息
+     * 方便在单元/集成测试中触发ACK模拟逻辑
+     *
+     * @param protocolType 协议类型
+     * @param data 自定义数据，可为null
+     * @return 最终发送的数据副本（包含模拟逻辑注入的字段）
+     */
+    public Map<String, Object> sendAckForTesting(ProtocolType protocolType, Map<String, Object> data) throws Exception {
+        Objects.requireNonNull(protocolType, "protocolType");
+        Map<String, Object> payloadData = data != null ? new HashMap<>(data) : new HashMap<>();
+        Map<String, Object> message = createProtocolMessage(protocolType, payloadData);
+        sendStompMessage(message);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ackData = (Map<String, Object>) message.get("data");
+        return ackData;
     }
 
 
@@ -3317,6 +3657,7 @@ public class MockVirtualMachine {
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) messageData.get("data");
             String taskId = (String) data.get("taskId");
+            latestTaskStartId = taskId;
 
             // 🔑 关键验证：dataConfig结构和assignedDatasetId位置
             if (!data.containsKey("dataConfig")) {
@@ -3337,6 +3678,82 @@ public class MockVirtualMachine {
             String assignedDatasetId = (String) dataConfig.get("assignedDatasetId");
             String dataPath = (String) dataConfig.get("dataPath");
 
+            @SuppressWarnings("unchecked")
+            Map<String, Object> initialModel = (Map<String, Object>) data.get("initialModel");
+            if (initialModel == null || initialModel.isEmpty()) {
+                log.error("🤖 [{}] FEDERATED_TASK_START缺少initialModel字段", vmData.getName());
+                sendErrorResponseV15(messageData, "缺少initialModel字段");
+                return;
+            }
+
+            String distributionId = (String) initialModel.get("distributionId");
+            if (distributionId == null || distributionId.trim().isEmpty()) {
+                log.error("🤖 [{}] initialModel缺少distributionId", vmData.getName());
+                sendErrorResponseV15(messageData, "initialModel缺少distributionId");
+                return;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> trainingPlan = (Map<String, Object>) data.get("trainingPlan");
+            if (trainingPlan != null) {
+                trainingPlans.put(taskId, new HashMap<>(trainingPlan));
+            }
+
+            initialModelPayloads.put(taskId, new HashMap<>(initialModel));
+
+            // 🆕 创建并注册任务执行上下文
+            Integer totalRounds = null;
+            if (trainingPlan != null && trainingPlan.get("totalRounds") instanceof Number totalRoundsNumber) {
+                totalRounds = totalRoundsNumber.intValue();
+            } else if (data.get("totalRounds") instanceof Number totalRoundsFromData) {
+                totalRounds = totalRoundsFromData.intValue();
+            }
+            String federatedAlgorithm = null;
+            if (trainingPlan != null) {
+                Object algo = trainingPlan.get("algorithm");
+                if (algo instanceof String algoStr) {
+                    federatedAlgorithm = algoStr;
+                }
+            }
+            if (!StringUtils.hasText(federatedAlgorithm)) {
+                Object algo = data.get("federatedAlgorithm");
+                if (algo instanceof String algoStr) {
+                    federatedAlgorithm = algoStr;
+                }
+            }
+
+            Map<String, Object> localTrainingConfig = trainingPlan != null
+                    ? new HashMap<>(trainingPlan)
+                    : Collections.emptyMap();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> initialModelParameters = initialModel.containsKey("parameters")
+                    ? (Map<String, Object>) initialModel.get("parameters")
+                    : Collections.emptyMap();
+
+            TaskExecutionContext context = TaskExecutionContext.builder()
+                    .taskId(taskId)
+                    .federatedAlgorithm(federatedAlgorithm)
+                    .totalRounds(totalRounds)
+                    .currentRound(0)
+                    .status(TaskStatus.WAITING_FOR_INSTRUCTIONS)
+                    .localTrainingConfig(localTrainingConfig)
+                    .globalModelParameters(initialModelParameters != null
+                            ? new HashMap<>(initialModelParameters)
+                            : null)
+                    .build();
+            activeTaskContexts.put(taskId, context);
+
+            // 🆕 初始化本地模型缓存，便于后续梯度生成
+            LocalModel localModel = LocalModel.builder()
+                    .modelParameters(initialModelParameters != null
+                            ? new HashMap<>(initialModelParameters)
+                            : new HashMap<>())
+                    .algorithmType(federatedAlgorithm)
+                    .lastUpdated(Instant.now())
+                    .build();
+            taskLocalModels.put(taskId, localModel);
+
             // 🆕 保存assignedDatasetId（完全依赖后端分配）
             taskAssignedDatasetMappings.put(taskId, assignedDatasetId);
             backendAssignedDatasetIds.add(assignedDatasetId);
@@ -3350,9 +3767,13 @@ public class MockVirtualMachine {
 
             log.info("🤖 [{}] 任务数据配置完成: taskId={}, assignedDatasetId={}, localPath={}",
                      vmData.getName(), taskId, assignedDatasetId, localPath);
+            log.info("🤖 [{}] 初始模型载荷: taskId={}, modelId={}, distributionId={}",
+                    vmData.getName(),
+                    initialModel.get("modelId"),
+                    distributionId);
 
             // 发送任务启动确认
-            sendFederatedTaskStartAckV15(taskId, assignedDatasetId);
+            sendFederatedTaskStartAckV15(taskId, assignedDatasetId, distributionId, initialModel);
 
         } catch (Exception e) {
             log.error("🤖 [{}] 处理FEDERATED_TASK_START失败: {}", vmData.getName(), e.getMessage());
@@ -3544,7 +3965,10 @@ public class MockVirtualMachine {
         log.error("🤖 [{}] 发送ERROR(v1.5): code={}, message={}", vmData.getName(), errorCode, errorMessage);
     }
 
-    private void sendFederatedTaskStartAckV15(String taskId, String assignedDatasetId) throws Exception {
+    private void sendFederatedTaskStartAckV15(String taskId,
+                                             String assignedDatasetId,
+                                             String distributionId,
+                                             Map<String, Object> initialModel) throws Exception {
         Map<String, Object> ackMessage = createProtocolMessage(ProtocolType.FEDERATED_TASK_START_ACK);
         Map<String, Object> data = new HashMap<>();
         data.put("vmId", vmData.getVmId());
@@ -3560,8 +3984,20 @@ public class MockVirtualMachine {
         datasetConfirmation.put("estimatedSamples", 1000); // 模拟数据样本数
         data.put("datasetConfirmation", datasetConfirmation);
 
+        Map<String, Object> initialModelReceipt = new HashMap<>();
+        initialModelReceipt.put("distributionId", distributionId);
+        if (initialModel != null) {
+            initialModelReceipt.put("modelId", initialModel.get("modelId"));
+            initialModelReceipt.put("modelType", initialModel.get("modelType"));
+            initialModelReceipt.put("checksum", initialModel.get("checksum"));
+        }
+        initialModelReceipt.put("checksumVerified", Boolean.TRUE);
+        initialModelReceipt.put("receivedAt", Instant.now().toString());
+        data.put("initialModelReceipt", initialModelReceipt);
+
         ackMessage.put("data", data);
         sendStompMessage(ackMessage);
+        initialModelReceipts.put(taskId, new HashMap<>(initialModelReceipt));
         log.info("🤖 [{}] 发送FEDERATED_TASK_START_ACK: assignedDatasetId={}",
                  vmData.getName(), assignedDatasetId);
     }
@@ -3573,6 +4009,7 @@ public class MockVirtualMachine {
         data.put("vmId", vmData.getVmId());
         data.put("taskId", taskId);
         data.put("round", round);
+        data.put("roundNumber", round); // v1.5协议要求
         data.put("assignedDatasetId", assignedDatasetId); // 🆕 v1.5必需字段
         data.put("gradientData", gradients);
         data.put("trainingMetrics", metrics);
@@ -4190,6 +4627,57 @@ public class MockVirtualMachine {
 
     public String getAccessToken() {
         return this.accessToken;
+    }
+
+    public Map<String, Object> getLatestInitialModelPayload() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return initialModelPayloads.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestInitialModelReceipt() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return initialModelReceipts.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestTrainingPlan() {
+        if (latestTaskStartId == null) {
+            return null;
+        }
+        return trainingPlans.get(latestTaskStartId);
+    }
+
+    public Map<String, Object> getLatestGlobalModel(String taskId) {
+        if (!StringUtils.hasText(taskId)) {
+            return null;
+        }
+        Map<String, Object> modelSnapshot = latestGlobalModels.get(taskId);
+        return modelSnapshot != null ? new HashMap<>(modelSnapshot) : null;
+    }
+
+    public Map<Integer, Map<String, Object>> getGlobalModelHistory(String taskId) {
+        if (!StringUtils.hasText(taskId)) {
+            return null;
+        }
+        Map<Integer, Map<String, Object>> history = globalModelHistory.get(taskId);
+        if (history == null) {
+            return null;
+        }
+        Map<Integer, Map<String, Object>> copy = new HashMap<>();
+        history.forEach((round, payload) -> copy.put(round, new HashMap<>(payload)));
+        return copy;
+    }
+
+    public String getLatestInitialModelDistributionId() {
+        Map<String, Object> payload = getLatestInitialModelPayload();
+        if (payload == null) {
+            return null;
+        }
+        Object id = payload.get("distributionId");
+        return id instanceof String ? (String) id : null;
     }
 
     // 🆕 v1.5.1测试辅助方法：获取最新数据集的信息

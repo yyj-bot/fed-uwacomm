@@ -23,14 +23,19 @@ import com.feduwacomm.aggregation.UniversalAggregationEngine.AggregationResult;
 import com.feduwacomm.enums.FederatedAlgorithm;
 import com.feduwacomm.utils.UuidUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,6 +44,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 /**
  * 联邦学习聚合服务
@@ -62,6 +68,7 @@ public class FederatedAggregationService {
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
+    private final PlatformTransactionManager transactionManager;
 
     // 🔧 轮次同步组件
     private final RoundStateManager roundStateManager;
@@ -72,14 +79,22 @@ public class FederatedAggregationService {
     private final Map<String, LocalDateTime> roundStartTimes = new ConcurrentHashMap<>();
     private final Map<String, ReentrantLock> aggregationLocks = new ConcurrentHashMap<>();
     private final Set<String> activeAggregations = ConcurrentHashMap.newKeySet();
+    private TransactionTemplate participantReadTemplate;
+
+    @PostConstruct
+    void initParticipantReadTemplate() {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.setReadOnly(true);
+        this.participantReadTemplate = template;
+    }
 
     /**
      * 处理模型上传事件
      * 检查是否满足聚合条件，如满足则触发聚合
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
-    @Transactional
     public void handleModelUploadEvent(ModelUploadEvent event) {
         String taskId = event.getTaskId();
         Integer roundNumber = event.getRoundNumber();
@@ -197,47 +212,24 @@ public class FederatedAggregationService {
      */
     private boolean shouldTriggerAggregation(String taskId, Integer roundNumber) {
         try {
-            // 获取任务总参与者数量
-            int totalParticipants = taskParticipantsMapper.countTotalParticipants(taskId);
+            final Integer initialRoundNumber = roundNumber;
+            ParticipantSnapshot participantSnapshot = loadParticipantSnapshot(taskId, initialRoundNumber);
+
+            int totalParticipants = participantSnapshot.totalParticipants();
             if (totalParticipants == 0) {
                 log.warn("任务{}没有参与者，无法进行聚合", taskId);
                 return false;
             }
 
             // 🔧 增强调试：安全地获取参与者详细状态信息
-            List<Map<String, Object>> participantDetails = null;
-            try {
-                participantDetails = taskParticipantsMapper.getParticipantStatusDetails(taskId);
-                log.debug("参与者状态详情查询: 任务ID={}, 原始结果数量={}", taskId,
-                         participantDetails != null ? participantDetails.size() : "null");
-
-                // 🔧 强化null过滤：确保返回的列表不包含null元素
-                if (participantDetails != null) {
-                    int originalSize = participantDetails.size();
-                    participantDetails = participantDetails.stream()
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-                    int filteredSize = participantDetails.size();
-
-                    if (originalSize != filteredSize) {
-                        log.warn("🔧 过滤null参与者元素: 任务ID={}, 原始数量={}, 过滤后数量={}",
-                                taskId, originalSize, filteredSize);
-                    }
-                } else {
-                    participantDetails = new ArrayList<>();
-                }
-
-                log.debug("参与者状态详情处理完成: 任务ID={}, 有效参与者数量={}", taskId, participantDetails.size());
-            } catch (Exception e) {
-                log.error("获取参与者详情失败: 任务ID={}, 错误={}", taskId, e.getMessage());
-                participantDetails = new ArrayList<>(); // 使用空列表避免后续null检查
-            }
+            List<Map<String, Object>> participantDetails = new ArrayList<>(participantSnapshot.participantDetails());
+            log.debug("参与者状态详情处理完成: 任务ID={}, 有效参与者数量={}", taskId, participantDetails.size());
 
             // 🔧 增强轮次检测逻辑：智能适应轮次同步问题
             log.debug("开始轮次检测: 任务ID={}, 期望轮次={}", taskId, roundNumber);
 
             // 首先检查传入的roundNumber是否有完成的参与者
-            int completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
+            int completedParticipants = participantSnapshot.completedParticipants();
             log.debug("初始检查: 任务ID={}, 检查轮次={}, 已完成参与者={}",
                     taskId, roundNumber, completedParticipants);
 
@@ -256,7 +248,7 @@ public class FederatedAggregationService {
                                 taskId, roundNumber, actualCompletedRound, targetRound);
 
                         // 使用目标轮次重新统计
-                        completedParticipants = taskParticipantsMapper.countCompletedParticipants(taskId, targetRound);
+                        completedParticipants = loadCommittedCompletedParticipants(taskId, targetRound);
                         roundNumber = targetRound; // 更新为目标轮次
 
                         log.info("✅ 轮次修正完成: 任务ID={}, 使用轮次={}, 已完成参与者={}",
@@ -330,6 +322,13 @@ public class FederatedAggregationService {
     @Async
     @Transactional
     public void triggerAggregation(String taskId, Integer roundNumber, String triggerReason) {
+        // 如果当前轮次的全局模型已存在且完成，则直接跳过本次聚合触发
+        GlobalModel existingModel = globalModelMapper.selectByTaskIdAndRound(taskId, roundNumber);
+        if (existingModel != null && GlobalModelStatus.COMPLETED.equals(existingModel.getStatus())) {
+            log.debug("检测到轮次{}的全局模型已存在，跳过重复聚合: taskId={}", roundNumber, taskId);
+            return;
+        }
+
         String aggregationKey = buildAggregationKey(taskId, roundNumber);
         FederatedTask task = null; // 在try块外定义task变量
         
@@ -493,6 +492,7 @@ public class FederatedAggregationService {
                     .completedAt(LocalDateTime.now())
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
+                    .distributionStatus("PENDING")
                     .build();
 
             // 设置全局指标
@@ -678,6 +678,85 @@ public class FederatedAggregationService {
      */
     private String buildAggregationKey(String taskId, Integer roundNumber) {
         return taskId + "_" + roundNumber;
+    }
+
+    private ParticipantSnapshot loadParticipantSnapshot(String taskId, Integer roundNumber) {
+        try {
+            final Integer queryRound = roundNumber;
+            return executeWithCommittedRead(() -> buildParticipantSnapshot(taskId, queryRound));
+        } catch (Exception ex) {
+            log.error("加载参与者快照失败: taskId={}, roundNumber={}, error={}", taskId, roundNumber, ex.getMessage(), ex);
+            return ParticipantSnapshot.empty();
+        }
+    }
+
+    private ParticipantSnapshot buildParticipantSnapshot(String taskId, Integer roundNumber) {
+        int total = 0;
+        int completed = 0;
+        List<Map<String, Object>> details;
+
+        try {
+            total = taskParticipantsMapper.countTotalParticipants(taskId);
+        } catch (Exception ex) {
+            log.error("统计任务参与者总数失败: taskId={}, error={}", taskId, ex.getMessage(), ex);
+        }
+
+        if (roundNumber != null) {
+            try {
+                completed = taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber);
+            } catch (Exception ex) {
+                log.error("统计已完成参与者数量失败: taskId={}, roundNumber={}, error={}",
+                        taskId, roundNumber, ex.getMessage(), ex);
+            }
+        }
+
+        try {
+            details = taskParticipantsMapper.getParticipantStatusDetails(taskId);
+        } catch (Exception ex) {
+            log.error("获取参与者详情失败: taskId={}, error={}", taskId, ex.getMessage(), ex);
+            details = Collections.emptyList();
+        }
+
+        if (details == null) {
+            details = new ArrayList<>();
+        } else {
+            int originalSize = details.size();
+            details = details.stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(ArrayList::new));
+            if (originalSize != details.size()) {
+                log.warn("🔧 过滤null参与者元素: 任务ID={}, 原始数量={}, 过滤后数量={}",
+                        taskId, originalSize, details.size());
+            }
+        }
+
+        return new ParticipantSnapshot(total, completed, details);
+    }
+
+    private int loadCommittedCompletedParticipants(String taskId, Integer roundNumber) {
+        try {
+            final Integer queryRound = roundNumber;
+            return executeWithCommittedRead(() -> taskParticipantsMapper.countCompletedParticipants(taskId, queryRound));
+        } catch (Exception ex) {
+            log.error("重载已完成参与者计数失败: taskId={}, roundNumber={}, error={}", taskId, roundNumber, ex.getMessage(), ex);
+            return 0;
+        }
+    }
+
+    private <T> T executeWithCommittedRead(Supplier<T> supplier) {
+        if (participantReadTemplate != null) {
+            return participantReadTemplate.execute(status -> supplier.get());
+        }
+        return supplier.get();
+    }
+
+    private record ParticipantSnapshot(int totalParticipants,
+                                       int completedParticipants,
+                                       List<Map<String, Object>> participantDetails) {
+
+        static ParticipantSnapshot empty() {
+            return new ParticipantSnapshot(0, 0, Collections.emptyList());
+        }
     }
 
 }

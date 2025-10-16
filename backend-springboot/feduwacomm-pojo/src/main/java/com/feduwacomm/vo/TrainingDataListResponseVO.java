@@ -13,7 +13,7 @@ import java.util.List;
  * 专门用于测试场景的响应包装类
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Data

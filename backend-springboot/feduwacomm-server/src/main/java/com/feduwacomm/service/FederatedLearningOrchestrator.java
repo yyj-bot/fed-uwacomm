@@ -1,5 +1,6 @@
 package com.feduwacomm.service;
 
+import com.feduwacomm.dto.RoundDatasetBinding;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.utils.MessageBuilder;
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,7 @@ import java.util.Map;
  * 负责协调和管理完整的联邦学习流程，符合协议v1.4标准
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Service
 public class FederatedLearningOrchestrator {
@@ -26,13 +28,16 @@ public class FederatedLearningOrchestrator {
     private final WebSocketMessageSender messageSender;
     private final MessageBuilder messageBuilder;
     private final FederatedTasksMapper federatedTasksMapper;
+    private final RoundStateManager roundStateManager;
 
     public FederatedLearningOrchestrator(WebSocketMessageSender messageSender,
                                         MessageBuilder messageBuilder,
-                                        FederatedTasksMapper federatedTasksMapper) {
+                                        FederatedTasksMapper federatedTasksMapper,
+                                        RoundStateManager roundStateManager) {
         this.messageSender = messageSender;
         this.messageBuilder = messageBuilder;
         this.federatedTasksMapper = federatedTasksMapper;
+        this.roundStateManager = roundStateManager;
     }
 
     // ==================== 联邦学习流程编排方法 ====================
@@ -57,11 +62,21 @@ public class FederatedLearningOrchestrator {
             Map<String, Object> roundSpecificConfig = buildRoundConfig(task, roundNumber);
             Map<String, Object> targetMetrics = buildTargetMetrics(task);
 
-            // 3. 向所有参与者发送ROUND_START消息
+            // 3. 准备轮次数据集上下文
+            Map<String, RoundDatasetBinding> datasetBindings =
+                    roundStateManager.prepareNextRoundContext(taskId, roundNumber);
+
+            // 4. 向所有参与者发送ROUND_START消息
             for (String vmId : participantVmIds) {
+                RoundDatasetBinding binding = datasetBindings.get(vmId);
+                if (binding == null) {
+                    logger.warn("ROUND_START 缺少数据集绑定: taskId={}, round={}, vmId={}",
+                            taskId, roundNumber, vmId);
+                }
                 messageSender.sendRoundStart(vmId, taskId, roundNumber,
                                            roundSpecificConfig, targetMetrics,
-                                           participantVmIds.size());
+                                           participantVmIds.size(),
+                                           buildDatasetContext(binding));
             }
 
             logger.info("轮次启动消息已发送 - TaskId: {}, RoundNumber: {}", taskId, roundNumber);
@@ -197,6 +212,22 @@ public class FederatedLearningOrchestrator {
         config.put("batchSize", 32);
 
         return config;
+    }
+
+    private Map<String, Object> buildDatasetContext(RoundDatasetBinding binding) {
+        if (binding == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> context = new HashMap<>();
+        context.put("vmId", binding.getVmId());
+        context.put("assignedDatasetId", binding.getAssignedDatasetId());
+        if (binding.getDatasetStatus() != null) {
+            context.put("datasetStatus", binding.getDatasetStatus());
+        }
+        if (binding.getLocalPath() != null) {
+            context.put("localPath", binding.getLocalPath());
+        }
+        return context;
     }
 
     /**

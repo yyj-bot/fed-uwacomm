@@ -34,8 +34,11 @@ logging:
     com.mysql: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   db:
     enabled: true  # 启用数据库日志记录
+  file:
+    name: /tmp/feduwacomm-test.log
 
 # JWT配置 - 双套配置（用户JWT和VM JWT）
 jwt:

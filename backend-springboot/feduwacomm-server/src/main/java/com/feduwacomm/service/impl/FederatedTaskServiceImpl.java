@@ -1,39 +1,58 @@
 package com.feduwacomm.service.impl;
 
 import com.feduwacomm.common.BaseContext;
+import com.feduwacomm.controller.FederatedTaskController;
 import com.feduwacomm.exception.UserException;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.entity.ModelDistribution;
 import com.feduwacomm.entity.TaskParticipant;
 import com.feduwacomm.entity.VmAckTracking;
 import com.feduwacomm.enums.*;
 import com.feduwacomm.event.FederatedTaskCreatedEvent;
+import com.feduwacomm.event.InitialModelDistributionStartedEvent;
 import com.feduwacomm.mapper.FederatedTasksMapper;
+import com.feduwacomm.mapper.ModelDistributionMapper;
 import com.feduwacomm.service.DataDistributionService;
 import com.feduwacomm.service.FederatedTaskService;
 import com.feduwacomm.service.LogService;
 import com.feduwacomm.service.TrainingDataService;
 import com.feduwacomm.service.WebSocketProtocolService;
+import com.feduwacomm.service.FederatedOrchestrationService;
+import com.feduwacomm.service.InitialModelGenerationService;
 import com.feduwacomm.utils.MessageBuilder;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.*;
-import com.feduwacomm.controller.FederatedTaskController;
+import com.feduwacomm.model.dto.federated.FederatedTaskConfigDTO;
+import com.feduwacomm.model.dto.federated.FederatedTaskCreateRequest;
+import com.feduwacomm.model.dto.federated.InitialModelConfigDTO;
+import com.feduwacomm.model.dto.initial.InitialModelDistributeRequest;
+import com.feduwacomm.model.dto.initial.InitialModelGenerateRequest;
+import com.feduwacomm.model.vo.initial.InitialModelDetailVO;
+import com.feduwacomm.model.vo.initial.InitialModelBindingVO;
 import com.feduwacomm.service.cache.MetricsCacheService;
 import com.feduwacomm.service.cache.model.GlobalMetrics;
 import com.feduwacomm.service.cache.exception.CacheValidationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -68,7 +87,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    // v1.4协议新增组件
+    // v1.5协议新增组件
     @Autowired
     private com.feduwacomm.service.RoundStateManager roundStateManager;
 
@@ -91,19 +110,34 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Autowired
     private com.feduwacomm.mapper.TaskParticipantsMapper taskParticipantsMapper;
 
+    @Autowired
+    private FederatedOrchestrationService orchestrationService;
+
+    @Autowired
+    private InitialModelGenerationService initialModelGenerationService;
+
+    @Autowired
+    private ModelDistributionMapper modelDistributionMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     // 任务状态常量
     private static final FederatedTaskStatus STATUS_CREATED = FederatedTaskStatus.CREATED;
     private static final FederatedTaskStatus STATUS_CONFIGURED = FederatedTaskStatus.CONFIGURED;
+    private static final FederatedTaskStatus STATUS_PENDING = FederatedTaskStatus.PENDING;
+    private static final FederatedTaskStatus STATUS_READY = FederatedTaskStatus.READY;
     private static final FederatedTaskStatus STATUS_RUNNING = FederatedTaskStatus.RUNNING;
     private static final FederatedTaskStatus STATUS_PAUSED = FederatedTaskStatus.PAUSED;
     private static final FederatedTaskStatus STATUS_STOPPED = FederatedTaskStatus.STOPPED;
     private static final FederatedTaskStatus STATUS_COMPLETED = FederatedTaskStatus.COMPLETED;
     private static final FederatedTaskStatus STATUS_FAILED = FederatedTaskStatus.FAILED;
     private static final FederatedTaskStatus STATUS_CANCELLED = FederatedTaskStatus.CANCELLED;
+    @org.springframework.beans.factory.annotation.Value("${federated.datasetAck.timeoutSeconds:120}")
+    private int datasetAckTimeoutSeconds;
 
     @Override
-    @Transactional
-    public TaskOperationVO createTask(TaskCreateDTO createDTO, String createdBy) {
+    public TaskOperationVO createTask(FederatedTaskCreateRequest createDTO, String createdBy) {
         log.info("开始创建联邦学习任务: taskName={}, algorithm={}, createdBy={}", 
             createDTO.getTaskName(), createDTO.getAlgorithm(), createdBy);
 
@@ -111,54 +145,170 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         if (!isValidTaskConfig(createDTO)) {
             throw new UserException("任务配置无效");
         }
+        if (createDTO.getInitialModelConfig() == null) {
+            throw new UserException("初始模型配置不能为空");
+        }
 
-        // 生成任务ID
-        String taskId = uuidUtil.generateUuid();
-        LocalDateTime now = LocalDateTime.now();
+        TransactionTemplate creationTemplate = new TransactionTemplate(transactionManager);
+        creationTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
 
-        // 构建任务实体
-        FederatedTask task = buildTaskFromCreateDTO(createDTO, taskId, createdBy, now);
+        TaskCreationResult creationResult = creationTemplate.execute(status ->
+            createTaskTransactional(createDTO, createdBy)
+        );
 
-        // 插入任务记录
-        int result = tasksMapper.insertTask(task);
-        if (result <= 0) {
+        if (creationResult == null || creationResult.getTask() == null) {
             throw new UserException("任务创建失败");
         }
 
-        // 创建参与者记录
-        if (createDTO.getParticipants() != null && !createDTO.getParticipants().isEmpty()) {
-            for (TaskCreateDTO.ParticipantDTO participantDTO : createDTO.getParticipants()) {
-                TaskParticipant participant = buildParticipantFromDTO(participantDTO, taskId, now);
-                tasksMapper.insertParticipant(participant);
-            }
+        TaskResourcePreparationResult preparationResult;
+        try {
+            preparationResult = prepareTaskResources(creationResult.getTask(), createdBy);
+        } catch (Exception ex) {
+            log.error("任务资源准备失败: taskId={}, error={}", creationResult.getTask().getId(), ex.getMessage(), ex);
+            preparationResult = TaskResourcePreparationResult.failed(
+                    creationResult.getTask().getDatasetId(),
+                    creationResult.getTargetVmIds(),
+                    "资源准备过程中发生异常: " + ex.getMessage());
         }
 
-        // 记录操作日志
-        logTask(taskId, "INFO", "任务创建成功", "TASK_MANAGER", null, 
-            Map.of("participants", createDTO.getParticipants()));
+        FederatedTask refreshedTask = tasksMapper.selectTaskById(creationResult.getTask().getId());
+        FederatedTaskStatus latestStatus = refreshedTask != null
+                ? refreshedTask.getStatus()
+                : creationResult.getTask().getStatus();
 
-        // 构建响应
         TaskOperationVO response = TaskOperationVO.builder()
-            .taskId(taskId)
-            .taskName(createDTO.getTaskName())
-            .status(STATUS_CREATED.getCode())
-            .createdAt(now)
+            .taskId(creationResult.getTask().getId())
+            .taskName(creationResult.getTask().getTaskName())
+            .status(latestStatus != null ? latestStatus.getCode() : STATUS_CREATED.getCode())
+            .createdAt(creationResult.getCreatedAt())
             .createdBy(createdBy)
-            .participantCount(createDTO.getParticipants().size())
-            .estimatedDuration(estimateTaskDuration(createDTO))
+            .participantCount(creationResult.getParticipantCount())
+            .estimatedDuration(creationResult.getEstimatedDuration())
+            .configSummary(creationResult.getConfigSummary())
             .build();
 
-        // v1.5.1修正版：创建任务时不再自动触发数据分发
-        // 数据分发改为在任务启动时触发
-        log.info("联邦学习任务创建完成: taskId={}, participantCount={}, 状态=CREATED（数据尚未分发）",
-            taskId, createDTO.getParticipants().size());
+        if (preparationResult != null) {
+            boolean triggered = preparationResult.isDatasetDistributionTriggered()
+                    || preparationResult.isModelDistributionTriggered();
+            response.setResourcePreparation(preparationResult.toSummary());
+            if (preparationResult.isReady()) {
+                response.setStatus(STATUS_PENDING.getCode());
+                response.setMessage(StringUtils.hasText(preparationResult.getMessage())
+                        ? "任务创建成功，" + preparationResult.getMessage()
+                        : "任务创建成功，资源已准备就绪");
+            } else if (preparationResult.hasError()) {
+                response.setMessage("任务创建成功，但资源准备失败: " + preparationResult.getErrorMessage());
+            } else if (triggered) {
+                response.setStatus(STATUS_PENDING.getCode());
+                if (StringUtils.hasText(preparationResult.getMessage())) {
+                    response.setMessage("任务创建成功，" + preparationResult.getMessage());
+                } else {
+                    response.setMessage("任务创建成功，资源准备进行中");
+                }
+            } else {
+                response.setMessage("任务创建成功，等待资源准备");
+            }
+        } else {
+            response.setMessage("任务创建成功，等待资源准备");
+        }
+
+        log.info("任务创建响应: taskId={}, status={}, message={}, resourcePrep={}",
+                response.getTaskId(), response.getStatus(), response.getMessage(), response.getResourcePreparation());
+
+        response.setTimestamp(LocalDateTime.now());
+        log.info("任务创建响应详情: taskId={}, status={}, initialModelSummary={}, resourcePrep={}",
+                response.getTaskId(),
+                response.getStatus(),
+                response.getConfigSummary() != null ? response.getConfigSummary().getInitialModel() : null,
+                response.getResourcePreparation());
+
+        log.info("联邦学习任务创建完成: taskId={}, participantCount={}, status={}, resourceSummary={}",
+            creationResult.getTask().getId(), creationResult.getParticipantCount(),
+            response.getStatus(), response.getResourcePreparation());
 
         return response;
     }
 
+    private TaskCreationResult createTaskTransactional(FederatedTaskCreateRequest createDTO, String createdBy) {
+        LocalDateTime now = LocalDateTime.now();
+        String taskId = uuidUtil.generateUuid();
+
+        FederatedTask task = buildTaskFromCreateDTO(createDTO, taskId, createdBy, now);
+        task.setStatus(STATUS_CREATED);
+        task.setUpdatedAt(now);
+
+        int inserted = tasksMapper.insertTask(task);
+        if (inserted <= 0) {
+            throw new UserException("任务创建失败");
+        }
+
+        List<FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO> participants = getSmartParticipants(createDTO);
+        List<String> targetVmIds = new ArrayList<>();
+        for (FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO participantDTO : participants) {
+            TaskParticipant participant = buildSmartParticipantFromDTO(participantDTO, taskId, now);
+            tasksMapper.insertParticipant(participant);
+            if (StringUtils.hasText(participantDTO.getVmId())) {
+                targetVmIds.add(participantDTO.getVmId());
+            }
+        }
+
+        InitialModelBindingVO binding = bindInitialModelForTask(taskId, createDTO.getInitialModelConfig(), createdBy);
+
+        logTask(taskId, "INFO", "任务创建成功", "TASK_MANAGER", null,
+            Map.of("participantCount", participants.size()));
+
+        return new TaskCreationResult(
+            task,
+            now,
+            participants.size(),
+            estimateTaskDuration(createDTO),
+            buildConfigSummary(createDTO.getInitialModelConfig(), binding),
+            targetVmIds
+        );
+    }
+
+    private TaskCreationResult createSmartTaskTransactional(FederatedTaskCreateRequest createDTO, String createdBy) {
+        LocalDateTime now = LocalDateTime.now();
+        String taskId = uuidUtil.generateUuid();
+
+        FederatedTask task = buildSmartTaskFromCreateDTO(createDTO, taskId, createdBy, now);
+        task.setStatus(STATUS_CREATED);
+        task.setUpdatedAt(now);
+
+        int inserted = tasksMapper.insertTask(task);
+        if (inserted <= 0) {
+            throw new UserException("任务创建失败");
+        }
+
+        List<FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO> participants = getSmartParticipants(createDTO);
+        List<String> targetVmIds = new ArrayList<>();
+        for (FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO participantDTO : participants) {
+            TaskParticipant participant = buildSmartParticipantFromDTO(participantDTO, taskId, now);
+            tasksMapper.insertParticipant(participant);
+            if (StringUtils.hasText(participantDTO.getVmId())) {
+                targetVmIds.add(participantDTO.getVmId());
+            }
+        }
+
+        InitialModelBindingVO binding = bindInitialModelForTask(taskId, createDTO.getInitialModelConfig(), createdBy);
+
+        logTask(taskId, "INFO", "任务创建成功", "TASK_MANAGER", null,
+            Map.of("datasetId", createDTO.getDatasetConfig().getDatasetId(),
+                   "participants", participants.size()));
+
+        return new TaskCreationResult(
+            task,
+            now,
+            participants.size(),
+            estimateSmartTaskDuration(createDTO),
+            buildConfigSummary(createDTO.getInitialModelConfig(), binding),
+            targetVmIds
+        );
+    }
+
     @Override
     @Transactional
-    public TaskOperationVO configureTask(String taskId, TaskConfigDTO configDTO, String updatedBy) {
+    public TaskOperationVO configureTask(String taskId, FederatedTaskConfigDTO configDTO, String updatedBy) {
         log.info("开始配置任务: taskId={}, updatedBy={}", taskId, updatedBy);
 
         FederatedTask task = getTaskById(taskId);
@@ -166,7 +316,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             throw new UserException("任务不存在");
         }
 
-        if (!STATUS_CREATED.equals(task.getStatus()) && !STATUS_CONFIGURED.equals(task.getStatus())) {
+        if (!STATUS_CREATED.equals(task.getStatus())
+                && !STATUS_CONFIGURED.equals(task.getStatus())) {
             throw new UserException("任务状态不允许配置");
         }
 
@@ -174,6 +325,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         updateTaskFromConfigDTO(task, configDTO, updatedBy);
         task.setStatus(STATUS_CONFIGURED);
         task.setUpdatedAt(LocalDateTime.now());
+
+        InitialModelBindingVO binding = null;
+        if (configDTO.getInitialModelConfig() != null) {
+            binding = bindInitialModelForTask(taskId, configDTO.getInitialModelConfig(), updatedBy);
+        }
 
         int result = tasksMapper.updateTask(task);
         if (result <= 0) {
@@ -188,6 +344,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .status(STATUS_CONFIGURED.getCode())
             .updatedAt(LocalDateTime.now())
             .configVersion("v1.1")
+            .configSummary(buildConfigSummary(configDTO.getInitialModelConfig(), binding))
             .build();
 
         log.info("任务配置完成: taskId={}", taskId);
@@ -204,78 +361,90 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             throw new UserException("任务不存在");
         }
 
-        // 允许CREATED和CONFIGURED状态的任务启动
-        if (!STATUS_CREATED.equals(task.getStatus()) && !STATUS_CONFIGURED.equals(task.getStatus())) {
-            throw new UserException("任务状态不允许启动，当前状态: " + task.getStatus());
+        if (STATUS_RUNNING.equals(task.getStatus())) {
+            throw new UserException("任务已在运行中");
+        }
+
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+
+        TaskResourcePreparationResult preparationResult = null;
+        boolean readyState = STATUS_READY.equals(task.getStatus()) || STATUS_PENDING.equals(task.getStatus());
+        if (!readyState) {
+            if (STATUS_CREATED.equals(task.getStatus())
+                    || STATUS_CONFIGURED.equals(task.getStatus())) {
+                log.info("任务状态为{}，尝试执行启动前资源准备: taskId={}",
+                        task.getStatus(), taskId);
+                preparationResult = prepareTaskResources(task, operatorId);
+                if (!preparationResult.isReady()) {
+                    String reason = preparationResult.hasError()
+                            ? preparationResult.getErrorMessage()
+                            : "任务资源尚未准备完成，无法启动";
+                    throw new UserException(reason);
+                }
+                task = getTaskById(taskId);
+            } else {
+                throw new UserException("任务状态不允许启动，当前状态: " + task.getStatus());
+            }
+        } else {
+            preparationResult = prepareTaskResources(task, operatorId);
+            if (preparationResult != null && !preparationResult.isReady()) {
+                String reason = preparationResult.hasError()
+                        ? preparationResult.getErrorMessage()
+                        : "任务资源尚未准备完成，无法启动";
+                throw new UserException(reason);
+            }
+        }
+
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+        if (participants.isEmpty()) {
+            throw new UserException("联邦学习任务没有可用参与者，无法启动");
         }
 
         LocalDateTime now = LocalDateTime.now();
+        task.setStatus(STATUS_RUNNING);
+        task.setStartedAt(now);
+        task.setUpdatedAt(now);
+        tasksMapper.updateTask(task);
 
-        // v1.5.1修正版：在启动任务时触发数据切片和分发
-        log.info("🚀 任务启动，触发数据切片和分发: taskId={}", taskId);
-
-        // 提取任务配置信息
-        String datasetId = task.getDatasetId();
-        String distributionStrategy = task.getDistributionStrategy();
-
-        // 提取参与者VM ID列表
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
-        List<String> participantVmIds = participants.stream()
-                .map(TaskParticipant::getVmId)
-                .collect(Collectors.toList());
-
-        // 发布任务启动事件，触发数据分发
-        if (datasetId != null && !datasetId.isEmpty() && !participantVmIds.isEmpty()) {
-            log.info("🔥 发布任务启动事件，触发数据分发: taskId={}, datasetId={}, vmCount={}, strategy={}",
-                    taskId, datasetId, participantVmIds.size(), distributionStrategy);
-
-            eventPublisher.publishEvent(new com.feduwacomm.event.FederatedTaskStartedEvent(
-                    this,  // 事件源
-                    taskId,
-                    task.getTaskName(),
-                    operatorId,
-                    datasetId,
-                    participantVmIds,
-                    distributionStrategy
-            ));
-
-            log.info("✅ 任务启动事件已发布，等待数据分发完成...");
-        } else {
-            log.warn("⚠️ 任务没有配置数据集或参与者，跳过数据分发: taskId={}, datasetId={}, vmCount={}",
-                    taskId, datasetId, participantVmIds.size());
-        }
-
-        // 更新任务状态
-        tasksMapper.updateTaskStatus(taskId, STATUS_RUNNING.getCode(), now);
-
-        // 更新参与者状态为连接中
         for (TaskParticipant participant : participants) {
-            tasksMapper.updateParticipantStatus(taskId, participant.getVmId(), "CONNECTED", now);
+            participant.setStatus(ParticipantStatus.CONNECTED);
+            tasksMapper.updateParticipantStatus(taskId, participant.getVmId(),
+                    ParticipantStatus.CONNECTED.getCode(), now);
         }
 
-        // 记录操作日志
-        logTask(taskId, "INFO", "任务启动成功", "TASK_MANAGER", null, 
-            Map.of("participants", participants.stream().map(TaskParticipant::getVmId).collect(Collectors.toList())));
+        logTask(taskId, "INFO", "任务启动成功", "TASK_MANAGER", null,
+            Map.of("participants", participants.stream()
+                    .map(TaskParticipant::getVmId)
+                    .collect(Collectors.toList())));
 
-        // 构建参与者状态列表
+        sendTrainingStartCommand(taskId, participants);
+
         List<TaskOperationVO.ParticipantStatus> participantStatuses = participants.stream()
             .map(p -> TaskOperationVO.ParticipantStatus.builder()
                 .vmId(p.getVmId())
-                .status("CONNECTED")
+                .status(ParticipantStatus.CONNECTED.getCode())
                 .dataSource(p.getDataSource())
                 .build())
             .collect(Collectors.toList());
-
-        // 发送训练启动指令给所有参与者
-        sendTrainingStartCommand(taskId, participants);
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
             .status(STATUS_RUNNING.getCode())
             .startedAt(now)
-            .currentRound(0)
+            .currentRound(task.getCurrentRound())
             .participants(participantStatuses)
+            .message("任务启动成功")
+            .timestamp(now)
             .build();
+        if (preparationResult != null) {
+            response.setResourcePreparation(preparationResult.toSummary());
+        }
+        if (binding != null) {
+            response.setConfigSummary(buildConfigSummaryFromTask(task, binding));
+        }
+
+        log.info("启动任务响应概要: taskId={}, resourcePreparation={}, configSummary={}",
+                taskId, response.getResourcePreparation(), response.getConfigSummary());
 
         log.info("任务启动完成: taskId={}, participantCount={}", taskId, participants.size());
         return response;
@@ -442,6 +611,33 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         LocalDateTime now = LocalDateTime.now();
 
+        // 处理初始模型绑定
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+        boolean modelDeleted = false;
+        boolean modelUnbound = false;
+        String boundModelId = null;
+        if (binding != null && StringUtils.hasText(binding.getModelId())) {
+            boundModelId = binding.getModelId();
+            if (Boolean.TRUE.equals(deleteDTO.getDeleteModel())) {
+                try {
+                    modelDeleted = initialModelGenerationService.deleteModel(boundModelId, operatorId);
+                    log.info("任务删除同步删除初始模型: taskId={}, modelId={}, deleted={}", taskId, boundModelId, modelDeleted);
+                } catch (Exception e) {
+                    log.error("删除初始模型失败: taskId={}, modelId={}, error={}", taskId, boundModelId, e.getMessage(), e);
+                    throw new UserException("删除初始模型失败: " + e.getMessage());
+                }
+            } else {
+                try {
+                    initialModelGenerationService.unbindModelFromTask(boundModelId, taskId, operatorId);
+                    modelUnbound = true;
+                    log.info("任务删除解除初始模型绑定: taskId={}, modelId={}", taskId, boundModelId);
+                } catch (Exception e) {
+                    log.error("解除初始模型绑定失败: taskId={}, modelId={}, error={}", taskId, boundModelId, e.getMessage(), e);
+                    throw new UserException("解除初始模型绑定失败: " + e.getMessage());
+                }
+            }
+        }
+
         // 删除相关数据
         if (deleteDTO.getDeleteData() != null && deleteDTO.getDeleteData()) {
             // 删除参与者数据
@@ -457,14 +653,20 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 记录操作日志（在删除任务记录前记录）
-        logTask(taskId, "INFO", "任务删除成功", "TASK_MANAGER", null, 
-            Map.of("deleteData", deleteDTO.getDeleteData(), "deleteModel", deleteDTO.getDeleteModel()));
+        Map<String, Object> logDetails = new HashMap<>();
+        logDetails.put("deleteData", deleteDTO.getDeleteData());
+        logDetails.put("deleteModel", deleteDTO.getDeleteModel());
+        logDetails.put("modelDeleted", modelDeleted);
+        logDetails.put("modelUnbound", modelUnbound);
+        logDetails.put("boundModelId", boundModelId);
+
+        logTask(taskId, "INFO", "任务删除成功", "TASK_MANAGER", null, logDetails);
 
         TaskOperationVO response = TaskOperationVO.builder()
             .taskId(taskId)
             .deletedAt(now)
             .dataDeleted(deleteDTO.getDeleteData())
-            .modelPreserved(!deleteDTO.getDeleteModel())
+            .modelPreserved(!modelDeleted)
             .build();
 
         log.info("任务删除完成: taskId={}", taskId);
@@ -481,13 +683,17 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         // 获取参与者信息
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
         List<TaskDetailVO.ParticipantVO> participantVOs = participants.stream()
             .map(this::convertToParticipantVO)
             .collect(Collectors.toList());
 
         // 构建指标信息
         TaskDetailVO.MetricsVO metrics = buildTaskMetrics(task, participants);
+
+        // 初始模型摘要
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+        TaskOperationVO.ConfigSummaryVO configSummary = buildConfigSummaryFromTask(task, binding);
 
         // 构建任务详情
         TaskDetailVO taskDetail = TaskDetailVO.builder()
@@ -509,6 +715,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .progress(task.getProgress())
             .participants(participantVOs)
             .metrics(metrics)
+            .configSummary(configSummary)
             .build();
 
         log.info("任务详情查询完成: taskId={}, status={}", taskId, task.getStatus());
@@ -607,7 +814,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     @Override
     public List<TaskParticipant> getTaskParticipants(String taskId) {
-        return tasksMapper.selectParticipantsByTaskId(taskId);
+        return taskParticipantsMapper.selectParticipantsByTaskId(taskId);
     }
 
     @Override
@@ -630,26 +837,36 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     @Override
     public boolean isValidStatusTransition(String currentStatus, String targetStatus) {
         // 定义状态转换规则
-        Map<String, Set<String>> validTransitions = Map.of(
-            STATUS_CREATED.getCode(), Set.of(STATUS_CONFIGURED.getCode(), STATUS_CANCELLED.getCode()),
-            STATUS_CONFIGURED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_CANCELLED.getCode()),
-            STATUS_RUNNING.getCode(), Set.of(STATUS_PAUSED.getCode(), STATUS_STOPPED.getCode(), STATUS_COMPLETED.getCode(), STATUS_FAILED.getCode()),
-            STATUS_PAUSED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_STOPPED.getCode(), STATUS_CANCELLED.getCode()),
-            STATUS_STOPPED.getCode(), Set.of(),
-            STATUS_COMPLETED.getCode(), Set.of(),
-            STATUS_FAILED.getCode(), Set.of(),
-            STATUS_CANCELLED.getCode(), Set.of()
-        );
+        Map<String, Set<String>> validTransitions = new HashMap<>();
+        validTransitions.put(STATUS_CREATED.getCode(), Set.of(STATUS_CONFIGURED.getCode(), STATUS_CANCELLED.getCode()));
+        validTransitions.put(STATUS_PENDING.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_CONFIGURED.getCode(), STATUS_CANCELLED.getCode()));
+        validTransitions.put(STATUS_READY.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_CANCELLED.getCode()));
+        validTransitions.put(STATUS_CONFIGURED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_CANCELLED.getCode()));
+        validTransitions.put(STATUS_RUNNING.getCode(), Set.of(STATUS_PAUSED.getCode(), STATUS_STOPPED.getCode(), STATUS_COMPLETED.getCode(), STATUS_FAILED.getCode()));
+        validTransitions.put(STATUS_PAUSED.getCode(), Set.of(STATUS_RUNNING.getCode(), STATUS_STOPPED.getCode(), STATUS_CANCELLED.getCode()));
+        validTransitions.put(STATUS_STOPPED.getCode(), Collections.emptySet());
+        validTransitions.put(STATUS_COMPLETED.getCode(), Collections.emptySet());
+        validTransitions.put(STATUS_FAILED.getCode(), Collections.emptySet());
+        validTransitions.put(STATUS_CANCELLED.getCode(), Collections.emptySet());
 
-        return validTransitions.getOrDefault(currentStatus, Set.of()).contains(targetStatus);
+        return validTransitions.getOrDefault(currentStatus, Collections.emptySet()).contains(targetStatus);
     }
 
     @Override
-    public boolean isValidTaskConfig(TaskCreateDTO createDTO) {
+    public boolean isValidTaskConfig(FederatedTaskCreateRequest createDTO) {
         if (createDTO.getTaskName() == null || createDTO.getTaskName().trim().isEmpty()) {
             return false;
         }
-        if (createDTO.getParticipants() == null || createDTO.getParticipants().isEmpty()) {
+        if (createDTO.getDatasetConfig() == null
+                || !StringUtils.hasText(createDTO.getDatasetConfig().getDatasetId())) {
+            return false;
+        }
+        if (createDTO.getParticipantConfig() == null
+                || createDTO.getParticipantConfig().getParticipants() == null
+                || createDTO.getParticipantConfig().getParticipants().isEmpty()) {
+            return false;
+        }
+        if (createDTO.getInitialModelConfig() == null || !StringUtils.hasText(createDTO.getInitialModelConfig().getMode())) {
             return false;
         }
         return createDTO.getAlgorithm() != null && !createDTO.getAlgorithm().trim().isEmpty();
@@ -672,13 +889,16 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     @Override
-    public String generateConfigJson(TaskCreateDTO createDTO) {
+    public String generateConfigJson(FederatedTaskCreateRequest createDTO) {
         try {
             Map<String, Object> config = new HashMap<>();
             config.put("hyperparameters", createDTO.getHyperparameters());
-            config.put("modelConfig", createDTO.getModelConfig());
+            config.put("initialModelConfig", createDTO.getInitialModelConfig());
             config.put("schedule", createDTO.getSchedule());
             config.put("securityConfig", createDTO.getSecurityConfig());
+            config.put("datasetConfig", createDTO.getDatasetConfig());
+            config.put("participantConfig", createDTO.getParticipantConfig());
+            config.put("aggregationConfig", createDTO.getAggregationConfig());
             return objectMapper.writeValueAsString(config);
         } catch (JsonProcessingException e) {
             log.error("生成配置JSON失败: {}", e.getMessage());
@@ -687,12 +907,12 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     @Override
-    public String generateConfigJson(TaskConfigDTO configDTO) {
+    public String generateConfigJson(FederatedTaskConfigDTO configDTO) {
         try {
             Map<String, Object> config = new HashMap<>();
             config.put("algorithm", configDTO.getAlgorithm());
             config.put("hyperparameters", configDTO.getHyperparameters());
-            config.put("modelConfig", configDTO.getModelConfig());
+            config.put("initialModelConfig", configDTO.getInitialModelConfig());
             config.put("dataConfig", configDTO.getDataConfig());
             config.put("securityConfig", configDTO.getSecurityConfig());
             return objectMapper.writeValueAsString(config);
@@ -703,7 +923,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     @Override
-    public int estimateTaskDuration(TaskCreateDTO createDTO) {
+    public int estimateTaskDuration(FederatedTaskCreateRequest createDTO) {
         // 基于超参数估算任务执行时间
         int baseTime = 3600; // 基础时间1小时
         if (createDTO.getHyperparameters() != null) {
@@ -735,6 +955,18 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         String algorithmCode = task.getAlgorithm() != null ? task.getAlgorithm().getCode() : "FEDERATED_AVERAGING";
+        Map<String, Object> trainingPlan = buildTrainingPlan(task);
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+        InitialModelDetailVO initialModelDetail = null;
+        if (binding != null && StringUtils.hasText(binding.getModelId())) {
+            try {
+                initialModelDetail = initialModelGenerationService.getModelDetail(binding.getModelId(), true);
+            } catch (Exception ex) {
+                log.warn("获取初始模型详情失败: taskId={}, modelId={}, error={}", taskId, binding.getModelId(), ex.getMessage());
+            }
+        } else {
+            log.warn("任务{} 未绑定初始模型，FEDERATED_TASK_START消息将缺少initialModel字段", taskId);
+        }
         log.info("开始向{}个参与者发送训练启动指令: taskId={}, algorithm={}", participants.size(), taskId, algorithmCode);
 
         for (TaskParticipant participant : participants) {
@@ -750,6 +982,12 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     continue;
                 }
 
+                if (!"COMPLETED".equalsIgnoreCase(participant.getDatasetStatus())) {
+                    log.error("参与者数据集状态未就绪，跳过发送: vmId={}, taskId={}, datasetStatus={}",
+                            participant.getVmId(), taskId, participant.getDatasetStatus());
+                    continue;
+                }
+
                 // 如果dataPath为null，生成默认路径
                 if (dataPath == null || dataPath.trim().isEmpty()) {
                     dataPath = "/data/assigned/" + assignedDatasetId;
@@ -758,6 +996,12 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 }
 
                 // 使用MessageBuilder构建标准TRAINING_START消息，符合协议v1.5.1标准
+                Map<String, Object> initialModelPayload = null;
+                if (initialModelDetail != null) {
+                    ModelDistribution distribution = ensureModelDistributionRecord(initialModelDetail.getModelId(), participant.getVmId());
+                    initialModelPayload = buildInitialModelPayload(initialModelDetail, distribution.getId());
+                }
+
                 ProtocolMessage startMessage = MessageBuilder.buildTrainingStartMessage(
                     participant.getVmId(),
                     taskId,
@@ -767,7 +1011,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                     MessageBuilder.buildGlobalModel(taskId, 1), // globalModel对象
                     "请开始本地ML训练任务", // message
                     assignedDatasetId, // v1.5.1新增
-                    dataPath // v1.5.1新增
+                    dataPath, // v1.5.1新增
+                    initialModelPayload,
+                    trainingPlan
                 );
 
                 // 发送到VM专用topic
@@ -787,7 +1033,38 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 taskId, algorithmCode, participants.size());
     }
 
-    private FederatedTask buildTaskFromCreateDTO(TaskCreateDTO createDTO, String taskId, String createdBy, LocalDateTime now) {
+    private boolean waitForDatasetAcknowledgments(String taskId) {
+        return vmAckTracker.waitForAllAcknowledgments(
+                taskId,
+                VmAckTracking.AckType.DATASET_COMPLETE.name(),
+                datasetAckTimeoutSeconds);
+    }
+
+    private boolean waitForModelDistributionAcknowledgments(String modelId,
+                                                            List<String> targetVmIds,
+                                                            int timeoutSeconds) {
+        if (!StringUtils.hasText(modelId) || CollectionUtils.isEmpty(targetVmIds)) {
+            return true;
+        }
+
+        Instant deadline = Instant.now().plusSeconds(Math.max(timeoutSeconds, 1));
+        while (Instant.now().isBefore(deadline)) {
+            List<String> pending = collectPendingModelVmIds(modelId, targetVmIds);
+            if (pending.isEmpty()) {
+                return true;
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(500);
+            } catch (InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
+        return collectPendingModelVmIds(modelId, targetVmIds).isEmpty();
+    }
+
+    private FederatedTask buildTaskFromCreateDTO(FederatedTaskCreateRequest createDTO, String taskId, String createdBy, LocalDateTime now) {
         FederatedTask task = new FederatedTask();
         task.setId(taskId);
         task.setTaskName(createDTO.getTaskName());
@@ -803,13 +1080,6 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             task.setEpochs(createDTO.getHyperparameters().getEpochs());
             task.setTotalRounds(createDTO.getHyperparameters().getRounds());
             task.setMinParticipants(createDTO.getHyperparameters().getMinParticipants());
-        }
-        
-        // 设置模型配置
-        if (createDTO.getModelConfig() != null) {
-            task.setModelType(createDTO.getModelConfig().getModelType());
-            task.setTestSize(createDTO.getModelConfig().getTestSize());
-            task.setRandomState(createDTO.getModelConfig().getRandomState());
         }
         
         // 设置调度配置
@@ -832,7 +1102,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         
         task.setCurrentRound(0);
         // progress现在通过getProgress()方法自动计算，无需设置
-        task.setParticipantCount(createDTO.getParticipants().size());
+        task.setParticipantCount(getSmartParticipants(createDTO).size());
         task.setEstimatedDuration(estimateTaskDuration(createDTO));
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
@@ -842,20 +1112,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         return task;
     }
 
-    private TaskParticipant buildParticipantFromDTO(TaskCreateDTO.ParticipantDTO participantDTO, String taskId, LocalDateTime now) {
-        return TaskParticipant.builder()
-            .id(uuidUtil.generateUuid())
-            .taskId(taskId)
-            .vmId(participantDTO.getVmId())
-            .role(ParticipantRole.fromCode(participantDTO.getRole()))
-            .status(ParticipantStatus.PENDING)
-            .dataSource(participantDTO.getDataSource())
-            .createdAt(now)
-            .updatedAt(now)
-            .build();
-    }
-
-    private void updateTaskFromConfigDTO(FederatedTask task, TaskConfigDTO configDTO, String updatedBy) {
+    private void updateTaskFromConfigDTO(FederatedTask task, FederatedTaskConfigDTO configDTO, String updatedBy) {
         if (configDTO.getAlgorithm() != null) {
             task.setAlgorithm(FederatedAlgorithm.fromCode(configDTO.getAlgorithm()));
         }
@@ -1001,6 +1258,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     private TaskVO convertToTaskVO(FederatedTask task) {
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(task.getId());
+        TaskOperationVO.InitialModelSummary initialModelSummary = extractInitialModelSummary(task, binding);
+        TaskOperationVO.ConfigSummaryVO configSummary = buildConfigSummaryFromTask(task, binding);
         return TaskVO.builder()
             .taskId(task.getId())
             .taskName(task.getTaskName())
@@ -1015,6 +1275,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .totalRounds(task.getTotalRounds())
             .progress(task.getProgress())
             .createdBy(task.getCreatedBy())
+            .initialModelSummary(initialModelSummary)
+            .configSummary(configSummary)
             .build();
     }
 
@@ -1080,7 +1342,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             .build();
     }
 
-    // ========== v1.3 图形化配置接口实现 ==========
+    // ========== 图形化配置接口实现 ==========
 
     @Override
     public ConfigPreviewVO.AvailableVmsVO getAvailableVms(String algorithm, Integer minCpuCores,
@@ -1315,25 +1577,31 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         log.info("数据分配预览: datasetId={}, strategy={}",
             requestDTO.getDatasetId(), requestDTO.getDistributionStrategy());
 
-        // 模拟数据分配计算，实际应该根据真实数据进行分配
-        List<ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO> allocations = new ArrayList<>();
+        List<FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO> participants =
+            Optional.ofNullable(requestDTO.getParticipants()).orElse(Collections.emptyList());
+        if (participants.isEmpty()) {
+            throw new UserException("参与者列表不能为空");
+        }
 
-        double totalRatio = requestDTO.getParticipants().stream()
-            .mapToDouble(FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO::getRequestedRatio)
+        double totalRatio = participants.stream()
+            .mapToDouble(participant -> Optional.ofNullable(participant.getRequestedRatio()).orElse(0.0))
             .sum();
+        if (totalRatio <= 0.0) {
+            throw new UserException("请求比例总和必须大于0");
+        }
 
-        int totalRows = 10000; // 模拟数据集行数
-        int participantIndex = 1;
-
-        for (FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO participant : requestDTO.getParticipants()) {
-            double normalizedRatio = participant.getRequestedRatio() / totalRatio;
-            int allocatedRows = (int) (totalRows * normalizedRatio);
-            int estimatedTime = (int) (allocatedRows * 0.08 + Math.random() * 100); // 模拟训练时间
+        int totalRows = 10000;
+        int index = 1;
+        List<ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO> allocations = new ArrayList<>();
+        for (FederatedTaskController.DistributionPreviewRequestDTO.ParticipantRequestDTO participant : participants) {
+            double ratio = Optional.ofNullable(participant.getRequestedRatio()).orElse(0.0) / totalRatio;
+            int allocatedRows = (int) Math.round(totalRows * ratio);
+            int estimatedTime = (int) Math.round(allocatedRows * 0.08 + Math.random() * 100);
 
             allocations.add(ConfigPreviewVO.DistributionPreviewVO.DistributionResultVO.ParticipantAllocationVO.builder()
                 .vmId(participant.getVmId())
-                .vmName("水声联邦学习节点-" + String.format("%03d", participantIndex++))
-                .allocatedRatio(normalizedRatio)
+                .vmName(String.format("水声联邦学习节点-%03d", index++))
+                .allocatedRatio(ratio)
                 .allocatedRows(allocatedRows)
                 .estimatedTrainingTime(estimatedTime)
                 .build());
@@ -1346,8 +1614,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
         ConfigPreviewVO.DistributionPreviewVO.QualityMetricsVO qualityMetrics =
             ConfigPreviewVO.DistributionPreviewVO.QualityMetricsVO.builder()
-                .iidScore(0.85 + Math.random() * 0.1) // 模拟IID分数
-                .balanceScore(0.90 + Math.random() * 0.08) // 模拟平衡分数
+                .iidScore(0.85 + Math.random() * 0.1)
+                .balanceScore(0.90 + Math.random() * 0.08)
                 .build();
 
         return ConfigPreviewVO.DistributionPreviewVO.builder()
@@ -1360,44 +1628,50 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     public ConfigPreviewVO.ParticipantValidationVO validateParticipants(
             FederatedTaskController.ParticipantValidationRequestDTO requestDTO) {
         log.info("参与者验证: algorithm={}, taskType={}, participantCount={}",
-            requestDTO.getAlgorithm(), requestDTO.getTaskType(), requestDTO.getParticipants().size());
+            requestDTO.getAlgorithm(), requestDTO.getTaskType(),
+            requestDTO.getParticipants() == null ? 0 : requestDTO.getParticipants().size());
+
+        List<FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO> participants =
+            Optional.ofNullable(requestDTO.getParticipants()).orElse(Collections.emptyList());
+        if (participants.isEmpty()) {
+            throw new UserException("参与者列表不能为空");
+        }
 
         List<ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO> validations = new ArrayList<>();
         boolean overallValid = true;
 
-        for (FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO participant :
-             requestDTO.getParticipants()) {
+        for (FederatedTaskController.ParticipantValidationRequestDTO.ParticipantForValidationDTO participant : participants) {
+            Map<String, ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO> results =
+                new HashMap<>();
 
-            Map<String, ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO> results = new HashMap<>();
+            results.put("connectivity",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("网络连接正常")
+                    .build());
 
-            // 模拟验证结果
-            results.put("connectivity", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("网络连接正常")
-                .build());
+            results.put("resources",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("资源满足要求")
+                    .build());
 
-            results.put("resources", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("资源满足要求")
-                .build());
+            results.put("algorithm_support",
+                ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
+                    .status("PASS")
+                    .message("支持指定算法")
+                    .build());
 
-            results.put("algorithm_support", ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.ValidationItemVO.builder()
-                .status("PASS")
-                .message("支持指定算法")
-                .build());
-
-            boolean isParticipantValid = results.values().stream()
-                .allMatch(result -> "PASS".equals(result.getStatus()));
+            boolean participantValid = results.values().stream()
+                .allMatch(item -> "PASS".equals(item.getStatus()));
 
             validations.add(ConfigPreviewVO.ParticipantValidationVO.ValidationResultVO.builder()
                 .vmId(participant.getVmId())
-                .isValid(isParticipantValid)
+                .isValid(participantValid)
                 .validationResults(results)
                 .build());
 
-            if (!isParticipantValid) {
-                overallValid = false;
-            }
+            overallValid = overallValid && participantValid;
         }
 
         return ConfigPreviewVO.ParticipantValidationVO.builder()
@@ -1493,74 +1767,111 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     @Override
-    @Transactional
-    public TaskOperationVO createSmartTask(TaskCreateDTO createDTO, String createdBy) {
-        log.info("开始创建智能联邦学习任务: taskName={}, format=v1.3, createdBy={}",
+    public TaskOperationVO createSmartTask(FederatedTaskCreateRequest createDTO, String createdBy) {
+        log.info("开始创建联邦学习任务: taskName={}, format=v1.5, createdBy={}",
             createDTO.getTaskName(), createdBy);
 
-        // 验证v1.3新格式配置
+        // 参数校验
         if (createDTO.getDatasetConfig() == null) {
             throw new UserException("数据集配置不能为空");
         }
         if (createDTO.getParticipantConfig() == null) {
             throw new UserException("参与者配置不能为空");
         }
+        if (createDTO.getInitialModelConfig() == null) {
+            throw new UserException("初始模型配置不能为空");
+        }
+
+        List<FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO> participants = getSmartParticipants(createDTO);
+        if (participants.isEmpty()) {
+            throw new UserException("任务至少需要一个参与者");
+        }
 
         // 检查虚拟机是否被占用（一台VM只能绑定一个任务）
-        for (TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO participant :
-             createDTO.getParticipantConfig().getParticipants()) {
+        for (FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO participant : participants) {
             if (isVmOccupied(participant.getVmId())) {
                 throw new UserException("虚拟机 " + participant.getVmId() + " 已被其他任务占用");
             }
         }
 
-        // 生成任务ID
-        String taskId = uuidUtil.generateUuid();
-        LocalDateTime now = LocalDateTime.now();
+        TransactionTemplate creationTemplate = new TransactionTemplate(transactionManager);
+        creationTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
 
-        // 构建v1.3任务实体
-        FederatedTask task = buildSmartTaskFromCreateDTO(createDTO, taskId, createdBy, now);
-        System.out.println("🔥🔥🔥 准备插入任务: taskId=" + taskId + ", datasetId=" + task.getDatasetId() + ", strategy=" + task.getDistributionStrategy());
+        TaskCreationResult creationResult = creationTemplate.execute(status ->
+            createSmartTaskTransactional(createDTO, createdBy)
+        );
 
-        // 插入任务记录
-        int result = tasksMapper.insertTask(task);
-        if (result <= 0) {
+        if (creationResult == null || creationResult.getTask() == null) {
             throw new UserException("任务创建失败");
         }
 
-        // 创建v1.3参与者记录
-        for (TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO participantDTO :
-             createDTO.getParticipantConfig().getParticipants()) {
-            TaskParticipant participant = buildSmartParticipantFromDTO(participantDTO, taskId, now);
-            tasksMapper.insertParticipant(participant);
+        TaskResourcePreparationResult preparationResult;
+        try {
+            preparationResult = prepareTaskResources(creationResult.getTask(), createdBy);
+        } catch (Exception ex) {
+            log.error("任务资源准备失败: taskId={}, error={}", creationResult.getTask().getId(), ex.getMessage(), ex);
+            preparationResult = TaskResourcePreparationResult.failed(
+                    creationResult.getTask().getDatasetId(),
+                    creationResult.getTargetVmIds(),
+                    "资源准备过程中发生异常: " + ex.getMessage());
         }
 
-        // 记录操作日志
-        logTask(taskId, "INFO", "v1.3智能任务创建成功", "TASK_MANAGER", null,
-            Map.of("datasetId", createDTO.getDatasetConfig().getDatasetId(),
-                   "participants", createDTO.getParticipantConfig().getParticipants().size()));
+        FederatedTask refreshedTask = tasksMapper.selectTaskById(creationResult.getTask().getId());
+        FederatedTaskStatus latestStatus = refreshedTask != null
+                ? refreshedTask.getStatus()
+                : creationResult.getTask().getStatus();
 
-        // 构建v1.3增强响应
         TaskOperationVO response = TaskOperationVO.builder()
-            .taskId(taskId)
-            .taskName(createDTO.getTaskName())
-            .status(STATUS_CREATED.getCode())
-            .createdAt(now)
+            .taskId(creationResult.getTask().getId())
+            .taskName(creationResult.getTask().getTaskName())
+            .status(latestStatus != null ? latestStatus.getCode() : STATUS_CREATED.getCode())
+            .createdAt(creationResult.getCreatedAt())
             .createdBy(createdBy)
-            .participantCount(createDTO.getParticipantConfig().getParticipants().size())
-            .estimatedDuration(estimateSmartTaskDuration(createDTO))
+            .participantCount(creationResult.getParticipantCount())
+            .estimatedDuration(creationResult.getEstimatedDuration())
+            .configSummary(creationResult.getConfigSummary())
             .build();
 
-        // v1.5.1修正版：创建任务时不再自动触发数据分发
-        // 数据分发改为在任务启动时触发
-        log.info("智能任务创建成功 (v1.3): taskId={}, participantCount={}, datasetId={}, 状态=CREATED（数据尚未分发）",
-            taskId, createDTO.getParticipantConfig().getParticipants().size(),
-            createDTO.getDatasetConfig().getDatasetId());
+        if (preparationResult != null) {
+            boolean triggered = preparationResult.isDatasetDistributionTriggered()
+                    || preparationResult.isModelDistributionTriggered();
+            response.setResourcePreparation(preparationResult.toSummary());
+            if (preparationResult.isReady()) {
+                response.setStatus(STATUS_PENDING.getCode());
+                response.setMessage(StringUtils.hasText(preparationResult.getMessage())
+                        ? "任务创建成功，" + preparationResult.getMessage()
+                        : "任务创建成功，资源已准备就绪");
+            } else if (preparationResult.hasError()) {
+                response.setMessage("任务创建成功，但资源准备失败: " + preparationResult.getErrorMessage());
+            } else if (triggered) {
+                response.setStatus(STATUS_PENDING.getCode());
+                if (StringUtils.hasText(preparationResult.getMessage())) {
+                    response.setMessage("任务创建成功，" + preparationResult.getMessage());
+                } else {
+                    response.setMessage("任务创建成功，资源准备进行中");
+                }
+            } else {
+                response.setMessage("任务创建成功，等待资源准备");
+            }
+        } else {
+            response.setMessage("任务创建成功，等待资源准备");
+        }
+        response.setTimestamp(LocalDateTime.now());
+
+        log.info("智能任务创建响应: taskId={}, status={}, message={}, resourcePrep={}",
+                response.getTaskId(), response.getStatus(), response.getMessage(), response.getResourcePreparation());
 
         return response;
     }
 
-    // ========== v1.3 私有辅助方法 ==========
+    // ========== 私有辅助方法 ==========
+
+    private List<FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO> getSmartParticipants(FederatedTaskCreateRequest createDTO) {
+        if (createDTO.getParticipantConfig() == null || createDTO.getParticipantConfig().getParticipants() == null) {
+            return Collections.emptyList();
+        }
+        return createDTO.getParticipantConfig().getParticipants();
+    }
 
     /**
      * 检查虚拟机是否被占用
@@ -1572,10 +1883,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * 构建v1.3智能任务实体
+     * 构建联邦任务实体
      */
-    private FederatedTask buildSmartTaskFromCreateDTO(TaskCreateDTO createDTO, String taskId, String createdBy, LocalDateTime now) {
+    private FederatedTask buildSmartTaskFromCreateDTO(FederatedTaskCreateRequest createDTO, String taskId, String createdBy, LocalDateTime now) {
         FederatedTask task = new FederatedTask();
+        List<FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO> participants = getSmartParticipants(createDTO);
         task.setId(taskId);
         task.setTaskName(createDTO.getTaskName());
         task.setTaskType(createDTO.getTaskType());
@@ -1585,16 +1897,16 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         task.setCreatedBy(createdBy);
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
-        task.setParticipantCount(createDTO.getParticipantConfig().getParticipants().size());
+        task.setParticipantCount(participants.size());
         task.setCurrentRound(0);
         task.setTotalRounds(createDTO.getHyperparameters() != null ? createDTO.getHyperparameters().getRounds() : 10);
         // progress现在通过getProgress()方法自动计算，无需设置
 
-        // 设置v1.3特有字段
+        // 设置数据集信息
         task.setDatasetId(createDTO.getDatasetConfig().getDatasetId());
         task.setDistributionStrategy(createDTO.getDatasetConfig().getDistributionStrategy());
 
-        // 生成配置JSON，包含v1.3新结构
+        // 生成配置JSON
         try {
             task.setConfig(objectMapper.writeValueAsString(createDTO));
         } catch (JsonProcessingException e) {
@@ -1605,9 +1917,9 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * 构建v1.3智能参与者实体
+     * 构建联邦任务参与者实体
      */
-    private TaskParticipant buildSmartParticipantFromDTO(TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO participantDTO,
+    private TaskParticipant buildSmartParticipantFromDTO(FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO participantDTO,
                                                         String taskId, LocalDateTime now) {
         TaskParticipant participant = new TaskParticipant();
         // 生成主键ID
@@ -1616,11 +1928,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         participant.setVmId(participantDTO.getVmId());
         participant.setRole(ParticipantRole.fromCode(participantDTO.getRole()));
         participant.setStatus(ParticipantStatus.CREATED);
-        participant.setDataRatio(participantDTO.getDataRatio());
+        participant.setDataRatio(toThousandRatio(participantDTO.getDataRatio()));
         participant.setCreatedAt(now);
         participant.setUpdatedAt(now);
 
-        // 设置v1.3特有字段
+        // 设置扩展字段
         if (participantDTO.getCapabilities() != null) {
             try {
                 // 将List转换为JSON数组字符串，以便正确存储到MySQL的JSON列
@@ -1638,13 +1950,375 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         return participant;
     }
 
+    private Integer toThousandRatio(Double ratio) {
+        if (ratio == null) {
+            return null;
+        }
+        int value = (int) Math.round(ratio * 1000);
+        if (value < 0) {
+            return 0;
+        }
+        if (value > 1000) {
+            return 1000;
+        }
+        return value;
+    }
+
+    private boolean isDatasetPrepared(List<TaskParticipant> participants) {
+        if (CollectionUtils.isEmpty(participants)) {
+            return false;
+        }
+        return participants.stream()
+                .filter(p -> StringUtils.hasText(p.getVmId()))
+                .allMatch(p -> "COMPLETED".equalsIgnoreCase(p.getDatasetStatus()));
+    }
+
+    private boolean isInitialModelDistributed(String modelId, List<String> targetVmIds) {
+        if (!StringUtils.hasText(modelId) || CollectionUtils.isEmpty(targetVmIds)) {
+            return false;
+        }
+        for (String vmId : targetVmIds) {
+            ModelDistribution record = modelDistributionMapper.selectByModelIdAndVmId(modelId, vmId);
+            if (record == null || !"COMPLETED".equalsIgnoreCase(record.getDistributionStatus())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 准备任务所需的初始资源（数据集与初始模型）
+     * 在任务创建阶段调用，确保只执行一次分发。
+     *
+     * @param task 联邦学习任务
+     * @param operatorId 操作人ID
+     * @return 是否完成准备
+     */
+    private TaskResourcePreparationResult prepareTaskResources(FederatedTask task, String operatorId) {
+        TaskResourcePreparationResult result = new TaskResourcePreparationResult();
+        if (task == null) {
+            result.setErrorMessage("任务不存在");
+            result.setMessage("任务不存在，无法准备资源");
+            return result;
+        }
+
+        String taskId = task.getId();
+        result.setDatasetId(task.getDatasetId());
+
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+        if (CollectionUtils.isEmpty(participants)) {
+            log.warn("任务{}没有参与者，跳过资源准备", taskId);
+            result.setMessage("任务没有参与者，等待参与者配置");
+            return result;
+        }
+
+        List<String> targetVmIds = participants.stream()
+                .map(TaskParticipant::getVmId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        result.setTargetVmIds(targetVmIds);
+
+        if (CollectionUtils.isEmpty(targetVmIds)) {
+            log.warn("任务{}的参与者VM ID缺失，无法准备资源", taskId);
+            result.setErrorMessage("参与者VM ID缺失，无法执行资源准备");
+            result.setMessage("参与者VM ID缺失，无法执行资源准备");
+            return result;
+        }
+        log.info("资源准备初始状态: taskId={}, participants={}, datasetStatuses={}",
+                taskId,
+                targetVmIds.size(),
+                participants.stream()
+                        .map(p -> p.getVmId() + ":" + (p.getDatasetStatus() != null ? p.getDatasetStatus() : "NULL"))
+                        .collect(Collectors.toList()));
+
+        boolean datasetPrepared = isDatasetPrepared(participants);
+        if (!datasetPrepared) {
+            if (StringUtils.hasText(task.getDatasetId())) {
+                log.info("任务{} 数据集未就绪，触发数据分发流程: datasetId={}, vmCount={}",
+                        taskId, task.getDatasetId(), targetVmIds.size());
+                result.setDatasetDistributionTriggered(true);
+                String effectiveOperator = StringUtils.hasText(operatorId) ? operatorId : "SYSTEM";
+                try {
+                    vmAckTracker.initializeDatasetAck(taskId, targetVmIds);
+
+                    DataDistributionDTO distributionDTO = buildAutoDistributionDTO(task, targetVmIds);
+                    DataDistributionTaskVO distributionTask =
+                        dataDistributionService.createDistributionTask(distributionDTO, effectiveOperator);
+                    if (distributionTask != null && StringUtils.hasText(distributionTask.getDistributionId())) {
+                        result.setDatasetDistributionId(distributionTask.getDistributionId());
+                        log.info("数据分发任务已创建: taskId={}, distributionId={}",
+                                taskId, distributionTask.getDistributionId());
+                        dataDistributionService.startDistribution(distributionTask.getDistributionId(), effectiveOperator);
+                        log.info("数据分发任务已启动: taskId={}, distributionId={}",
+                                taskId, distributionTask.getDistributionId());
+                    } else {
+                        log.warn("数据分发任务创建失败或返回空ID: taskId={}", taskId);
+                        result.setErrorMessage("数据分发任务创建失败");
+                        result.setMessage("数据分发任务创建失败");
+                        return result;
+                    }
+
+                    result.appendMessage("已触发数据分发任务");
+                    boolean datasetAcked = waitForDatasetAcknowledgments(taskId);
+
+                    participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+                    datasetPrepared = isDatasetPrepared(participants);
+                    if (datasetAcked && !datasetPrepared) {
+                        log.info("任务{} 数据集ACK已到达但状态未更新，执行纠正", taskId);
+                        for (TaskParticipant participant : participants) {
+                            if (StringUtils.hasText(participant.getVmId()) &&
+                                    !"COMPLETED".equalsIgnoreCase(participant.getDatasetStatus())) {
+                                participant.setDatasetStatus("COMPLETED");
+                                participant.setDatasetCompletedAt(LocalDateTime.now());
+                                participant.setUpdatedAt(LocalDateTime.now());
+                                taskParticipantsMapper.updateParticipant(participant);
+                                log.info("任务{} 数据集状态纠正: vmId={}", taskId, participant.getVmId());
+                            }
+                        }
+                        participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+                        datasetPrepared = isDatasetPrepared(participants);
+                    }
+                    if (datasetAcked) {
+                        if (datasetPrepared) {
+                            result.appendMessage("数据分发已完成");
+                        } else {
+                            result.appendMessage("数据分发已确认，等待参与者状态更新");
+                        }
+                    } else {
+                        result.appendMessage("正在等待数据分发确认");
+                    }
+                } 
+                catch (Exception ex) {
+                    log.error("任务{} 数据集分发失败: {}", taskId, ex.getMessage(), ex);
+                    result.setErrorMessage("数据集分发失败: " + ex.getMessage());
+                    result.setMessage("数据分发过程中发生错误");
+                    participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
+                    result.setPendingDatasetVmIds(collectPendingDatasetVmIds(participants));
+                    return result;
+                }
+            } else {
+                log.info("任务{} 未配置数据集，跳过数据分发准备", taskId);
+                datasetPrepared = true;
+                result.appendMessage("任务未配置数据集，跳过数据分发");
+            }
+        } else {
+            result.appendMessage("数据分发已完成");
+        }
+        result.setDatasetPrepared(datasetPrepared);
+        List<String> pendingDatasetVmIds = StringUtils.hasText(task.getDatasetId())
+                ? collectPendingDatasetVmIds(participants)
+                : Collections.emptyList();
+        result.setPendingDatasetVmIds(pendingDatasetVmIds);
+        if (!datasetPrepared) {
+            List<String> datasetStatusSnapshot = participants.stream()
+                    .filter(p -> StringUtils.hasText(p.getVmId()))
+                    .map(p -> p.getVmId() + ":" + (StringUtils.hasText(p.getDatasetStatus()) ? p.getDatasetStatus() : "NULL"))
+                    .collect(Collectors.toList());
+            log.info("任务{} 数据集状态快照: {}", taskId, datasetStatusSnapshot);
+        }
+
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+        if (binding != null && StringUtils.hasText(binding.getModelId())) {
+            result.setInitialModelId(binding.getModelId());
+        }
+        log.info("任务{} 初始模型绑定查询结果: {}", taskId, binding != null ? binding.getModelId() : "null");
+
+        boolean modelDistributed = false;
+        if (binding != null && StringUtils.hasText(binding.getModelId())) {
+            modelDistributed = isInitialModelDistributed(binding.getModelId(), targetVmIds);
+            if (!modelDistributed) {
+                log.info("任务{} 初始模型未分发，开始执行分发流程: modelId={}, vmCount={}",
+                        taskId, binding.getModelId(), targetVmIds.size());
+                result.setModelDistributionTriggered(true);
+                try {
+                    result.appendMessage("已触发初始模型分发");
+                    InitialModelDistributeRequest distributeRequest = InitialModelDistributeRequest.builder()
+                            .modelId(binding.getModelId())
+                            .verifyIntegrity(Boolean.TRUE)
+                            .timeoutSeconds(Math.max(datasetAckTimeoutSeconds, 300))
+                            .build();
+                    initialModelGenerationService.distributeInitialModel(
+                            taskId,
+                            distributeRequest,
+                            StringUtils.hasText(operatorId) ? operatorId : "SYSTEM");
+                    boolean modelAcked = waitForModelDistributionAcknowledgments(
+                            binding.getModelId(),
+                            targetVmIds,
+                            Math.max(datasetAckTimeoutSeconds, 300));
+                    modelDistributed = isInitialModelDistributed(binding.getModelId(), targetVmIds);
+                    if (modelAcked) {
+                        if (modelDistributed) {
+                            result.appendMessage("初始模型分发完成");
+                        } else {
+                            result.appendMessage("初始模型分发已确认，等待状态入库");
+                        }
+                    } else {
+                        result.appendMessage("正在等待初始模型分发确认");
+                    }
+                } catch (Exception ex) {
+                    log.error("任务{} 初始模型分发失败: {}", taskId, ex.getMessage(), ex);
+                    result.setErrorMessage("初始模型分发失败: " + ex.getMessage());
+                    result.setMessage("初始模型分发过程中发生错误");
+                    result.setPendingModelVmIds(collectPendingModelVmIds(binding.getModelId(), targetVmIds));
+                    return result;
+                }
+            } else {
+                result.appendMessage("初始模型已完成分发");
+            }
+            result.setPendingModelVmIds(collectPendingModelVmIds(binding.getModelId(), targetVmIds));
+        } else {
+            log.warn("任务{} 未找到绑定的初始模型，跳过初始模型分发准备", taskId);
+            result.appendMessage("未找到绑定的初始模型");
+            result.setPendingModelVmIds(Collections.emptyList());
+        }
+        result.setModelDistributed(modelDistributed);
+
+        log.info("资源准备状态: taskId={}, datasetPrepared={}, modelDistributed={}, datasetTriggered={}, modelTriggered={}, ready={}, error={}",
+                taskId, datasetPrepared, modelDistributed, result.isDatasetDistributionTriggered(),
+                result.isModelDistributionTriggered(), result.isReady(), result.hasError());
+
+        boolean preparationTriggered = result.isDatasetDistributionTriggered() || result.isModelDistributionTriggered();
+        if (!result.isReady() && !result.hasError() && preparationTriggered && (task.getStatus() == null || !STATUS_PENDING.equals(task.getStatus()))) {
+            LocalDateTime pendingAt = LocalDateTime.now();
+            task.setStatus(STATUS_PENDING);
+            task.setUpdatedAt(pendingAt);
+            int pendingRows = tasksMapper.updateTaskStatus(taskId, STATUS_PENDING.getCode(), pendingAt);
+            System.out.println("[prepareTaskResources] pending update: taskId=" + taskId + ", rows=" + pendingRows + ", triggered=" + (result.isDatasetDistributionTriggered() || result.isModelDistributionTriggered()) + ", ready=" + result.isReady() + ", error=" + result.hasError());
+            logTask(taskId, "INFO", "任务资源准备进行中，状态更新为PENDING", "TASK_MANAGER", null,
+                    Map.of("datasetTriggered", result.isDatasetDistributionTriggered(),
+                           "modelTriggered", result.isModelDistributionTriggered()));
+            log.info("任务{} 资源准备进入PENDING: datasetTriggered={}, modelTriggered={}, rows={}", taskId,
+                    result.isDatasetDistributionTriggered(), result.isModelDistributionTriggered(), pendingRows);
+        }
+
+        if (datasetPrepared && modelDistributed) {
+            LocalDateTime readyAt = LocalDateTime.now();
+            task.setStatus(STATUS_PENDING);
+            task.setUpdatedAt(readyAt);
+            int readyRows = tasksMapper.updateTaskStatus(taskId, STATUS_PENDING.getCode(), readyAt);
+            System.out.println("[prepareTaskResources] ready update: taskId=" + taskId + ", rows=" + readyRows + ", datasetPrepared=" + datasetPrepared + ", modelDistributed=" + modelDistributed);
+
+            logTask(taskId, "INFO", "任务资源准备完成，状态已更新为PENDING", "TASK_MANAGER", null,
+                    Map.of("datasetPrepared", true, "modelDistributed", true));
+            log.info("任务{} 资源准备完成，rows={}", taskId, readyRows);
+            result.markReady(readyAt);
+            if (!StringUtils.hasText(result.getMessage())) {
+                result.setMessage("资源已准备完成，等待调度");
+            }
+        } else if (!StringUtils.hasText(result.getMessage()) && !result.hasError()) {
+            result.setMessage("资源准备进行中");
+        }
+
+        return result;
+    }
+
+    private List<String> collectPendingDatasetVmIds(List<TaskParticipant> participants) {
+        if (CollectionUtils.isEmpty(participants)) {
+            return Collections.emptyList();
+        }
+        return participants.stream()
+                .filter(p -> StringUtils.hasText(p.getVmId()))
+                .filter(p -> !"COMPLETED".equalsIgnoreCase(p.getDatasetStatus()))
+                .map(TaskParticipant::getVmId)
+                .collect(Collectors.toList());
+    }
+
+    private DataDistributionDTO buildAutoDistributionDTO(FederatedTask task, List<String> targetVmIds) {
+        String strategy = StringUtils.hasText(task.getDistributionStrategy())
+                ? task.getDistributionStrategy()
+                : "BALANCED";
+        Map<String, Object> distributionConfig = new HashMap<>();
+        distributionConfig.put("autoTriggered", Boolean.TRUE);
+        distributionConfig.put("taskName", task.getTaskName());
+        distributionConfig.put("strategy", strategy);
+
+        return DataDistributionDTO.builder()
+                .taskId(task.getId())
+                .datasetIds(List.of(task.getDatasetId()))
+                .distributionStrategy(strategy)
+                .targetVmIds(targetVmIds)
+                .distributionConfig(distributionConfig)
+                .shardCount(Math.max(targetVmIds.size(), 1))
+                .enableShuffle(Boolean.FALSE)
+                .enableCompression(Boolean.FALSE)
+                .verifyIntegrity(Boolean.TRUE)
+                .timeoutSeconds(Math.max(datasetAckTimeoutSeconds, 600))
+                .maxRetries(3)
+                .dataType("TRAINING_DATA")
+                .description("auto-preparation")
+                .build();
+    }
+
+    private List<String> collectPendingModelVmIds(String modelId, List<String> targetVmIds) {
+        if (!StringUtils.hasText(modelId) || CollectionUtils.isEmpty(targetVmIds)) {
+            return Collections.emptyList();
+        }
+        List<String> pending = new ArrayList<>();
+        for (String vmId : targetVmIds) {
+            ModelDistribution record = modelDistributionMapper.selectByModelIdAndVmId(modelId, vmId);
+            if (record == null || !"COMPLETED".equalsIgnoreCase(record.getDistributionStatus())) {
+                pending.add(vmId);
+            }
+        }
+        return pending;
+    }
+
+    private InitialModelBindingVO bindInitialModelForTask(String taskId, InitialModelConfigDTO config, String operatorId) {
+        if (config == null) {
+            throw new UserException("初始模型配置不能为空");
+        }
+        if (!StringUtils.hasText(config.getMode())) {
+            throw new UserException("初始模型配置模式不能为空");
+        }
+
+        String mode = config.getMode().toUpperCase(Locale.ROOT);
+        InitialModelBindingVO binding = null;
+        switch (mode) {
+            case "CUSTOM" -> {
+                if (!StringUtils.hasText(config.getInitialModelId())) {
+                    throw new UserException("CUSTOM 模式必须提供初始模型ID");
+                }
+                binding = initialModelGenerationService.bindModelToTask(
+                        config.getInitialModelId(),
+                        taskId,
+                        mode,
+                        false,
+                        operatorId);
+            }
+            case "AUTO" -> {
+                InitialModelConfigDTO.AutoGenerateConfig auto = config.getAutoGenerateConfig();
+                if (auto == null || !StringUtils.hasText(auto.getModelType()) || CollectionUtils.isEmpty(auto.getArchitecture())) {
+                    throw new UserException("AUTO 模式需要提供模型类型与架构参数");
+                }
+                InitialModelGenerateRequest request = InitialModelGenerateRequest.builder()
+                        .modelType(auto.getModelType())
+                        .architecture(auto.getArchitecture())
+                        .description(auto.getDescription())
+                        .randomSeed(auto.getRandomSeed())
+                        .labels(auto.getLabels())
+                        .metadata(auto.getMetadata())
+                        .build();
+                InitialModelDetailVO generated = initialModelGenerationService.generateInitialModel(request, operatorId);
+                binding = initialModelGenerationService.bindModelToTask(
+                        generated.getModelId(),
+                        taskId,
+                        mode,
+                        true,
+                        operatorId);
+            }
+            default -> throw new UserException("不支持的初始模型配置模式: " + config.getMode());
+        }
+        log.info("任务{} 初始模型绑定完成: mode={}, bindingModelId={}", taskId, mode, binding != null ? binding.getModelId() : "null");
+        return binding;
+    }
+
     /**
      * 估算智能任务执行时间
      */
-    private int estimateSmartTaskDuration(TaskCreateDTO createDTO) {
+    private int estimateSmartTaskDuration(FederatedTaskCreateRequest createDTO) {
         // 根据数据集大小、参与者数量和算法复杂度估算时间
         int baseTime = 3600; // 1小时基础时间
-        int participantCount = createDTO.getParticipantConfig().getParticipants().size();
+        int participantCount = getSmartParticipants(createDTO).size();
         int rounds = createDTO.getHyperparameters() != null ? createDTO.getHyperparameters().getRounds() : 10;
 
         // 复杂算法增加时间
@@ -1654,6 +2328,93 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
 
         return (int) (baseTime * participantCount * rounds * algorithmMultiplier / 10);
+    }
+
+    private TaskOperationVO.ConfigSummaryVO buildConfigSummary(InitialModelConfigDTO config, InitialModelBindingVO binding) {
+        TaskOperationVO.InitialModelSummary summary = buildInitialModelSummaryFromConfig(config, binding);
+        if (summary == null) {
+            return null;
+        }
+        return TaskOperationVO.ConfigSummaryVO.builder()
+                .initialModel(summary)
+                .build();
+    }
+
+    private TaskOperationVO.ConfigSummaryVO buildConfigSummaryFromTask(FederatedTask task, InitialModelBindingVO binding) {
+        TaskOperationVO.InitialModelSummary summary = extractInitialModelSummary(task, binding);
+        if (summary == null) {
+            return null;
+        }
+        return TaskOperationVO.ConfigSummaryVO.builder()
+                .initialModel(summary)
+                .build();
+    }
+
+    private TaskOperationVO.InitialModelSummary buildInitialModelSummaryFromConfig(InitialModelConfigDTO config, InitialModelBindingVO binding) {
+        String mode = config != null ? config.getMode() : null;
+        String configuredModelId = config != null ? config.getInitialModelId() : null;
+        return mergeInitialModelSummary(mode, configuredModelId, binding);
+    }
+
+    private TaskOperationVO.InitialModelSummary extractInitialModelSummary(FederatedTask task, InitialModelBindingVO binding) {
+        String mode = null;
+        String configuredModelId = null;
+        if (task != null && StringUtils.hasText(task.getConfig())) {
+            try {
+                JsonNode root = objectMapper.readTree(task.getConfig());
+                JsonNode imc = root.get("initialModelConfig");
+                if (imc != null) {
+                    JsonNode modeNode = imc.get("mode");
+                    if (modeNode != null && !modeNode.isNull()) {
+                        mode = modeNode.asText();
+                    }
+                    JsonNode idNode = imc.get("initialModelId");
+                    if (idNode != null && !idNode.isNull()) {
+                        configuredModelId = idNode.asText();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("解析任务配置中的 initialModelConfig 失败: taskId={}, error={}",
+                        task.getId(), e.getMessage());
+            }
+        }
+        return mergeInitialModelSummary(mode, configuredModelId, binding);
+    }
+
+    private TaskOperationVO.InitialModelSummary mergeInitialModelSummary(String mode, String configuredModelId,
+                                                                        InitialModelBindingVO binding) {
+        String effectiveMode = mode;
+        String effectiveModelId = configuredModelId;
+        boolean autoGenerated = StringUtils.hasText(mode) && "AUTO".equalsIgnoreCase(mode);
+        String bindingStatus = null;
+
+        if (binding != null) {
+            if (StringUtils.hasText(binding.getModelId())) {
+                effectiveModelId = binding.getModelId();
+            }
+            bindingStatus = binding.getStatus();
+            if (binding.getAutoGenerated() != null && binding.getAutoGenerated()) {
+                autoGenerated = true;
+            }
+            if (!StringUtils.hasText(effectiveMode)) {
+                effectiveMode = Boolean.TRUE.equals(binding.getAutoGenerated()) ? "AUTO" : "CUSTOM";
+            }
+        }
+
+        if (!StringUtils.hasText(effectiveMode) && StringUtils.hasText(effectiveModelId)) {
+            effectiveMode = "CUSTOM";
+        }
+
+        if (!StringUtils.hasText(effectiveMode)) {
+            return null;
+        }
+
+        return TaskOperationVO.InitialModelSummary.builder()
+                .mode(effectiveMode)
+                .initialModelId(effectiveModelId)
+                .autoGenerated(autoGenerated)
+                .bindingStatus(bindingStatus)
+                .build();
     }
 
     @Override
@@ -1720,15 +2481,15 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
     }
 
-    // ====================== v1.4协议任务生命周期管理方法 ======================
+    // ====================== v1.5协议任务生命周期管理方法 ======================
 
     /**
-     * v1.4启动联邦学习任务
+     * v1.5启动联邦学习任务
      * 实现"后端大脑"集中控制，VM被动响应
      */
     @Transactional
     public TaskOperationVO startFederatedTask(String taskId) {
-        log.info("v1.4启动联邦学习任务: taskId={}", taskId);
+        log.info("v1.5启动联邦学习任务: taskId={}", taskId);
 
         // 获取轮次锁
         if (!roundLockManager.acquireRoundLock(taskId)) {
@@ -1755,8 +2516,8 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             task.setStartedAt(now);
             task.setUpdatedAt(now);
 
-            // 设置v1.4协议字段
-            task.setProtocolVersion("1.4");
+            // 设置v1.5协议字段
+            task.setProtocolVersion("1.5");
             task.setLifecycleStatus("ACTIVE");
 
             // 更新任务状态
@@ -1766,7 +2527,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             }
 
             // 初始化VM确认跟踪器
-            List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
             List<String> vmIds = participants.stream()
                 .map(TaskParticipant::getVmId)
                 .collect(Collectors.toList());
@@ -1776,15 +2537,15 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             startFirstRound(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务启动成功", "TASK_LIFECYCLE", null,
-                Map.of("protocolVersion", "1.4", "participantCount", participants.size()));
+            logTask(taskId, "INFO", "v1.5任务启动成功", "TASK_LIFECYCLE", null,
+                Map.of("protocolVersion", "1.5", "participantCount", participants.size()));
 
             TaskOperationVO response = TaskOperationVO.builder()
                 .taskId(taskId)
                 .startedAt(now)
                 .build();
 
-            log.info("v1.4任务启动完成: taskId={}", taskId);
+            log.info("v1.5任务启动完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -1793,11 +2554,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4停止联邦学习任务
+     * v1.5停止联邦学习任务
      */
     @Transactional
     public TaskOperationVO stopFederatedTask(String taskId) {
-        log.info("v1.4停止联邦学习任务: taskId={}", taskId);
+        log.info("v1.5停止联邦学习任务: taskId={}", taskId);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -1838,7 +2599,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             saveRoundStateSnapshot(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务停止成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务停止成功", "TASK_LIFECYCLE", null,
                 Map.of("currentRound", task.getCurrentRound(), "acknowledged", allAcknowledged));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -1846,7 +2607,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .stoppedAt(now)
                 .build();
 
-            log.info("v1.4任务停止完成: taskId={}", taskId);
+            log.info("v1.5任务停止完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -1855,11 +2616,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4恢复联邦学习任务
+     * v1.5恢复联邦学习任务
      */
     @Transactional
     public TaskOperationVO resumeFederatedTask(String taskId) {
-        log.info("v1.4恢复联邦学习任务: taskId={}", taskId);
+        log.info("v1.5恢复联邦学习任务: taskId={}", taskId);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -1879,7 +2640,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             restoreRoundStateSnapshot(taskId);
 
             // 重新初始化VM确认跟踪器
-            List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+            List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
             List<String> vmIds = participants.stream()
                 .map(TaskParticipant::getVmId)
                 .collect(Collectors.toList());
@@ -1901,7 +2662,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             sendResumeCommandToAllVMs(taskId);
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务恢复成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务恢复成功", "TASK_LIFECYCLE", null,
                 Map.of("resumedRound", task.getCurrentRound()));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -1909,7 +2670,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .resumedAt(now)
                 .build();
 
-            log.info("v1.4任务恢复完成: taskId={}", taskId);
+            log.info("v1.5任务恢复完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -1918,11 +2679,11 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     }
 
     /**
-     * v1.4删除联邦学习任务
+     * v1.5删除联邦学习任务
      */
     @Transactional
     public TaskOperationVO deleteFederatedTask(String taskId, boolean preserveData) {
-        log.info("v1.4删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
+        log.info("v1.5删除联邦学习任务: taskId={}, preserveData={}", taskId, preserveData);
 
         if (!roundLockManager.acquireRoundLock(taskId)) {
             throw new UserException("无法获取任务锁，任务可能正在被其他操作处理");
@@ -1940,7 +2701,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 stopFederatedTask(taskId);
             }
 
-            // 清理v1.4协议相关状态
+            // 清理v1.5协议相关状态
             roundStateManager.cleanupTask(taskId);
             vmAckTracker.cleanupTask(taskId);
 
@@ -1969,7 +2730,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             }
 
             // 记录操作日志
-            logTask(taskId, "INFO", "v1.4任务删除成功", "TASK_LIFECYCLE", null,
+            logTask(taskId, "INFO", "v1.5任务删除成功", "TASK_LIFECYCLE", null,
                 Map.of("preserveData", preserveData));
 
             TaskOperationVO response = TaskOperationVO.builder()
@@ -1978,7 +2739,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
                 .dataDeleted(!preserveData)
                 .build();
 
-            log.info("v1.4任务删除完成: taskId={}", taskId);
+            log.info("v1.5任务删除完成: taskId={}", taskId);
             return response;
 
         } finally {
@@ -1986,7 +2747,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         }
     }
 
-    // ====================== v1.4协议辅助方法 ======================
+    // ====================== v1.5协议辅助方法 ======================
 
     /**
      * 启动第一轮训练
@@ -2012,13 +2773,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private void sendStopCommandToAllVMs(String taskId) {
         log.info("发送停止指令到所有VM: taskId={}", taskId);
 
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
         for (TaskParticipant participant : participants) {
             Map<String, Object> message = new HashMap<>();
             message.put("type", "TASK_STOP");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("reason", "USER_REQUESTED");
             message.put("timestamp", LocalDateTime.now());
 
@@ -2034,14 +2795,14 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         log.info("发送恢复指令到所有VM: taskId={}", taskId);
 
         FederatedTask task = getTaskById(taskId);
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
 
         for (TaskParticipant participant : participants) {
             Map<String, Object> message = new HashMap<>();
             message.put("type", "TASK_RESUME");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("currentRound", task.getCurrentRound());
             message.put("timestamp", LocalDateTime.now());
 
@@ -2055,13 +2816,13 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
     private void sendRoundStartToAllVMs(String taskId, int round) {
         log.info("发送轮次开始消息: taskId={}, round={}", taskId, round);
 
-        List<TaskParticipant> participants = tasksMapper.selectParticipantsByTaskId(taskId);
+        List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
         for (TaskParticipant participant : participants) {
             Map<String, Object> message = new HashMap<>();
             message.put("type", "ROUND_START");
             message.put("taskId", taskId);
             message.put("vmId", participant.getVmId());
-            message.put("protocol", "1.4");
+            message.put("protocol", "1.5");
             message.put("round", round);
             message.put("timestamp", LocalDateTime.now());
 
@@ -2472,7 +3233,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
 
     @Override
     @Transactional
-    public TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy) {
+    public TaskOperationVO createStandardFederatedTask(FederatedTaskCreateRequest createDTO, String createdBy) {
         // 📊 进度跟踪：步骤6-7实现
         log.info("开始标准任务创建流程: taskName={}", createDTO.getTaskName());
 
@@ -2496,7 +3257,7 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         // 步骤8：数据集分配
         List<String> participantVmIds = createDTO.getParticipantConfig().getParticipants()
             .stream()
-            .map(TaskCreateDTO.ParticipantConfigDTO.SmartParticipantDTO::getVmId)
+            .map(FederatedTaskCreateRequest.ParticipantConfigDTO.SmartParticipantDTO::getVmId)
             .collect(Collectors.toList());
         log.info("开始数据集分配: taskId={}, participants={}", taskId, participantVmIds.size());
 
@@ -2587,19 +3348,38 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
             DatasetQueryResult queryResult = queryDatasetStatus(
                 participant.getVmId(), taskId, participant.getAssignedDatasetId());
 
-            if (queryResult.isSuccess() && "CREATED".equals(queryResult.getDatasetStatus())) {
-                // 更新数据库中的数据集状态
-                participant.setDatasetStatus("CREATED");
-                participant.setDatasetCreatedAt(LocalDateTime.now());
+            boolean datasetReady = queryResult.isSuccess()
+                    && queryResult.getDatasetStatus() != null
+                    && List.of("CREATED", "COMPLETED", "READY").contains(queryResult.getDatasetStatus());
+
+            if (datasetReady) {
+                String status = queryResult.getDatasetStatus();
+                participant.setDatasetStatus(status);
+                if ("COMPLETED".equals(status)) {
+                    if (participant.getDatasetCompletedAt() == null) {
+                        participant.setDatasetCompletedAt(LocalDateTime.now());
+                    }
+                } else {
+                    if (participant.getDatasetCreatedAt() == null) {
+                        participant.setDatasetCreatedAt(LocalDateTime.now());
+                    }
+                }
+                if (queryResult.getLocalPath() != null) {
+                    participant.setLocalPath(queryResult.getLocalPath());
+                }
+                participant.setUpdatedAt(LocalDateTime.now());
                 taskParticipantsMapper.updateParticipant(participant);
 
                 readyCount++;
                 validationResults.put(participant.getVmId(), "READY");
                 log.info("VM数据集验证成功: vmId={}", participant.getVmId());
             } else {
-                validationResults.put(participant.getVmId(), "NOT_READY");
-                log.warn("VM数据集验证失败: vmId={}, status={}",
-                        participant.getVmId(), queryResult.getDatasetStatus());
+                String failureReason = queryResult.getErrorMessage() != null
+                        ? queryResult.getErrorMessage()
+                        : "status=" + queryResult.getDatasetStatus();
+                validationResults.put(participant.getVmId(), "NOT_READY:" + failureReason);
+                log.warn("VM数据集验证失败: vmId={}, status={}, reason={}",
+                        participant.getVmId(), queryResult.getDatasetStatus(), failureReason);
             }
         }
 
@@ -2616,29 +3396,232 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
         // 📊 进度跟踪：步骤12-13实现
         log.info("启动联邦学习流程: taskId={}", taskId);
 
-        // 步骤12：向所有虚拟机发送FEDERATED_TASK_START消息
+        FederatedTask task = tasksMapper.selectByTaskId(taskId);
+        if (task == null) {
+            throw new UserException("任务不存在或已被删除");
+        }
+
+        InitialModelBindingVO binding = initialModelGenerationService.getTaskBinding(taskId);
+        if (binding == null || !StringUtils.hasText(binding.getModelId())) {
+            throw new UserException("任务尚未绑定初始模型，无法启动联邦学习流程");
+        }
+
+        log.info("当前任务绑定初始模型: modelId={}", binding.getModelId());
+
+        InitialModelDetailVO initialModelDetail = initialModelGenerationService.getModelDetail(
+                binding.getModelId(), true);
+        if (initialModelDetail == null) {
+            throw new UserException("未找到任务绑定的初始模型，停止启动流程");
+        }
+
         List<TaskParticipant> participants = taskParticipantsMapper.selectParticipantsByTaskId(taskId);
         log.info("获取参与者列表，准备发送启动消息: taskId={}, count={}", taskId, participants.size());
+        if (participants.isEmpty()) {
+            throw new UserException("联邦学习任务没有可用参与者，无法启动");
+        }
 
+        List<String> targetVmIds = participants.stream()
+                .map(TaskParticipant::getVmId)
+                .filter(StringUtils::hasText)
+                .toList();
+
+        InitialModelDistributionStartedEvent.DistributionConfig distributionConfig =
+                new InitialModelDistributionStartedEvent.DistributionConfig(true, datasetAckTimeoutSeconds, 0);
+        eventPublisher.publishEvent(new InitialModelDistributionStartedEvent(
+                this,
+                initialModelDetail.getModelId(),
+                taskId,
+                null,
+                initialModelDetail.getModelType(),
+                targetVmIds,
+                distributionConfig
+        ));
+
+        Map<String, Object> trainingPlan = buildTrainingPlan(task);
         for (TaskParticipant participant : participants) {
-            sendFederatedTaskStart(
-                participant.getVmId(), taskId, participant.getAssignedDatasetId());
-            log.info("发送任务启动消息: vmId={}, taskId={}", participant.getVmId(), taskId);
+            if (!StringUtils.hasText(participant.getVmId())) {
+                log.warn("跳过VM ID为空的参与者: participantId={}, taskId={}", participant.getId(), taskId);
+                continue;
+            }
+            ModelDistribution distribution = ensureModelDistributionRecord(
+                    initialModelDetail.getModelId(), participant.getVmId());
+
+            Map<String, Object> dataConfig = buildDataConfig(participant);
+            Map<String, Object> initialModelPayload = buildInitialModelPayload(
+                    initialModelDetail, distribution.getId());
+            log.info("初始模型载荷: taskId={}, vmId={}, payload={}", taskId, participant.getVmId(), initialModelPayload);
+            log.info("准备推送FEDERATED_TASK_START: vmId={}, distributionId={}, assignedDatasetId={}, datasetStatus={}, localPath={}",
+                    participant.getVmId(),
+                    distribution.getId(),
+                    dataConfig.get("assignedDatasetId"),
+                    participant.getDatasetStatus(),
+                    participant.getLocalPath());
+            if (!StringUtils.hasText((String) dataConfig.get("assignedDatasetId"))) {
+                log.warn("参与者缺少assignedDatasetId: participantId={}, vmId={}, taskId={}",
+                        participant.getId(), participant.getVmId(), taskId);
+            }
+
+            try {
+                webSocketProtocolService.sendFederatedTaskStart(
+                        participant.getVmId(),
+                        taskId,
+                        dataConfig,
+                        initialModelPayload,
+                        trainingPlan);
+
+                LocalDateTime now = LocalDateTime.now();
+                modelDistributionMapper.updateDistributionStatus(distribution.getId(), "IN_PROGRESS", now, null);
+                modelDistributionMapper.updateVerificationStatus(distribution.getId(), Boolean.FALSE, null);
+                log.info("发送任务启动消息: vmId={}, taskId={}, distributionId={}",
+                        participant.getVmId(), taskId, distribution.getId());
+            } catch (Exception ex) {
+                LocalDateTime failedAt = LocalDateTime.now();
+                modelDistributionMapper.updateDistributionStatus(
+                        distribution.getId(), "FAILED", failedAt, ex.getMessage());
+                modelDistributionMapper.updateVerificationStatus(distribution.getId(), Boolean.FALSE, null);
+                log.error("向VM发送启动消息失败: vmId={}, taskId={}, error={}",
+                        participant.getVmId(), taskId, ex.getMessage(), ex);
+                throw new UserException("发送联邦任务启动消息失败: " + ex.getMessage());
+            }
         }
 
         // 步骤13：更新任务状态为RUNNING并开始联邦学习流程
-        FederatedTask task = tasksMapper.selectByTaskId(taskId);
         task.setStatus(FederatedTaskStatus.RUNNING);
         task.setStartedAt(LocalDateTime.now());
         tasksMapper.updateTask(task);
         log.info("任务状态更新完成: taskId={}, status=RUNNING", taskId);
+
+        boolean datasetPrepared = participants.stream()
+                .allMatch(participant -> "COMPLETED".equalsIgnoreCase(participant.getDatasetStatus()));
+        TaskOperationVO.ResourcePreparationSummary resourceSummary = TaskOperationVO.ResourcePreparationSummary.builder()
+                .datasetPrepared(datasetPrepared)
+                .datasetDistributionTriggered(Boolean.TRUE)
+                .modelDistributed(InitialModelStatus.DISTRIBUTED.getCode().equalsIgnoreCase(initialModelDetail.getStatus()))
+                .modelDistributionTriggered(Boolean.TRUE)
+                .datasetId(participants.stream()
+                        .map(TaskParticipant::getAssignedDatasetId)
+                        .filter(StringUtils::hasText)
+                        .findFirst()
+                        .orElse(null))
+                .initialModelId(initialModelDetail.getModelId())
+                .targetVmIds(targetVmIds)
+                .readyAt(LocalDateTime.now())
+                .datasetSnapshotRound(1)
+                .datasetBindingsSnapshot(participants.stream()
+                        .filter(participant -> StringUtils.hasText(participant.getVmId())
+                                && StringUtils.hasText(participant.getAssignedDatasetId()))
+                        .map(participant -> RoundDatasetBinding.builder()
+                                .vmId(participant.getVmId())
+                                .assignedDatasetId(participant.getAssignedDatasetId())
+                                .datasetStatus(participant.getDatasetStatus())
+                                .localPath(participant.getLocalPath())
+                                .build())
+                        .toList())
+                .message("资源准备完成，任务已启动")
+                .build();
+
+        TaskOperationVO.InitialModelSummary initialModelSummary = TaskOperationVO.InitialModelSummary.builder()
+                .mode(binding.getMode())
+                .initialModelId(binding.getModelId())
+                .autoGenerated(binding.getAutoGenerated())
+                .bindingStatus(binding.getStatus())
+                .build();
+
+        TaskOperationVO.ConfigSummaryVO configSummary = TaskOperationVO.ConfigSummaryVO.builder()
+                .initialModel(initialModelSummary)
+                .build();
 
         return TaskOperationVO.builder()
             .taskId(taskId)
             .status("RUNNING")
             .message("联邦学习任务启动成功")
             .timestamp(LocalDateTime.now())
+            .configSummary(configSummary)
+            .resourcePreparation(resourceSummary)
             .build();
+    }
+
+    private Map<String, Object> buildTrainingPlan(FederatedTask task) {
+        Map<String, Object> trainingPlan = new HashMap<>();
+        if (task.getAlgorithm() != null) {
+            trainingPlan.put("algorithm", task.getAlgorithm().getCode());
+        }
+        if (task.getTotalRounds() != null) {
+            trainingPlan.put("totalRounds", task.getTotalRounds());
+        }
+        trainingPlan.put("roundNumber", 1);
+
+        Map<String, Object> hyperparameters = new HashMap<>();
+        if (task.getLearningRate() != null) {
+            hyperparameters.put("learningRate", task.getLearningRate());
+        }
+        if (task.getBatchSize() != null) {
+            hyperparameters.put("batchSize", task.getBatchSize());
+        }
+        if (task.getEpochs() != null) {
+            hyperparameters.put("epochs", task.getEpochs());
+        }
+        if (!hyperparameters.isEmpty()) {
+            trainingPlan.put("hyperparameters", hyperparameters);
+        }
+        trainingPlan.put("message", "任务初始化阶段已完成，将开始第一轮训练");
+        trainingPlan.put("startTimestamp", Instant.now().toString());
+        return trainingPlan;
+    }
+
+    private Map<String, Object> buildInitialModelPayload(InitialModelDetailVO detail, String distributionId) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("distributionId", distributionId);
+        payload.put("modelId", detail.getModelId());
+        payload.put("modelType", detail.getModelType());
+        payload.put("generationMethod", detail.getGenerationMethod());
+        payload.put("modelSize", detail.getModelSize());
+        payload.put("checksum", detail.getChecksum());
+        payload.put("autoGenerated", detail.getAutoGenerated());
+        payload.put("metadata", detail.getMetadata());
+        payload.put("labels", detail.getLabels());
+        payload.put("description", detail.getDescription());
+        payload.put("parameters", detail.getModelParameters());
+        payload.put("bindingStatus", detail.getBindingStatus());
+        return payload;
+    }
+
+    private Map<String, Object> buildDataConfig(TaskParticipant participant) {
+        Map<String, Object> dataConfig = new HashMap<>();
+        dataConfig.put("assignedDatasetId", participant.getAssignedDatasetId());
+        dataConfig.put("dataPath", StringUtils.hasText(participant.getLocalPath())
+                ? participant.getLocalPath()
+                : "/data/training");
+        dataConfig.put("validationSplit", 0.2);
+        dataConfig.put("shuffle", Boolean.TRUE);
+        if (participant.getDataRatio() != null) {
+            dataConfig.put("dataRatio", participant.getDataRatio());
+        }
+        if (StringUtils.hasText(participant.getDatasetStatus())) {
+            dataConfig.put("datasetStatus", participant.getDatasetStatus());
+        }
+        return dataConfig;
+    }
+
+    private ModelDistribution ensureModelDistributionRecord(String modelId, String vmId) {
+        ModelDistribution existing = modelDistributionMapper.selectByModelIdAndVmId(modelId, vmId);
+        LocalDateTime now = LocalDateTime.now();
+        if (existing != null) {
+            log.debug("复用初始模型分发记录: modelId={}, vmId={}, recordId={}", modelId, vmId, existing.getId());
+            modelDistributionMapper.updateDistributionStatus(existing.getId(), "PENDING", null, null);
+            modelDistributionMapper.updateVerificationStatus(existing.getId(), Boolean.FALSE, null);
+            return existing;
+        }
+        ModelDistribution record = ModelDistribution.builder()
+                .id(uuidUtil.generateUuid())
+                .modelId(modelId)
+                .vmId(vmId)
+                .distributionStatus("PENDING")
+                .createdAt(now)
+                .build();
+        modelDistributionMapper.insertModelDistribution(record);
+        log.info("创建新的初始模型分发记录: modelId={}, vmId={}, recordId={}", modelId, vmId, record.getId());
+        return record;
     }
 
     // ========== v1.5协议私有辅助方法 ==========
@@ -2656,25 +3639,246 @@ public class FederatedTaskServiceImpl implements FederatedTaskService {
      * 查询数据集状态
      */
     private DatasetQueryResult queryDatasetStatus(String vmId, String taskId, String assignedDatasetId) {
-        // 发送DATASET_LIST_QUERY查询数据集状态
-        // TODO: 实现实际的WebSocket查询逻辑
         log.info("查询数据集状态: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
 
-        // 暂时返回成功结果，实际实现时需要真正的WebSocket查询
-        return DatasetQueryResult.builder()
-            .success(true)
-            .datasetStatus("CREATED")
-            .localPath("/data/assigned/" + assignedDatasetId)
-            .build();
+        if (assignedDatasetId == null || assignedDatasetId.trim().isEmpty()) {
+            log.warn("查询数据集状态失败：assignedDatasetId为空, vmId={}, taskId={}", vmId, taskId);
+            return DatasetQueryResult.builder()
+                    .success(false)
+                    .datasetStatus("UNKNOWN")
+                    .errorMessage("assignedDatasetId为空")
+                    .build();
+        }
+
+        try {
+            DatasetQueryResult result = webSocketProtocolService.queryDatasetStatus(vmId, taskId, assignedDatasetId);
+            if (result == null) {
+                log.warn("数据集状态查询返回null: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+                return DatasetQueryResult.builder()
+                        .success(false)
+                        .datasetStatus("UNKNOWN")
+                        .errorMessage("查询结果为空")
+                        .build();
+            }
+            log.info("数据集状态查询结果: vmId={}, assignedDatasetId={}, status={}, localPath={}",
+                    vmId, assignedDatasetId, result.getDatasetStatus(), result.getLocalPath());
+            return result;
+        } catch (Exception e) {
+            log.error("查询数据集状态异常: vmId={}, taskId={}, assignedDatasetId={}, error={}",
+                    vmId, taskId, assignedDatasetId, e.getMessage(), e);
+            return DatasetQueryResult.builder()
+                    .success(false)
+                    .datasetStatus("UNKNOWN")
+                    .errorMessage("查询异常: " + e.getMessage())
+                    .build();
+        }
     }
 
-    /**
-     * 发送联邦任务启动消息
-     */
-    private void sendFederatedTaskStart(String vmId, String taskId, String assignedDatasetId) {
-        log.info("发送联邦任务启动消息: vmId={}, taskId={}, assignedDatasetId={}", vmId, taskId, assignedDatasetId);
+    private static final class TaskCreationResult {
+        private final FederatedTask task;
+        private final LocalDateTime createdAt;
+        private final int participantCount;
+        private final int estimatedDuration;
+        private final TaskOperationVO.ConfigSummaryVO configSummary;
+        private final List<String> targetVmIds;
 
-        // 🔧 v1.5.1修正：调用WebSocketProtocolService发送FEDERATED_TASK_START消息
-        webSocketProtocolService.sendFederatedTaskStart(vmId, taskId, assignedDatasetId);
+        TaskCreationResult(FederatedTask task,
+                           LocalDateTime createdAt,
+                           int participantCount,
+                           int estimatedDuration,
+                           TaskOperationVO.ConfigSummaryVO configSummary,
+                           List<String> targetVmIds) {
+            this.task = task;
+            this.createdAt = createdAt;
+            this.participantCount = participantCount;
+            this.estimatedDuration = estimatedDuration;
+            this.configSummary = configSummary;
+            this.targetVmIds = targetVmIds != null ? new ArrayList<>(targetVmIds) : Collections.emptyList();
+        }
+
+        FederatedTask getTask() {
+            return task;
+        }
+
+        LocalDateTime getCreatedAt() {
+            return createdAt;
+        }
+
+        int getParticipantCount() {
+            return participantCount;
+        }
+
+        int getEstimatedDuration() {
+            return estimatedDuration;
+        }
+
+        TaskOperationVO.ConfigSummaryVO getConfigSummary() {
+            return configSummary;
+        }
+
+        List<String> getTargetVmIds() {
+            return targetVmIds;
+        }
     }
+
+    private static final class TaskResourcePreparationResult {
+        private boolean ready;
+        private boolean datasetPrepared;
+        private boolean datasetDistributionTriggered;
+        private boolean modelDistributed;
+        private boolean modelDistributionTriggered;
+        private String datasetDistributionId;
+        private List<String> pendingDatasetVmIds = new ArrayList<>();
+        private List<String> pendingModelVmIds = new ArrayList<>();
+        private List<String> targetVmIds = new ArrayList<>();
+        private String datasetId;
+        private String initialModelId;
+        private LocalDateTime readyAt;
+        private String message;
+        private String errorMessage;
+        private Integer datasetSnapshotRound;
+        private List<RoundDatasetBinding> datasetBindingsSnapshot = new ArrayList<>();
+
+        static TaskResourcePreparationResult failed(String datasetId, List<String> targetVmIds, String errorMessage) {
+            TaskResourcePreparationResult result = new TaskResourcePreparationResult();
+            result.setDatasetId(datasetId);
+            result.setTargetVmIds(targetVmIds);
+            result.setErrorMessage(errorMessage);
+            result.setMessage("资源准备过程中发生异常");
+            return result;
+        }
+
+        boolean isReady() {
+            return ready;
+        }
+
+        boolean hasError() {
+            return StringUtils.hasText(errorMessage);
+        }
+
+        String getErrorMessage() {
+            return errorMessage;
+        }
+
+        String getMessage() {
+            return message;
+        }
+
+        void markReady(LocalDateTime readyAt) {
+            this.ready = true;
+            this.readyAt = readyAt;
+            this.datasetPrepared = true;
+            this.modelDistributed = true;
+        }
+
+        void setDatasetPrepared(boolean datasetPrepared) {
+            this.datasetPrepared = datasetPrepared;
+        }
+
+        void setDatasetDistributionTriggered(boolean datasetDistributionTriggered) {
+            this.datasetDistributionTriggered = datasetDistributionTriggered;
+        }
+
+        void setDatasetDistributionId(String datasetDistributionId) {
+            this.datasetDistributionId = datasetDistributionId;
+        }
+
+        void setModelDistributed(boolean modelDistributed) {
+            this.modelDistributed = modelDistributed;
+        }
+
+        void setModelDistributionTriggered(boolean modelDistributionTriggered) {
+            this.modelDistributionTriggered = modelDistributionTriggered;
+        }
+
+        void setPendingDatasetVmIds(List<String> pendingDatasetVmIds) {
+            this.pendingDatasetVmIds = pendingDatasetVmIds != null
+                    ? new ArrayList<>(pendingDatasetVmIds)
+                    : new ArrayList<>();
+        }
+
+        void setPendingModelVmIds(List<String> pendingModelVmIds) {
+            this.pendingModelVmIds = pendingModelVmIds != null
+                    ? new ArrayList<>(pendingModelVmIds)
+                    : new ArrayList<>();
+        }
+
+        void setTargetVmIds(List<String> targetVmIds) {
+            this.targetVmIds = targetVmIds != null
+                    ? new ArrayList<>(targetVmIds)
+                    : new ArrayList<>();
+        }
+
+        void setDatasetId(String datasetId) {
+            this.datasetId = datasetId;
+        }
+
+        void setInitialModelId(String initialModelId) {
+            this.initialModelId = initialModelId;
+        }
+
+        void setDatasetSnapshotRound(Integer datasetSnapshotRound) {
+            this.datasetSnapshotRound = datasetSnapshotRound;
+        }
+
+        void setDatasetBindingsSnapshot(List<RoundDatasetBinding> datasetBindingsSnapshot) {
+            this.datasetBindingsSnapshot = datasetBindingsSnapshot != null
+                    ? new ArrayList<>(datasetBindingsSnapshot)
+                    : new ArrayList<>();
+        }
+
+        void setMessage(String message) {
+            if (StringUtils.hasText(message)) {
+                this.message = message;
+            }
+        }
+
+        void appendMessage(String append) {
+            if (!StringUtils.hasText(append)) {
+                return;
+            }
+            if (!StringUtils.hasText(this.message)) {
+                this.message = append;
+            } else if (!this.message.contains(append)) {
+                this.message = this.message + "；" + append;
+            }
+        }
+
+        void setErrorMessage(String errorMessage) {
+            this.errorMessage = errorMessage;
+        }
+
+        boolean isDatasetDistributionTriggered() {
+            return datasetDistributionTriggered;
+        }
+
+        boolean isModelDistributionTriggered() {
+            return modelDistributionTriggered;
+        }
+
+        boolean hasPendingWork() {
+            return !ready && (datasetDistributionTriggered || modelDistributionTriggered);
+        }
+
+        TaskOperationVO.ResourcePreparationSummary toSummary() {
+            return TaskOperationVO.ResourcePreparationSummary.builder()
+                    .datasetPrepared(datasetPrepared)
+                    .datasetDistributionTriggered(datasetDistributionTriggered)
+                    .modelDistributed(modelDistributed)
+                    .modelDistributionTriggered(modelDistributionTriggered)
+                    .datasetDistributionId(datasetDistributionId)
+                    .pendingDatasetVmIds(pendingDatasetVmIds)
+                    .pendingModelVmIds(pendingModelVmIds)
+                    .datasetId(datasetId)
+                    .initialModelId(initialModelId)
+                    .targetVmIds(targetVmIds)
+                    .readyAt(readyAt)
+                    .message(message)
+                    .errorMessage(errorMessage)
+                    .datasetSnapshotRound(datasetSnapshotRound)
+                    .datasetBindingsSnapshot(datasetBindingsSnapshot)
+                    .build();
+        }
+    }
+
 }

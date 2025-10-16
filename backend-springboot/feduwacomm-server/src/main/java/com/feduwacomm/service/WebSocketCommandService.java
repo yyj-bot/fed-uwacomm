@@ -10,7 +10,7 @@ import com.feduwacomm.dto.WebSocketMessage;
  * 支持异步发送和结果回调机制
  *
  * @author FedUWAComm Team
- * @version 1.4.0 (v1.4协议标准版)
+ * @version 1.5.0 (v1.4协议标准版)
  * @since 2025-09-28
  */
 public interface WebSocketCommandService {

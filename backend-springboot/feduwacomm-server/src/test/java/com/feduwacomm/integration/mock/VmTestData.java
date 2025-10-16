@@ -1,129 +1,114 @@
 package com.feduwacomm.integration.mock;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 虚拟机测试数据封装类
- * 用于存储虚拟机的基本配置信息和测试过程中动态生成的数据
+ * 虚拟机测试数据模型
+ * 提供联邦流程集成测试所需的虚拟机静态信息。
  */
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class VmTestData {
 
-    /**
-     * 虚拟机ID - 由后端注册时动态生成
-     * 格式: vm-{uuid}
-     */
     private String vmId;
+    private final String name;
+    private final String ipAddress;
+    private final int port;
+    private final int cpuCores;
+    private final int memoryMb;
+    private final int gpuCount;
+    private final Map<String, Object> capabilities;
+    private final Map<String, Object> systemInfo;
+    private final int baseTrainingTime;
+    private final int dataPointsForTesting;
+    private final double performanceFactor;
 
-    /**
-     * 虚拟机名称 - 固定标识符
-     */
-    private String name;
+    public VmTestData(String vmId,
+                      String name,
+                      String ipAddress,
+                      int port,
+                      int cpuCores,
+                      int memoryMb,
+                      int gpuCount) {
+        this.vmId = vmId;
+        this.name = name;
+        this.ipAddress = ipAddress;
+        this.port = port;
+        this.cpuCores = cpuCores;
+        this.memoryMb = memoryMb;
+        this.gpuCount = gpuCount;
+        this.capabilities = new HashMap<>();
+        capabilities.put("supportsV15", Boolean.TRUE);
+        capabilities.put("features", List.of(
+            gpuCount > 0 ? "GPU_ACCELERATION" : "CPU_ONLY",
+            "DATA_ENCRYPTION",
+            "SLICE_VERIFICATION"
+        ));
+        capabilities.put("supportedAlgorithms", List.of("FEDERATED_AVERAGING", "FEDERATED_PROXIMAL"));
+        capabilities.put("maxBatchSize", 256);
+        capabilities.put("gpuMemoryMb", gpuCount > 0 ? 8192 : 0);
+        Map<String, Object> info = new HashMap<>();
+        info.put("os", "Ubuntu 22.04");
+        info.put("kernel", "5.15.0");
+        info.put("gpuCount", gpuCount);
+        info.put("cpuCores", cpuCores);
+        info.put("memoryMb", memoryMb);
+        this.systemInfo = info;
 
-    /**
-     * IP地址
-     */
-    private String ipAddress;
+        this.baseTrainingTime = 120; // 默认基础训练时间（秒）
+        this.dataPointsForTesting = 5000;
+        this.performanceFactor = gpuCount > 0 ? 1.2 : 1.0;
+    }
 
-    /**
-     * 端口号
-     */
-    private int port;
+    public String getVmId() {
+        return vmId;
+    }
 
-    /**
-     * CPU核心数
-     */
-    private int cpuCores;
+    public void setVmId(String vmId) {
+        this.vmId = vmId;
+    }
 
-    /**
-     * 内存大小 (MB)
-     */
-    private int memoryMb;
+    public String getName() {
+        return name;
+    }
 
-    /**
-     * GPU数量
-     */
-    private int gpuCount;
+    public String getIpAddress() {
+        return ipAddress;
+    }
 
-    /**
-     * 获取虚拟机能力配置
-     */
-    public java.util.Map<String, Object> getCapabilities() {
-        java.util.Map<String, Object> capabilities = new java.util.HashMap<>();
+    public int getPort() {
+        return port;
+    }
 
-        // 基于硬件配置决定算法支持
-        java.util.List<String> algorithms = new java.util.ArrayList<>();
-        algorithms.add("FEDERATED_AVERAGING");
-        if (cpuCores >= 8) {
-            algorithms.add("FEDERATED_PROXIMAL");
-        }
-        if (gpuCount > 0) {
-            algorithms.add("FEDOPT");
-        }
+    public int getCpuCores() {
+        return cpuCores;
+    }
 
-        capabilities.put("cpuCores", cpuCores);
-        capabilities.put("memoryMb", memoryMb);
-        capabilities.put("gpuCount", gpuCount);
-        capabilities.put("algorithms", algorithms);
-        capabilities.put("maxBatchSize", Math.min(1024, memoryMb / 8));
-        capabilities.put("concurrent_tasks", Math.max(1, cpuCores / 4));
+    public int getMemoryMb() {
+        return memoryMb;
+    }
 
+    public int getGpuCount() {
+        return gpuCount;
+    }
+
+    public Map<String, Object> getCapabilities() {
         return capabilities;
     }
 
-    /**
-     * 获取系统信息
-     */
-    public java.util.Map<String, Object> getSystemInfo() {
-        java.util.Map<String, Object> systemInfo = new java.util.HashMap<>();
-
-        systemInfo.put("os", "Ubuntu 20.04");
-        systemInfo.put("kernel", "5.4.0-74-generic");
-        systemInfo.put("pythonVersion", "3.8.10");
-        systemInfo.put("frameworks", java.util.Arrays.asList("pytorch", "tensorflow", "scikit-learn"));
-
-        if (gpuCount > 0) {
-            systemInfo.put("gpu", "NVIDIA RTX 3080");
-            systemInfo.put("cudaVersion", "11.4");
-        }
-
+    public Map<String, Object> getSystemInfo() {
         return systemInfo;
     }
 
-    /**
-     * 基于VM名称获取数据分配数量
-     * 用于测试过程中的数据分配
-     */
-    public int getDataPointsForTesting() {
-        switch (name) {
-            case "VM-Node-1": return 1600;  // 20% of 8000
-            case "VM-Node-2": return 1200;  // 15% of 8000
-            case "VM-Node-3": return 1200;  // 15% of 8000
-            case "VM-Node-4": return 2000;  // 25% of 8000
-            case "VM-Node-5": return 2000;  // 25% of 8000
-            default: return 1000;
-        }
-    }
-
-    /**
-     * 基于VM硬件配置计算基础训练时间（毫秒）
-     */
     public int getBaseTrainingTime() {
-        double cpuFactor = 1.0 / (cpuCores / 4.0);
-        double gpuFactor = gpuCount > 0 ? 0.6 : 1.0;
-        double memoryFactor = memoryMb < 8192 ? 1.2 : 1.0;
-
-        return (int)(200 * cpuFactor * gpuFactor * memoryFactor); // 减少10倍训练时间
+        return baseTrainingTime;
     }
 
-    /**
-     * 获取VM性能系数（用于生成训练指标）
-     */
+    public int getDataPointsForTesting() {
+        return dataPointsForTesting;
+    }
+
     public double getPerformanceFactor() {
-        return (cpuCores + gpuCount * 4.0) / 20.0;
+        return performanceFactor;
     }
 }

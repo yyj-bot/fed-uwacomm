@@ -26,6 +26,7 @@ import java.util.concurrent.ScheduledFuture;
 public class RetryServiceImpl implements RetryService {
 
     private final TaskScheduler taskScheduler;
+    private final InitialModelDistributionRetryExecutor initialModelDistributionRetryExecutor;
 
     // 重试次数跟踪
     private final Map<String, Integer> retryCountMap = new ConcurrentHashMap<>();
@@ -41,8 +42,10 @@ public class RetryServiceImpl implements RetryService {
     private static final long BASE_DELAY_MS = 1000; // 1秒基础延迟
     private static final double BACKOFF_MULTIPLIER = 2.0; // 指数退避倍数
 
-    public RetryServiceImpl(@Qualifier("heartBeatScheduler") TaskScheduler taskScheduler) {
+    public RetryServiceImpl(@Qualifier("heartBeatScheduler") TaskScheduler taskScheduler,
+                            InitialModelDistributionRetryExecutor initialModelDistributionRetryExecutor) {
         this.taskScheduler = taskScheduler;
+        this.initialModelDistributionRetryExecutor = initialModelDistributionRetryExecutor;
     }
 
     @Override
@@ -259,6 +262,10 @@ public class RetryServiceImpl implements RetryService {
             case "distribution":
                 // 分发重试逻辑 - 由分发服务处理
                 log.info("分发重试将由分发服务处理: entityId={}", entityId);
+                break;
+
+            case "initial_model_distribution":
+                initialModelDistributionRetryExecutor.retry(entityId, attempt, context);
                 break;
 
             case "websocket":

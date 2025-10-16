@@ -1,348 +1,601 @@
 package com.feduwacomm.service.impl;
 
-import com.feduwacomm.common.PageResult;
-import com.feduwacomm.dto.InitialModelGenerationDTO;
+import com.feduwacomm.entity.FederatedTask;
+import com.feduwacomm.entity.GlobalModel;
 import com.feduwacomm.entity.InitialModel;
 import com.feduwacomm.entity.ModelDistribution;
+import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.enums.AggregationMethod;
 import com.feduwacomm.enums.GenerationMethod;
+import com.feduwacomm.enums.InitialModelBindingStatus;
 import com.feduwacomm.enums.InitialModelStatus;
+import com.feduwacomm.enums.GlobalModelStatus;
 import com.feduwacomm.enums.ModelType;
+import com.feduwacomm.event.InitialModelDistributionCompletedEvent;
+import com.feduwacomm.event.InitialModelDistributionStartedEvent;
 import com.feduwacomm.event.InitialModelGeneratedEvent;
+import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.InitialModelMapper;
 import com.feduwacomm.mapper.ModelDistributionMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.mapper.GlobalModelMapper;
+import com.feduwacomm.model.dto.initial.InitialModelDistributeRequest;
+import com.feduwacomm.model.dto.initial.InitialModelGenerateRequest;
+import com.feduwacomm.model.dto.initial.InitialModelUploadRequest;
+import com.feduwacomm.model.vo.initial.InitialModelBindingVO;
+import com.feduwacomm.model.vo.initial.InitialModelDetailVO;
+import com.feduwacomm.model.vo.initial.InitialModelDownloadVO;
 import com.feduwacomm.service.InitialModelGenerationService;
+import com.feduwacomm.service.GlobalModelDistributionService;
 import com.feduwacomm.service.sklearn.SklearnModelParameterGeneratorFactory;
 import com.feduwacomm.service.sklearn.SklearnModelParameterValidator;
 import com.feduwacomm.utils.UuidUtil;
 import com.feduwacomm.vo.InitialModelInfoVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * 初始模型生成服务实现
- * 
- * @author FedUWAComm Team
- * @version 1.0.0
+ * 初始模型管理服务实现
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class InitialModelGenerationServiceImpl implements InitialModelGenerationService {
 
+    private static final Random RANDOM = new SecureRandom();
+
     private final InitialModelMapper initialModelMapper;
     private final ModelDistributionMapper modelDistributionMapper;
+    private final FederatedTasksMapper federatedTasksMapper;
+    private final TaskParticipantsMapper taskParticipantsMapper;
+    private final GlobalModelMapper globalModelMapper;
+    private final GlobalModelDistributionService globalModelDistributionService;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final UuidUtil uuidUtil;
     private final SklearnModelParameterGeneratorFactory parameterGeneratorFactory;
     private final SklearnModelParameterValidator parameterValidator;
-
-    private static final Random RANDOM = new SecureRandom();
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional
-    public InitialModelInfoVO generateInitialModel(InitialModelGenerationDTO generationDTO, String createdBy) {
-        log.info("开始生成初始模型: taskId={}, modelType={}, method={}", 
-                generationDTO.getTaskId(), generationDTO.getModelType(), generationDTO.getGenerationMethod());
+    public InitialModelDetailVO generateInitialModel(InitialModelGenerateRequest request, String createdBy) {
+        validateGenerateRequest(request);
 
-        // 创建初始模型记录
         String modelId = uuidUtil.generateUuid();
-        InitialModel initialModel = InitialModel.builder()
+        LocalDateTime now = LocalDateTime.now();
+
+        InitialModel model = InitialModel.builder()
                 .id(modelId)
-                .taskId(generationDTO.getTaskId())
-                .modelType(ModelType.fromCode(generationDTO.getModelType()))
-                .generationMethod(GenerationMethod.fromCode(generationDTO.getGenerationMethod()))
-                .architectureParams(convertToJson(generationDTO.getArchitectureParams()))
+                .modelType(ModelType.fromCode(request.getModelType()))
+                .generationMethod(GenerationMethod.AUTO)
+                .architectureParams(convertToJson(request.getArchitecture()))
+                .metadata(convertToJson(request.getMetadata()))
+                .labels(convertListToJson(request.getLabels()))
+                .description(request.getDescription())
+                .randomSeed(request.getRandomSeed())
+                .autoGenerated(Boolean.TRUE)
+                .bindingStatus(InitialModelBindingStatus.UNBOUND)
+                .bindingAutoGenerated(Boolean.FALSE)
                 .status(InitialModelStatus.GENERATING)
-                .createdAt(LocalDateTime.now())
+                .createdAt(now)
                 .createdBy(createdBy)
-                .updatedAt(LocalDateTime.now())
+                .updatedAt(now)
+                .updatedBy(createdBy)
                 .build();
 
-        // 插入数据库
-        initialModelMapper.insertInitialModel(initialModel);
+        initialModelMapper.insertInitialModel(model);
+        log.info("初始模型生成请求入库: modelId={}, createdBy={}", modelId, createdBy);
 
-        // 异步执行模型生成
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (GenerationMethod.RANDOM.getCode().equals(generationDTO.getGenerationMethod())) {
-                    generateRandomModel(initialModel, generationDTO.getArchitectureParams());
-                } else if (GenerationMethod.CUSTOM_UPLOAD.getCode().equals(generationDTO.getGenerationMethod())) {
-                    // 自定义上传模式下，等待用户上传文件
-                    log.info("等待用户上传自定义模型文件: modelId={}", modelId);
-                }
-            } catch (Exception e) {
-                log.error("模型生成失败: modelId={}, error={}", modelId, e.getMessage(), e);
-                updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
-            }
-        });
+        CompletableFuture.runAsync(() -> handleAutoGeneration(request, createdBy, model));
 
-        return convertToInfoVO(initialModel, new HashMap<>());
+        return buildDetail(model, emptyDistributionStats(), null);
     }
 
     @Override
     @Transactional
-    public InitialModelInfoVO uploadCustomModel(String taskId, String modelType, String filePath,
-                                              String architectureParams, String createdBy) {
-        log.info("上传自定义初始模型: taskId={}, modelType={}", taskId, modelType);
+    public InitialModelDetailVO uploadCustomModel(InitialModelUploadRequest request, String filePath, String createdBy) {
+        validateUploadRequest(request, filePath);
 
+        String modelId = uuidUtil.generateUuid();
+        LocalDateTime now = LocalDateTime.now();
+
+        InitialModel model = InitialModel.builder()
+                .id(modelId)
+                .modelType(ModelType.fromCode(request.getModelType()))
+                .generationMethod(GenerationMethod.CUSTOM)
+                .architectureParams(extractArchitectureFromMetadata(request.getMetadata()))
+                .metadata(convertToJson(request.getMetadata()))
+                .labels(convertListToJson(request.getLabels()))
+                .description(request.getDescription())
+                .randomSeed(request.getRandomSeed())
+                .parametersCount(request.getParametersCount())
+                .checksum(request.getChecksum())
+                .storagePath(filePath)
+                .autoGenerated(Boolean.FALSE)
+                .bindingStatus(InitialModelBindingStatus.UNBOUND)
+                .bindingAutoGenerated(Boolean.FALSE)
+                .status(InitialModelStatus.READY)
+                .createdAt(now)
+                .createdBy(createdBy)
+                .updatedAt(now)
+                .updatedBy(createdBy)
+                .build();
+
+        initialModelMapper.insertInitialModel(model);
+        log.info("自定义初始模型上传完成: modelId={}, filePath={}", modelId, filePath);
+
+        return buildDetail(model, emptyDistributionStats(), null);
+    }
+
+    @Override
+    @Transactional
+    public InitialModelDetailVO distributeInitialModel(String taskId, InitialModelDistributeRequest request, String operatorId) {
+        if (!StringUtils.hasText(taskId)) {
+            throw new IllegalArgumentException("任务ID不能为空");
+        }
+        InitialModelDistributeRequest distributeRequest = request != null ? request : new InitialModelDistributeRequest();
+        String modelId = StringUtils.hasText(distributeRequest.getModelId()) ? distributeRequest.getModelId() : null;
+
+        if (!StringUtils.hasText(modelId)) {
+            InitialModelBindingVO binding = getTaskBinding(taskId);
+            if (binding == null || !StringUtils.hasText(binding.getModelId())) {
+                throw new IllegalArgumentException("未找到可分发的初始模型，请先生成或绑定模型后再分发");
+            }
+            modelId = binding.getModelId();
+        }
+
+        InitialModel model = requireModel(modelId);
+        List<String> targetVmIds = resolveTargetVmIds(taskId, distributeRequest.getTargetVmIds());
+        if (targetVmIds.isEmpty()) {
+            throw new IllegalArgumentException("没有可用的虚拟机用于初始模型分发");
+        }
+
+        log.info("准备创建初始模型分发记录: modelId={}, targetVmIds={}", modelId, targetVmIds);
+        List<ModelDistribution> distributionRecords = createDistributionRecords(modelId, targetVmIds);
+        log.info("初始模型分发记录创建完成: modelId={}, count={}", modelId, distributionRecords.size());
+        Map<String, String> distributionIdByVm = distributionRecords.stream()
+                .collect(Collectors.toMap(ModelDistribution::getVmId, ModelDistribution::getId, (existing, replacement) -> existing));
+
+        if (!distributionRecords.isEmpty()) {
+            modelDistributionMapper.batchInsertModelDistributions(distributionRecords);
+            distributionRecords.forEach(record ->
+                    log.debug("分发记录插入: modelId={}, vmId={}, recordId={}",
+                            record.getModelId(), record.getVmId(), record.getId()));
+        }
+
+        ensureInitialGlobalModelRecord(taskId, model, distributionIdByVm.size());
+
+        boolean verifyIntegrity = distributeRequest.getVerifyIntegrity() == null || distributeRequest.getVerifyIntegrity();
+        int timeoutSeconds = distributeRequest.getTimeoutSeconds() != null && distributeRequest.getTimeoutSeconds() > 0
+                ? distributeRequest.getTimeoutSeconds() : 300;
+        int maxRetries = distributeRequest.getMaxRetries() != null && distributeRequest.getMaxRetries() >= 0
+                ? distributeRequest.getMaxRetries() : 0;
+
+        InitialModelDistributionStartedEvent.DistributionConfig config =
+                new InitialModelDistributionStartedEvent.DistributionConfig(verifyIntegrity, timeoutSeconds, maxRetries);
+
+        eventPublisher.publishEvent(new InitialModelDistributionStartedEvent(
+                this,
+                modelId,
+                taskId,
+                null,
+                model.getModelType() != null ? model.getModelType().getCode() : null,
+                targetVmIds,
+                config
+        ));
+
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("distributionType", "INITIAL_MODEL");
+        metrics.put("modelSize", model.getModelSize());
+        metrics.put("autoGenerated", Boolean.TRUE.equals(model.getAutoGenerated()));
+
+        if (!distributionRecords.isEmpty()) {
+            final List<ModelDistribution> recordsSnapshot = new ArrayList<>(distributionRecords);
+            final List<String> distributionVmIds = new ArrayList<>(targetVmIds);
+            final Map<String, Object> metricsSnapshot = Collections.unmodifiableMap(new HashMap<>(metrics));
+            final Map<String, String> distributionMapSnapshot = Collections.unmodifiableMap(new HashMap<>(distributionIdByVm));
+            final long startMillis = System.currentTimeMillis();
+            final String taskIdSnapshot = taskId;
+            final String modelIdSnapshot = modelId;
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        globalModelDistributionService.distributeGlobalModel(
+                                taskIdSnapshot, 0, modelIdSnapshot, metricsSnapshot, distributionVmIds, distributionMapSnapshot);
+
+                        long duration = System.currentTimeMillis() - startMillis;
+                        Map<String, Object> distributionStats = new HashMap<>();
+                        distributionStats.put("total", (long) recordsSnapshot.size());
+                        distributionStats.put("completed", (long) recordsSnapshot.size());
+                        distributionStats.put("inProgress", 0L);
+                        distributionStats.put("failed", 0L);
+                        distributionStats.put("pending", 0L);
+
+                        eventPublisher.publishEvent(InitialModelDistributionCompletedEvent.success(
+                                InitialModelGenerationServiceImpl.this,
+                                modelIdSnapshot,
+                                taskIdSnapshot,
+                                null,
+                                recordsSnapshot.size(),
+                                recordsSnapshot.size(),
+                                0,
+                                new ArrayList<>(distributionVmIds),
+                                Collections.emptyList(),
+                                distributionStats,
+                                duration
+                        ));
+                    } catch (Exception ex) {
+                        long duration = System.currentTimeMillis() - startMillis;
+                        log.error("初始模型分发现异常: modelId={}, taskId={}, error={}", modelIdSnapshot, taskIdSnapshot, ex.getMessage(), ex);
+
+                        TransactionTemplate statusTemplate = new TransactionTemplate(transactionManager);
+                        statusTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                        statusTemplate.executeWithoutResult(status -> {
+                            LocalDateTime now = LocalDateTime.now();
+                            for (ModelDistribution record : recordsSnapshot) {
+                                modelDistributionMapper.updateDistributionStatus(record.getId(), "FAILED", now, ex.getMessage());
+                            }
+                        });
+
+                        eventPublisher.publishEvent(InitialModelDistributionCompletedEvent.failure(
+                                InitialModelGenerationServiceImpl.this,
+                                modelIdSnapshot,
+                                taskIdSnapshot,
+                                null,
+                                recordsSnapshot.size(),
+                                ex.getMessage(),
+                                duration
+                        ));
+                    }
+                }
+            });
+        }
+
+        return getModelDetail(modelId, false);
+    }
+
+    @Override
+    @Transactional
+    public void retryInitialModelDistribution(String modelId,
+                                              String taskId,
+                                              List<String> targetVmIds,
+                                              String orchestrationId,
+                                              int attempt) {
+        if (!StringUtils.hasText(modelId) || !StringUtils.hasText(taskId)) {
+            throw new IllegalArgumentException("模型ID与任务ID不能为空");
+        }
+
+        List<String> retryTargets = CollectionUtils.isEmpty(targetVmIds)
+                ? Collections.emptyList()
+                : targetVmIds.stream()
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+        if (retryTargets.isEmpty()) {
+            log.warn("初始模型分发重试时未找到目标虚拟机: modelId={}, taskId={}", modelId, taskId);
+            return;
+        }
+
+        InitialModel model = requireModel(modelId);
+        LocalDateTime now = LocalDateTime.now();
+        List<ModelDistribution> preparedRecords = new ArrayList<>();
+
+        for (String vmId : retryTargets) {
+            ModelDistribution existing = modelDistributionMapper.selectByModelIdAndVmId(modelId, vmId);
+            if (existing == null) {
+                ModelDistribution newRecord = ModelDistribution.builder()
+                        .id(uuidUtil.generateUuid())
+                        .modelId(modelId)
+                        .vmId(vmId)
+                        .distributionStatus("PENDING")
+                        .createdAt(now)
+                        .build();
+                modelDistributionMapper.insertModelDistribution(newRecord);
+                preparedRecords.add(newRecord);
+            } else {
+                modelDistributionMapper.updateDistributionStatus(existing.getId(), "PENDING", null, null);
+                modelDistributionMapper.updateVerificationStatus(existing.getId(), Boolean.FALSE, null);
+                preparedRecords.add(existing);
+            }
+        }
+
+        InitialModelDistributionStartedEvent.DistributionConfig config =
+                new InitialModelDistributionStartedEvent.DistributionConfig(true, 300, 0);
+
+        eventPublisher.publishEvent(new InitialModelDistributionStartedEvent(
+                this,
+                modelId,
+                taskId,
+                orchestrationId,
+                model.getModelType() != null ? model.getModelType().getCode() : null,
+                retryTargets,
+                config
+        ));
+
+        long startMillis = System.currentTimeMillis();
         try {
-            // 创建模型记录
-            String modelId = uuidUtil.generateUuid();
-            InitialModel initialModel = InitialModel.builder()
-                    .id(modelId)
-                    .taskId(taskId)
-                    .modelType(ModelType.fromCode(modelType))
-                    .generationMethod(GenerationMethod.CUSTOM_UPLOAD)
-                    .architectureParams(architectureParams)
-                    .status(InitialModelStatus.GENERATING) // 等待用户提供模型数据
-                    .createdAt(LocalDateTime.now())
-                    .createdBy(createdBy)
-                    .updatedAt(LocalDateTime.now())
-                    .build();
+            Map<String, Object> metrics = new HashMap<>();
+            metrics.put("distributionType", "INITIAL_MODEL_RETRY");
+            metrics.put("modelSize", model.getModelSize());
+            metrics.put("autoGenerated", Boolean.TRUE.equals(model.getAutoGenerated()));
+            metrics.put("retryAttempt", attempt);
 
-            // 插入数据库
-            initialModelMapper.insertInitialModel(initialModel);
+            Map<String, String> retryDistributionMap = preparedRecords.stream()
+                    .collect(Collectors.toMap(ModelDistribution::getVmId, ModelDistribution::getId, (existing, replacement) -> existing));
 
-            log.info("自定义模型记录创建成功: modelId={}", modelId);
+            ensureInitialGlobalModelRecord(taskId, model, retryDistributionMap.size());
 
-            return convertToInfoVO(initialModel, getDistributionStats(modelId));
+            globalModelDistributionService.distributeGlobalModel(
+                    taskId, 0, modelId, metrics, retryTargets, retryDistributionMap);
 
-        } catch (Exception e) {
-            log.error("自定义模型创建失败: taskId={}, error={}", taskId, e.getMessage(), e);
-            throw new RuntimeException("模型创建失败: " + e.getMessage(), e);
+            LocalDateTime distributedAt = LocalDateTime.now();
+            for (ModelDistribution record : preparedRecords) {
+                modelDistributionMapper.updateDistributionStatus(record.getId(), "IN_PROGRESS", distributedAt, null);
+            }
+
+            long duration = System.currentTimeMillis() - startMillis;
+            Map<String, Object> distributionStats = new HashMap<>();
+            distributionStats.put("total", (long) retryTargets.size());
+            distributionStats.put("completed", (long) retryTargets.size());
+            distributionStats.put("inProgress", 0L);
+            distributionStats.put("failed", 0L);
+            distributionStats.put("pending", 0L);
+
+            eventPublisher.publishEvent(InitialModelDistributionCompletedEvent.success(
+                    this,
+                    modelId,
+                    taskId,
+                    orchestrationId,
+                    retryTargets.size(),
+                    retryTargets.size(),
+                    0,
+                    new ArrayList<>(retryTargets),
+                    Collections.emptyList(),
+                    distributionStats,
+                    duration
+            ));
+        } catch (Exception ex) {
+            LocalDateTime failedAt = LocalDateTime.now();
+            for (ModelDistribution record : preparedRecords) {
+                modelDistributionMapper.updateDistributionStatus(record.getId(), "FAILED", failedAt, ex.getMessage());
+                modelDistributionMapper.updateVerificationStatus(record.getId(), Boolean.FALSE, null);
+            }
+            long duration = System.currentTimeMillis() - startMillis;
+            eventPublisher.publishEvent(InitialModelDistributionCompletedEvent.failure(
+                    this, modelId, taskId, orchestrationId, retryTargets.size(), ex.getMessage(), duration));
+            throw new RuntimeException("初始模型分发重试失败: " + ex.getMessage(), ex);
         }
     }
 
     @Override
-    public InitialModelInfoVO getModelInfo(String modelId) {
-        log.debug("获取模型信息: modelId={}", modelId);
-        
-        InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null) {
-            throw new RuntimeException("模型不存在: " + modelId);
-        }
+    public InitialModelDetailVO getModelDetail(String modelId, boolean includeParameters) {
+        InitialModel model = requireModel(modelId);
+        Map<String, Object> rawStats = modelDistributionMapper.getDistributionProgress(modelId);
+        Map<String, Object> distributionStats = ensureDistributionStats(modelId, rawStats);
+        log.info("获取初始模型分发进度: modelId={}, rawStats={}, resolvedStats={}", modelId, rawStats, distributionStats);
+        Map<String, Object> parameters = includeParameters ? parseJsonToMap(model.getModelData()) : null;
 
-        Map<String, Object> distributionStats = getDistributionStats(modelId);
-        return convertToInfoVO(model, distributionStats);
+        return buildDetail(model, distributionStats, parameters);
     }
 
     @Override
-    public List<InitialModelInfoVO> getTaskModels(String taskId) {
-        log.debug("获取任务的所有初始模型: taskId={}", taskId);
-        
-        List<InitialModel> models = initialModelMapper.selectByTaskId(taskId);
-        return models.stream()
-                .map(model -> convertToInfoVO(model, getDistributionStats(model.getId())))
-                .collect(Collectors.toList());
-    }
+    public InitialModelDownloadVO prepareModelDownload(String modelId) {
+        InitialModel model = requireModel(modelId);
 
-    @Override
-    public PageResult<InitialModelInfoVO> getTaskModelsPaged(String taskId, String status, Integer page, Integer size) {
-        log.debug("获取任务的分页模型列表: taskId={}, status={}, page={}, size={}", taskId, status, page, size);
-        
-        List<InitialModel> allModels = StringUtils.hasText(status) ?
-                initialModelMapper.selectByTaskId(taskId).stream()
-                        .filter(m -> status.equals(m.getStatus()))
-                        .collect(Collectors.toList()) :
-                initialModelMapper.selectByTaskId(taskId);
-
-        // 分页处理
-        int offset = (page - 1) * size;
-        List<InitialModelInfoVO> pagedList = allModels.stream()
-                .skip(offset)
-                .limit(size)
-                .map(model -> convertToInfoVO(model, getDistributionStats(model.getId())))
-                .collect(Collectors.toList());
-
-        return PageResult.of(pagedList, (long) allModels.size(), (long) page, (long) size);
-    }
-
-    @Override
-    @Transactional
-    public InitialModelInfoVO regenerateFailedModel(String modelId, String regeneratedBy) {
-        log.info("重新生成失败的模型: modelId={}, regeneratedBy={}", modelId, regeneratedBy);
-
-        InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null) {
-            throw new RuntimeException("模型不存在: " + modelId);
-        }
-
-        if (!InitialModelStatus.FAILED.equals(model.getStatus())) {
-            throw new RuntimeException("只能重新生成失败的模型");
-        }
-
-        // 重置模型状态
-        initialModelMapper.updateStatus(modelId, InitialModelStatus.GENERATING.getCode());
-
-        // 异步重新生成
-        CompletableFuture.runAsync(() -> {
-            try {
-                Map<String, Object> architectureParams = parseJsonToMap(model.getArchitectureParams());
-                if (GenerationMethod.RANDOM.equals(model.getGenerationMethod())) {
-                    generateRandomModel(model, architectureParams);
+        String storagePath = model.getStoragePath();
+        if (StringUtils.hasText(storagePath)) {
+            Path path = Paths.get(storagePath);
+            if (Files.exists(path)) {
+                try {
+                    String filename = resolveDownloadFilename(model, path.getFileName().toString());
+                    String contentType = Files.probeContentType(path);
+                    long size = Files.size(path);
+                    return InitialModelDownloadVO.builder()
+                        .fileResource(true)
+                        .filePath(path.toString())
+                        .filename(filename)
+                        .contentType(contentType != null ? contentType : MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                        .contentLength(size)
+                        .build();
+                } catch (Exception ex) {
+                    log.warn("读取模型文件失败，将尝试内存回退: modelId={}, path={}, error={}", modelId, storagePath, ex.getMessage());
                 }
-            } catch (Exception e) {
-                log.error("模型重新生成失败: modelId={}, error={}", modelId, e.getMessage(), e);
-                updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
+            } else {
+                log.warn("模型文件不存在，将尝试内存回退: modelId={}, path={}", modelId, storagePath);
             }
-        });
+        }
 
-        model.setStatus(InitialModelStatus.GENERATING);
-        return convertToInfoVO(model, getDistributionStats(modelId));
+        if (StringUtils.hasText(model.getModelData())) {
+            byte[] content = model.getModelData().getBytes(StandardCharsets.UTF_8);
+            String filename = resolveDownloadFilename(model, model.getId() + ".json");
+            return InitialModelDownloadVO.builder()
+                .fileResource(false)
+                .filename(filename)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .contentLength(content.length)
+                .inlineContent(content)
+                .build();
+        }
+
+        log.error("模型下载失败：无可用内容，标记为FAILED: modelId={}", modelId);
+        initialModelMapper.updateStatus(modelId, InitialModelStatus.FAILED.getCode(), "SYSTEM");
+        throw new IllegalStateException("模型文件与参数数据均缺失，无法下载");
     }
 
     @Override
-    @Transactional
-    public boolean deleteModel(String modelId, String deletedBy) {
-        log.info("删除初始模型: modelId={}, deletedBy={}", modelId, deletedBy);
+    public List<InitialModelBindingVO> getModelBindings(String modelId) {
+        InitialModel model = requireModel(modelId);
+        return buildBindingVOs(model, new ConcurrentHashMap<>());
+    }
 
-        InitialModel model = initialModelMapper.selectById(modelId);
+    @Override
+    public InitialModelBindingVO getTaskBinding(String taskId) {
+        InitialModel model = initialModelMapper.selectByTaskId(taskId);
         if (model == null) {
-            return false;
+            return null;
         }
-
-        // 删除分发记录
-        modelDistributionMapper.deleteByModelId(modelId);
-
-        // 删除数据库记录
-        return initialModelMapper.deleteById(modelId) > 0;
+        List<InitialModelBindingVO> bindings = buildBindingVOs(model, new ConcurrentHashMap<>());
+        return bindings.isEmpty() ? null : bindings.get(0);
     }
 
     @Override
     @Transactional
-    public int deleteTaskModels(String taskId, String deletedBy) {
-        log.info("批量删除任务的所有模型: taskId={}, deletedBy={}", taskId, deletedBy);
+    public InitialModelBindingVO bindModelToTask(String modelId,
+                                                 String taskId,
+                                                 String mode,
+                                                 boolean autoGenerated,
+                                                 String operatorId) {
+        InitialModel model = requireModel(modelId);
+        GenerationMethod bindingMode = GenerationMethod.fromCode(mode);
 
-        List<InitialModel> models = initialModelMapper.selectByTaskId(taskId);
-        int deletedCount = 0;
-
-        for (InitialModel model : models) {
-            if (deleteModel(model.getId(), deletedBy)) {
-                deletedCount++;
-            }
+        if (StringUtils.hasText(model.getTaskId()) && !model.getTaskId().equals(taskId)) {
+            log.warn("模型已绑定其他任务，拒绝重新绑定: modelId={}, currentTaskId={}, targetTaskId={}",
+                    modelId, model.getTaskId(), taskId);
+            throw new IllegalStateException("该模型已绑定到其他联邦任务，无法重复绑定");
         }
 
-        return deletedCount;
+        InitialModel taskBinding = initialModelMapper.selectByTaskId(taskId);
+        if (taskBinding != null && !taskBinding.getId().equals(modelId)) {
+            log.warn("任务已绑定其他模型，拒绝重复绑定: taskId={}, currentModelId={}, targetModelId={}",
+                    taskId, taskBinding.getId(), modelId);
+            throw new IllegalStateException("该联邦任务已绑定其他初始模型，无法重复绑定");
+        }
+
+        initialModelMapper.bindModelToTask(
+                modelId,
+                taskId,
+                InitialModelBindingStatus.BOUND.getCode(),
+                bindingMode.getCode(),
+                autoGenerated,
+                operatorId
+        );
+
+        log.info("初始模型绑定成功: modelId={}, taskId={}, mode={}", modelId, taskId, bindingMode.getCode());
+
+        InitialModel updatedModel = requireModel(modelId);
+        List<InitialModelBindingVO> bindings = buildBindingVOs(updatedModel, new ConcurrentHashMap<>());
+        return bindings.isEmpty() ? null : bindings.get(0);
+    }
+
+    @Override
+    @Transactional
+    public void unbindModelFromTask(String modelId, String taskId, String operatorId) {
+        InitialModel model = requireModel(modelId);
+        if (!StringUtils.hasText(model.getTaskId())) {
+            log.info("模型当前未绑定任务，跳过解绑: modelId={}", modelId);
+            return;
+        }
+        if (!model.getTaskId().equals(taskId)) {
+            log.info("模型绑定任务与请求不一致，跳过解绑: modelId={}, boundTaskId={}, requestTaskId={}",
+                    modelId, model.getTaskId(), taskId);
+            return;
+        }
+        int affected = initialModelMapper.unbindModelFromTask(
+                modelId,
+                taskId,
+                InitialModelBindingStatus.UNBOUND.getCode(),
+                operatorId
+        );
+        if (affected == 0) {
+            log.info("未找到需要解绑的记录: modelId={}, taskId={}", modelId, taskId);
+            return;
+        }
+        log.info("初始模型解绑完成: modelId={}, taskId={}", modelId, taskId);
+    }
+
+    @Override
+    public List<InitialModelInfoVO> listModels(String status) {
+        List<InitialModel> models = StringUtils.hasText(status)
+                ? initialModelMapper.selectByStatus(status)
+                : initialModelMapper.selectAll();
+        if (models.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<String, String> taskNameCache = new ConcurrentHashMap<>();
+        return models.stream()
+                .map(model -> {
+                    Map<String, Object> distributionStats = modelDistributionMapper.getDistributionProgress(model.getId());
+                    return toInfoVO(model, distributionStats, taskNameCache);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteModel(String modelId, String operatorId) {
+        InitialModel model = requireModel(modelId);
+        if (StringUtils.hasText(model.getTaskId())) {
+            initialModelMapper.unbindModelFromTask(
+                    modelId,
+                    model.getTaskId(),
+                    InitialModelBindingStatus.UNBOUND.getCode(),
+                    operatorId
+            );
+        }
+        modelDistributionMapper.deleteByModelId(modelId);
+        int deleted = initialModelMapper.deleteById(modelId);
+        log.info("初始模型删除: modelId={}, deleted={}", modelId, deleted);
+        return deleted > 0;
     }
 
     @Override
     public boolean validateModelIntegrity(String modelId) {
-        log.info("验证模型JSON数据完整性: modelId={}", modelId);
-
-        InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null || !StringUtils.hasText(model.getModelData())) {
+        InitialModel model = requireModel(modelId);
+        if (!StringUtils.hasText(model.getModelData())) {
             return false;
         }
-
         try {
-            // 首先验证JSON数据是否可以正常解析
-            Map<String, Object> modelDataMap = objectMapper.readValue(
-                    model.getModelData(), Map.class);
+            Map<String, Object> modelData = objectMapper.readValue(
+                    model.getModelData(), new TypeReference<>() {});
 
-            // 尝试使用sklearn验证器进行更详细的验证
             if (parameterGeneratorFactory.isSupported(model.getModelType().getCode())) {
                 SklearnModelParameterValidator.ValidationResult result =
-                        parameterValidator.validate(model.getModelType().getCode(), modelDataMap);
-
+                        parameterValidator.validate(model.getModelType().getCode(), modelData);
                 if (!result.isValid()) {
-                    log.warn("sklearn格式验证失败: modelId={}, message={}", modelId, result.getMessage());
-                    // 即使sklearn验证失败，只要JSON可解析，也认为数据完整性OK
-                    // 这是为了保持向后兼容性
-                    return true;
+                    log.warn("模型参数验证失败: modelId={}, message={}", modelId, result.getMessage());
+                    return false;
                 }
-
-                log.debug("sklearn格式验证通过: modelId={}", modelId);
             }
-
             return true;
         } catch (Exception e) {
-            log.error("模型JSON数据验证失败: modelId={}, error={}", modelId, e.getMessage());
+            log.error("模型数据解析失败: modelId={}, error={}", modelId, e.getMessage());
             return false;
         }
     }
 
     @Override
-    @Transactional
-    public boolean updateModelStatus(String modelId, String status) {
-        log.debug("更新模型状态: modelId={}, status={}", modelId, status);
-        return initialModelMapper.updateStatus(modelId, status) > 0;
-    }
-
-    @Override
-    public Integer getGenerationProgress(String modelId) {
-        // 简单实现：基于状态返回进度
-        InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null) {
-            return 0;
-        }
-
-        switch (model.getStatus()) {
-            case GENERATING:
-                return 50; // 正在生成，返回50%
-            case READY:
-            case DISTRIBUTED:
-                return 100;
-            case FAILED:
-                return 0;
-            default:
-                return 0;
-        }
-    }
-
-    @Override
-    @Transactional
-    public boolean cancelGeneration(String modelId, String cancelledBy) {
-        log.info("取消模型生成: modelId={}, cancelledBy={}", modelId, cancelledBy);
-
-        InitialModel model = initialModelMapper.selectById(modelId);
-        if (model == null || !InitialModelStatus.GENERATING.equals(model.getStatus())) {
-            return false;
-        }
-
-        // 更新状态为失败
-        return updateModelStatus(modelId, InitialModelStatus.FAILED.getCode());
-    }
-
-    @Override
-    @Transactional
-    public int cleanupFailedModels(int daysOld) {
-        log.info("清理过期失败模型: daysOld={}", daysOld);
-
-        List<InitialModel> failedModels = initialModelMapper.selectFailedModelsOlderThan(daysOld);
-        int cleanedCount = 0;
-
-        for (InitialModel model : failedModels) {
-            if (deleteModel(model.getId(), "SYSTEM")) {
-                cleanedCount++;
-            }
-        }
-
-        log.info("清理完成，删除了{}个过期失败模型", cleanedCount);
-        return cleanedCount;
-    }
-
-    @Override
-    public InitialModelInfoVO.ModelGenerationStats getGenerationStats(String taskId) {
-        log.debug("获取模型生成统计信息: taskId={}", taskId);
-
-        List<InitialModel> models = StringUtils.hasText(taskId) ?
-                initialModelMapper.selectByTaskId(taskId) :
-                initialModelMapper.selectByStatus(InitialModelStatus.READY.getCode()); // 获取所有就绪模型作为全局统计
-
+    public InitialModelInfoVO.ModelGenerationStats getGenerationStats() {
+        List<InitialModel> models = initialModelMapper.selectAll();
         if (models.isEmpty()) {
             return InitialModelInfoVO.ModelGenerationStats.builder()
                     .totalModels(0)
@@ -355,24 +608,21 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
                     .build();
         }
 
-        // 统计各状态数量
-        Map<String, Long> statusCounts = models.stream()
-                .collect(Collectors.groupingBy(m -> m.getStatus().getCode(), Collectors.counting()));
+        Map<String, Long> statusCount = models.stream()
+                .collect(Collectors.groupingBy(model -> model.getStatus().getCode(), Collectors.counting()));
 
-        int generating = statusCounts.getOrDefault(InitialModelStatus.GENERATING.getCode(), 0L).intValue();
-        int ready = statusCounts.getOrDefault(InitialModelStatus.READY.getCode(), 0L).intValue();
-        int distributed = statusCounts.getOrDefault(InitialModelStatus.DISTRIBUTED.getCode(), 0L).intValue();
-        int failed = statusCounts.getOrDefault(InitialModelStatus.FAILED.getCode(), 0L).intValue();
+        int generating = statusCount.getOrDefault(InitialModelStatus.GENERATING.getCode(), 0L).intValue();
+        int ready = statusCount.getOrDefault(InitialModelStatus.READY.getCode(), 0L).intValue();
+        int distributed = statusCount.getOrDefault(InitialModelStatus.DISTRIBUTED.getCode(), 0L).intValue();
+        int failed = statusCount.getOrDefault(InitialModelStatus.FAILED.getCode(), 0L).intValue();
 
-        // 计算成功率
-        double successRate = models.isEmpty() ? 0.0 : 
-                (double) (ready + distributed) / models.size() * 100;
+        double successRate = models.isEmpty() ? 0.0 :
+                ((double) (ready + distributed) / models.size()) * 100;
 
-        // 计算平均生成时间（仅针对已完成的模型）
         double avgGenerationTime = models.stream()
-                .filter(m -> m.getCreatedAt() != null && m.getUpdatedAt() != null)
-                .filter(m -> !InitialModelStatus.GENERATING.equals(m.getStatus()))
-                .mapToDouble(m -> ChronoUnit.SECONDS.between(m.getCreatedAt(), m.getUpdatedAt()))
+                .filter(model -> model.getCreatedAt() != null && model.getUpdatedAt() != null)
+                .filter(model -> !InitialModelStatus.GENERATING.equals(model.getStatus()))
+                .mapToDouble(model -> java.time.Duration.between(model.getCreatedAt(), model.getUpdatedAt()).toSeconds())
                 .average()
                 .orElse(0.0);
 
@@ -387,283 +637,524 @@ public class InitialModelGenerationServiceImpl implements InitialModelGeneration
                 .build();
     }
 
-    /**
-     * 生成随机模型
-     */
-    private void generateRandomModel(InitialModel model, Map<String, Object> params) {
+    /* ===================== 内部辅助方法 ===================== */
+
+    private void handleAutoGeneration(InitialModelGenerateRequest request, String createdBy, InitialModel model) {
         try {
-            log.info("开始生成初始模型JSON数据: modelId={}", model.getId());
-
-            // 模拟模型生成过程
-            Thread.sleep(2000 + RANDOM.nextInt(3000)); // 2-5秒随机生成时间
-
-            // 使用新的sklearn参数生成器
-            Map<String, Object> modelData = generateSklearnModelParameters(
-                    model.getId(), model.getTaskId(), model.getModelType().getCode(),
-                    params, model.getGenerationMethod().getCode(), model.getCreatedBy());
-
-            String modelJsonStr = objectMapper.writeValueAsString(modelData);
-
-            // 计算模型大小（字节）
-            long modelSize = modelJsonStr.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-
-            // 更新数据库，包括model_data、model_size和status
-            initialModelMapper.updateModelDataAndSize(
+            Map<String, Object> architecture = request.getArchitecture();
+            Map<String, Object> modelData = generateModelParameters(
                     model.getId(),
-                    modelJsonStr,
-                    modelSize,
-                    InitialModelStatus.READY.getCode()
+                    model.getModelType().getCode(),
+                    architecture,
+                    createdBy
             );
+            String modelJson = objectMapper.writeValueAsString(modelData);
+            long modelSize = modelJson.getBytes(StandardCharsets.UTF_8).length;
+            String checksum = sha256Hex(modelJson);
 
-            // 更新内存中的model对象，确保发布事件时modelSize不为null
-            model.setModelSize(modelSize);
+            initialModelMapper.updateModelContent(
+                    model.getId(),
+                    modelJson,
+                    modelSize,
+                    convertToJson(request.getMetadata()),
+                    convertListToJson(request.getLabels()),
+                    request.getDescription(),
+                    request.getRandomSeed(),
+                    extractParameterCount(modelData),
+                    checksum,
+                    null,
+                    InitialModelStatus.READY.getCode(),
+                    createdBy
+            );
+            initialModelMapper.updateStatus(model.getId(), InitialModelStatus.READY.getCode(), createdBy);
+            log.info("自动生成初始模型完成: modelId={}, size={}", model.getId(), modelSize);
 
-            // 发布模型生成完成事件
-            publishModelGeneratedEvent(model, params);
-
-            log.info("初始模型JSON数据生成完成: modelId={}, size={}KB",
-                    model.getId(), modelSize / 1024);
-
+            eventPublisher.publishEvent(new InitialModelGeneratedEvent(
+                    this,
+                    model.getId(),
+                    null,
+                    null,
+                    model.getModelType().getCode(),
+                    model.getGenerationMethod().getCode(),
+                    modelSize,
+                    null,
+                    checksum,
+                    architecture,
+                    createdBy
+            ));
         } catch (Exception e) {
-            log.error("初始模型生成失败: modelId={}, error={}", model.getId(), e.getMessage(), e);
-            throw new RuntimeException("模型生成失败", e);
+            log.error("初始模型自动生成失败: modelId={}, error={}", model.getId(), e.getMessage(), e);
+            initialModelMapper.updateStatus(model.getId(), InitialModelStatus.FAILED.getCode(), createdBy);
         }
     }
 
-    /**
-     * 生成真实的机器学习模型参数 (基于RandomForest结构)
-     */
-    private Map<String, Object> generateRealisticModelParameters(String modelType, Map<String, Object> params) {
-        Map<String, Object> modelData = new HashMap<>();
+    private Map<String, Object> generateModelParameters(String modelId,
+                                                        String modelType,
+                                                        Map<String, Object> architecture,
+                                                        String createdBy) throws JsonProcessingException {
+        Map<String, Object> result = parameterGeneratorFactory.generateParameters(
+                modelType,
+                modelId,
+                null,
+                architecture,
+                GenerationMethod.AUTO.getCode(),
+                createdBy);
 
-        // 基础评估指标 (参考 metrics_RandomForest JSON文件)
-        modelData.put("r2", -0.001 + Math.random() * 0.002);
-        modelData.put("mse", 1.0 + Math.random() * 0.5);
-        modelData.put("rmse", Math.sqrt((Double)modelData.get("mse")));
-        modelData.put("mae", 0.4 + Math.random() * 0.3);
-        modelData.put("median_ae", Math.random() * 1e-13);
-        modelData.put("explained_variance", -1e-15 + Math.random() * 2e-15);
-        modelData.put("mape", 2.0 + Math.random() * 2.0);
-        modelData.put("max_error", 3.0 + Math.random() * 2.0);
-        modelData.put("mean_residual", -0.05 + Math.random() * 0.1);
-        modelData.put("std_residual", 1.0 + Math.random() * 0.3);
-        modelData.put("residual_skewness", -1.0 + Math.random() * 2.0);
-        modelData.put("residual_kurtosis", 3.0 + Math.random() * 2.0);
-
-        // 模型特定参数
-        Map<String, Object> modelParams = new HashMap<>();
-        switch (modelType.toUpperCase()) {
-            case "RANDOM_FOREST":
-                modelParams.put("n_estimators", 100);
-                modelParams.put("max_depth", 10);
-                modelParams.put("random_state", 42);
-                modelParams.put("min_samples_split", 2);
-                modelParams.put("min_samples_leaf", 1);
-                break;
-            case "NEURAL_NETWORK":
-                modelParams.put("hidden_layers", Arrays.asList(128, 64, 32));
-                modelParams.put("activation", "relu");
-                modelParams.put("learning_rate", 0.001);
-                modelParams.put("optimizer", "adam");
-                break;
+        if (result != null) {
+            SklearnModelParameterValidator.ValidationResult validation =
+                    parameterValidator.validate(modelType, result);
+            if (validation.isValid()) {
+                return result;
+            }
+            log.warn("生成参数未通过验证，回退到默认模型: {}", validation.getMessage());
         }
 
-        modelData.put("model_parameters", modelParams);
-        modelData.put("is_initial_model", true); // 标记为初始模型
+        return generateDefaultModelParameters(modelType, architecture);
+    }
+
+    private Map<String, Object> generateDefaultModelParameters(String modelType, Map<String, Object> params) {
+        Map<String, Object> modelData = new HashMap<>();
+        modelData.put("r2", -0.001 + Math.random() * 0.002);
+        modelData.put("mse", 1.0 + Math.random() * 0.5);
+        modelData.put("rmse", Math.sqrt((Double) modelData.get("mse")));
+        modelData.put("mae", 0.4 + Math.random() * 0.3);
+        modelData.put("mape", 2.0 + Math.random() * 2.0);
         modelData.put("model_type", modelType.toLowerCase());
         modelData.put("generation_timestamp", System.currentTimeMillis());
-
+        modelData.put("is_initial_model", true);
+        modelData.put("architecture", params);
         return modelData;
     }
 
-    /**
-     * 生成符合sklearn标准的模型参数 (新实现)
-     */
-    private Map<String, Object> generateSklearnModelParameters(String modelId, String taskId, String modelType,
-                                                             Map<String, Object> architectureParams,
-                                                             String generationMethod, String createdBy) {
-        log.info("使用sklearn参数生成器: modelType={}, modelId={}", modelType, modelId);
-
-        try {
-            // 使用新的参数生成器工厂
-            Map<String, Object> modelData = parameterGeneratorFactory.generateParameters(
-                    modelType, modelId, taskId, architectureParams, generationMethod, createdBy);
-
-            if (modelData == null) {
-                log.warn("sklearn参数生成器不支持模型类型: {}, 回退到传统方法", modelType);
-                // 回退到原有实现
-                return generateRealisticModelParameters(modelType, architectureParams);
-            }
-
-            // 验证生成的参数格式
-            SklearnModelParameterValidator.ValidationResult validation =
-                    parameterValidator.validate(modelType, modelData);
-
-            if (!validation.isValid()) {
-                log.error("生成的sklearn参数验证失败: {}, 回退到传统方法", validation.getMessage());
-                return generateRealisticModelParameters(modelType, architectureParams);
-            }
-
-            log.info("sklearn标准参数生成成功: modelType={}, modelId={}", modelType, modelId);
-            return modelData;
-
-        } catch (Exception e) {
-            log.error("sklearn参数生成异常: modelType={}, error={}, 回退到传统方法",
-                    modelType, e.getMessage(), e);
-            return generateRealisticModelParameters(modelType, architectureParams);
+    private InitialModel requireModel(String modelId) {
+        InitialModel model = initialModelMapper.selectById(modelId);
+        if (model == null) {
+            throw new NoSuchElementException("初始模型不存在: " + modelId);
         }
+        return model;
     }
 
-    /**
-     * 发布模型生成完成事件
-     */
-    private void publishModelGeneratedEvent(InitialModel model, Map<String, Object> params) {
-        InitialModelGeneratedEvent event = new InitialModelGeneratedEvent(
-                this,
-                model.getId(),
-                model.getTaskId(),
-                null, // orchestrationId 如需要可从外部传入
-                model.getModelType().getCode(),
-                model.getGenerationMethod().getCode(),
-                model.getModelSize(),
-                null, // filePath 不再使用
-                null, // checksum 不再使用
-                params,
-                model.getCreatedBy()
-        );
+    private InitialModelDetailVO buildDetail(InitialModel model,
+                                             Map<String, Object> distributionStats,
+                                             Map<String, Object> modelParameters) {
+        Map<String, String> taskNameCache = new ConcurrentHashMap<>();
+        List<InitialModelBindingVO> bindingVOS = buildBindingVOs(model, taskNameCache);
+        InitialModelBindingVO activeBinding = bindingVOS.stream()
+                .filter(vo -> InitialModelBindingStatus.BOUND.getCode().equals(vo.getStatus()))
+                .findFirst()
+                .orElse(null);
 
-        eventPublisher.publishEvent(event);
-        log.debug("发布模型生成完成事件: {}", event);
-    }
-
-    /**
-     * 获取模型分发状态统计
-     */
-    private Map<String, Object> getDistributionStats(String modelId) {
-        try {
-            return modelDistributionMapper.getDistributionProgress(modelId);
-        } catch (Exception e) {
-            log.warn("获取分发统计失败: modelId={}, error={}", modelId, e.getMessage());
-            return new HashMap<>();
-        }
-    }
-
-    /**
-     * 转换为信息VO
-     */
-    private InitialModelInfoVO convertToInfoVO(InitialModel model, Map<String, Object> distributionStats) {
-        // 格式化模型大小
-        String sizeFormatted = formatFileSize(model.getModelSize());
-        
-        // 状态描述
-        String statusDescription = getStatusDescription(model.getStatus().getCode());
-        
-        // 分发状态统计
-        InitialModelInfoVO.DistributionStats distStats = InitialModelInfoVO.DistributionStats.builder()
-                .total((Integer) distributionStats.getOrDefault("total", 0))
-                .completed((Integer) distributionStats.getOrDefault("completed", 0))
-                .inProgress((Integer) distributionStats.getOrDefault("inProgress", 0))
-                .failed((Integer) distributionStats.getOrDefault("failed", 0))
-                .progressPercentage(calculateProgressPercentage(distributionStats))
-                .build();
-
-        return InitialModelInfoVO.builder()
-                .id(model.getId())
-                .taskId(model.getTaskId())
+        return InitialModelDetailVO.builder()
+                .modelId(model.getId())
                 .modelType(model.getModelType().getCode())
                 .generationMethod(model.getGenerationMethod().getCode())
                 .modelSize(model.getModelSize())
-                .modelSizeFormatted(sizeFormatted)
-                .architectureParams(parseJsonToMap(model.getArchitectureParams()))
+                .modelSizeFormatted(formatFileSize(model.getModelSize()))
+                .architecture(parseJsonToMap(model.getArchitectureParams()))
+                .metadata(parseJsonToMap(model.getMetadata()))
+                .labels(parseJsonToList(model.getLabels()))
+                .description(model.getDescription())
+                .randomSeed(model.getRandomSeed())
+                .parametersCount(model.getParametersCount())
+                .modelParameters(modelParameters)
+                .checksum(model.getChecksum())
+                .storagePath(model.getStoragePath())
                 .status(model.getStatus().getCode())
-                .statusDescription(statusDescription)
+                .statusDescription(model.getStatus().getDescription())
+                .autoGenerated(Boolean.TRUE.equals(model.getAutoGenerated()))
+                .bindingStatus(model.getBindingStatus() != null ? model.getBindingStatus().getCode() : null)
+                .activeBinding(activeBinding)
+                .bindings(bindingVOS)
+                .distributionStats(toDetailDistributionStats(distributionStats))
                 .createdAt(model.getCreatedAt())
                 .createdBy(model.getCreatedBy())
                 .updatedAt(model.getUpdatedAt())
-                .distributionStats(distStats)
+                .updatedBy(model.getUpdatedBy())
                 .build();
     }
 
-    /**
-     * 格式化文件大小
-     */
-    private String formatFileSize(Long sizeInBytes) {
-        if (sizeInBytes == null || sizeInBytes == 0) {
-            return "0 B";
-        }
-
-        String[] units = {"B", "KB", "MB", "GB", "TB"};
-        int unitIndex = 0;
-        double size = sizeInBytes.doubleValue();
-
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-
-        return String.format("%.2f %s", size, units[unitIndex]);
+    private InitialModelInfoVO toInfoVO(InitialModel model,
+                                        Map<String, Object> distributionStats,
+                                        Map<String, String> taskNameCache) {
+        List<InitialModelBindingVO> bindings = buildBindingVOs(model, taskNameCache);
+        InitialModelBindingVO activeBinding = bindings.stream()
+                .filter(vo -> InitialModelBindingStatus.BOUND.getCode().equals(vo.getStatus()))
+                .findFirst()
+                .orElse(null);
+        List<String> labels = parseJsonToList(model.getLabels());
+        return InitialModelInfoVO.builder()
+                .modelId(model.getId())
+                .modelType(model.getModelType().getCode())
+                .generationMethod(model.getGenerationMethod().getCode())
+                .modelSize(model.getModelSize())
+                .modelSizeFormatted(formatFileSize(model.getModelSize()))
+                .architecture(parseJsonToMap(model.getArchitectureParams()))
+                .metadata(parseJsonToMap(model.getMetadata()))
+                .labels(labels)
+                .status(model.getStatus().getCode())
+                .statusDescription(model.getStatus().getDescription())
+                .bindingStatus(model.getBindingStatus() != null ? model.getBindingStatus().getCode() : null)
+                .autoGenerated(Boolean.TRUE.equals(model.getAutoGenerated()))
+                .activeBinding(activeBinding)
+                .distributionStats(toInfoDistributionStats(distributionStats))
+                .checksum(model.getChecksum())
+                .createdAt(model.getCreatedAt())
+                .updatedAt(model.getUpdatedAt())
+                .build();
     }
 
-    /**
-     * 获取状态描述
-     */
-    private String getStatusDescription(String status) {
-        switch (status) {
-            case "GENERATING":
-                return "正在生成中";
-            case "READY":
-                return "已就绪";
-            case "DISTRIBUTED":
-                return "已分发";
-            case "FAILED":
-                return "生成失败";
-            default:
-                return "未知状态";
+    private List<InitialModelBindingVO> buildBindingVOs(InitialModel model,
+                                                        Map<String, String> taskNameCache) {
+        if (model == null || !StringUtils.hasText(model.getTaskId())) {
+            return Collections.emptyList();
+        }
+        String taskId = model.getTaskId();
+        String taskName = taskNameCache.computeIfAbsent(taskId, this::resolveTaskName);
+        InitialModelBindingVO vo = InitialModelBindingVO.builder()
+                .modelId(model.getId())
+                .taskId(taskId)
+                .taskName(taskName)
+                .mode(model.getBindingMode() != null ? model.getBindingMode().getCode() : null)
+                .status(model.getBindingStatus() != null ? model.getBindingStatus().getCode() : null)
+                .autoGenerated(Boolean.TRUE.equals(model.getBindingAutoGenerated()))
+                .boundAt(model.getBoundAt())
+                .unboundAt(model.getUnboundAt())
+                .boundBy(model.getBoundBy())
+                .unboundBy(model.getUnboundBy())
+                .build();
+        return Collections.singletonList(vo);
+    }
+
+    private String resolveTaskName(String taskId) {
+        if (!StringUtils.hasText(taskId)) {
+            return null;
+        }
+        FederatedTask task = federatedTasksMapper.selectTaskById(taskId);
+        return task != null ? task.getTaskName() : null;
+    }
+
+    private InitialModelDetailVO.DistributionStats toDetailDistributionStats(Map<String, Object> stats) {
+        if (stats == null || stats.isEmpty()) {
+            return InitialModelDetailVO.DistributionStats.builder()
+                    .total(0)
+                    .completed(0)
+                    .inProgress(0)
+                    .failed(0)
+                    .progressPercentage(0.0)
+                .latestDistributionAt(null)
+                .build();
+        }
+        int total = toInt(stats.get("total"));
+        int completed = toInt(stats.get("completed"));
+        int inProgress = toInt(stats.get("inProgress"));
+        int failed = toInt(stats.get("failed"));
+        double progress = total == 0 ? 0.0 : (completed * 100.0 / total);
+        return InitialModelDetailVO.DistributionStats.builder()
+                .total(total)
+                .completed(completed)
+                .inProgress(inProgress)
+                .failed(failed)
+                .progressPercentage(progress)
+                .latestDistributionAt(null)
+                .build();
+    }
+
+    private InitialModelInfoVO.DistributionStats toInfoDistributionStats(Map<String, Object> stats) {
+        if (stats == null || stats.isEmpty()) {
+            return InitialModelInfoVO.DistributionStats.builder()
+                    .total(0)
+                    .completed(0)
+                    .inProgress(0)
+                    .failed(0)
+                    .progressPercentage(0.0)
+                    .latestDistributionAt(null)
+                    .build();
+        }
+        int total = toInt(stats.get("total"));
+        int completed = toInt(stats.get("completed"));
+        int inProgress = toInt(stats.get("inProgress"));
+        int failed = toInt(stats.get("failed"));
+        double progress = total == 0 ? 0.0 : (completed * 100.0 / total);
+        return InitialModelInfoVO.DistributionStats.builder()
+                .total(total)
+                .completed(completed)
+                .inProgress(inProgress)
+                .failed(failed)
+                .progressPercentage(progress)
+                .latestDistributionAt(null)
+                .build();
+    }
+
+    private Map<String, Object> emptyDistributionStats() {
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total", 0);
+        stats.put("completed", 0);
+        stats.put("inProgress", 0);
+        stats.put("failed", 0);
+        stats.put("pending", 0);
+        return stats;
+    }
+
+    private Map<String, Object> ensureDistributionStats(String modelId, Map<String, Object> stats) {
+        if (stats != null && !stats.isEmpty()) {
+            return stats;
+        }
+
+        List<ModelDistribution> distributions = modelDistributionMapper.selectEntitiesByModelId(modelId);
+        if (CollectionUtils.isEmpty(distributions)) {
+            return emptyDistributionStats();
+        }
+
+        Map<String, Object> resolved = new HashMap<>();
+        long total = distributions.size();
+        long completed = distributions.stream()
+                .filter(record -> "COMPLETED".equalsIgnoreCase(record.getDistributionStatus()))
+                .count();
+        long inProgress = distributions.stream()
+                .filter(record -> "IN_PROGRESS".equalsIgnoreCase(record.getDistributionStatus()))
+                .count();
+        long failed = distributions.stream()
+                .filter(record -> "FAILED".equalsIgnoreCase(record.getDistributionStatus()))
+                .count();
+        long pending = total - completed - inProgress - failed;
+
+        resolved.put("total", total);
+        resolved.put("completed", completed);
+        resolved.put("inProgress", inProgress);
+        resolved.put("failed", failed);
+        resolved.put("pending", pending);
+        return resolved;
+    }
+
+    private List<String> resolveTargetVmIds(String taskId, List<String> requestedVmIds) {
+        if (!CollectionUtils.isEmpty(requestedVmIds)) {
+            return requestedVmIds.stream()
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .collect(Collectors.toList());
+        }
+        List<String> vmIds = taskParticipantsMapper.selectParticipantsByTaskId(taskId).stream()
+                .map(TaskParticipant::getVmId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        log.info("根据任务参与者解析目标VM: taskId={}, vmIds={}", taskId, vmIds);
+        return vmIds;
+    }
+
+    private void ensureInitialGlobalModelRecord(String taskId, InitialModel model, int participantCount) {
+        if (!StringUtils.hasText(taskId) || model == null) {
+            return;
+        }
+
+        GlobalModel existingById = globalModelMapper.selectById(model.getId());
+        if (existingById != null) {
+            return;
+        }
+
+        GlobalModel existingByRound = globalModelMapper.selectByTaskIdAndRound(taskId, 0);
+        if (existingByRound != null) {
+            return;
+        }
+
+        AggregationMethod aggregationMethod = resolveAggregationMethod(taskId);
+        LocalDateTime now = LocalDateTime.now();
+
+        GlobalModel initialGlobalModel = GlobalModel.builder()
+                .id(model.getId())
+                .taskId(taskId)
+                .roundNumber(0)
+                .aggregationMethod(aggregationMethod)
+                .globalParameters(StringUtils.hasText(model.getModelData()) ? model.getModelData() : "{}")
+                .participantCount(Math.max(participantCount, 0))
+                .aggregationDuration(0L)
+                .status(GlobalModelStatus.COMPLETED)
+                .startedAt(now)
+                .completedAt(now)
+                .createdAt(now)
+                .updatedAt(now)
+                .distributionStatus("PENDING")
+                .build();
+
+        globalModelMapper.insertGlobalModel(initialGlobalModel);
+        log.info("初始全局模型记录已创建: taskId={}, modelId={}, participants={}", taskId, model.getId(), participantCount);
+    }
+
+    private AggregationMethod resolveAggregationMethod(String taskId) {
+        FederatedTask task = federatedTasksMapper.selectByTaskId(taskId);
+        if (task != null && task.getAlgorithm() != null) {
+            try {
+                return AggregationMethod.fromCode(task.getAlgorithm().getCode());
+            } catch (IllegalArgumentException ex) {
+                log.warn("任务{}的算法无法映射为聚合方法，使用默认值: {}", taskId, ex.getMessage());
+            }
+        }
+        return AggregationMethod.FEDERATED_AVERAGING;
+    }
+
+    private List<ModelDistribution> createDistributionRecords(String modelId, List<String> targetVmIds) {
+        List<ModelDistribution> records = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (String vmId : targetVmIds) {
+            ModelDistribution record = ModelDistribution.builder()
+                    .id(uuidUtil.generateUuid())
+                    .modelId(modelId)
+                    .vmId(vmId)
+                    .distributionStatus("PENDING")
+                    .createdAt(now)
+                    .build();
+            records.add(record);
+        }
+        return records;
+    }
+
+    private void validateGenerateRequest(InitialModelGenerateRequest request) {
+        if (request == null || !StringUtils.hasText(request.getModelType())) {
+            throw new IllegalArgumentException("模型类型不能为空");
+        }
+        if (CollectionUtils.isEmpty(request.getArchitecture())) {
+            throw new IllegalArgumentException("模型架构参数不能为空");
         }
     }
 
-    /**
-     * 计算分发进度百分比
-     */
-    private Double calculateProgressPercentage(Map<String, Object> stats) {
-        Integer total = (Integer) stats.getOrDefault("total", 0);
-        Integer completed = (Integer) stats.getOrDefault("completed", 0);
-        
-        if (total == 0) {
-            return 0.0;
+    private void validateUploadRequest(InitialModelUploadRequest request, String filePath) {
+        if (request == null || !StringUtils.hasText(request.getModelType())) {
+            throw new IllegalArgumentException("模型类型不能为空");
         }
-        
-        return (double) completed / total * 100;
+        if (!StringUtils.hasText(filePath)) {
+            throw new IllegalArgumentException("文件路径不能为空");
+        }
     }
 
-    /**
-     * 转换为JSON字符串
-     */
-    private String convertToJson(Object obj) {
-        if (obj == null) {
+    private String convertToJson(Object value) {
+        if (value == null) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(obj);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            log.error("转换为JSON失败: {}", e.getMessage());
-            return null;
+            throw new IllegalArgumentException("JSON 序列化失败: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * 解析JSON为Map
-     */
-    @SuppressWarnings("unchecked")
+    private String convertListToJson(List<String> labels) {
+        if (CollectionUtils.isEmpty(labels)) {
+            return null;
+        }
+        return convertToJson(labels);
+    }
+
+    private String resolveDownloadFilename(InitialModel model, String defaultName) {
+        if (StringUtils.hasText(defaultName)) {
+            return defaultName;
+        }
+        String modelTypeCode = model.getModelType() != null ? model.getModelType().getCode() : "model";
+        return model.getId() + "-" + modelTypeCode.toLowerCase(Locale.ROOT) + ".json";
+    }
+
     private Map<String, Object> parseJsonToMap(String json) {
         if (!StringUtils.hasText(json)) {
             return new HashMap<>();
         }
         try {
-            return objectMapper.readValue(json, Map.class);
+            return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (JsonProcessingException e) {
-            log.error("解析JSON失败: json={}, error={}", json, e.getMessage());
+            log.warn("JSON 解析失败，返回空Map: {}", e.getMessage());
             return new HashMap<>();
         }
+    }
+
+    private List<String> parseJsonToList(String json) {
+        if (!StringUtils.hasText(json)) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            log.warn("标签解析失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private String formatFileSize(Long bytes) {
+        if (bytes == null || bytes <= 0) {
+            return "0 B";
+        }
+        String[] units = {"B", "KB", "MB", "GB", "TB"};
+        int unitIndex = 0;
+        double size = bytes;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        return String.format(Locale.ROOT, "%.2f %s", size, units[unitIndex]);
+    }
+
+    private int toInt(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private long toLong(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private Integer extractParameterCount(Map<String, Object> modelData) {
+        if (modelData == null) {
+            return null;
+        }
+        Object parameters = modelData.get("model_parameters");
+        if (parameters instanceof Collection<?> collection) {
+            return collection.size();
+        }
+        if (parameters instanceof Map<?, ?> map) {
+            return map.size();
+        }
+        return null;
+    }
+
+    private String sha256Hex(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("计算SHA-256失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractArchitectureFromMetadata(Map<String, Object> metadata) {
+        if (metadata == null) {
+            return null;
+        }
+        Object architecture = metadata.get("architecture");
+        if (architecture == null) {
+            return null;
+        }
+        return convertToJson(architecture);
     }
 }

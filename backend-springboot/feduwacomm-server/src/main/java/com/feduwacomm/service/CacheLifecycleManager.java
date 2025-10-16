@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * 负责缓存的生命周期管理、定期清理和事件响应
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Component
 public class CacheLifecycleManager {

@@ -32,4 +32,6 @@ public class TaskVO {
     private Double progress;
     private String createdBy;
     private Double finalAccuracy; // 仅完成状态时有值
+    private TaskOperationVO.InitialModelSummary initialModelSummary;
+    private TaskOperationVO.ConfigSummaryVO configSummary;
 }

@@ -94,6 +94,11 @@ public interface TaskParticipantsMapper {
                                       @Param("vmId") String vmId);
 
     /**
+     * 根据assignedDatasetId查询参与者
+     */
+    TaskParticipant selectParticipantByAssignedDatasetId(@Param("assignedDatasetId") String assignedDatasetId);
+
+    /**
      * 获取指定任务中参与者实际完成的最新轮次
      */
     Integer getLatestCompletedRound(@Param("taskId") String taskId);

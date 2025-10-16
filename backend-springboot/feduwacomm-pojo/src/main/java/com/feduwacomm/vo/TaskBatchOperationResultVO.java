@@ -13,7 +13,7 @@ import java.util.List;
  * 返回批量操作的执行结果和详细信息
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Data

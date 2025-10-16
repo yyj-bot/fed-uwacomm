@@ -14,7 +14,7 @@ import java.util.Objects;
  * 用于缓存联邦学习任务的全局度量指标
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Data
 @Builder
