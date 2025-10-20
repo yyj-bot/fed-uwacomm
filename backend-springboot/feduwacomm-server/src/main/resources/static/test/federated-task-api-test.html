@@ -503,7 +503,7 @@
                 <div class="api-section">
                     <div class="api-header">
                         <h3>📈 数据分配预览</h3>
-                        <small>实时预览数据在各VM上的分配情况</small>
+                        <small>数据分发改由后端自动调度，此处仅保留说明</small>
                     </div>
                     <div class="api-body">
                         <div id="distributionPreview" style="display: none;">
@@ -511,10 +511,10 @@
                             <div id="distributionTable"></div>
                         </div>
                         <div id="distributionPlaceholder" style="text-align: center; padding: 40px; color: #6c757d;">
-                            请先选择数据集和虚拟机后，即可预览数据分配
+                            数据分发由后端服务自动执行，前端无需预览或手动触发
                         </div>
-                        <button onclick="previewDataDistribution()" class="btn btn-primary" id="previewBtn" disabled>🔍 预览分配</button>
-                        <button onclick="validateParticipants()" class="btn btn-success" id="validateBtn" disabled>✅ 验证参与者</button>
+                        <button onclick="previewDataDistribution()" class="btn btn-primary" id="previewBtn" disabled title="数据分发由后端自动执行">🔒 分发预览已禁用</button>
+                        <button onclick="validateParticipants()" class="btn btn-success" id="validateBtn" disabled title="参与者验证由后端流程负责">🔒 参与者验证已禁用</button>
                     </div>
                 </div>
 
@@ -965,7 +965,6 @@
         let availableDatasets = [];
         let selectedVms = [];
         let selectedDataset = null;
-        let distributionPreviewData = null;
 
         // Token管理
         function setToken() {
@@ -1497,121 +1496,18 @@
 
         // 预览数据分配
         async function previewDataDistribution() {
-            if (!selectedDataset || selectedVms.length === 0) {
-                alert('请先选择数据集和虚拟机');
-                return;
-            }
-
-            const distributionData = {
-                datasetId: selectedDataset.datasetId,
-                distributionStrategy: document.getElementById('distributionStrategy').value,
-                participants: selectedVms.map(vm => ({
-                    vmId: vm.vmId,
-                    requestedRatio: parseFloat(document.getElementById(`ratio_${vm.vmId}`).value)
-                }))
-            };
-
-            const result = await makeRequest('/api/federated/tasks/preview-distribution', 'POST', distributionData);
-
-            if (result.success && result.data.data) {
-                distributionPreviewData = result.data.data;
-                showDistributionPreview(result.data.data);
-            } else {
-                alert('预览失败: ' + (result.data.message || '未知错误'));
-            }
-        }
-
-        // 显示分配预览
-        function showDistributionPreview(data) {
-            const previewDiv = document.getElementById('distributionPreview');
-            const placeholderDiv = document.getElementById('distributionPlaceholder');
-            const tableDiv = document.getElementById('distributionTable');
-
-            previewDiv.style.display = 'block';
-            placeholderDiv.style.display = 'none';
-
-            let tableHtml = `
-                <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                    <thead>
-                        <tr style="background: #f8f9fa;">
-                            <th style="border: 1px solid #dee2e6; padding: 10px;">虚拟机</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px;">分配比例</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px;">数据行数</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px;">预估训练时间</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            data.distributionResult.participants.forEach(participant => {
-                tableHtml += `
-                    <tr>
-                        <td style="border: 1px solid #dee2e6; padding: 10px;">${participant.vmName}</td>
-                        <td style="border: 1px solid #dee2e6; padding: 10px;">${(participant.allocatedRatio * 100).toFixed(1)}%</td>
-                        <td style="border: 1px solid #dee2e6; padding: 10px;">${participant.allocatedRows.toLocaleString()}</td>
-                        <td style="border: 1px solid #dee2e6; padding: 10px;">${Math.round(participant.estimatedTrainingTime/60)}分钟</td>
-                    </tr>
-                `;
-            });
-
-            tableHtml += `
-                    </tbody>
-                </table>
-                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <div><strong>质量指标:</strong></div>
-                    <div>IID分数: ${(data.qualityMetrics.iidScore * 100).toFixed(1)}% | 均衡分数: ${(data.qualityMetrics.balanceScore * 100).toFixed(1)}%</div>
-                </div>
-            `;
-
-            tableDiv.innerHTML = tableHtml;
+            alert('数据分配预览由后端自动处理，当前调试页面不再提供该接口。');
         }
 
         // 更新分配预览
         function updateDistributionPreview() {
-            if (selectedDataset && selectedVms.length > 0) {
-                document.getElementById('previewBtn').disabled = false;
-                document.getElementById('validateBtn').disabled = false;
-            } else {
-                document.getElementById('previewBtn').disabled = true;
-                document.getElementById('validateBtn').disabled = true;
-            }
+            document.getElementById('previewBtn').disabled = true;
+            document.getElementById('validateBtn').disabled = true;
         }
 
         // 验证参与者
         async function validateParticipants() {
-            if (selectedVms.length === 0) {
-                alert('请先选择虚拟机');
-                return;
-            }
-
-            const validationData = {
-                algorithm: document.getElementById('smartAlgorithm').value,
-                taskType: document.getElementById('smartTaskType').value,
-                participants: selectedVms.map(vm => ({
-                    vmId: vm.vmId,
-                    role: 'PARTICIPANT'
-                }))
-            };
-
-            const result = await makeRequest('/api/federated/tasks/validate-participants', 'POST', validationData);
-
-            if (result.success && result.data.data) {
-                const validation = result.data.data;
-                let message = `验证结果: ${validation.overallValid ? '✅ 通过' : '❌ 失败'}\n\n`;
-
-                validation.participantValidations.forEach(pv => {
-                    const vm = selectedVms.find(v => v.vmId === pv.vmId);
-                    message += `${vm.name}: ${pv.isValid ? '✅' : '❌'}\n`;
-
-                    Object.entries(pv.validationResults).forEach(([key, result]) => {
-                        message += `  - ${key}: ${result.status} - ${result.message}\n`;
-                    });
-                });
-
-                alert(message);
-            } else {
-                alert('验证失败: ' + (result.data.message || '未知错误'));
-            }
+            alert('参与者验证已集成至后端任务流程，调试页面不再提供接口调用。');
         }
 
         // 加载算法模板

@@ -505,20 +505,37 @@ CREATE INDEX idx_log_cleanup_tasks_created_at ON log_cleanup_tasks (created_at);
 -- 13. 初始模型表
 CREATE TABLE IF NOT EXISTS initial_models (
                                               id VARCHAR(32) PRIMARY KEY COMMENT '初始模型唯一标识(32位UUID)',
-                                              task_id VARCHAR(32) NOT NULL COMMENT '关联任务ID(32位UUID)',
+                                              task_id VARCHAR(32) NULL COMMENT '关联任务ID(32位UUID)',
                                               model_type ENUM('NEURAL_NETWORK', 'RANDOM_FOREST') NOT NULL COMMENT '模型类型',
-                                              generation_method ENUM('RANDOM', 'CUSTOM_UPLOAD') NOT NULL COMMENT '生成方式',
+                                              generation_method ENUM('AUTO', 'CUSTOM') NOT NULL COMMENT '生成方式(AUTO-系统生成, CUSTOM-手动上传)',
                                               model_size BIGINT COMMENT '模型大小(字节)',
                                               architecture_params JSON COMMENT '架构参数(JSON格式)',
+                                              metadata JSON COMMENT '扩展元信息(JSON格式)',
                                               model_data JSON COMMENT '模型参数数据(JSON格式)',
+                                              description VARCHAR(255) COMMENT '模型描述',
+                                              labels JSON COMMENT '模型标签(JSON数组)',
+                                              random_seed INT COMMENT '随机种子',
+                                              parameters_count INT COMMENT '参数数量',
+                                              checksum VARCHAR(128) COMMENT '模型校验和',
+                                              storage_path VARCHAR(500) COMMENT '模型文件存储路径',
+                                              binding_status ENUM('UNBOUND', 'BOUND') DEFAULT 'UNBOUND' COMMENT '绑定状态',
+                                              binding_mode ENUM('AUTO', 'CUSTOM') NULL COMMENT '绑定模式',
+                                              binding_auto_generated TINYINT(1) DEFAULT 0 COMMENT '绑定是否由AUTO模式生成',
+                                              bound_at TIMESTAMP NULL COMMENT '最近绑定时间',
+                                              bound_by VARCHAR(32) NULL COMMENT '最近绑定操作人',
+                                              unbound_at TIMESTAMP NULL COMMENT '最近解绑时间',
+                                              unbound_by VARCHAR(32) NULL COMMENT '最近解绑操作人',
+                                              auto_generated TINYINT(1) DEFAULT 0 COMMENT '是否自动生成',
                                               status ENUM('GENERATING', 'READY', 'DISTRIBUTED', 'FAILED') DEFAULT 'GENERATING' COMMENT '状态',
                                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                               created_by VARCHAR(32) COMMENT '创建者ID(32位UUID)',
                                               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                                              INDEX idx_initial_models_task_id (task_id),
+                                              updated_by VARCHAR(32) COMMENT '更新者ID(32位UUID)',
+                                              UNIQUE KEY uk_initial_models_task (task_id),
                                               INDEX idx_initial_models_status (status),
+                                              INDEX idx_initial_models_binding_status (binding_status),
                                               INDEX idx_initial_models_created_at (created_at),
-                                              FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE CASCADE
+                                              FOREIGN KEY (task_id) REFERENCES federated_tasks (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='初始模型表 - 存储联邦学习初始模型信息';
 
@@ -632,7 +649,7 @@ CREATE TABLE IF NOT EXISTS workflow_stage_executions (
 -- 为federated_tasks表添加新字段
 ALTER TABLE federated_tasks
     ADD COLUMN orchestration_id VARCHAR(32) NULL COMMENT '工作流编排ID(32位UUID)',
-    ADD COLUMN initial_model_strategy ENUM('RANDOM', 'CUSTOM_UPLOAD') DEFAULT 'RANDOM' COMMENT '初始模型策略',
+    ADD COLUMN initial_model_strategy ENUM('AUTO', 'CUSTOM') DEFAULT 'AUTO' COMMENT '初始模型策略',
     ADD COLUMN workflow_config JSON COMMENT '工作流配置(JSON格式)',
     ADD INDEX idx_federated_tasks_orchestration_id (orchestration_id);
 
@@ -750,6 +767,7 @@ CREATE TABLE IF NOT EXISTS round_states (
                                             completed_participants INT NOT NULL DEFAULT 0 COMMENT '已完成参与者数量',
                                             gradient_uploads_received INT NOT NULL DEFAULT 0 COMMENT '已收到梯度上传数量',
                                             model_broadcasts_acked INT NOT NULL DEFAULT 0 COMMENT '模型广播确认数量',
+                                            dataset_bindings JSON NULL COMMENT '每轮VM与assignedDatasetId的绑定快照',
                                             started_at TIMESTAMP NULL COMMENT '轮次开始时间',
                                             completed_at TIMESTAMP NULL COMMENT '轮次完成时间',
                                             error_message TEXT NULL COMMENT '错误信息',

@@ -72,6 +72,7 @@ public class RoundLockManager {
             boolean dbLockAcquired = acquireDatabaseLock(taskId);
             if (!dbLockAcquired) {
                 log.warn("获取数据库锁失败: taskId={}", taskId);
+                lock.unlock();
                 return false;
             }
 
@@ -81,9 +82,15 @@ public class RoundLockManager {
         } catch (InterruptedException e) {
             log.error("获取锁被中断: taskId={}", taskId, e);
             Thread.currentThread().interrupt();
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
             return false;
         } catch (Exception e) {
             log.error("获取锁异常: taskId={}", taskId, e);
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
             return false;
         }
     }
@@ -169,9 +176,18 @@ public class RoundLockManager {
                     return false;
                 }
 
-                // 使用updated_at作为版本号进行乐观锁检查
-                // 这里通过更新操作的返回值来判断是否获取到锁
-                int affectedRows = updateTaskForLock(taskId, task.getUpdatedAt());
+                String statusName = task.getStatus() != null ? task.getStatus().name() : null;
+                if (statusName == null) {
+                    log.warn("任务状态为空，无法执行乐观锁: taskId={}", taskId);
+                    return false;
+                }
+
+                int affectedRows = federatedTasksMapper.updateTaskStatusWithVersion(
+                    taskId,
+                    statusName,
+                    java.time.LocalDateTime.now(),
+                    task.getVersion()
+                );
 
                 if (affectedRows > 0) {
                     log.debug("数据库乐观锁获取成功: taskId={}, retry={}", taskId, retry);
@@ -197,50 +213,6 @@ public class RoundLockManager {
 
         log.warn("数据库乐观锁获取失败，超过最大重试次数: taskId={}, maxRetry={}", taskId, MAX_RETRY_COUNT);
         return false;
-    }
-
-    /**
-     * 更新任务以获取乐观锁
-     * 使用updated_at字段作为版本控制
-     *
-     * @param taskId 任务ID
-     * @param lastUpdatedAt 上次更新时间
-     * @return 影响的行数
-     */
-    private int updateTaskForLock(String taskId, java.time.LocalDateTime lastUpdatedAt) {
-        try {
-            var task = federatedTasksMapper.selectTaskById(taskId);
-            if (task == null) {
-                log.warn("任务不存在: taskId={}", taskId);
-                return 0;
-            }
-
-            // 检查时间戳是否匹配（兼容旧的时间戳检查）
-            if (!task.getUpdatedAt().equals(lastUpdatedAt)) {
-                log.debug("时间戳不匹配，可能存在并发更新: taskId={}, expected={}, actual={}",
-                         taskId, lastUpdatedAt, task.getUpdatedAt());
-                return 0;
-            }
-
-            // 使用乐观锁进行更新，version字段会自动递增
-            int result = federatedTasksMapper.updateTaskStatusWithVersion(
-                taskId,
-                task.getStatus().name(),
-                java.time.LocalDateTime.now(),
-                task.getVersion()
-            );
-
-            if (result > 0) {
-                log.debug("乐观锁更新成功: taskId={}, version={}", taskId, task.getVersion());
-            } else {
-                log.warn("乐观锁更新失败，版本冲突: taskId={}, expectedVersion={}", taskId, task.getVersion());
-            }
-
-            return result;
-        } catch (Exception e) {
-            log.error("乐观锁更新异常: taskId={}", taskId, e);
-            return 0;
-        }
     }
 
     /**

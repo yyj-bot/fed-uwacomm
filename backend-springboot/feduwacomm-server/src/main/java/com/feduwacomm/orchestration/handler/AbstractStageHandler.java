@@ -16,31 +16,45 @@ public abstract class AbstractStageHandler implements StageHandler {
     public final StageResult execute(WorkflowContext context) {
         WorkflowStage stage = getSupportedStage();
         String orchestrationId = context.getOrchestrationId();
-        
+        StageResult result = null;
+
         log.info("开始执行工作流阶段: stage={}, orchestrationId={}", stage, orchestrationId);
-        
+
         try {
             // 验证输入
             if (!validateInput(context)) {
-                return StageResult.failure("阶段输入验证失败: " + stage);
-            }
-            
-            // 执行阶段逻辑
-            StageResult result = doExecute(context);
-            
-            if (result.isSuccess()) {
-                log.info("工作流阶段执行成功: stage={}, orchestrationId={}", stage, orchestrationId);
+                result = StageResult.failure("阶段输入验证失败: " + stage);
             } else {
-                log.warn("工作流阶段执行失败: stage={}, orchestrationId={}, error={}", 
-                    stage, orchestrationId, result.getError());
+                // 执行阶段逻辑
+                result = doExecute(context);
+
+                if (result == null) {
+                    log.error("工作流阶段执行返回空结果: stage={}, orchestrationId={}", stage, orchestrationId);
+                    result = StageResult.failure("阶段执行返回空结果: " + stage);
+                } else if (result.isSuccess()) {
+                    log.info("工作流阶段执行成功: stage={}, orchestrationId={}", stage, orchestrationId);
+                } else {
+                    log.warn("工作流阶段执行失败: stage={}, orchestrationId={}, error={}",
+                        stage, orchestrationId, result.getError());
+                }
             }
-            
-            return result;
-            
+
         } catch (Exception e) {
             log.error("工作流阶段执行异常: stage={}, orchestrationId={}", stage, orchestrationId, e);
-            return StageResult.failure("阶段执行异常: " + e.getMessage(), e);
+            result = StageResult.failure("阶段执行异常: " + e.getMessage(), e);
+        } finally {
+            try {
+                cleanup(context);
+            } catch (Exception cleanupException) {
+                log.warn("工作流阶段清理异常: stage={}, orchestrationId={}, error={}",
+                    stage, orchestrationId, cleanupException.getMessage(), cleanupException);
+                if (result == null) {
+                    result = StageResult.failure("阶段清理异常: " + cleanupException.getMessage(), cleanupException);
+                }
+            }
         }
+
+        return result;
     }
 
     /**

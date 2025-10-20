@@ -21,9 +21,6 @@ export { trainingData as trainingDataApi } from './training-data'
 export { log as logApi } from './system-log'
 // export { log as systemApi } from './system-log' // 向后兼容别名
 
-// 虚拟机轮次模块API
-export { vmRoundModels as vmRoundModelsApi } from './vm-round-models'
 
 // 重新导出服务层
-export { userService as authService } from '../services/user'
-export { wsService as websocketService } from '../services/websocket' 
+export { userService as authService } from '../services/user' 

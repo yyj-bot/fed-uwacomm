@@ -28,14 +28,8 @@ const { Title } = Typography
 const SystemPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('logs')
   const { 
-    logList,
     systemMonitor
   } = useSystem()
-
-  // 计算错误日志数量用于显示徽标
-  const errorLogCount = logList?.filter(log => log.level === 'ERROR').length || 0
-  const warningLogCount = logList?.filter(log => log.level === 'WARN').length || 0
-  const totalIssues = errorLogCount + warningLogCount
 
   // 子Tabs的items配置
   const logTabItems = [
@@ -69,13 +63,6 @@ const SystemPage: React.FC = () => {
         <Space>
           <FileTextOutlined />
           系统日志
-          {totalIssues > 0 && (
-            <Badge 
-              count={totalIssues} 
-              size="small"
-              style={{ backgroundColor: errorLogCount > 0 ? '#ff4d4f' : '#faad14' }}
-            />
-          )}
         </Space>
       ),
       children: (

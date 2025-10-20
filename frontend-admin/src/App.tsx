@@ -9,24 +9,27 @@ import {
   DashboardPage,
   SystemManagementPage,
   FederatedLearningPage,
-  ModelManagementPage,
   SystemLogsPage,
   UnderwaterOptimizationPage,
   EnvironmentAnalysisPage,
+  VMManagementPage,
+  AdminVMManagementPage,
   UserProfilePage,
   AccountSettingsPage
 } from '@/modules'
+
+// 模型管理相关页面
+import {
+  InitialModelPage,
+  VersionManagementPage
+} from '@/modules/model-management'
 
 // 联邦学习相关页面
 import TaskListPage from '@/modules/federated-learning/TaskListPage'
 import TaskDetailPage from '@/modules/federated-learning/TaskDetailPage'
 import TaskCreatePage from '@/modules/federated-learning/TaskCreatePage'
-import OrchestrationListPage from '@/modules/federated-learning/OrchestrationListPage'
-import OrchestrationDetailPage from '@/modules/federated-learning/OrchestrationDetailPage'
-import OrchestrationTimelinePage from '@/modules/federated-learning/OrchestrationTimelinePage'
-import OrchestrationAnalyticsPage from '@/modules/federated-learning/OrchestrationAnalyticsPage'
 
-import { userService, websocketService } from '@/services'
+import { userService } from '@/services'
 import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
 import { useAuthStore } from '@/store/auth/authStore'
 
@@ -42,11 +45,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   
   // 简化逻辑：只检查token存在，不验证有效性
   if (!token) {
-    console.log('❌ ProtectedRoute无token，重定向到login')
+    //console.log('❌ ProtectedRoute无token，重定向到login')
     return <Navigate to="/login" replace />
   }
   
-  console.log('✅ ProtectedRoute有token，允许访问')
+  //console.log('✅ ProtectedRoute有token，允许访问')
   return <>{children}</>
 }
 
@@ -55,7 +58,7 @@ const App: React.FC = () => {
   
   useEffect(() => {
     // 初始化应用
-    console.log('🚀 App应用初始化开始')
+    //console.log('🚀 App应用初始化开始')
     
     // 同步localStorage和store的认证状态
     const localToken = localStorage.getItem('access_token')
@@ -76,20 +79,20 @@ const App: React.FC = () => {
     
     // 如果localStorage有token，但store没有认证状态，同步到store
     if (localToken && (!storeToken || !storeIsAuthenticated)) {
-      console.log('✅ 检测到localStorage有token，同步到store')
+      //console.log('✅ 检测到localStorage有token，同步到store')
       authStore.initializeAuth()
     }
     // 如果localStorage没有token，但store认为已认证，清理store（但不调用API logout）
     else if (!localToken && storeIsAuthenticated) {
-      console.log('🧹 localStorage无token，直接清理store状态（不调用API）')
+      //console.log('🧹 localStorage无token，直接清理store状态（不调用API）')
       authStore.clearAuthState()
     }
     // 如果状态一致，无需操作
     else {
-      console.log('✅ 认证状态一致，无需操作')
+      //console.log('✅ 认证状态一致，无需操作')
     }
     
-    console.log('🎯 App初始化完成')
+    //console.log('🎯 App初始化完成')
   }, [])
   
   return (
@@ -151,13 +154,17 @@ const App: React.FC = () => {
                       <Route path="/federated-learning/tasks/create" element={<TaskCreatePage />} />
                       <Route path="/federated-learning/tasks/:taskId" element={<TaskDetailPage />} />
                       
-                      {/* 工作流编排路由 */}
-                      <Route path="/federated-learning/orchestrations" element={<OrchestrationListPage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId" element={<OrchestrationDetailPage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId/timeline" element={<OrchestrationTimelinePage />} />
-                      <Route path="/federated-learning/orchestrations/:orchestrationId/analytics" element={<OrchestrationAnalyticsPage />} />
+                      {/* 模型管理路由 */}
+                      <Route path="/models" element={<Navigate to="/models/initial" replace />} />
+                      <Route path="/models/initial" element={<InitialModelPage />} />
+                      <Route path="/models/versions" element={<VersionManagementPage />} />
+                      {/* 部署运维功能已合并到版本管理页面 */}
                       
-                      <Route path="/models" element={<ModelManagementPage />} />
+                      {/* VM管理路由 */}
+                      <Route path="/vm-management" element={<Navigate to="/vm-management/list" replace />} />
+                      <Route path="/vm-management/list" element={<VMManagementPage />} />
+                      <Route path="/vm-management/admin" element={<AdminVMManagementPage />} />
+                      
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />
                       <Route path="/environment-analysis" element={<EnvironmentAnalysisPage />} />

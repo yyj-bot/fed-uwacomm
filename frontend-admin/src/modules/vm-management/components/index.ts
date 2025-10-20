@@ -1,0 +1,32 @@
+/**
+ * VM管理组件导出
+ * 
+ * @author FedUWAComm Team
+ * @version 1.0.0
+ */
+
+export { default as VMList } from './VMList'
+export { default as VMDetail } from './VMDetail'
+export { default as VMModels } from './VMModels'
+export { default as VMEditModal } from './VMEditModal'
+export { default as VMStatistics } from './VMStatistics'
+
+// 管理员VM管理组件
+export { default as VMAssignmentOverview } from './VMAssignmentOverview'
+export { default as VMAssignmentManager } from './VMAssignmentManager'
+export { default as UserVmList } from './UserVmList'
+export { default as UserVmManagement } from './UserVmManagement'
+export { default as VMForceControl } from './VMForceControl'
+export { default as AdminVMList } from './AdminVMList'
+export { default as UnassignedVMList } from './UnassignedVMList'
+export { default as VMEditDrawer } from './VMEditDrawer'
+
+
+
+
+
+
+
+
+
+

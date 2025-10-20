@@ -18,15 +18,6 @@ interface ModelVersionPaginatedResponse<T> {
 // 创建模型API实例
 const modelApiInstance = createApiInstance('MODEL')
 
-// 部署配置类型
-interface DeploymentConfig {
-  replicas?: number
-  resources?: {
-    cpu?: string
-    memory?: string
-  }
-  environment?: Record<string, string>
-}
 
 // 评估结果类型
 interface EvaluationResult {
@@ -40,29 +31,6 @@ interface EvaluationResult {
   createdAt: string
 }
 
-// 部署信息类型
-interface DeploymentInfo {
-  deploymentId: string
-  modelId: string
-  deploymentName: string
-  targetVms?: string[]
-  status: string
-  deploymentConfig?: DeploymentConfig
-  endpoints?: string[]
-  createdAt: string
-}
-
-// 回滚信息类型
-interface RollbackInfo {
-  rollbackId: string
-  deploymentId: string
-  fromModelId: string
-  toModelId: string
-  status: string
-  rollbackReason?: string
-  rollbackTime?: number
-  createdAt: string
-}
 
 // 统计信息类型
 interface ModelStatistics {
@@ -73,79 +41,310 @@ interface ModelStatistics {
   accuracyTrend: Array<{ roundNumber: number; accuracy: number }>
 }
 
-// ==================== 全局模型版本管理API ====================
-export const model = {
-  // ==================== 3. 模型上传接口 ====================
+// ==================== 初始模型管理API ====================
+export const initialModel = {
+  // ==================== 2.1 随机生成初始模型 ====================
   
-  // 3.1 模型文件上传
-  async uploadModel(formData: FormData): Promise<{
+  async generateInitialModel(generationData: {
+    taskId: string
+    modelType: 'NEURAL_NETWORK' | 'RANDOM_FOREST'
+    architecture: {
+      // 神经网络参数
+      inputSize?: number
+      hiddenLayers?: number[]
+      outputSize?: number
+      activationFunction?: string
+      optimizer?: string
+      learningRate?: number
+      // 随机森林参数
+      n_estimators?: number
+      n_features?: number
+      task_type?: 'classification' | 'regression'
+    }
+    randomSeed?: number
+    description?: string
+  }): Promise<{
     modelId: string
     taskId: string
-    roundNumber: number
+    modelType: string
+    modelSize: number
+    parametersCount: number
+    architecture: {
+      // 神经网络参数
+      inputSize?: number
+      hiddenLayers?: number[]
+      outputSize?: number
+      activationFunction?: string
+      optimizer?: string
+      learningRate?: number
+      // 随机森林参数
+      n_estimators?: number
+      n_features?: number
+      task_type?: string
+    }
+    generatedAt: string
     status: string
+    checksum: string
     description?: string
-    parameters: Record<string, unknown>
-    createdAt: string
   }> {
     const response = await modelApiInstance.post<ApiResponse<{
       modelId: string
       taskId: string
-      roundNumber: number
+      modelType: string
+      modelSize: number
+      parametersCount: number
+      architecture: {
+        // 神经网络参数
+        inputSize?: number
+        hiddenLayers?: number[]
+        outputSize?: number
+        activationFunction?: string
+        optimizer?: string
+        learningRate?: number
+        // 随机森林参数
+        n_estimators?: number
+        n_features?: number
+        task_type?: string
+      }
+      generatedAt: string
       status: string
+      checksum: string
       description?: string
-      parameters: Record<string, unknown>
-      createdAt: string
-    }>>('/upload', formData, {
+    }>>('/initial/generate', generationData)
+    return response.data.data
+  },
+
+  // ==================== 2.2 上传自定义初始模型 ====================
+  
+  async uploadCustomInitialModel(formData: FormData): Promise<{
+    modelId: string
+    taskId: string
+    modelType: string
+    fileName: string
+    modelSize: number
+    uploadedAt: string
+    status: string
+    checksum: string
+    metadata?: {
+      architecture?: {
+        inputSize: number
+        outputSize: number
+      }
+      framework?: string
+      version?: string
+    }
+  }> {
+    const response = await modelApiInstance.post<ApiResponse<{
+      modelId: string
+      taskId: string
+      modelType: string
+      fileName: string
+      modelSize: number
+      uploadedAt: string
+      status: string
+      checksum: string
+      metadata?: {
+        architecture?: {
+          inputSize: number
+          outputSize: number
+        }
+        framework?: string
+        version?: string
+      }
+    }>>('/initial/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     return response.data.data
   },
 
-  // 3.2 批量模型上传
-  async uploadModelBatch(batchData: {
+  // ==================== 2.3 获取任务初始模型 ====================
+  
+  async getTaskInitialModel(taskId: string, params: {
+    includeParameters?: boolean
+    format?: 'json' | 'binary'
+  } = {}): Promise<{
+    modelId: string
     taskId: string
-    models: Array<{
-      roundNumber: number
-      description?: string
-      parameters?: Record<string, unknown>
-      file: File
-    }>
-  }): Promise<{
-    successCount: number
-    failedCount: number
-    models: Array<{
+    modelType: string
+    modelSize: number
+    createdAt: string
+    status: string
+    architecture: {
+      inputSize: number
+      hiddenLayers: number[]
+      outputSize: number
+      activationFunction: string
+      optimizer: string
+      learningRate: number
+    }
+    distributionStatus: {
+      totalVms: number
+      distributedVms: number
+      failedVms: number
+      distributedAt?: string
+    }
+    checksum: string
+  }> {
+    const response = await modelApiInstance.get<ApiResponse<{
       modelId: string
+      taskId: string
+      modelType: string
+      modelSize: number
+      createdAt: string
       status: string
-      message: string
+      architecture: {
+        inputSize: number
+        hiddenLayers: number[]
+        outputSize: number
+        activationFunction: string
+        optimizer: string
+        learningRate: number
+      }
+      distributionStatus: {
+        totalVms: number
+        distributedVms: number
+        failedVms: number
+        distributedAt?: string
+      }
+      checksum: string
+    }>>(`/initial/${taskId}`, { params })
+    return response.data.data
+  },
+
+  // ==================== 2.4 分发初始模型 ====================
+  
+  async distributeInitialModel(taskId: string, distributionData: {
+    vmIds: string[]
+    distributionMode: 'ASYNC' | 'SYNC'
+    timeout?: number
+    retryAttempts?: number
+    verifyChecksum?: boolean
+    notifyOnCompletion?: boolean
+  }): Promise<{
+    distributionId: string
+    taskId: string
+    modelId: string
+    targetVms: string[]
+    distributionMode: string
+    status: string
+    startedAt: string
+    estimatedCompletion?: string
+    progress: {
+      total: number
+      completed: number
+      failed: number
+      inProgress: number
+    }
+  }> {
+    const response = await modelApiInstance.post<ApiResponse<{
+      distributionId: string
+      taskId: string
+      modelId: string
+      targetVms: string[]
+      distributionMode: string
+      status: string
+      startedAt: string
+      estimatedCompletion?: string
+      progress: {
+        total: number
+        completed: number
+        failed: number
+        inProgress: number
+      }
+    }>>(`/initial/${taskId}/distribute`, distributionData)
+    return response.data.data
+  },
+
+  // ==================== 2.5 查询分发状态 ====================
+  
+  async getDistributionStatus(distributionId: string): Promise<{
+    distributionId: string
+    taskId: string
+    modelId: string
+    status: string
+    startedAt: string
+    completedAt?: string
+    progress: {
+      total: number
+      completed: number
+      failed: number
+      inProgress: number
+    }
+    vmDetails: Array<{
+      vmId: string
+      status: string
+      distributedAt?: string
+      verificationStatus: string
+      checksum?: string
     }>
   }> {
-    const formData = new FormData()
-    formData.append('taskId', batchData.taskId)
-    
-    batchData.models.forEach((model, index) => {
-      formData.append(`models[${index}].roundNumber`, model.roundNumber.toString())
-      if (model.description) {
-        formData.append(`models[${index}].description`, model.description)
+    const response = await modelApiInstance.get<ApiResponse<{
+      distributionId: string
+      taskId: string
+      modelId: string
+      status: string
+      startedAt: string
+      completedAt?: string
+      progress: {
+        total: number
+        completed: number
+        failed: number
+        inProgress: number
       }
-      if (model.parameters) {
-        formData.append(`models[${index}].parameters`, JSON.stringify(model.parameters))
-      }
-      formData.append(`models[${index}].file`, model.file)
-    })
-
-    const response = await modelApiInstance.post<ApiResponse<{
-      successCount: number
-      failedCount: number
-      models: Array<{
-        modelId: string
+      vmDetails: Array<{
+        vmId: string
         status: string
-        message: string
+        distributedAt?: string
+        verificationStatus: string
+        checksum?: string
       }>
-    }>>('/upload/batch', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    }>>(`/initial/distribution/${distributionId}`)
     return response.data.data
   },
+
+  // ==================== 2.6 下载初始模型 ====================
+  
+  async downloadInitialModel(taskId: string, params: {
+    format?: 'binary' | 'json'
+    modelId?: string
+  } = {}): Promise<Blob> {
+    const response = await modelApiInstance.get(`/initial/${taskId}/download`, { 
+      params,
+      responseType: 'blob'
+    })
+    return response.data
+  },
+
+  // ==================== 2.7 删除初始模型 ====================
+  
+  async deleteInitialModel(taskId: string, deleteData: {
+    force?: boolean
+  } = {}): Promise<{
+    taskId: string
+    modelId: string
+    deletedAt: string
+    cleanupStatus: {
+      modelFileDeleted: boolean
+      distributionRecordsCleared: boolean
+      vmCachesCleared: number
+    }
+  }> {
+    const response = await modelApiInstance.delete<ApiResponse<{
+      taskId: string
+      modelId: string
+      deletedAt: string
+      cleanupStatus: {
+        modelFileDeleted: boolean
+        distributionRecordsCleared: boolean
+        vmCachesCleared: number
+      }
+    }>>(`/initial/${taskId}`, { data: deleteData })
+    return response.data.data
+  }
+} as const
+
+// ==================== 全局模型版本管理API ====================
+export const model = {
 
   // ==================== 4. 模型版本查询接口 ====================
   
@@ -166,14 +365,24 @@ export const model = {
     roundNumber: number
     aggregationMethod: string
     clientCount: number
-    modelJson: Record<string, unknown>
+    // ⭐ 核心评估指标（顶级字段）
+    accuracy: number
+    loss: number
+    status: string
+    description: string
+    // 文件相关字段
+    fileSize: number
+    fileFormat: string
+    // ⭐ 其他评估指标（不包含accuracy/loss）
     metrics: {
-      accuracy: number
-      loss: number
+      precision: number
+      recall: number
+      f1_score: number
     }
+    // ⭐ 扩展参数（替代modelJson）
+    parameters: Record<string, unknown>
     createdAt: string
     aggregatedAt: string
-    status: string
   }> {
     const response = await modelApiInstance.get<ApiResponse<{
       modelId: string
@@ -181,14 +390,24 @@ export const model = {
       roundNumber: number
       aggregationMethod: string
       clientCount: number
-      modelJson: Record<string, unknown>
+      // ⭐ 核心评估指标（顶级字段）
+      accuracy: number
+      loss: number
+      status: string
+      description: string
+      // 文件相关字段
+      fileSize: number
+      fileFormat: string
+      // ⭐ 其他评估指标（不包含accuracy/loss）
       metrics: {
-        accuracy: number
-        loss: number
+        precision: number
+        recall: number
+        f1_score: number
       }
+      // ⭐ 扩展参数（替代modelJson）
+      parameters: Record<string, unknown>
       createdAt: string
       aggregatedAt: string
-      status: string
     }>>(`/versions/${modelId}`)
     return response.data.data
   },
@@ -302,111 +521,6 @@ export const model = {
     return response.data.data
   },
 
-  // ==================== 6. 模型部署接口 ====================
-  
-  // 6.1 模型部署
-  async deployModel(deploymentData: {
-    modelId: string
-    deploymentName: string
-    targetVms?: string[]
-    deploymentConfig?: DeploymentConfig
-    description?: string
-  }): Promise<{
-    deploymentId: string
-    modelId: string
-    deploymentName: string
-    targetVms?: string[]
-    status: string
-    deploymentConfig?: DeploymentConfig
-    endpoints?: string[]
-    createdAt: string
-  }> {
-    const response = await modelApiInstance.post<ApiResponse<{
-      deploymentId: string
-      modelId: string
-      deploymentName: string
-      targetVms?: string[]
-      status: string
-      deploymentConfig?: DeploymentConfig
-      endpoints?: string[]
-      createdAt: string
-    }>>('/deploy', deploymentData)
-    return response.data.data
-  },
-
-  // 6.2 部署状态查询
-  async getDeploymentStatus(deploymentId: string): Promise<{
-    deploymentId: string
-    modelId: string
-    deploymentName: string
-    status: string
-    replicas?: {
-      desired: number
-      available: number
-      ready: number
-    }
-    endpoints?: string[]
-    healthCheck?: {
-      status: string
-      lastCheck: string
-      responseTime: number
-    }
-    createdAt: string
-    updatedAt: string
-  }> {
-    const response = await modelApiInstance.get<ApiResponse<{
-      deploymentId: string
-      modelId: string
-      deploymentName: string
-      status: string
-      replicas?: {
-        desired: number
-        available: number
-        ready: number
-      }
-      endpoints?: string[]
-      healthCheck?: {
-        status: string
-        lastCheck: string
-        responseTime: number
-      }
-      createdAt: string
-      updatedAt: string
-    }>>(`/deploy/status/${deploymentId}`)
-    return response.data.data
-  },
-
-  // 6.3 部署列表查询
-  async getDeploymentList(params: {
-    modelId?: string
-    status?: string
-    page?: number
-    size?: number
-  } = {}): Promise<ModelVersionPaginatedResponse<{
-    deploymentId: string
-    modelId: string
-    deploymentName: string
-    status: string
-    replicas?: {
-      desired: number
-      available: number
-    }
-    createdAt: string
-  }>> {
-    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<{
-      deploymentId: string
-      modelId: string
-      deploymentName: string
-      status: string
-      replicas?: {
-        desired: number
-        available: number
-      }
-      createdAt: string
-    }>>>('/deploy/list', { params })
-    return response.data.data
-  },
-
   // ==================== 7. 模型回滚接口 ====================
   
   // 7.1 模型回滚
@@ -443,8 +557,26 @@ export const model = {
     deploymentId?: string
     page?: number
     size?: number
-  } = {}): Promise<ModelVersionPaginatedResponse<RollbackInfo>> {
-    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<RollbackInfo>>>('/rollback/history', { params })
+  } = {}): Promise<ModelVersionPaginatedResponse<{
+    rollbackId: string
+    deploymentId: string
+    fromModelId: string
+    toModelId: string
+    status: string
+    rollbackReason?: string
+    rollbackTime?: number
+    createdAt: string
+  }>> {
+    const response = await modelApiInstance.get<ApiResponse<ModelVersionPaginatedResponse<{
+      rollbackId: string
+      deploymentId: string
+      fromModelId: string
+      toModelId: string
+      status: string
+      rollbackReason?: string
+      rollbackTime?: number
+      createdAt: string
+    }>>>('/rollback/history', { params })
     return response.data.data
   },
 

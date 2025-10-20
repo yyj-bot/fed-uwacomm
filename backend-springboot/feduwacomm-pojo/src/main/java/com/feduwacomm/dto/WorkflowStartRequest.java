@@ -55,8 +55,8 @@ public class WorkflowStartRequest {
      * 初始模型策略枚举
      */
     public enum InitialModelStrategy {
-        RANDOM("随机生成"),
-        CUSTOM_UPLOAD("自定义上传");
+        AUTO("自动生成"),
+        CUSTOM("自定义上传");
 
         private final String description;
 

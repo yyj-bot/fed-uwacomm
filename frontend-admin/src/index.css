@@ -12,17 +12,43 @@ html, body {
   font-size: 14px;
   line-height: 1.5;
   color: #333;
-  background-color: #f5f5f5;
+  background-color: #f0f2f5;
   overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
 }
 
 /* 强制覆盖样式 - 不向后兼容 */
 body, #root {
-  background-color: #f5f5f5 !important;
+  background-color: #f0f2f5;
 }
 
 .ant-layout {
-  background: #f0f2f5 !important;
+  background: #f0f2f5;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 确保所有Ant Design的Row和Col不会溢出 */
+.ant-row {
+  max-width: 100%;
+  width: 100%;
+}
+
+.ant-col {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 确保所有Card组件不会溢出 */
+.ant-card {
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ant-card-body {
+  box-sizing: border-box;
 }
 
 /* 强制头部为深蓝色背景 */
@@ -191,4 +217,421 @@ body, #root {
 .chart-container canvas {
   max-width: 100%;
   height: auto;
+}
+
+/* 强制仪表盘所有卡片为白色背景 */
+.fed-dashboard .ant-card,
+.fed-overview-card.ant-card {
+  background: white !important;
+}
+
+.fed-dashboard .ant-card-body,
+.fed-overview-card .ant-card-body {
+  background: white !important;
+}
+
+/* 确保所有文字清晰可见 */
+.fed-dashboard .ant-statistic-title {
+  color: #666 !important;
+}
+
+.fed-dashboard .ant-statistic-content {
+  color: #262626 !important;
+}
+
+/* 全局强制表格按钮始终可见 - 最高优先级 */
+.ant-table .ant-btn,
+.ant-table .ant-space .ant-btn,
+.ant-table-tbody .ant-btn,
+.ant-table-tbody .ant-btn-text,
+.ant-table-tbody .ant-btn-link,
+.ant-table-tbody .ant-btn-icon-only {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.ant-table .ant-space,
+.ant-table .ant-space-item {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.ant-table .ant-btn .anticon {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 确保删除按钮显示为红色 */
+.ant-table .ant-btn-link.ant-btn-dangerous,
+.ant-table .ant-btn-text.ant-btn-dangerous,
+.ant-table .ant-btn[danger] {
+  color: #ff4d4f !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+}
+
+.ant-table .ant-btn-link.ant-btn-dangerous:hover,
+.ant-table .ant-btn-text.ant-btn-dangerous:hover,
+.ant-table .ant-btn[danger]:hover {
+  color: #ff4d4f !important;
+  background: #fff1f0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ant-table .ant-btn-link.ant-btn-dangerous .anticon,
+.ant-table .ant-btn-text.ant-btn-dangerous .anticon,
+.ant-table .ant-btn[danger] .anticon {
+  color: #ff4d4f !important;
+  font-size: 16px !important;
+}
+
+/* 禁用状态保持灰色 */
+.ant-table .ant-btn-link.ant-btn-dangerous:disabled,
+.ant-table .ant-btn-text.ant-btn-dangerous:disabled,
+.ant-table .ant-btn[danger]:disabled {
+  color: rgba(0, 0, 0, 0.25) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ant-table .ant-btn-link.ant-btn-dangerous:disabled .anticon,
+.ant-table .ant-btn-text.ant-btn-dangerous:disabled .anticon,
+.ant-table .ant-btn[danger]:disabled .anticon {
+  color: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 全局确认对话框按钮样式 */
+.ant-modal-confirm-btns .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  min-width: 80px;
+  height: 36px;
+}
+
+.ant-modal-confirm-btns .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%) !important;
+  border: none;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.ant-modal-confirm-btns .ant-btn-primary:hover,
+.ant-modal-confirm-btns .ant-btn-primary:focus {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-dangerous {
+  background: linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%) !important;
+  border: none !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.3);
+}
+
+.ant-modal-confirm-btns .ant-btn-dangerous:hover,
+.ant-modal-confirm-btns .ant-btn-dangerous:focus {
+  background: linear-gradient(135deg, #ff7875 0%, #ff4d4f 100%) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous) {
+  background: white !important;
+  border: 1px solid #d9d9d9;
+  color: #262626 !important;
+}
+
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous):hover,
+.ant-modal-confirm-btns .ant-btn:not(.ant-btn-primary):not(.ant-btn-dangerous):focus {
+  background: #fafafa !important;
+  border-color: #40a9ff;
+  color: #40a9ff !important;
+}
+
+/* 系统管理页面全局样式优化 */
+.fed-system-management-page .ant-card {
+  background: white !important;
+  border: 1px solid #e8e8e8;
+}
+
+.fed-system-management-page .ant-table-wrapper {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table-container {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table-content {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%) !important;
+  color: #262626 !important;
+}
+
+.fed-system-management-page .ant-table-tbody {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table-tbody > tr {
+  background: white !important;
+}
+
+.fed-system-management-page .ant-table-tbody > tr > td {
+  background: white !important;
+  color: #262626 !important;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.fed-system-management-page .ant-table-tbody > tr:hover > td {
+  background: #f0f9ff !important;
+}
+
+/* 确保所有模态框都有正确的样式 */
+.ant-modal-mask {
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+/* 优化 Ant Design 组件的圆角 */
+.ant-card {
+  border-radius: 12px;
+}
+
+.ant-btn {
+  border-radius: 8px;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector {
+  border-radius: 8px;
+}
+
+/* 统一阴影效果 */
+.ant-card-hoverable:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 优化标签样式 */
+.ant-tag {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* 优化按钮过渡效果 */
+.ant-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 页面内容区域背景 */
+.ant-layout-content {
+  background: #f0f2f5;
+}
+
+/* 全局强制所有表格为白色背景 - 最高优先级覆盖 */
+.ant-table,
+.ant-table-wrapper,
+.ant-table-container,
+.ant-table-content,
+.ant-table table {
+  background: white !important;
+}
+
+/* 消除表头和表体之间的间隙 - 使用最高优先级 */
+:where(.css-dev-only-do-not-override-1v6tikl).ant-table-wrapper table,
+.ant-table-wrapper table,
+.ant-table table,
+.ant-table-container table {
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+}
+
+/* 移除所有可能产生间隙的隐藏元素和伪元素 */
+.ant-table-thead tr,
+.ant-table-tbody tr,
+.ant-table-thead::before,
+.ant-table-thead::after,
+.ant-table-tbody::before,
+.ant-table-tbody::after,
+.ant-table-thead tr::before,
+.ant-table-thead tr::after,
+.ant-table-tbody tr::before,
+.ant-table-tbody tr::after {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+}
+
+/* 特别针对可能产生间隙的测量行（measurement row） */
+.ant-table-measure-row,
+.ant-table-measure-row *,
+tr.ant-table-measure-row,
+.ant-table-thead .ant-table-measure-row,
+.ant-table-tbody .ant-table-measure-row {
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  line-height: 0 !important;
+  visibility: collapse !important;
+  display: none !important;
+}
+
+/* 重置表头和表体单元格的样式 */
+.ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%) !important;
+  color: #262626 !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  height: auto !important;
+}
+
+.ant-table-tbody > tr > td {
+  background: white !important;
+  color: #262626 !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  height: auto !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f0f9ff !important;
+}
+
+/* 确保表格行的所有子元素也是正确的颜色 */
+.ant-table-tbody > tr > td * {
+  color: inherit;
+}
+
+/* 针对fed-user-management特别加强 */
+.fed-user-management .ant-table-tbody > tr,
+.fed-user-management .ant-table-tbody > tr > td {
+  background-color: white !important;
+  background: white !important;
+  color: #262626 !important;
+}
+
+/* 呼吸灯动画 - 全局 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+/* 删除按钮效果 - 与其他按钮保持一致 */
+.ant-btn-dangerous.ant-btn-text,
+.ant-btn.ant-btn-dangerous.ant-btn-text {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 6px;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.ant-btn-dangerous.ant-btn-text:hover,
+.ant-btn.ant-btn-dangerous.ant-btn-text:hover {
+  background: rgba(24, 144, 255, 0.1) !important;
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  color: #ff4d4f !important;
+  border: none !important;
+}
+
+.ant-btn-dangerous.ant-btn-text:active,
+.ant-btn.ant-btn-dangerous.ant-btn-text:active {
+  transform: scale(0.96);
+  background: rgba(24, 144, 255, 0.15) !important;
+  background-color: rgba(24, 144, 255, 0.15) !important;
+}
+
+.ant-btn-dangerous.ant-btn-text:focus,
+.ant-btn.ant-btn-dangerous.ant-btn-text:focus {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* 特别强制覆盖 - 系统管理页面的删除按钮 */
+.fed-user-management button.ant-btn-text.ant-btn-dangerous,
+.fed-user-management .ant-btn.ant-btn-text.ant-btn-dangerous,
+button.ant-btn-text.ant-btn-dangerous[type="button"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.fed-user-management button.ant-btn-text.ant-btn-dangerous:hover,
+.fed-user-management .ant-btn.ant-btn-text.ant-btn-dangerous:hover,
+button.ant-btn-text.ant-btn-dangerous[type="button"]:hover {
+  background: rgba(24, 144, 255, 0.1) !important;
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  color: #ff4d4f !important;
+}
+
+/* Popconfirm美化 */
+.ant-popconfirm .ant-popover-inner-content {
+  padding: 16px;
+}
+
+.ant-popconfirm-buttons .ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  flex: 0 0 90px !important;
+}
+
+/* 强制修复 Popconfirm 按钮文字颜色 */
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous span {
+  background-color: #ff4d4f !important;
+  border-color: #ff4d4f !important;
+  color: #ffffff !important;
+}
+
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover span,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus span,
+.ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:focus span,
+.ant-popover .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:active span {
+  background-color: #d9363e !important;
+  border-color: #d9363e !important;
+  color: #ffffff !important;
+}
+
+.ant-popconfirm-buttons .ant-btn:not(.ant-btn-primary),
+.ant-popconfirm-buttons .ant-btn:not(.ant-btn-primary) span {
+  color: #000 !important;
+  background-color: #fff !important;
 } 

@@ -14,7 +14,7 @@ import java.util.Map;
  * 提供任务的总体统计和状态分布信息
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  * @since 2025-09-28
  */
 @Data

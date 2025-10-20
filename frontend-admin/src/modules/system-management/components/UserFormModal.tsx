@@ -13,12 +13,14 @@ import {
   Button, 
   Space, 
   message,
-  Spin 
+  Spin,
+  Divider 
 } from 'antd'
-import { UserOutlined, MailOutlined, LockOutlined } from '@ant-design/icons'
+import { UserOutlined, MailOutlined, LockOutlined, SafetyOutlined, CheckCircleOutlined, EditOutlined } from '@ant-design/icons'
 import { useAdmin } from '@/store'
 import { getFriendlyErrorMessage } from '@/utils'
 import type { User } from '@/types'
+import './SystemManagementModals.css'
 
 const { Option } = Select
 const { Password } = Input
@@ -125,11 +127,19 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
 
   return (
       <Modal
-        title={mode === 'create' ? '添加用户' : '编辑用户'}
+        title={
+          <Space>
+            {mode === 'create' ? <UserOutlined style={{ color: '#1890ff' }} /> : <EditOutlined style={{ color: '#1890ff' }} />}
+            <span style={{ fontSize: '18px', fontWeight: 600 }}>
+              {mode === 'create' ? '添加新用户' : '编辑用户信息'}
+            </span>
+          </Space>
+        }
         open={visible}
         onCancel={handleCancel}
+        centered
       footer={[
-        <Button key="cancel" onClick={handleCancel}>
+        <Button key="cancel" onClick={handleCancel} size="large">
           取消
         </Button>,
         <Button 
@@ -137,8 +147,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           type="primary" 
           loading={isLoading}
           onClick={handleOk}
+          size="large"
+          icon={mode === 'create' ? <CheckCircleOutlined /> : <CheckCircleOutlined />}
         >
-          {mode === 'create' ? '创建' : '更新'}
+          {mode === 'create' ? '创建用户' : '保存修改'}
         </Button>
       ]}
       destroyOnHidden
@@ -161,9 +173,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             ]}
           >
             <Input 
-              prefix={<UserOutlined />}
+              prefix={<UserOutlined style={{ color: '#1890ff' }} />}
               placeholder="请输入用户名" 
               autoComplete="off"
+              size="large"
             />
           </Form.Item>
 
@@ -176,9 +189,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             ]}
           >
             <Input 
-              prefix={<MailOutlined />}
+              prefix={<MailOutlined style={{ color: '#1890ff' }} />}
               placeholder="请输入邮箱地址" 
               autoComplete="off"
+              size="large"
             />
           </Form.Item>
 
@@ -194,9 +208,10 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             extra={mode === 'edit' ? '留空则不修改密码' : undefined}
           >
             <Password 
-              prefix={<LockOutlined />}
-              placeholder={mode === 'create' ? '请输入密码' : '留空则不修改密码'} 
+              prefix={<LockOutlined style={{ color: '#1890ff' }} />}
+              placeholder={mode === 'create' ? '请输入密码（至少6位）' : '留空则不修改密码'} 
               autoComplete="new-password"
+              size="large"
             />
           </Form.Item>
 
@@ -205,11 +220,31 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
             name="role"
             rules={[{ required: true, message: '请选择用户角色' }]}
           >
-            <Select placeholder="请选择用户角色">
-              <Option value="ADMIN">管理员</Option>
-              <Option value="RESEARCHER">研究员</Option>
-              <Option value="OPERATOR">操作员</Option>
-              <Option value="VIEWER">观察者</Option>
+            <Select placeholder="请选择用户角色" size="large">
+              <Option value="ADMIN">
+                <Space>
+                  <SafetyOutlined style={{ color: '#ff4d4f' }} />
+                  管理员 - 拥有所有权限
+                </Space>
+              </Option>
+              <Option value="RESEARCHER">
+                <Space>
+                  <SafetyOutlined style={{ color: '#1890ff' }} />
+                  研究员 - 读写执行权限
+                </Space>
+              </Option>
+              <Option value="OPERATOR">
+                <Space>
+                  <SafetyOutlined style={{ color: '#52c41a' }} />
+                  操作员 - 读取执行权限
+                </Space>
+              </Option>
+              <Option value="VIEWER">
+                <Space>
+                  <SafetyOutlined style={{ color: '#d9d9d9' }} />
+                  观察者 - 仅读取权限
+                </Space>
+              </Option>
             </Select>
           </Form.Item>
 

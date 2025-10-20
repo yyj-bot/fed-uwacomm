@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 使用内存缓存提供高性能的度量指标存储和检索
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Service
 public class MetricsCacheServiceImpl implements MetricsCacheService {

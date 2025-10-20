@@ -4,7 +4,7 @@
  */
 
 .fed-table-container {
-  background: #ffffff;
+  background: #ffffff !important;
   border-radius: 6px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02);
 }
@@ -15,7 +15,7 @@
   align-items: center;
   padding: 16px 24px;
   border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  background: #fafafa !important;
   border-radius: 6px 6px 0 0;
 }
 
@@ -36,34 +36,94 @@
 
 .fed-table {
   border-radius: 0 0 6px 6px;
+  background: white !important;
 }
 
 .fed-table .ant-table {
   border-radius: 0 0 6px 6px;
+  background: white !important;
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+}
+
+.fed-table .ant-table table {
+  border-spacing: 0 !important;
+  border-collapse: collapse !important;
+}
+
+.fed-table .ant-table-container {
+  background: white !important;
+}
+
+.fed-table .ant-table-content {
+  background: white !important;
+}
+
+.fed-table .ant-table-thead {
+  background: transparent !important;
+}
+
+.fed-table .ant-table-thead > tr {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
 }
 
 .fed-table .ant-table-thead > tr > th {
-  background: #fafafa;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%) !important;
   font-weight: 600;
-  color: #000000d9;
-  border-bottom: 1px solid #f0f0f0;
+  color: #262626 !important;
+  border: none !important;
+  border-bottom: none !important;
+  margin: 0 !important;
+  padding: 12px 16px !important;
+  line-height: 1.5 !important;
+  vertical-align: middle !important;
+}
+
+.fed-table .ant-table-tbody {
+  background: white !important;
+  margin: 0 !important;
+  margin-top: -2px !important;
+  padding: 0 !important;
+  position: relative !important;
+  top: -1px !important;
+}
+
+.fed-table .ant-table-tbody > tr {
+  background: white !important;
 }
 
 .fed-table .ant-table-tbody > tr > td {
+  background: white !important;
+  color: #262626 !important;
   border-bottom: 1px solid #f0f0f0;
-  padding: 12px 16px;
+  padding: 12px 16px !important;
+  vertical-align: middle !important;
+}
+
+.fed-table .ant-table-tbody > tr:first-child > td {
+  border-top: none !important;
+  margin-top: 0 !important;
+  padding: 12px 16px !important;
+  vertical-align: middle !important;
+}
+
+.fed-table .ant-table-tbody > tr:hover {
+  background: #ffffff !important;
 }
 
 .fed-table .ant-table-tbody > tr:hover > td {
-  background: #f5f5f5;
+  background: #ffffff !important;
 }
 
 .fed-table .ant-table-tbody > tr.ant-table-row-selected > td {
-  background: #e6f7ff;
+  background: #ffffff;
 }
 
 .fed-table .ant-table-tbody > tr.ant-table-row-selected:hover > td {
-  background: #bae7ff;
+  background: #ffffff;
 }
 
 /* 空状态样式 */
@@ -160,4 +220,37 @@
 
 .fed-table-striped .ant-table-tbody > tr:nth-child(odd):hover > td {
   background: #f0f0f0;
+}
+
+/* 确保操作列的按钮始终可见 */
+.fed-table .ant-table-tbody .ant-btn,
+.fed-table .ant-table-tbody .ant-btn-text,
+.fed-table .ant-table-tbody .ant-btn-icon-only {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.fed-table .ant-table-tbody .ant-space {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.fed-table .ant-table-tbody .ant-space-item {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 悬停时也保持可见 */
+.fed-table .ant-table-tbody > tr:hover .ant-btn,
+.fed-table .ant-table-tbody > tr:hover .ant-btn-text,
+.fed-table .ant-table-tbody > tr:hover .ant-btn-icon-only {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 确保图标按钮的图标始终显示 */
+.fed-table .ant-table-tbody .ant-btn .anticon {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: inline-block !important;
 }

@@ -12,7 +12,7 @@ import jakarta.annotation.PreDestroy;
  * 启用定时任务和缓存生命周期管理
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 @Configuration
 @EnableScheduling

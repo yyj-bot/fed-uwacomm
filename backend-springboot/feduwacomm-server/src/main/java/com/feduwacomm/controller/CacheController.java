@@ -265,9 +265,9 @@ public class CacheController {
      */
     private void warmupSystemConfigs() {
         try {
-            cacheService.put("system:config:version", "1.4.0");
+            cacheService.put("system:config:version", "1.5.0");
             cacheService.put("system:config:name", "FedUWAComm");
-            cacheService.put("system:config:protocol_version", "1.4");
+            cacheService.put("system:config:protocol_version", "1.5");
             cacheService.put("system:config:environment", "production");
             cacheService.put("system:config:startup_time", System.currentTimeMillis());
             cacheService.put("system:config:admin_email", "admin@feduwacomm.com");

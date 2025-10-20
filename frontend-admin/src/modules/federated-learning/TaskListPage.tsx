@@ -99,7 +99,7 @@ const TaskListPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
-  const [dateRange, setDateRange] = useState<[any, any] | null>(null)
+  const [dateRange, setDateRange] = useState<any>(null)
 
   // 初始化加载任务列表
   useEffect(() => {
@@ -122,7 +122,9 @@ const TaskListPage: React.FC = () => {
       params.type = typeFilter
     }
     
-    if (dateRange && dateRange[0] && dateRange[1]) {
+    // 修复日期范围处理：确保日期存在且有效
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+      // 传递日期字符串（YYYY-MM-DD格式），后端/Mock会处理时间范围
       params.startDate = dateRange[0].format('YYYY-MM-DD')
       params.endDate = dateRange[1].format('YYYY-MM-DD')
     }
@@ -326,9 +328,18 @@ const TaskListPage: React.FC = () => {
               size="small" 
               status={isRunning ? 'active' : 'normal'}
               format={(percent) => `${percent}%`}
+              strokeColor={{
+                '0%': '#1890ff',
+                '100%': '#52c41a',
+              }}
             />
             {record.currentRound && record.totalRounds && (
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#595959', 
+                marginTop: '4px',
+                fontWeight: 500
+              }}>
                 轮次: {record.currentRound}/{record.totalRounds}
               </div>
             )}
@@ -344,13 +355,6 @@ const TaskListPage: React.FC = () => {
       render: (count: number) => (
         <Tag color="geekblue">{count}个</Tag>
       )
-    },
-    {
-      title: '算法',
-      dataIndex: 'algorithm',
-      key: 'algorithm',
-      width: 120,
-      ellipsis: true
     },
     {
       title: '创建时间',
@@ -524,8 +528,15 @@ const TaskListPage: React.FC = () => {
             
             <RangePicker
               value={dateRange}
-              onChange={setDateRange}
+              onChange={(dates) => setDateRange(dates)}
               placeholder={['开始日期', '结束日期']}
+              format="YYYY-MM-DD"
+              allowClear
+              style={{ width: 240 }}
+              disabledDate={(current) => {
+                // 禁用未来日期
+                return current && current > new Date()
+              }}
             />
             
             <Button type="primary" onClick={handleSearch} loading={taskListLoading}>
@@ -564,4 +575,6 @@ const TaskListPage: React.FC = () => {
 }
 
 export default TaskListPage
+
+
 

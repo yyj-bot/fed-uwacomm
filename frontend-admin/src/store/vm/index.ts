@@ -9,5 +9,9 @@ export { useVMStore } from './vmStore'
 export { useVM } from './useVMStore'
 export type { VMState, VMActions, VMStore } from './vmStore'
 
+export { useAdminVmStore } from './adminVmStore'
+export { useAdminVM } from './useAdminVM'
+export type { AdminVmState, AdminVmActions, AdminVmStore } from './adminVmStore'
+
 // 默认导出 hook
 export { useVM as default } from './useVMStore'

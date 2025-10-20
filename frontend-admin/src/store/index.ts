@@ -30,9 +30,6 @@ export { useSystem } from './system'
 // ==================== 仪表盘模块 ====================
 export { useDashboard } from './dashboard'
 
-// ==================== WebSocket 连接模块 ====================
-export { useWebSocket } from './websocket'
-
 // ==================== 类型导出 ====================
 export type { DashboardOverview, DashboardChartData } from './dashboard'
 

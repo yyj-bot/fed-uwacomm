@@ -6,12 +6,8 @@
  * @version 1.0.0
  */
 
-import { model } from '@/api/model-version'
+import { model, initialModel } from '@/api/model-version'
 import type { 
-  UploadModelRequest,
-  UploadModelResponse,
-  BatchUploadRequest,
-  BatchUploadResponse,
   ModelVersionListParams,
   ModelVersionDetail,
   TaskModelVersions,
@@ -19,11 +15,9 @@ import type {
   EvaluationResponse,
   BatchEvaluationRequest,
   BatchEvaluationResponse,
-  DeploymentRequest,
-  DeploymentResponse,
-  DeploymentStatus,
   RollbackRequest,
   RollbackResponse,
+  RollbackInfo,
   DownloadRequest,
   DeleteModelRequest,
   DeleteModelResponse,
@@ -33,61 +27,224 @@ import type {
   TaskStatistics,
   ModelVersionPaginatedResponse,
   EvaluationResult,
-  RollbackInfo,
-  ModelStatistics
+  ModelStatistics,
+  // 初始模型管理相关类型
+  InitialModelGenerationRequest,
+  InitialModelGenerationResponse,
+  InitialModelUploadRequest,
+  InitialModelUploadResponse,
+  InitialModelInfo,
+  ModelDistributionRequest,
+  ModelDistributionResponse,
+  DistributionStatusDetail,
+  InitialModelDeleteRequest,
+  InitialModelDeleteResponse
 } from './type'
 
 /**
  * 模型版本管理服务类
  */
 export class ModelVersionService {
-  // ==================== 模型上传管理 ====================
+  // ==================== 初始模型管理 ====================
 
   /**
-   * 上传模型文件
-   * @param formData 模型上传数据
-   * @returns 上传响应信息
+   * 生成随机初始模型
+   * @param generationData 模型生成数据
+   * @returns 生成响应信息
    */
-  async uploadModel(formData: FormData): Promise<UploadModelResponse> {
+  async generateInitialModel(generationData: InitialModelGenerationRequest): Promise<InitialModelGenerationResponse> {
     try {
-      this.validateUploadModel(formData)
+      this.validateInitialModelGenerationRequest(generationData)
       
-      const response = await model.uploadModel(formData)
+      const response = await initialModel.generateInitialModel(generationData)
       
       return {
         modelId: response.modelId,
         taskId: response.taskId,
-        roundNumber: response.roundNumber,
+        modelType: response.modelType,
+        modelSize: response.modelSize,
+        parametersCount: response.parametersCount,
+        architecture: response.architecture,
+        generatedAt: response.generatedAt,
         status: response.status,
-        description: response.description,
-        parameters: response.parameters,
-        createdAt: response.createdAt
+        checksum: response.checksum
       }
     } catch (error) {
-      throw this.handleServiceError(error, '模型文件上传失败')
+      throw this.handleServiceError(error, '随机初始模型生成失败')
     }
   }
 
   /**
-   * 批量上传模型
-   * @param batchData 批量上传数据
-   * @returns 批量上传响应
+   * 上传自定义初始模型
+   * @param uploadData 上传数据
+   * @returns 上传响应信息
    */
-  async uploadModelBatch(batchData: BatchUploadRequest): Promise<BatchUploadResponse> {
+  async uploadCustomInitialModel(uploadData: InitialModelUploadRequest): Promise<InitialModelUploadResponse> {
     try {
-      this.validateBatchUploadRequest(batchData)
+      this.validateInitialModelUploadRequest(uploadData)
       
-      const response = await model.uploadModelBatch(batchData)
+      // 构建FormData
+      const formData = new FormData()
+      formData.append('taskId', uploadData.taskId)
+      formData.append('modelType', uploadData.modelType)
+      if (uploadData.description) {
+        formData.append('description', uploadData.description)
+      }
+      formData.append('file', uploadData.file)
+      if (uploadData.metadata) {
+        formData.append('metadata', JSON.stringify(uploadData.metadata))
+      }
+      
+      const response = await initialModel.uploadCustomInitialModel(formData)
       
       return {
-        successCount: response.successCount,
-        failedCount: response.failedCount,
-        models: response.models
+        modelId: response.modelId,
+        taskId: response.taskId,
+        modelType: response.modelType,
+        fileName: response.fileName,
+        modelSize: response.modelSize,
+        uploadedAt: response.uploadedAt,
+        status: response.status,
+        checksum: response.checksum,
+        metadata: response.metadata
       }
     } catch (error) {
-      throw this.handleServiceError(error, '批量模型上传失败')
+      throw this.handleServiceError(error, '自定义初始模型上传失败')
     }
   }
+
+  /**
+   * 获取任务初始模型信息
+   * @param taskId 任务ID
+   * @param params 查询参数
+   * @returns 初始模型信息
+   */
+  async getTaskInitialModel(taskId: string, params: {
+    includeParameters?: boolean
+    format?: 'json' | 'binary'
+  } = {}): Promise<InitialModelInfo> {
+    try {
+      this.validateTaskId(taskId)
+      this.validateInitialModelQueryParams(params)
+      
+      const response = await initialModel.getTaskInitialModel(taskId, params)
+      
+      return {
+        modelId: response.modelId,
+        taskId: response.taskId,
+        modelType: response.modelType,
+        modelSize: response.modelSize,
+        createdAt: response.createdAt,
+        status: response.status as any,
+        architecture: response.architecture,
+        distributionStatus: response.distributionStatus,
+        checksum: response.checksum
+      }
+    } catch (error) {
+      throw this.handleServiceError(error, `获取任务初始模型失败 (TaskID: ${taskId})`)
+    }
+  }
+
+  /**
+   * 分发初始模型到虚拟机
+   * @param taskId 任务ID
+   * @param distributionData 分发数据
+   * @returns 分发响应信息
+   */
+  async distributeInitialModel(taskId: string, distributionData: ModelDistributionRequest): Promise<ModelDistributionResponse> {
+    try {
+      this.validateTaskId(taskId)
+      this.validateModelDistributionRequest(distributionData)
+      
+      const response = await initialModel.distributeInitialModel(taskId, distributionData)
+      
+      return {
+        distributionId: response.distributionId,
+        taskId: response.taskId,
+        modelId: response.modelId,
+        targetVms: response.targetVms,
+        distributionMode: response.distributionMode,
+        status: response.status,
+        startedAt: response.startedAt,
+        estimatedCompletion: response.estimatedCompletion,
+        progress: response.progress
+      }
+    } catch (error) {
+      throw this.handleServiceError(error, `初始模型分发失败 (TaskID: ${taskId})`)
+    }
+  }
+
+  /**
+   * 获取分发状态
+   * @param distributionId 分发ID
+   * @returns 分发状态详情
+   */
+  async getDistributionStatus(distributionId: string): Promise<DistributionStatusDetail> {
+    try {
+      this.validateDistributionId(distributionId)
+      
+      const response = await initialModel.getDistributionStatus(distributionId)
+      
+      return {
+        distributionId: response.distributionId,
+        taskId: response.taskId,
+        modelId: response.modelId,
+        status: response.status as any,
+        startedAt: response.startedAt,
+        completedAt: response.completedAt,
+        progress: response.progress,
+        vmDetails: response.vmDetails
+      }
+    } catch (error) {
+      throw this.handleServiceError(error, `获取分发状态失败 (DistributionID: ${distributionId})`)
+    }
+  }
+
+  /**
+   * 下载初始模型
+   * @param taskId 任务ID
+   * @param params 下载参数
+   * @returns 文件数据流
+   */
+  async downloadInitialModel(taskId: string, params: {
+    format?: 'binary' | 'json'
+    modelId?: string
+  } = {}): Promise<Blob> {
+    try {
+      this.validateTaskId(taskId)
+      this.validateInitialModelDownloadParams(params)
+      
+      const blob = await initialModel.downloadInitialModel(taskId, params)
+      return blob
+    } catch (error) {
+      throw this.handleServiceError(error, `下载初始模型失败 (TaskID: ${taskId})`)
+    }
+  }
+
+  /**
+   * 删除初始模型
+   * @param taskId 任务ID
+   * @param deleteData 删除参数
+   * @returns 删除响应信息
+   */
+  async deleteInitialModel(taskId: string, deleteData: InitialModelDeleteRequest = {}): Promise<InitialModelDeleteResponse> {
+    try {
+      this.validateTaskId(taskId)
+      this.validateInitialModelDeleteRequest(deleteData)
+      
+      const response = await initialModel.deleteInitialModel(taskId, deleteData)
+      
+      return {
+        taskId: response.taskId,
+        modelId: response.modelId,
+        deletedAt: response.deletedAt,
+        cleanupStatus: response.cleanupStatus
+      }
+    } catch (error) {
+      throw this.handleServiceError(error, `删除初始模型失败 (TaskID: ${taskId})`)
+    }
+  }
+
 
   // ==================== 模型版本查询管理 ====================
 
@@ -216,70 +373,6 @@ export class ModelVersionService {
     }
   }
 
-  // ==================== 模型部署管理 ====================
-
-  /**
-   * 部署模型
-   * @param deploymentData 部署数据
-   * @returns 部署响应信息
-   */
-  async deployModel(deploymentData: DeploymentRequest): Promise<DeploymentResponse> {
-    try {
-      this.validateDeploymentRequest(deploymentData)
-      
-      const response = await model.deployModel(deploymentData)
-      
-      return {
-        deploymentId: response.deploymentId,
-        modelId: response.modelId,
-        deploymentName: response.deploymentName,
-        targetVms: response.targetVms,
-        status: response.status,
-        deploymentConfig: response.deploymentConfig,
-        endpoints: response.endpoints,
-        createdAt: response.createdAt
-      }
-    } catch (error) {
-      throw this.handleServiceError(error, `模型部署失败 (ModelID: ${deploymentData.modelId})`)
-    }
-  }
-
-  /**
-   * 获取部署状态
-   * @param deploymentId 部署ID
-   * @returns 部署状态信息
-   */
-  async getDeploymentStatus(deploymentId: string): Promise<DeploymentStatus> {
-    try {
-      this.validateDeploymentId(deploymentId)
-      
-      const status = await model.getDeploymentStatus(deploymentId)
-      return this.transformDeploymentStatus(status)
-    } catch (error) {
-      throw this.handleServiceError(error, `获取部署状态失败 (DeploymentID: ${deploymentId})`)
-    }
-  }
-
-  /**
-   * 获取部署列表
-   * @param params 查询参数
-   * @returns 分页部署列表
-   */
-  async getDeploymentList(params: {
-    modelId?: string
-    status?: string
-    page?: number
-    size?: number
-  } = {}): Promise<ModelVersionPaginatedResponse<any>> {
-    try {
-      this.validateDeploymentListParams(params)
-      
-      const result = await model.getDeploymentList(params)
-      return this.transformDeploymentList(result)
-    } catch (error) {
-      throw this.handleServiceError(error, '获取部署列表失败')
-    }
-  }
 
   // ==================== 模型回滚管理 ====================
 
@@ -299,7 +392,7 @@ export class ModelVersionService {
         deploymentId: response.deploymentId,
         fromModelId: response.fromModelId,
         toModelId: response.toModelId,
-        status: response.status,
+        status: response.status as any,
         rollbackReason: response.rollbackReason,
         rollbackTime: response.rollbackTime,
         createdAt: response.createdAt
@@ -451,6 +544,192 @@ export class ModelVersionService {
   // ==================== 私有验证方法 ====================
 
   /**
+   * 验证初始模型生成请求
+   */
+  private validateInitialModelGenerationRequest(data: InitialModelGenerationRequest): void {
+    this.validateTaskId(data.taskId)
+    
+    if (!data.modelType || typeof data.modelType !== 'string') {
+      throw new Error('模型类型不能为空')
+    }
+    
+    const validModelTypes = ['NEURAL_NETWORK', 'RANDOM_FOREST', 'neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
+    if (!validModelTypes.includes(data.modelType)) {
+      throw new Error('模型类型无效')
+    }
+    
+    if (!data.architecture || typeof data.architecture !== 'object') {
+      throw new Error('模型架构参数不能为空')
+    }
+    
+    const { architecture } = data
+    
+    // 根据模型类型验证不同的架构参数
+    if (data.modelType === 'NEURAL_NETWORK' || data.modelType === 'neural_network') {
+      // 神经网络参数验证
+      if (!Number.isInteger(architecture.inputSize) || architecture.inputSize <= 0) {
+        throw new Error('输入层大小必须为正整数')
+      }
+      
+      if (!Array.isArray(architecture.hiddenLayers) || architecture.hiddenLayers.length === 0) {
+        throw new Error('隐藏层配置不能为空')
+      }
+      
+      architecture.hiddenLayers.forEach((size, index) => {
+        if (!Number.isInteger(size) || size <= 0) {
+          throw new Error(`隐藏层${index + 1}大小必须为正整数`)
+        }
+      })
+      
+      if (!Number.isInteger(architecture.outputSize) || architecture.outputSize <= 0) {
+        throw new Error('输出层大小必须为正整数')
+      }
+      
+      if (!architecture.activationFunction || typeof architecture.activationFunction !== 'string') {
+        throw new Error('激活函数不能为空')
+      }
+      
+      if (!architecture.optimizer || typeof architecture.optimizer !== 'string') {
+        throw new Error('优化器不能为空')
+      }
+      
+      if (typeof architecture.learningRate !== 'number' || architecture.learningRate <= 0) {
+        throw new Error('学习率必须为正数')
+      }
+    } else if (data.modelType === 'RANDOM_FOREST' || data.modelType === 'random_forest') {
+      // 随机森林参数验证
+      if (!Number.isInteger(architecture.n_estimators) || architecture.n_estimators < 10 || architecture.n_estimators > 500) {
+        throw new Error('树的数量必须为10-500之间的整数')
+      }
+      
+      if (!Number.isInteger(architecture.n_features) || architecture.n_features < 1) {
+        throw new Error('特征数量必须为大于等于1的整数')
+      }
+      
+      if (!architecture.task_type || !['classification', 'regression'].includes(architecture.task_type)) {
+        throw new Error('任务类型必须为classification或regression')
+      }
+    }
+    
+    if (data.randomSeed !== undefined && (!Number.isInteger(data.randomSeed) || data.randomSeed < 0)) {
+      throw new Error('随机种子必须为非负整数')
+    }
+  }
+
+  /**
+   * 验证初始模型上传请求
+   */
+  private validateInitialModelUploadRequest(data: InitialModelUploadRequest): void {
+    this.validateTaskId(data.taskId)
+    
+    if (!data.modelType || typeof data.modelType !== 'string') {
+      throw new Error('模型类型不能为空')
+    }
+    
+    const validModelTypes = ['NEURAL_NETWORK', 'RANDOM_FOREST', 'neural_network', 'random_forest', 'svm', 'linear_regression', 'logistic_regression']
+    if (!validModelTypes.includes(data.modelType)) {
+      throw new Error('模型类型无效')
+    }
+    
+    if (!data.file || !(data.file instanceof File)) {
+      throw new Error('模型文件不能为空')
+    }
+    
+    // 验证文件大小（100MB限制）
+    const maxSize = 100 * 1024 * 1024
+    if (data.file.size > maxSize) {
+      throw new Error('模型文件大小不能超过100MB')
+    }
+    
+    // 验证文件格式
+    const supportedFormats = ['.pth', '.pt', '.h5', '.pb', '.onnx', '.pkl', '.pickle', '.joblib']
+    const fileName = data.file.name.toLowerCase()
+    const isValidFormat = supportedFormats.some(format => fileName.endsWith(format))
+    if (!isValidFormat) {
+      throw new Error('不支持的模型文件格式')
+    }
+  }
+
+  /**
+   * 验证初始模型查询参数
+   */
+  private validateInitialModelQueryParams(params: any): void {
+    if (params.includeParameters !== undefined && typeof params.includeParameters !== 'boolean') {
+      throw new Error('includeParameters参数必须为布尔值')
+    }
+    
+    if (params.format !== undefined && !['json', 'binary'].includes(params.format)) {
+      throw new Error('format参数必须为json或binary')
+    }
+  }
+
+  /**
+   * 验证模型分发请求
+   */
+  private validateModelDistributionRequest(data: ModelDistributionRequest): void {
+    if (!data.vmIds || !Array.isArray(data.vmIds) || data.vmIds.length === 0) {
+      throw new Error('目标虚拟机列表不能为空')
+    }
+    
+    if (data.vmIds.length > 50) {
+      throw new Error('目标虚拟机数量不能超过50个')
+    }
+    
+    data.vmIds.forEach(vmId => {
+      if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
+        throw new Error('虚拟机ID不能为空')
+      }
+    })
+    
+    if (!data.distributionMode || !['ASYNC', 'SYNC'].includes(data.distributionMode)) {
+      throw new Error('分发模式必须为ASYNC或SYNC')
+    }
+    
+    if (data.timeout !== undefined && (!Number.isInteger(data.timeout) || data.timeout <= 0)) {
+      throw new Error('超时时间必须为正整数')
+    }
+    
+    if (data.retryAttempts !== undefined && (!Number.isInteger(data.retryAttempts) || data.retryAttempts < 0)) {
+      throw new Error('重试次数必须为非负整数')
+    }
+    
+    if (data.verifyChecksum !== undefined && typeof data.verifyChecksum !== 'boolean') {
+      throw new Error('verifyChecksum参数必须为布尔值')
+    }
+    
+    if (data.notifyOnCompletion !== undefined && typeof data.notifyOnCompletion !== 'boolean') {
+      throw new Error('notifyOnCompletion参数必须为布尔值')
+    }
+  }
+
+  /**
+   * 验证分发ID
+   */
+  private validateDistributionId(distributionId: string): void {
+    if (!distributionId || typeof distributionId !== 'string' || distributionId.trim().length === 0) {
+      throw new Error('分发ID不能为空')
+    }
+  }
+
+  /**
+   * 验证初始模型下载参数
+   */
+  private validateInitialModelDownloadParams(params: any): void {
+    if (params.format !== undefined && !['binary', 'json'].includes(params.format)) {
+      throw new Error('下载格式必须为binary或json')
+    }
+  }
+
+  /**
+   * 验证初始模型删除请求
+   */
+  private validateInitialModelDeleteRequest(data: InitialModelDeleteRequest): void {
+    if (data.force !== undefined && typeof data.force !== 'boolean') {
+      throw new Error('强制删除标志必须为布尔值')
+    }
+  }
+
+  /**
    * 验证模型ID
    */
   private validateModelId(modelId: string): void {
@@ -486,91 +765,6 @@ export class ModelVersionService {
     if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.trim().length === 0) {
       throw new Error('部署ID不能为空')
     }
-  }
-
-  /**
-   * 验证模型上传
-   */
-  private validateUploadModel(formData: FormData): void {
-    if (!formData || !(formData instanceof FormData)) {
-      throw new Error('上传数据格式不正确')
-    }
-    
-    const taskId = formData.get('taskId')
-    if (!taskId || typeof taskId !== 'string' || taskId.trim().length === 0) {
-      throw new Error('任务ID不能为空')
-    }
-    
-    // 验证taskId格式
-    const uuidRegex = /^[a-f0-9]{32}$/i
-    if (!uuidRegex.test(taskId)) {
-      throw new Error('任务ID格式不正确')
-    }
-    
-    const roundNumber = formData.get('roundNumber')
-    if (!roundNumber) {
-      throw new Error('训练轮数不能为空')
-    }
-    
-    const roundNum = parseInt(roundNumber.toString(), 10)
-    if (isNaN(roundNum) || roundNum <= 0) {
-      throw new Error('训练轮数必须为正整数')
-    }
-    
-    const file = formData.get('file')
-    if (!file || !(file instanceof File)) {
-      throw new Error('模型文件不能为空')
-    }
-    
-    // 验证文件大小（100MB限制）
-    const maxSize = 100 * 1024 * 1024
-    if (file.size > maxSize) {
-      throw new Error('模型文件大小不能超过100MB')
-    }
-    
-    // 验证文件格式
-    const supportedFormats = ['.pth', '.pt', '.h5', '.pb', '.onnx', '.pkl', '.pickle', '.joblib']
-    const fileName = file.name.toLowerCase()
-    const isValidFormat = supportedFormats.some(format => fileName.endsWith(format))
-    if (!isValidFormat) {
-      throw new Error('不支持的模型文件格式')
-    }
-  }
-
-  /**
-   * 验证批量上传请求
-   */
-  private validateBatchUploadRequest(data: BatchUploadRequest): void {
-    if (!data.taskId || typeof data.taskId !== 'string') {
-      throw new Error('任务ID不能为空')
-    }
-    
-    const uuidRegex = /^[a-f0-9]{32}$/i
-    if (!uuidRegex.test(data.taskId)) {
-      throw new Error('任务ID格式不正确')
-    }
-    
-    if (!data.models || !Array.isArray(data.models) || data.models.length === 0) {
-      throw new Error('模型列表不能为空')
-    }
-    
-    if (data.models.length > 20) {
-      throw new Error('批量上传模型数量不能超过20个')
-    }
-    
-    data.models.forEach((model, index) => {
-      if (!Number.isInteger(model.roundNumber) || model.roundNumber <= 0) {
-        throw new Error(`模型${index + 1}的训练轮数必须为正整数`)
-      }
-      
-      if (!model.file || !(model.file instanceof File)) {
-        throw new Error(`模型${index + 1}的文件不能为空`)
-      }
-      
-      if (model.file.size > 100 * 1024 * 1024) {
-        throw new Error(`模型${index + 1}的文件大小不能超过100MB`)
-      }
-    })
   }
 
   /**
@@ -717,47 +911,6 @@ export class ModelVersionService {
     }
   }
 
-  /**
-   * 验证部署请求
-   */
-  private validateDeploymentRequest(data: DeploymentRequest): void {
-    this.validateModelId(data.modelId)
-    
-    if (!data.deploymentName || typeof data.deploymentName !== 'string' || data.deploymentName.trim().length === 0) {
-      throw new Error('部署名称不能为空')
-    }
-    
-    if (data.deploymentName.length > 100) {
-      throw new Error('部署名称不能超过100个字符')
-    }
-    
-    if (data.targetVms && !Array.isArray(data.targetVms)) {
-      throw new Error('目标虚拟机列表必须为数组格式')
-    }
-    
-    if (data.deploymentConfig) {
-      if (data.deploymentConfig.replicas !== undefined && (!Number.isInteger(data.deploymentConfig.replicas) || data.deploymentConfig.replicas <= 0)) {
-        throw new Error('副本数量必须为正整数')
-      }
-    }
-  }
-
-  /**
-   * 验证部署列表参数
-   */
-  private validateDeploymentListParams(params: any): void {
-    if (params.modelId !== undefined && typeof params.modelId === 'string') {
-      this.validateModelId(params.modelId)
-    }
-    
-    if (params.page !== undefined && params.page < 1) {
-      throw new Error('页码必须大于0')
-    }
-    
-    if (params.size !== undefined && (params.size < 1 || params.size > 100)) {
-      throw new Error('每页大小必须在1-100范围内')
-    }
-  }
 
   /**
    * 验证回滚请求
@@ -915,11 +1068,20 @@ export class ModelVersionService {
       roundNumber: detail.roundNumber,
       aggregationMethod: detail.aggregationMethod,
       clientCount: detail.clientCount,
-      modelJson: detail.modelJson,
+      // ⭐ 核心评估指标（顶级字段）
+      accuracy: detail.accuracy,
+      loss: detail.loss,
+      status: detail.status,
+      description: detail.description,
+      // 文件相关字段
+      fileSize: detail.fileSize,
+      fileFormat: detail.fileFormat,
+      // ⭐ 其他评估指标（不包含accuracy/loss）
       metrics: detail.metrics,
+      // ⭐ 扩展参数（替代modelJson）
+      parameters: detail.parameters,
       createdAt: detail.createdAt,
-      aggregatedAt: detail.aggregatedAt,
-      status: detail.status
+      aggregatedAt: detail.aggregatedAt
     }
   }
 
@@ -948,35 +1110,6 @@ export class ModelVersionService {
     }
   }
 
-  /**
-   * 转换部署状态
-   */
-  private transformDeploymentStatus(status: any): DeploymentStatus {
-    return {
-      deploymentId: status.deploymentId,
-      modelId: status.modelId,
-      deploymentName: status.deploymentName,
-      status: status.status,
-      replicas: status.replicas,
-      endpoints: status.endpoints,
-      healthCheck: status.healthCheck,
-      createdAt: status.createdAt,
-      updatedAt: status.updatedAt
-    }
-  }
-
-  /**
-   * 转换部署列表
-   */
-  private transformDeploymentList(result: any): ModelVersionPaginatedResponse<any> {
-    return {
-      total: result.total,
-      pages: result.pages,
-      current: result.current,
-      size: result.size,
-      records: result.records
-    }
-  }
 
   /**
    * 转换回滚历史

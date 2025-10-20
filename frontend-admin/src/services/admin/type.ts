@@ -225,5 +225,382 @@ export interface AdminServiceConfig {
   readonly retryDelay: number
 }
 
+// ==================== 虚拟机管理相关类型 ====================
+
+/**
+ * VM权限类型
+ */
+export type VmPermission = 'READ' | 'WRITE' | 'EXECUTE' | 'ADMIN'
+
+/**
+ * VM状态类型
+ */
+export type VmStatus = 'RUNNING' | 'STOPPED' | 'ERROR' | 'STARTING' | 'STOPPING' | 'OFFLINE'
+
+/**
+ * VM连接状态类型
+ */
+export type VmConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
+
+/**
+ * VM控制操作类型
+ */
+export type VmControlAction = 'START' | 'STOP' | 'RESTART' | 'FORCE_STOP'
+
+/**
+ * 虚拟机分配信息
+ */
+export interface VmAssignment {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 用户ID */
+  readonly userId: string
+  /** 权限列表 */
+  readonly permissions: VmPermission[]
+  /** 分配时间 */
+  readonly assignedAt: string
+  /** 分配者ID */
+  readonly assignedBy: string
+  /** 备注信息 */
+  readonly notes?: string
+}
+
+/**
+ * 虚拟机分配详情（包含用户信息）
+ */
+export interface VmAssignmentDetail {
+  /** 用户ID */
+  readonly userId: string
+  /** 用户名 */
+  readonly username: string
+  /** 邮箱 */
+  readonly email: string
+  /** 权限列表 */
+  readonly permissions: VmPermission[]
+  /** 分配时间 */
+  readonly assignedAt: string
+  /** 分配者ID */
+  readonly assignedBy: string
+}
+
+/**
+ * 虚拟机基本信息
+ */
+export interface VirtualMachine {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 虚拟机名称 */
+  readonly name: string
+  /** IP地址 */
+  readonly ipAddress: string
+  /** 端口 */
+  readonly port?: number
+  /** 虚拟机状态 */
+  readonly status: VmStatus
+  /** 连接状态 */
+  readonly connectionStatus: VmConnectionStatus
+  /** 操作系统类型 */
+  readonly osType?: string
+  /** CPU核心数 */
+  readonly cpuCores?: number
+  /** 内存大小(MB) */
+  readonly memoryMb?: number
+  /** 磁盘大小(GB) */
+  readonly diskGb?: number
+  /** 是否已分配 */
+  readonly isAssigned?: boolean
+  /** 已分配用户数量 */
+  readonly assignedUserCount?: number
+  /** 创建时间 */
+  readonly createdAt: string
+  /** 更新时间 */
+  readonly updatedAt?: string
+  /** 最后心跳时间 */
+  readonly lastHeartbeat?: string
+  /** 系统信息 */
+  readonly systemInfo?: {
+    os?: string
+    kernel?: string
+    python?: string
+    gpu?: string
+    cuda?: string
+    cudnn?: string
+  }
+  /** 能力配置 */
+  readonly capabilities?: {
+    supportedAlgorithms?: string[]
+    maxBatchSize?: number
+    maxMemoryUsage?: number
+    gpuMemory?: number
+    networkSpeed?: number
+  }
+  /** 网络配置 */
+  readonly networkConfig?: {
+    uploadSpeed?: number
+    downloadSpeed?: number
+    latency?: number
+    bandwidth?: number
+  }
+  /** 元数据 */
+  readonly metadata?: {
+    description?: string
+    location?: string
+    owner?: string
+    department?: string
+    tags?: string[]
+  }
+}
+
+/**
+ * 用户虚拟机信息
+ */
+export interface UserVm {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 虚拟机名称 */
+  readonly vmName: string
+  /** IP地址 */
+  readonly ipAddress: string
+  /** 虚拟机状态 */
+  readonly status: VmStatus
+  /** 权限列表 */
+  readonly permissions: VmPermission[]
+  /** 分配时间 */
+  readonly assignedAt: string
+}
+
+/**
+ * 批量操作结果
+ */
+export interface BatchOperationResult {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 操作状态 */
+  readonly status: 'SUCCESS' | 'FAILED'
+  /** 分配时间 */
+  readonly assignedAt?: string
+  /** 取消分配时间 */
+  readonly unassignedAt?: string
+  /** 错误信息 */
+  readonly error?: string
+}
+
+/**
+ * 虚拟机分配概况统计
+ */
+export interface VmAssignmentOverview {
+  /** 概况统计 */
+  readonly summary: {
+    /** 总虚拟机数 */
+    readonly totalVms: number
+    /** 已分配虚拟机数 */
+    readonly assignedVms: number
+    /** 未分配虚拟机数 */
+    readonly unassignedVms: number
+    /** 总用户数 */
+    readonly totalUsers: number
+    /** 拥有虚拟机的用户数 */
+    readonly usersWithVms: number
+  }
+  /** 状态分布 */
+  readonly statusDistribution: Record<VmStatus, number>
+  /** 热门虚拟机（分配最多的） */
+  readonly topAssignedVms: Array<{
+    readonly vmId: string
+    readonly vmName: string
+    readonly assignedUserCount: number
+  }>
+  /** 最近分配记录 */
+  readonly recentAssignments: Array<{
+    readonly vmId: string
+    readonly vmName: string
+    readonly userId: string
+    readonly username: string
+    readonly assignedAt: string
+  }>
+}
+
+/**
+ * VM控制命令响应
+ */
+export interface VmControlResponse {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 操作类型 */
+  readonly action: VmControlAction
+  /** 命令ID */
+  readonly commandId: string
+  /** 操作原因 */
+  readonly reason?: string
+  /** 执行者ID */
+  readonly executedBy: string
+  /** 执行时间 */
+  readonly executedAt: string
+  /** 预计完成时间（秒） */
+  readonly estimatedTime?: number
+}
+
+/**
+ * 分配虚拟机请求参数
+ */
+export interface AssignVmRequest {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 用户ID */
+  readonly userId: string
+  /** 权限列表 */
+  readonly permissions?: VmPermission[]
+  /** 备注信息 */
+  readonly notes?: string
+}
+
+/**
+ * 取消分配虚拟机响应
+ */
+export interface UnassignVmResponse {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 用户ID */
+  readonly userId: string
+  /** 取消分配时间 */
+  readonly unassignedAt: string
+}
+
+/**
+ * 虚拟机分配信息响应
+ */
+export interface VmAssignmentInfoResponse {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 虚拟机名称 */
+  readonly vmName: string
+  /** 分配列表 */
+  readonly assignments: VmAssignmentDetail[]
+  /** 总分配数 */
+  readonly totalAssignments: number
+}
+
+/**
+ * 更新权限响应
+ */
+export interface UpdateVmPermissionsResponse {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 用户ID */
+  readonly userId: string
+  /** 旧权限列表 */
+  readonly oldPermissions: VmPermission[]
+  /** 新权限列表 */
+  readonly newPermissions: VmPermission[]
+  /** 更新时间 */
+  readonly updatedAt: string
+}
+
+/**
+ * 用户虚拟机列表请求参数
+ */
+export interface UserVmListParams extends PaginationParams {
+  /** 用户ID */
+  readonly userId: string
+  /** 状态筛选 */
+  readonly status?: VmStatus
+}
+
+/**
+ * 批量分配虚拟机请求
+ */
+export interface BatchAssignVmsRequest {
+  /** 用户ID */
+  readonly userId: string
+  /** 虚拟机ID列表 */
+  readonly vmIds: string[]
+  /** 权限列表 */
+  readonly permissions?: VmPermission[]
+  /** 备注信息 */
+  readonly notes?: string
+}
+
+/**
+ * 批量分配虚拟机响应
+ */
+export interface BatchAssignVmsResponse {
+  /** 用户ID */
+  readonly userId: string
+  /** 成功数量 */
+  readonly successCount: number
+  /** 失败数量 */
+  readonly failedCount: number
+  /** 操作结果列表 */
+  readonly results: BatchOperationResult[]
+}
+
+/**
+ * 批量移除虚拟机请求
+ */
+export interface BatchRemoveVmsRequest {
+  /** 用户ID */
+  readonly userId: string
+  /** 虚拟机ID列表 */
+  readonly vmIds: string[]
+}
+
+/**
+ * 批量移除虚拟机响应
+ */
+export interface BatchRemoveVmsResponse {
+  /** 用户ID */
+  readonly userId: string
+  /** 成功数量 */
+  readonly successCount: number
+  /** 失败数量 */
+  readonly failedCount: number
+  /** 操作结果列表 */
+  readonly results: BatchOperationResult[]
+}
+
+/**
+ * 管理员虚拟机列表请求参数
+ */
+export interface AdminVmListParams extends PaginationParams {
+  /** 状态筛选 */
+  readonly status?: VmStatus
+  /** 是否已分配筛选 */
+  readonly assigned?: boolean
+  /** 关键词搜索（名称、IP） */
+  readonly keyword?: string
+}
+
+/**
+ * 未分配虚拟机列表请求参数
+ */
+export interface UnassignedVmListParams {
+  /** 状态筛选 */
+  readonly status?: VmStatus
+}
+
+/**
+ * 未分配虚拟机列表响应
+ */
+export interface UnassignedVmListResponse {
+  /** 未分配虚拟机列表 */
+  readonly unassignedVms: VirtualMachine[]
+  /** 总数 */
+  readonly total: number
+}
+
+/**
+ * 强制控制虚拟机请求
+ */
+export interface ForceControlVmRequest {
+  /** 虚拟机ID */
+  readonly vmId: string
+  /** 操作类型 */
+  readonly action: VmControlAction
+  /** 操作原因（必填） */
+  readonly reason: string
+  /** 超时时间（秒） */
+  readonly timeout?: number
+}
+
 // ==================== 重新导出基础类型 ====================
 // 注：工具类型已从 @/types 统一导入，不再重复定义

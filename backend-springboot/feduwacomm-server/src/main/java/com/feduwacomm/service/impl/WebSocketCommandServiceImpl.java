@@ -23,7 +23,7 @@ import java.util.concurrent.*;
  * - 支持6种核心命令类型的发送和状态管理
  *
  * @author FedUWAComm Team
- * @version 1.4.0 (v1.4协议标准版)
+ * @version 1.5.0 (v1.4协议标准版)
  * @since 2025-09-28
  */
 @Slf4j

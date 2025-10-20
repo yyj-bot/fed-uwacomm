@@ -5,7 +5,7 @@ package com.feduwacomm.service.cache.exception;
  * 当缓存数据无效、不完整或过期时抛出此异常
  *
  * @author FedUWAComm Team
- * @version 1.4.0
+ * @version 1.5.0
  */
 public class CacheValidationException extends RuntimeException {
 

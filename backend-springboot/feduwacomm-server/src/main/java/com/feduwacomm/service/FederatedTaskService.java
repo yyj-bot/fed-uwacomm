@@ -1,10 +1,12 @@
 package com.feduwacomm.service;
 
+import com.feduwacomm.controller.FederatedTaskController;
 import com.feduwacomm.dto.*;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.TaskParticipant;
+import com.feduwacomm.model.dto.federated.FederatedTaskConfigDTO;
+import com.feduwacomm.model.dto.federated.FederatedTaskCreateRequest;
 import com.feduwacomm.vo.*;
-import com.feduwacomm.controller.FederatedTaskController;
 
 import java.util.List;
 
@@ -16,15 +18,14 @@ public interface FederatedTaskService {
 
     // 任务生命周期管理
     /**
-     * 创建联邦学习任务 (v1.0 已废弃)
+     * 创建联邦学习任务（统一入口）
      */
-    @Deprecated
-    TaskOperationVO createTask(TaskCreateDTO createDTO, String createdBy);
+    TaskOperationVO createTask(FederatedTaskCreateRequest createDTO, String createdBy);
 
     /**
      * 配置任务参数
      */
-    TaskOperationVO configureTask(String taskId, TaskConfigDTO configDTO, String updatedBy);
+    TaskOperationVO configureTask(String taskId, FederatedTaskConfigDTO configDTO, String updatedBy);
 
     /**
      * 启动任务
@@ -123,7 +124,7 @@ public interface FederatedTaskService {
     /**
      * 验证任务配置是否有效
      */
-    boolean isValidTaskConfig(TaskCreateDTO createDTO);
+    boolean isValidTaskConfig(FederatedTaskCreateRequest createDTO);
 
     // 内部方法
     /**
@@ -139,17 +140,17 @@ public interface FederatedTaskService {
     /**
      * 生成任务配置JSON
      */
-    String generateConfigJson(TaskCreateDTO createDTO);
+    String generateConfigJson(FederatedTaskCreateRequest createDTO);
 
     /**
      * 生成任务配置JSON
      */
-    String generateConfigJson(TaskConfigDTO configDTO);
+    String generateConfigJson(FederatedTaskConfigDTO configDTO);
 
     /**
      * 估算任务执行时间
      */
-    int estimateTaskDuration(TaskCreateDTO createDTO);
+    int estimateTaskDuration(FederatedTaskCreateRequest createDTO);
 
     // ========== v1.3 图形化配置接口方法 ==========
 
@@ -201,7 +202,7 @@ public interface FederatedTaskService {
      * 创建智能任务 (v1.3 标准方法)
      * 支持新的datasetConfig和participantConfig格式
      */
-    TaskOperationVO createSmartTask(TaskCreateDTO createDTO, String createdBy);
+    TaskOperationVO createSmartTask(FederatedTaskCreateRequest createDTO, String createdBy);
 
     /**
      * 获取任务全局模型列表
@@ -225,7 +226,7 @@ public interface FederatedTaskService {
      * 实现13步标准化流程的步骤6-12
      * 🎯 实现目标：完整的标准任务创建链路，包含数据集分配
      */
-    TaskOperationVO createStandardFederatedTask(TaskCreateDTO createDTO, String createdBy);
+    TaskOperationVO createStandardFederatedTask(FederatedTaskCreateRequest createDTO, String createdBy);
 
     /**
      * 数据集分配和assignedDatasetId生成 (v1.5)

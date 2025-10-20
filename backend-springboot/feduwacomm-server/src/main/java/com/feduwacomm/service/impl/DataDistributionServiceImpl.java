@@ -717,7 +717,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             // 构建VM ID列表和比例列表（按照participants顺序，保证映射关系）
             List<String> vmIds = new ArrayList<>();
             List<Integer> ratios = new ArrayList<>();
-            Map<String, Integer> vmRatioMap = new HashMap<>();
+            Map<String, Integer> vmRatioMap = new LinkedHashMap<>();
 
             // 检查是否所有dataRatio都已配置
             boolean allRatiosConfigured = participants.stream()
@@ -730,18 +730,28 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     Integer dataRatio = participant.getDataRatio();
                     vmIds.add(participant.getVmId());
                     ratios.add(dataRatio);
-                    vmRatioMap.put(participant.getVmId(), dataRatio);
                     ratioSum += dataRatio;
                 }
 
-                // 验证总和必须=1000
-                if (ratioSum != 1000) {
-                    throw new BusinessException(String.format(
-                            "数据分配权重总和必须等于1000，当前总和=%d，请调整各VM的dataRatio配置", ratioSum));
+                if (ratioSum <= 0) {
+                    throw new BusinessException("数据分配权重总和必须大于0，请检查各VM的dataRatio配置");
                 }
 
-                log.info("📊 使用配置的千分比权重: taskId={}, vmRatioMap={}, sum={}",
-                        taskId, vmRatioMap, ratioSum);
+                List<Integer> normalizedRatios = normalizeRatios(ratios);
+                for (int i = 0; i < vmIds.size(); i++) {
+                    vmRatioMap.put(vmIds.get(i), normalizedRatios.get(i));
+                }
+
+                int normalizedSum = normalizedRatios.stream().mapToInt(Integer::intValue).sum();
+                if (ratioSum != 1000) {
+                    log.info("⚠️ 数据分配权重总和不等于1000，将按归一化比例执行: taskId={}, originalSum={}, normalizedSum={}, ratios={}",
+                            taskId, ratioSum, normalizedSum, vmRatioMap);
+                } else {
+                    log.info("📊 使用配置的千分比权重: taskId={}, vmRatioMap={}, sum={}",
+                            taskId, vmRatioMap, ratioSum);
+                }
+
+                ratios = normalizedRatios;
             } else {
                 // 方案B：存在null或0的dataRatio，自动分配平均权重（总和=1000）
                 int vmCount = participants.size();
@@ -888,6 +898,7 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                         participant.setAssignedDatasetId(assignedDatasetId);
                         participant.setDatasetStatus("UPLOADING");
                         participant.setDatasetCreatedAt(LocalDateTime.now());
+                        participant.setLocalPath("/data/assigned/" + assignedDatasetId);
                         participant.setUpdatedAt(LocalDateTime.now());
 
                         int updated = taskParticipantsMapper.updateParticipant(participant);
@@ -972,33 +983,11 @@ public class DataDistributionServiceImpl implements DataDistributionService {
             log.info("✅ 数据行传输完成: vmId={}, totalBatches={}, totalRows={}", vmId, batchCount, offset - startIndex);
 
             // 步骤3：发送DATASET_COMPLETE消息
-            sendDatasetCompleteV151(vmId, assignedDatasetId, offset - startIndex);
+            sendDatasetCompleteV151(taskId, vmId, assignedDatasetId, offset - startIndex);
             log.info("✅ DATASET_COMPLETE消息已发送: vmId={}, totalRows={}", vmId, offset - startIndex);
 
             // 更新传输大小
             dataDistributionDetailMapper.updateTransferredSize(detail.getId(), totalTransferredBytes);
-
-            // 更新TaskParticipant状态为READY（数据传输完成）
-            TransactionTemplate finalUpdateTemplate = new TransactionTemplate(transactionManager);
-            // 🔥 强制创建新事务，不加入外层事务
-            finalUpdateTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-            finalUpdateTemplate.execute(status -> {
-                try {
-                    TaskParticipant finalParticipant = taskParticipantsMapper.selectParticipant(taskId, vmId);
-                    if (finalParticipant != null) {
-                        finalParticipant.setDatasetStatus("COMPLETED");
-                        finalParticipant.setUpdatedAt(LocalDateTime.now());
-                        int updated = taskParticipantsMapper.updateParticipant(finalParticipant);
-                        log.info("✅ 数据集状态更新为COMPLETED: vmId={}, updateCount={}", vmId, updated);
-                        return updated;
-                    }
-                    return 0;
-                } catch (Exception e) {
-                    log.error("❌ 更新COMPLETED状态失败: vmId={}, error={}", vmId, e.getMessage(), e);
-                    status.setRollbackOnly();
-                    return 0;
-                }
-            });
 
         } catch (Exception e) {
             log.error("❌ VM数据分发异常: vmId={}, error={}", vmId, e.getMessage(), e);
@@ -1097,8 +1086,9 @@ public class DataDistributionServiceImpl implements DataDistributionService {
     /**
      * 发送DATASET_COMPLETE消息（v1.5.1协议）
      */
-    private void sendDatasetCompleteV151(String vmId, String assignedDatasetId, int totalRows) {
+    private void sendDatasetCompleteV151(String taskId, String vmId, String assignedDatasetId, int totalRows) {
         Map<String, Object> messageData = new HashMap<>();
+        messageData.put("taskId", taskId);
         messageData.put("assignedDatasetId", assignedDatasetId);
         messageData.put("totalRows", totalRows);
         messageData.put("status", "COMPLETE");
@@ -1128,6 +1118,45 @@ public class DataDistributionServiceImpl implements DataDistributionService {
                     }
                 })
                 .sum();
+    }
+
+    private List<Integer> normalizeRatios(List<Integer> ratios) {
+        if (ratios == null || ratios.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Integer> sanitized = new ArrayList<>(ratios.size());
+        for (Integer ratio : ratios) {
+            sanitized.add(ratio == null ? 0 : ratio);
+        }
+        int gcdValue = 0;
+        for (Integer ratio : sanitized) {
+            if (ratio == null || ratio <= 0) {
+                return sanitized;
+            }
+            gcdValue = gcdValue == 0 ? ratio : gcd(gcdValue, ratio);
+            if (gcdValue == 1) {
+                break;
+            }
+        }
+        if (gcdValue <= 1) {
+            return sanitized;
+        }
+        List<Integer> normalized = new ArrayList<>(sanitized.size());
+        for (Integer ratio : sanitized) {
+            normalized.add(ratio / gcdValue);
+        }
+        return normalized;
+    }
+
+    private int gcd(int a, int b) {
+        a = Math.abs(a);
+        b = Math.abs(b);
+        while (b != 0) {
+            int temp = a % b;
+            a = b;
+            b = temp;
+        }
+        return a;
     }
 
     /**

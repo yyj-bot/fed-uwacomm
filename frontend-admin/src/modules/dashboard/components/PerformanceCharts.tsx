@@ -29,53 +29,25 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   const [timeRange, setTimeRange] = useState<string>('24h')
   const [metric, setMetric] = useState<string>('all')
 
-  // 生成安全的静态数据
-  const generateSafeData = React.useCallback(() => {
-    const baseData = [
-      { time: '00:00', cpu: 25, memory: 45, network: 15, storage: 30, tasks: 3, participants: 18 },
-      { time: '01:00', cpu: 22, memory: 42, network: 12, storage: 32, tasks: 2, participants: 16 },
-      { time: '02:00', cpu: 20, memory: 40, network: 10, storage: 35, tasks: 4, participants: 15 },
-      { time: '03:00', cpu: 28, memory: 48, network: 18, storage: 33, tasks: 3, participants: 19 },
-      { time: '04:00', cpu: 35, memory: 52, network: 25, storage: 38, tasks: 5, participants: 22 },
-      { time: '05:00', cpu: 42, memory: 58, network: 32, storage: 42, tasks: 6, participants: 25 },
-      { time: '06:00', cpu: 38, memory: 55, network: 28, storage: 40, tasks: 4, participants: 23 },
-      { time: '07:00', cpu: 45, memory: 62, network: 35, storage: 45, tasks: 7, participants: 28 },
-      { time: '08:00', cpu: 50, memory: 65, network: 40, storage: 48, tasks: 8, participants: 30 },
-      { time: '09:00', cpu: 48, memory: 63, network: 38, storage: 46, tasks: 7, participants: 29 },
-      { time: '10:00', cpu: 52, memory: 67, network: 42, storage: 50, tasks: 9, participants: 32 },
-      { time: '11:00', cpu: 46, memory: 61, network: 36, storage: 44, tasks: 6, participants: 27 },
-      { time: '12:00', cpu: 40, memory: 56, network: 30, storage: 38, tasks: 5, participants: 24 },
-      { time: '13:00', cpu: 44, memory: 59, network: 34, storage: 41, tasks: 6, participants: 26 },
-      { time: '14:00', cpu: 48, memory: 63, network: 38, storage: 45, tasks: 7, participants: 28 },
-      { time: '15:00', cpu: 45, memory: 60, network: 35, storage: 43, tasks: 6, participants: 27 },
-      { time: '16:00', cpu: 42, memory: 57, network: 32, storage: 40, tasks: 5, participants: 25 },
-      { time: '17:00', cpu: 38, memory: 54, network: 28, storage: 37, tasks: 4, participants: 23 },
-      { time: '18:00', cpu: 35, memory: 51, network: 25, storage: 35, tasks: 4, participants: 21 },
-      { time: '19:00', cpu: 32, memory: 48, network: 22, storage: 33, tasks: 3, participants: 19 },
-      { time: '20:00', cpu: 30, memory: 46, network: 20, storage: 31, tasks: 3, participants: 18 },
-      { time: '21:00', cpu: 28, memory: 44, network: 18, storage: 29, tasks: 2, participants: 17 },
-      { time: '22:00', cpu: 26, memory: 42, network: 16, storage: 28, tasks: 2, participants: 16 },
-      { time: '23:00', cpu: 24, memory: 41, network: 14, storage: 27, tasks: 2, participants: 15 }
-    ]
-    
-    // 确保数据格式完全正确
-    return baseData.map((item, index) => ({
-      ...item,
-      timestamp: Date.now() - (baseData.length - index) * 60 * 60 * 1000,
-      // 确保所有数值都是有效数字
-      cpu: Math.max(0, Math.min(100, item.cpu)),
-      memory: Math.max(0, Math.min(100, item.memory)),
-      network: Math.max(0, Math.min(100, item.network)),
-      storage: Math.max(0, Math.min(100, item.storage)),
-      tasks: Math.max(0, item.tasks),
-      participants: Math.max(0, item.participants)
-    }))
-  }, [])
-
-  // 使用静态安全数据
+  // 从chartData中提取性能数据
   const data = React.useMemo(() => {
-    return generateSafeData()
-  }, [generateSafeData])
+    if (!chartData?.systemPerformanceTrend) {
+      return []
+    }
+
+    const { timestamps, cpuUsage, memoryUsage, diskUsage, networkIn, networkOut } = chartData.systemPerformanceTrend
+    
+    return timestamps.map((timestamp, index) => ({
+      time: new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      timestamp,
+      cpu: cpuUsage[index] || 0,
+      memory: memoryUsage[index] || 0,
+      network: ((networkIn[index] || 0) + (networkOut[index] || 0)) / 2, // 网络平均值
+      storage: diskUsage[index] || 0,
+      tasks: 0, // 业务指标需要从taskExecutionTrend获取
+      participants: 0
+    }))
+  }, [chartData])
 
   if (loading) {
     return (

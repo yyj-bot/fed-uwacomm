@@ -1,12 +1,19 @@
 .task-list-page {
   padding: 24px;
-  background: #f0f2f5;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
   min-height: 100vh;
 }
 
 .task-list-page .ant-card {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.task-list-page .ant-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 .page-header {
@@ -14,48 +21,119 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  padding: 20px;
+  margin: -24px -24px 24px -24px;
+  border-radius: 12px 12px 0 0;
 }
 
 .page-title h2 {
   margin: 0;
-  color: #262626;
-  font-size: 24px;
-  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .page-description {
-  color: #8c8c8c;
+  color: #595959;
   font-size: 14px;
-  margin-top: 4px;
+  margin-top: 8px;
   display: block;
+  font-weight: 400;
 }
 
 .page-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+}
+
+.page-actions .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.page-actions .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.page-actions .ant-btn:not(.ant-btn-primary) {
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.page-actions .ant-btn:not(.ant-btn-primary):hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
 }
 
 .search-section {
   margin-bottom: 24px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 6px;
-  border: 1px solid #f0f0f0;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 10px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .ant-table-wrapper {
   margin-top: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.ant-table-thead > tr > th {
-  background: #fafafa;
+.task-list-page .ant-table {
+  background: #ffffff !important;
+}
+
+.task-list-page .ant-table-container {
+  background: #ffffff !important;
+}
+
+.task-list-page .ant-table-content {
+  background: #ffffff !important;
+}
+
+.task-list-page .ant-table-thead > tr > th {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%);
   font-weight: 600;
+  color: #262626;
+  border-bottom: 2px solid #e8e8e8;
+  padding: 16px;
+  font-size: 14px;
 }
 
-.ant-table-tbody > tr:hover > td {
-  background: #f5f5f5;
+.task-list-page .ant-table-tbody > tr {
+  transition: all 0.3s ease;
+}
+
+.task-list-page .ant-table-tbody > tr:hover > td {
+  background: rgba(230, 244, 255, 0.6) !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.task-list-page .ant-table-tbody > tr {
+  background: #ffffff !important;
+}
+
+.task-list-page .ant-table-tbody > tr > td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent;
 }
 
 /* 进度条样式 */
@@ -65,17 +143,131 @@
 
 .ant-progress-text {
   font-size: 12px;
+  font-weight: 600;
+}
+
+.task-list-page .ant-progress-bg {
+  background: linear-gradient(90deg, #1890ff 0%, #52c41a 100%);
 }
 
 /* 操作按钮样式 */
-.ant-btn-text:hover {
-  background: rgba(0, 0, 0, 0.04);
+.task-list-page .ant-btn-text {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.task-list-page .ant-btn-text:hover {
+  background: rgba(24, 144, 255, 0.08);
+  transform: scale(1.1);
 }
 
 /* 状态标签样式 */
-.ant-tag {
+.task-list-page .ant-tag {
   margin: 0;
-  border-radius: 4px;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 500;
+  border: none;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 链接按钮样式 */
+.task-list-page .ant-btn-link {
+  font-weight: 600;
+  color: #1890ff;
+  transition: all 0.3s ease;
+}
+
+.task-list-page .ant-btn-link:hover {
+  color: #096dd9;
+  transform: translateX(4px);
+}
+
+/* 搜索框和选择器样式 */
+.search-section .ant-input {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.search-section .ant-input:hover,
+.search-section .ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.search-section .ant-select-selector {
+  border-radius: 8px !important;
+  border: 1px solid #d9d9d9 !important;
+  transition: all 0.3s ease;
+}
+
+.search-section .ant-select-focused .ant-select-selector {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+.search-section .ant-picker {
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+  background: #ffffff !important;
+}
+
+.search-section .ant-picker:hover,
+.search-section .ant-picker-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+  background: #ffffff !important;
+}
+
+.search-section .ant-picker-input > input {
+  color: #262626 !important;
+  background: transparent !important;
+}
+
+.search-section .ant-picker-range-separator {
+  color: #8c8c8c !important;
+}
+
+.search-section .ant-picker-suffix {
+  color: #8c8c8c !important;
+}
+
+.search-section .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+/* 分页样式 */
+.task-list-page .ant-pagination {
+  margin-top: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 8px;
+}
+
+.task-list-page .ant-pagination-item {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.task-list-page .ant-pagination-item:hover {
+  border-color: #1890ff;
+  transform: translateY(-2px);
+}
+
+.task-list-page .ant-pagination-item-active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border-color: #1890ff;
+  font-weight: 600;
+}
+
+.task-list-page .ant-pagination-item-active a {
+  color: #ffffff;
 }
 
 /* 响应式设计 */
@@ -88,6 +280,8 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
+    margin: -16px -16px 16px -16px;
+    padding: 16px;
   }
   
   .page-actions {
@@ -96,7 +290,7 @@
   }
   
   .search-section {
-    padding: 12px;
+    padding: 16px;
   }
   
   .search-section .ant-space {
@@ -115,25 +309,109 @@
 }
 
 /* 加载状态样式 */
-.ant-table-placeholder {
+.task-list-page .ant-table-placeholder {
   padding: 60px 0;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
 }
 
-.ant-spin-container {
+.task-list-page .ant-spin-container {
   position: relative;
+}
+
+.task-list-page .ant-spin-dot-item {
+  background-color: #1890ff;
 }
 
 /* 工具提示样式 */
 .ant-tooltip-inner {
   font-size: 12px;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* 确认框样式 */
 .ant-popconfirm-inner {
   padding: 12px 16px;
+  border-radius: 8px;
 }
 
 .ant-popconfirm-message {
   font-size: 14px;
 }
+
+.ant-popconfirm-buttons {
+  margin-top: 12px;
+}
+
+.ant-popconfirm-buttons .ant-btn {
+  border-radius: 6px;
+}
+
+/* Modal 样式优化 */
+.ant-modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  border-bottom: 2px solid #f0f0f0;
+}
+
+/* 空状态样式 */
+.task-list-page .ant-empty-description {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* 强制覆盖所有可能的黑色背景 */
+.task-list-page .ant-table-wrapper,
+.task-list-page .ant-table,
+.task-list-page .ant-table-container,
+.task-list-page .ant-table-content,
+.task-list-page .ant-table-body,
+.task-list-page .ant-table-tbody,
+.task-list-page table {
+  background: #ffffff !important;
+}
+
+.task-list-page .ant-picker,
+.task-list-page .ant-picker-panel-container,
+.task-list-page .ant-picker-input {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* 确保所有输入框和选择器都是白色背景 */
+.search-section .ant-input,
+.search-section .ant-select-selector,
+.search-section .ant-picker {
+  background: #ffffff !important;
+  color: #262626 !important;
+}
+
+/* 添加一些微动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-list-page .ant-card {
+  animation: fadeInUp 0.5s ease;
+}
+
+/* 进度条动画优化 */
+.task-list-page .ant-progress-status-active .ant-progress-bg::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+
+
 

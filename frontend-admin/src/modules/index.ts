@@ -5,10 +5,12 @@ export { DashboardPage } from './dashboard'
 export { LoginPage } from './login'
 export { SystemManagementPage } from './system-management'
 export { FederatedLearningPage } from './federated-learning'
-export { ModelManagementPage } from './model-management'
 export { SystemLogsPage } from './system-log'
 export { UnderwaterOptimizationPage } from './underwater-optimization'
 export { EnvironmentAnalysisPage } from './environment-analysis'
+
+// VM管理模块
+export { VMManagementPage, AdminVMManagementPage } from './vm-management'
 
 // 用户模块
 export { UserProfilePage, AccountSettingsPage } from './user' 

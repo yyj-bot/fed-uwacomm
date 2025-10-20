@@ -248,6 +248,9 @@ node_modules/
 
 .taskmaster
 
+.m2
+
 # Task files
 # tasks.json
 # tasks/ 
+.m2/

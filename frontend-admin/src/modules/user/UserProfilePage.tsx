@@ -29,14 +29,18 @@ import {
   EditOutlined,
   SaveOutlined,
   CloseOutlined,
-  EyeOutlined
+  IdcardOutlined,
+  SafetyOutlined,
+  ClockCircleOutlined,
+  EnvironmentOutlined,
+  CheckCircleOutlined
 } from '@ant-design/icons'
 
 import { useAuth } from '@/store/auth'
 import type { UpdateProfileRequest } from '@/services/user'
+import styles from './UserProfilePage.module.css'
 
 const { Title, Text } = Typography
-const { TextArea } = Input
 
 interface ProfileFormData {
   username: string
@@ -166,10 +170,14 @@ const UserProfilePage: React.FC = () => {
 
   if (isLoading && !user) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <Spin size="large" />
-        <div style={{ marginTop: '16px' }}>
-          <Text type="secondary">正在加载用户信息...</Text>
+      <div className={styles.profileContainer}>
+        <div className={styles.contentWrapper}>
+          <div className={styles.loadingWrapper}>
+            <Spin size="large" />
+            <div className={styles.loadingText}>
+              <Text type="secondary">正在加载用户信息...</Text>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -177,18 +185,22 @@ const UserProfilePage: React.FC = () => {
 
   if (!user) {
     return (
-      <div style={{ padding: '20px' }}>
-        <Alert
-          message="用户信息加载失败"
-          description="无法获取用户信息，请刷新页面重试"
-          type="error"
-          showIcon
-          action={
-            <Button size="small" onClick={() => fetchUserProfile()}>
-              重新加载
-            </Button>
-          }
-        />
+      <div className={styles.profileContainer}>
+        <div className={styles.contentWrapper}>
+          <div className={styles.errorWrapper}>
+            <Alert
+              message="用户信息加载失败"
+              description="无法获取用户信息，请刷新页面重试"
+              type="error"
+              showIcon
+              action={
+                <Button size="small" onClick={() => fetchUserProfile()}>
+                  重新加载
+                </Button>
+              }
+            />
+          </div>
+        </div>
       </div>
     )
   }
@@ -197,181 +209,219 @@ const UserProfilePage: React.FC = () => {
   const statusDisplay = getStatusDisplay(user.status)
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-      <Card
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <UserOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
-            <Title level={4} style={{ margin: 0 }}>个人资料</Title>
-          </div>
-        }
-        extra={
-          !isEditing ? (
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={handleEdit}
-            >
-              编辑资料
-            </Button>
-          ) : (
-            <Space>
-              <Button
-                icon={<CloseOutlined />}
-                onClick={handleCancel}
-              >
-                取消
-              </Button>
+    <div className={styles.profileContainer}>
+      <div className={styles.contentWrapper}>
+        <Card
+          className={styles.profileCard}
+          title={
+            <div className={styles.cardTitle}>
+              <UserOutlined className={styles.titleIcon} />
+              <Title level={4} className={styles.titleText}>个人资料</Title>
+            </div>
+          }
+          extra={
+            !isEditing ? (
               <Button
                 type="primary"
-                icon={<SaveOutlined />}
-                loading={isUpdatingProfile}
-                onClick={handleSave}
+                icon={<EditOutlined />}
+                onClick={handleEdit}
+                className={styles.editButton}
               >
-                保存
+                编辑资料
               </Button>
-            </Space>
-          )
-        }
-      >
+            ) : (
+              <Space className={styles.actionButtons}>
+                <Button
+                  icon={<CloseOutlined />}
+                  onClick={handleCancel}
+                  className={styles.cancelButton}
+                >
+                  取消
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={isUpdatingProfile}
+                  onClick={handleSave}
+                  className={styles.saveButton}
+                >
+                  保存
+                </Button>
+              </Space>
+            )
+          }
+        >
         <Row gutter={[24, 24]}>
           {/* 左侧头像区域 */}
-          <Col xs={24} sm={8} md={6}>
-            <div style={{ textAlign: 'center' }}>
-              <Avatar
-                size={120}
-                icon={<UserOutlined />}
-                style={{
-                  backgroundColor: '#1890ff',
-                  marginBottom: '16px'
-                }}
-              />
-              <div>
-                <Title level={5} style={{ margin: '8px 0 4px' }}>
+          <Col xs={24} sm={24} md={8} lg={7}>
+            <div className={styles.avatarSection}>
+              <div className={styles.avatarWrapper}>
+                <Avatar
+                  size={120}
+                  icon={<UserOutlined />}
+                  className={styles.avatar}
+                />
+                <div className={styles.avatarBadge} title="在线" />
+              </div>
+              <div className={styles.userInfo}>
+                <Title level={5} className={styles.username}>
                   {user.username}
                 </Title>
-                <Text type="secondary">{user.email}</Text>
+                <Text className={styles.userEmail}>{user.email}</Text>
               </div>
             </div>
           </Col>
 
           {/* 右侧信息区域 */}
-          <Col xs={24} sm={16} md={18}>
-            <Form
-              form={form}
-              layout="vertical"
-              disabled={!isEditing}
-            >
-              {/* 基本信息 */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item
-                    label="用户名"
-                    name="username"
-                    rules={[
-                      { required: true, message: '请输入用户名' },
-                      { min: 3, max: 50, message: '用户名长度应在3-50字符之间' }
-                    ]}
-                  >
-                    <Input
-                      prefix={<UserOutlined />}
-                      placeholder="请输入用户名"
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="邮箱地址"
-                    name="email"
-                    rules={[
-                      { required: true, message: '请输入邮箱地址' },
-                      { type: 'email', message: '邮箱格式不正确' }
-                    ]}
-                  >
-                    <Input
-                      prefix={<MailOutlined />}
-                      placeholder="请输入邮箱地址"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
+          <Col xs={24} sm={24} md={16} lg={17}>
+            <div className={styles.infoSection}>
+              <Form
+                form={form}
+                layout="vertical"
+                disabled={!isEditing}
+                className={styles.formWrapper}
+              >
+                {/* 基本信息 */}
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      label={
+                        <span>
+                          <UserOutlined style={{ marginRight: 6 }} />
+                          用户名
+                        </span>
+                      }
+                      name="username"
+                      rules={[
+                        { required: true, message: '请输入用户名' },
+                        { min: 3, max: 50, message: '用户名长度应在3-50字符之间' }
+                      ]}
+                    >
+                      <Input
+                        prefix={<UserOutlined />}
+                        placeholder="请输入用户名"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      label={
+                        <span>
+                          <MailOutlined style={{ marginRight: 6 }} />
+                          邮箱地址
+                        </span>
+                      }
+                      name="email"
+                      rules={[
+                        { required: true, message: '请输入邮箱地址' },
+                        { type: 'email', message: '邮箱格式不正确' }
+                      ]}
+                    >
+                      <Input
+                        prefix={<MailOutlined />}
+                        placeholder="请输入邮箱地址"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-              <Divider>系统信息</Divider>
+                <Divider className={styles.divider}>系统信息</Divider>
 
-              {/* 系统信息（只读） */}
-              <Row gutter={16}>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>用户ID</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Text copyable={{ text: user.userId }}>
-                        {user.userId}
-                      </Text>
+                {/* 系统信息（只读） */}
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <IdcardOutlined />
+                        用户ID
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Text copyable={{ text: user.userId }}>
+                          {user.userId}
+                        </Text>
+                      </div>
                     </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>用户角色</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Tag color={roleDisplay.color}>
-                        {roleDisplay.name}
-                      </Tag>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <SafetyOutlined />
+                        用户角色
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Tag color={roleDisplay.color} className={styles.roleTag}>
+                          {roleDisplay.name}
+                        </Tag>
+                      </div>
                     </div>
-                  </div>
-                </Col>
-              </Row>
+                  </Col>
+                </Row>
 
-              <Row gutter={16}>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>账户状态</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Tag color={statusDisplay.color}>
-                        {statusDisplay.name}
-                      </Tag>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <CheckCircleOutlined />
+                        账户状态
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Tag color={statusDisplay.color} className={styles.statusTag}>
+                          {statusDisplay.name}
+                        </Tag>
+                      </div>
                     </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>创建时间</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Text>{formatDateTime(user.createdAt)}</Text>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <ClockCircleOutlined />
+                        创建时间
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Text>{formatDateTime(user.createdAt)}</Text>
+                      </div>
                     </div>
-                  </div>
-                </Col>
-              </Row>
+                  </Col>
+                </Row>
 
-              <Row gutter={16}>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>最后更新</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Text>{formatDateTime(user.updatedAt)}</Text>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <ClockCircleOutlined />
+                        最后更新
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Text>{formatDateTime(user.updatedAt)}</Text>
+                      </div>
                     </div>
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div style={{ marginBottom: '16px' }}>
-                    <Text strong>最后登录</Text>
-                    <div style={{ marginTop: '4px' }}>
-                      <Text>
-                        {user.lastLoginTime ? formatDateTime(user.lastLoginTime) : '未知'}
-                      </Text>
-                      {user.lastLoginIp && (
-                        <div style={{ fontSize: '12px', color: '#999' }}>
-                          IP: {user.lastLoginIp}
-                        </div>
-                      )}
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <div className={styles.infoItem}>
+                      <div className={styles.infoLabel}>
+                        <ClockCircleOutlined />
+                        最后登录
+                      </div>
+                      <div className={styles.infoValue}>
+                        <Text>
+                          {user.lastLoginTime ? formatDateTime(user.lastLoginTime) : '未知'}
+                        </Text>
+                        {user.lastLoginIp && (
+                          <div className={styles.ipInfo}>
+                            <EnvironmentOutlined />
+                            IP: {user.lastLoginIp}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Col>
-              </Row>
-            </Form>
+                  </Col>
+                </Row>
+              </Form>
+            </div>
           </Col>
         </Row>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

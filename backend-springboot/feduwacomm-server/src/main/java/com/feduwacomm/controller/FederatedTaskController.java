@@ -2,23 +2,30 @@ package com.feduwacomm.controller;
 
 import com.feduwacomm.common.BaseContext;
 import com.feduwacomm.common.Result;
-import com.feduwacomm.dto.*;
+import com.feduwacomm.dto.TaskBatchOperationDTO;
+import com.feduwacomm.dto.TaskCancelDTO;
+import com.feduwacomm.dto.TaskDeleteDTO;
+import com.feduwacomm.dto.TaskLogQueryDTO;
+import com.feduwacomm.dto.TaskQueryDTO;
+import com.feduwacomm.dto.TaskStopDTO;
+import com.feduwacomm.model.dto.federated.FederatedTaskConfigDTO;
+import com.feduwacomm.model.dto.federated.FederatedTaskCreateRequest;
 import com.feduwacomm.service.FederatedTaskService;
+import com.feduwacomm.service.TrainingDataService;
+import com.feduwacomm.service.VmInstanceService;
 import com.feduwacomm.utils.IpUtil;
 import com.feduwacomm.vo.*;
-import com.feduwacomm.service.VmInstanceService;
-import com.feduwacomm.service.TrainingDataService;
+import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.List;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -260,15 +267,15 @@ public class FederatedTaskController {
         }
     }
 
-    // ========== v1.3 增强的任务创建接口 ==========
+    // ========== v1.5 任务创建接口 ==========
 
     /**
-     * 创建联邦学习任务 (v1.3 专用)
+     * 创建联邦学习任务 (v1.5)
      * POST /api/federated/tasks
-     * 只支持v1.3新格式，不再兼容v1.0旧格式
+     * 仅支持 v1.5 新格式，不再兼容旧版结构
      */
     @PostMapping("/tasks")
-    public Result<TaskOperationVO> createTask(@Valid @RequestBody TaskCreateDTO createDTO,
+    public Result<TaskOperationVO> createTask(@Valid @RequestBody FederatedTaskCreateRequest createDTO,
                                             HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String currentUserId = BaseContext.getCurrentId();
@@ -280,23 +287,22 @@ public class FederatedTaskController {
             participantCount = createDTO.getParticipantConfig().getParticipants().size();
         }
 
-        log.info("收到v1.3任务创建请求: taskName={}, algorithm={}, participantCount={}, userId={}, ip={}",
+        log.info("收到任务创建请求: taskName={}, algorithm={}, participantCount={}, userId={}, ip={}",
             createDTO.getTaskName(), createDTO.getAlgorithm(), participantCount, currentUserId, clientIp);
 
-        accessLog.info("v1.3联邦任务创建请求: taskName={}, algorithm={}, userId={}, ip={}",
+        accessLog.info("联邦任务创建请求: taskName={}, algorithm={}, userId={}, ip={}",
             createDTO.getTaskName(), createDTO.getAlgorithm(), currentUserId, clientIp);
 
         try {
-            // 只使用v1.3智能任务创建
             TaskOperationVO response = federatedTaskService.createSmartTask(createDTO, currentUserId);
 
-            log.info("v1.3任务创建成功: taskId={}, taskName={}, userId={}",
+            log.info("任务创建成功: taskId={}, taskName={}, userId={}",
                 response.getTaskId(), createDTO.getTaskName(), currentUserId);
 
             return Result.success("任务创建成功", response);
 
         } catch (Exception e) {
-            log.error("v1.3任务创建失败: taskName={}, userId={}, error={}",
+            log.error("任务创建失败: taskName={}, userId={}, error={}",
                 createDTO.getTaskName(), currentUserId, e.getMessage());
             return Result.error("任务创建失败: " + e.getMessage());
         }
@@ -308,7 +314,7 @@ public class FederatedTaskController {
      */
     @PutMapping("/tasks/{taskId}/config")
     public Result<TaskOperationVO> configureTask(@PathVariable String taskId,
-                                               @Valid @RequestBody TaskConfigDTO configDTO,
+                                               @Valid @RequestBody FederatedTaskConfigDTO configDTO,
                                                HttpServletRequest request) {
         String clientIp = IpUtil.getClientIpAddress(request);
         String currentUserId = BaseContext.getCurrentId();
@@ -782,4 +788,5 @@ public class FederatedTaskController {
             private String role;
         }
     }
+
 }

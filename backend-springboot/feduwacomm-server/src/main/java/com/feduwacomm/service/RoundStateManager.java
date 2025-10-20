@@ -1,16 +1,26 @@
 package com.feduwacomm.service;
 
+import com.feduwacomm.dto.RoundDatasetBinding;
 import com.feduwacomm.entity.FederatedTask;
 import com.feduwacomm.entity.GlobalModel;
+import com.feduwacomm.entity.RoundStateRecord;
 import com.feduwacomm.enums.RoundState;
 import com.feduwacomm.mapper.FederatedTasksMapper;
 import com.feduwacomm.mapper.GlobalModelMapper;
+import com.feduwacomm.mapper.RoundStateMapper;
+import com.feduwacomm.mapper.TaskParticipantsMapper;
+import com.feduwacomm.mapper.VmRoundModelsMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.IntSupplier;
 
 /**
  * 轮次状态管理器
@@ -32,6 +42,18 @@ public class RoundStateManager {
     @Autowired
     private FederatedTasksMapper federatedTasksMapper;
 
+    @Autowired
+    private RoundStateMapper roundStateMapper;
+
+    @Autowired
+    private TaskParticipantsMapper taskParticipantsMapper;
+
+    @Autowired
+    private VmRoundModelsMapper vmRoundModelsMapper;
+
+    @Autowired
+    private RoundDatasetBindingService roundDatasetBindingService;
+
     /**
      * 获取当前轮次状态
      *
@@ -49,6 +71,14 @@ public class RoundStateManager {
         if (currentRound == null || currentRound <= 0) {
             log.debug("任务尚未开始轮次: taskId={}", taskId);
             return null;
+        }
+
+        RoundStateRecord roundStateRecord = roundStateMapper.selectByTaskIdAndRound(taskId, currentRound);
+        if (roundStateRecord != null && roundStateRecord.getState() != null) {
+            RoundState state = parseRoundStateName(roundStateRecord.getState());
+            if (state != null) {
+                return state;
+            }
         }
 
         GlobalModel currentGlobalModel = globalModelMapper.selectByTaskIdAndRound(taskId, currentRound);
@@ -131,8 +161,15 @@ public class RoundStateManager {
             return false;
         }
 
+        RoundStateRecord roundStateRecord = ensureRoundStateRecord(taskId, currentRound);
+
         // 验证当前状态
-        RoundState currentState = parseRoundState(currentGlobalModel);
+        RoundState currentState = roundStateRecord != null && roundStateRecord.getState() != null
+                ? parseRoundStateName(roundStateRecord.getState())
+                : null;
+        if (currentState == null) {
+            currentState = parseRoundState(currentGlobalModel);
+        }
         if (currentState != from) {
             log.error("状态转换失败，当前状态不匹配: taskId={}, expected={}, actual={}",
                      taskId, from, currentState);
@@ -141,15 +178,326 @@ public class RoundStateManager {
 
         // 执行状态转换
         boolean success = updateGlobalModelState(currentGlobalModel, to);
-        if (success) {
+        boolean stateSynced = updateRoundStateRecord(taskId, currentRound, to, null);
+        if (success && stateSynced) {
             log.info("轮次状态转换成功: taskId={}, round={}, from={}, to={}",
                     taskId, currentRound, from, to);
-        } else {
+        } else if (!success) {
             log.error("轮次状态转换失败: taskId={}, round={}, from={}, to={}",
                      taskId, currentRound, from, to);
+        } else {
+            log.warn("轮次状态转换已更新全局模型，但 round_states 未同步: taskId={}, round={}", taskId, currentRound);
         }
 
-        return success;
+        return success && stateSynced;
+    }
+
+    /**
+     * 采集并持久化下一轮次所需的数据集上下文，供 ROUND_START 消息和 VM 调度使用。
+     *
+     * @param taskId      任务ID
+     * @param roundNumber 下一轮轮次号
+     * @return vmId -> 数据集绑定映射
+     */
+    @Transactional
+    public Map<String, RoundDatasetBinding> prepareNextRoundContext(String taskId, int roundNumber) {
+        RoundStateRecord record = ensureRoundStateRecord(taskId, roundNumber);
+        if (record == null) {
+            log.warn("无法准备轮次上下文: round_states 未创建, taskId={}, round={}", taskId, roundNumber);
+            return Collections.emptyMap();
+        }
+        Map<String, RoundDatasetBinding> bindings = roundDatasetBindingService.captureCurrentBindings(taskId);
+        roundDatasetBindingService.persistBindings(taskId, roundNumber, bindings);
+        return bindings != null ? bindings : Collections.emptyMap();
+    }
+
+    @Transactional
+    public void markDistributionStarted(String taskId, Integer roundNumber, int participantCount) {
+        if (taskId == null || roundNumber == null || roundNumber <= 0) {
+            log.warn("markDistributionStarted 参数无效: taskId={}, roundNumber={}, participantCount={}",
+                    taskId, roundNumber, participantCount);
+            return;
+        }
+
+        ensureRoundStateRecord(taskId, roundNumber);
+        int acked = 0;
+
+        roundStateMapper.updateCounters(
+                taskId,
+                roundNumber,
+                participantCount,
+                0,
+                0,
+                acked
+        );
+        updateRoundStateRecord(taskId, roundNumber, RoundState.DISTRIBUTING, null);
+        log.info("轮次分发启动: taskId={}, roundNumber={}, participants={}", taskId, roundNumber, participantCount);
+    }
+
+    /**
+     * 记录梯度上传进度，保持round_states与真实训练进展一致
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordGradientUpload(String taskId, Integer roundNumber) {
+        if (taskId == null || roundNumber == null || roundNumber <= 0) {
+            log.warn("recordGradientUpload 参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return;
+        }
+
+        RoundStateRecord record = ensureRoundStateRecord(taskId, roundNumber);
+        if (record == null) {
+            log.warn("recordGradientUpload 无法确保round_states记录存在: taskId={}, roundNumber={}", taskId, roundNumber);
+            return;
+        }
+
+        int participantCount = resolveParticipantCount(record, taskId);
+
+        int gradients = safeCount(() -> vmRoundModelsMapper.countReadyModels(taskId, roundNumber));
+        int completedParticipants = safeCount(() -> taskParticipantsMapper.countCompletedParticipants(taskId, roundNumber));
+
+        int existingCompleted = Objects.requireNonNullElse(record.getCompletedParticipants(), 0);
+        int existingGradients = Objects.requireNonNullElse(record.getGradientUploadsReceived(), 0);
+        int existingAcked = Objects.requireNonNullElse(record.getModelBroadcastsAcked(), 0);
+
+        int resolvedCompleted = Math.max(Math.max(existingCompleted, completedParticipants), gradients);
+        int resolvedGradients = Math.max(existingGradients, gradients);
+
+        log.info("记录梯度上传进度: taskId={}, roundNumber={}, gradients(now)={}, completed(now)={}, existingGradients={}, existingCompleted={}",
+                taskId, roundNumber, gradients, completedParticipants, existingGradients, existingCompleted);
+        System.out.println("🛠 recordGradientUpload -> taskId=" + taskId + ", round=" + roundNumber +
+                ", gradients=" + gradients + ", completed=" + completedParticipants);
+
+        int rows = roundStateMapper.updateCounters(
+                taskId,
+                roundNumber,
+                participantCount,
+                resolvedCompleted,
+                resolvedGradients,
+                existingAcked
+        );
+
+        if (rows == 0) {
+            log.warn("round_states 计数更新未生效: taskId={}, roundNumber={}, gradients={}, completed={}",
+                    taskId, roundNumber, resolvedGradients, resolvedCompleted);
+        } else {
+            log.info("round_states计数已更新: taskId={}, round={}, participants={}, completed={}, gradients={}, acked={}",
+                    taskId, roundNumber, participantCount, resolvedCompleted, resolvedGradients, existingAcked);
+            System.out.println("✅ round_states counters updated -> taskId=" + taskId + ", round=" + roundNumber +
+                    ", completed=" + resolvedCompleted + ", gradients=" + resolvedGradients);
+        }
+
+        RoundState currentState = record.getState() != null ? parseRoundStateName(record.getState()) : null;
+        if (currentState == null || currentState == RoundState.INITIALIZING || currentState == RoundState.DISTRIBUTING) {
+            updateRoundStateRecord(taskId, roundNumber, RoundState.TRAINING, null);
+        }
+
+        log.debug("记录梯度上传进度完成: taskId={}, roundNumber={}, gradients={}, participants={}",
+                taskId, roundNumber, resolvedGradients, resolvedCompleted);
+    }
+
+    /**
+     * 确保指定轮次的round_states记录已初始化
+     *
+     * @param taskId 任务ID
+     * @param roundNumber 轮次号
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void ensureRoundStateInitialized(String taskId, Integer roundNumber) {
+        if (taskId == null || roundNumber == null || roundNumber <= 0) {
+            log.warn("ensureRoundStateInitialized 参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return;
+        }
+        ensureRoundStateRecord(taskId, roundNumber);
+    }
+
+    private int safeCount(IntSupplier supplier) {
+        try {
+            return supplier.getAsInt();
+        } catch (Exception ex) {
+            log.error("统计轮次计数失败: {}", ex.getMessage(), ex);
+            return 0;
+        }
+    }
+
+    @Transactional
+    public void updateDistributionProgress(String taskId,
+                                           Integer roundNumber,
+                                           Integer participantCount,
+                                           Integer ackedCount) {
+        if (taskId == null || roundNumber == null || roundNumber <= 0) {
+            log.warn("updateDistributionProgress 参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return;
+        }
+
+        RoundStateRecord record = ensureRoundStateRecord(taskId, roundNumber);
+        if (record == null) {
+            log.warn("updateDistributionProgress 找不到对应的round_states记录: taskId={}, roundNumber={}", taskId, roundNumber);
+            return;
+        }
+
+        Integer resolvedParticipant = participantCount != null ? participantCount : record.getParticipantCount();
+        Integer resolvedAcked = ackedCount != null
+                ? Math.max(ackedCount, Objects.requireNonNullElse(record.getModelBroadcastsAcked(), 0))
+                : record.getModelBroadcastsAcked();
+        Integer resolvedCompleted = resolvedAcked;
+        Integer resolvedGradients = ackedCount != null
+                ? Math.max(ackedCount, Objects.requireNonNullElse(record.getGradientUploadsReceived(), 0))
+                : record.getGradientUploadsReceived();
+
+        roundStateMapper.updateCounters(
+                taskId,
+                roundNumber,
+                resolvedParticipant,
+                resolvedCompleted,
+                resolvedGradients,
+                resolvedAcked
+        );
+    }
+
+    @Transactional
+    public boolean markRoundCompleted(String taskId,
+                                      Integer roundNumber,
+                                      Integer participantCountHint,
+                                      Integer ackedCount) {
+        if (taskId == null || roundNumber == null || roundNumber <= 0) {
+            log.warn("markRoundCompleted 参数无效: taskId={}, roundNumber={}", taskId, roundNumber);
+            return false;
+        }
+
+        RoundStateRecord record = ensureRoundStateRecord(taskId, roundNumber);
+        if (record == null) {
+            log.warn("markRoundCompleted 找不到对应的round_states记录: taskId={}, roundNumber={}", taskId, roundNumber);
+            return false;
+        }
+
+        int participantCount = participantCountHint != null && participantCountHint > 0
+                ? participantCountHint
+                : resolveParticipantCount(record, taskId);
+        int acked = ackedCount != null
+                ? ackedCount
+                : Objects.requireNonNullElse(record.getModelBroadcastsAcked(), 0);
+
+        roundStateMapper.updateCounters(
+                taskId,
+                roundNumber,
+                participantCount,
+                Math.max(acked, Objects.requireNonNullElse(record.getCompletedParticipants(), 0)),
+                Math.max(acked, Objects.requireNonNullElse(record.getGradientUploadsReceived(), 0)),
+                Math.max(acked, Objects.requireNonNullElse(record.getModelBroadcastsAcked(), 0))
+        );
+
+        return updateRoundStateRecord(taskId, roundNumber, RoundState.COMPLETED, null);
+    }
+
+    private RoundState parseRoundStateName(String stateName) {
+        if (stateName == null) {
+            return null;
+        }
+        try {
+            return RoundState.fromString(stateName);
+        } catch (IllegalArgumentException ex) {
+            log.warn("round_states存在未知状态: {}", stateName);
+            return null;
+        }
+    }
+
+    private RoundStateRecord ensureRoundStateRecord(String taskId, int roundNumber) {
+        RoundStateRecord existing = roundStateMapper.selectByTaskIdAndRound(taskId, roundNumber);
+        if (existing != null) {
+            System.out.println("📄 round_states exist -> taskId=" + taskId + ", round=" + roundNumber + ", state=" + existing.getState());
+            log.debug("round_states记录已存在: taskId={}, round={}, state={}, participants={}, gradients={}",
+                    taskId, roundNumber, existing.getState(), existing.getParticipantCount(),
+                    existing.getGradientUploadsReceived());
+            return existing;
+        }
+
+        RoundStateRecord record = RoundStateRecord.builder()
+                .taskId(taskId)
+                .roundNumber(roundNumber)
+                .state(RoundState.INITIALIZING.name())
+                .participantCount(0)
+                .completedParticipants(0)
+                .gradientUploadsReceived(0)
+                .modelBroadcastsAcked(0)
+                .build();
+        try {
+            roundStateMapper.insertRoundState(record);
+            System.out.println("🆕 round_states inserted -> taskId=" + taskId + ", round=" + roundNumber);
+            log.info("round_states记录已创建: taskId={}, round={}", taskId, roundNumber);
+        } catch (Exception e) {
+            log.debug("创建round_states记录可能存在并发: taskId={}, round={}, error={}",
+                    taskId, roundNumber, e.getMessage());
+        }
+        RoundStateRecord ensured = null;
+        for (int i = 0; i < 5; i++) {
+            ensured = roundStateMapper.selectByTaskIdAndRound(taskId, roundNumber);
+            if (ensured != null) {
+                return ensured;
+            }
+            try {
+                Thread.sleep(20L);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        if (ensured == null) {
+            log.warn("round_states记录在重试后仍不可见: taskId={}, round={}", taskId, roundNumber);
+        }
+        return ensured;
+    }
+
+    private boolean updateRoundStateRecord(String taskId,
+                                           int roundNumber,
+                                           RoundState roundState,
+                                           String errorMessage) {
+        RoundStateRecord record = ensureRoundStateRecord(taskId, roundNumber);
+        if (record == null) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startedAt = null;
+        LocalDateTime completedAt = null;
+
+        if (record.getStartedAt() == null && roundState != RoundState.INITIALIZING) {
+            startedAt = now;
+        }
+        if (roundState.isTerminalState()) {
+            completedAt = now;
+        }
+
+        int rows = roundStateMapper.updateState(taskId, roundNumber, roundState.name(), startedAt, completedAt, errorMessage);
+        if (rows == 0) {
+            RoundStateRecord refreshed = roundStateMapper.selectByTaskIdAndRound(taskId, roundNumber);
+            if (refreshed != null) {
+                RoundState persistedState = parseRoundStateName(refreshed.getState());
+                if (persistedState == roundState) {
+                    log.debug("round_states状态已由其他线程更新: taskId={}, roundNumber={}, targetState={}",
+                            taskId, roundNumber, roundState);
+                    return true;
+                }
+            }
+            log.warn("round_states状态更新未生效: taskId={}, roundNumber={}, targetState={}",
+                    taskId, roundNumber, roundState);
+            return false;
+        }
+        return true;
+    }
+
+    private int resolveParticipantCount(RoundStateRecord record, String taskId) {
+        if (record != null && record.getParticipantCount() != null && record.getParticipantCount() > 0) {
+            return record.getParticipantCount();
+        }
+        try {
+            return taskParticipantsMapper.countTotalParticipants(taskId);
+        } catch (Exception e) {
+            log.warn("统计参与者数量失败: taskId={}, error={}", taskId, e.getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -248,6 +596,7 @@ public class RoundStateManager {
         }
     }
 
+
     /**
      * 创建新轮次的全局模型记录
      *
@@ -281,6 +630,8 @@ public class RoundStateManager {
 
         int result = globalModelMapper.insertGlobalModel(globalModel);
         if (result > 0) {
+            ensureRoundStateRecord(taskId, roundNumber);
+            updateRoundStateRecord(taskId, roundNumber, RoundState.INITIALIZING, null);
             log.info("新轮次模型创建成功: taskId={}, roundNumber={}", taskId, roundNumber);
             return true;
         } else {
@@ -323,15 +674,19 @@ public class RoundStateManager {
         }
 
         boolean success = updateGlobalModelState(globalModel, roundState);
-        if (success) {
+        boolean stateSynced = updateRoundStateRecord(taskId, roundNumber, roundState, null);
+        if (success && stateSynced) {
             log.info("轮次状态设置成功: taskId={}, roundNumber={}, roundState={}",
                     taskId, roundNumber, roundState);
-        } else {
+        } else if (!success) {
             log.error("轮次状态设置失败: taskId={}, roundNumber={}, roundState={}",
                      taskId, roundNumber, roundState);
+        } else {
+            log.warn("轮次状态设置已更新全局模型，但 round_states 未同步: taskId={}, roundNumber={}",
+                    taskId, roundNumber);
         }
 
-        return success;
+        return success && stateSynced;
     }
 
     /**
@@ -521,6 +876,14 @@ public class RoundStateManager {
                 log.debug("已清理全局模型记录: taskId={}, 删除数量={}", taskId, deletedModels);
             } catch (Exception e) {
                 log.warn("清理全局模型记录时出错: taskId={}, error={}", taskId, e.getMessage());
+            }
+
+            try {
+                int deletedRounds = roundStateMapper.deleteByTaskId(taskId);
+                cleanupCount += deletedRounds;
+                log.debug("已清理round_states记录: taskId={}, 删除数量={}", taskId, deletedRounds);
+            } catch (Exception e) {
+                log.warn("清理round_states记录时出错: taskId={}, error={}", taskId, e.getMessage());
             }
 
             // 重置任务的轮次信息
