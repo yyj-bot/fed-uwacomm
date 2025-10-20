@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class MessageType(Enum):
-    """消息类型枚举 - 对应v1.4协议的34个消息类型"""
+    """消息类型枚举 - 对应v1.5.1协议的36个消息类型"""
     # 连接管理
     CONNECT = "CONNECT"
     CONNECT_ACK = "CONNECT_ACK"
@@ -45,9 +45,11 @@ class MessageType(Enum):
     GRADIENT_UPLOAD = "GRADIENT_UPLOAD"
     GRADIENT_UPLOAD_ACK = "GRADIENT_UPLOAD_ACK"
 
-    # 训练数据管理
+    # 训练数据管理 - v1.5.1增强
     TRAINING_DATA_QUERY = "TRAINING_DATA_QUERY"
     TRAINING_DATA_RESPONSE = "TRAINING_DATA_RESPONSE"
+    DATASET_LIST_QUERY = "DATASET_LIST_QUERY"  # v1.5新增
+    DATASET_LIST_RESPONSE = "DATASET_LIST_RESPONSE"  # v1.5新增
     DATASET_CREATE = "DATASET_CREATE"
     DATASET_CREATE_ACK = "DATASET_CREATE_ACK"
     DATASET_APPEND_ROWS = "DATASET_APPEND_ROWS"
@@ -56,6 +58,8 @@ class MessageType(Enum):
     DATASET_COMPLETE_ACK = "DATASET_COMPLETE_ACK"
     DATASET_DELETE = "DATASET_DELETE"
     DATASET_DELETE_ACK = "DATASET_DELETE_ACK"
+    DATASET_STATUS_QUERY = "DATASET_STATUS_QUERY"  # v1.5增强
+    DATASET_STATUS_RESPONSE = "DATASET_STATUS_RESPONSE"  # v1.5增强
 
     # 状态查询
     STATUS_QUERY = "STATUS_QUERY"
@@ -63,6 +67,8 @@ class MessageType(Enum):
 
     # 错误处理
     ERROR = "ERROR"
+    MESSAGE_ERROR = "MESSAGE_ERROR"  # v1.5增强
+    CONNECTION_ERROR = "CONNECTION_ERROR"  # v1.5增强
 
 
 class MessageRouter:
@@ -99,18 +105,22 @@ class MessageRouter:
             MessageType.GLOBAL_MODEL_BROADCAST.value: self._handle_global_model_broadcast,
             MessageType.GRADIENT_UPLOAD_ACK.value: self._handle_gradient_upload_ack,
 
-            # 训练数据管理
+            # 训练数据管理 - v1.5.1增强
             MessageType.TRAINING_DATA_QUERY.value: self._handle_training_data_query,
+            MessageType.DATASET_LIST_QUERY.value: self._handle_dataset_list_query,  # v1.5新增
             MessageType.DATASET_CREATE.value: self._handle_dataset_create,
             MessageType.DATASET_APPEND_ROWS.value: self._handle_dataset_append_rows,
             MessageType.DATASET_COMPLETE.value: self._handle_dataset_complete,
             MessageType.DATASET_DELETE.value: self._handle_dataset_delete,
+            MessageType.DATASET_STATUS_QUERY.value: self._handle_dataset_status_query,  # v1.5增强
 
             # 状态查询
             MessageType.STATUS_QUERY.value: self._handle_status_query,
 
             # 错误处理
-            MessageType.ERROR.value: self._handle_error_message
+            MessageType.ERROR.value: self._handle_error_message,
+            MessageType.MESSAGE_ERROR.value: self._handle_message_error,  # v1.5增强
+            MessageType.CONNECTION_ERROR.value: self._handle_connection_error  # v1.5增强
         }
 
     def route_message(self, message: Dict[str, Any]) -> bool:
@@ -404,29 +414,32 @@ class MessageRouter:
             return False
 
     def _validate_task_config(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
-        """验证任务配置"""
+        """验证任务配置 - v1.5.1版本"""
         try:
             # 必需字段检查
-            required_fields = ["taskId", "federatedAlgorithm", "totalRounds"]
+            required_fields = ["taskId", "algorithm", "config"]
             for field in required_fields:
                 if field not in task_data:
                     return {"valid": False, "error": f"缺少必需字段: {field}"}
 
             # 算法支持检查
-            algorithm = task_data.get("federatedAlgorithm")
+            algorithm = task_data.get("algorithm")
             supported_algorithms = ["FEDERATED_AVERAGING", "FEDERATED_PROXIMAL", "FEDERATED_NOVA", "SCAFFOLD"]
             if algorithm not in supported_algorithms:
                 return {"valid": False, "error": f"不支持的算法: {algorithm}"}
 
+            # 配置参数检查
+            config = task_data.get("config", {})
+            
             # 轮次数检查
-            total_rounds = task_data.get("totalRounds")
-            if not isinstance(total_rounds, int) or total_rounds < 1 or total_rounds > 1000:
+            rounds = config.get("rounds")
+            if not rounds or not isinstance(rounds, int) or rounds < 1 or rounds > 1000:
                 return {"valid": False, "error": "轮次数必须在1-1000之间"}
 
-            # 配置参数检查
-            local_config = task_data.get("localTrainingConfig", {})
-            if "datasetId" not in local_config:
-                return {"valid": False, "error": "缺少数据集ID"}
+            # v1.5.1: 检查assignedDatasetId（v1.5+必需）
+            data_config = task_data.get("dataConfig", {})
+            if "assignedDatasetId" not in data_config:
+                return {"valid": False, "error": "缺少assignedDatasetId（v1.5+必需字段）"}
 
             return {"valid": True, "error": None}
 
@@ -816,36 +829,302 @@ class MessageRouter:
         except ImportError:
             return {"error": "psutil未安装，无法获取系统指标"}
 
-    # ========== 数据管理消息处理 ==========
+    # ========== 数据管理消息处理 - v1.5.1 ==========
     def _handle_training_data_query(self, message: Dict[str, Any]) -> bool:
         """处理训练数据查询"""
-        # 实现训练数据查询逻辑
-        logger.info("处理训练数据查询")
-        return True
+        try:
+            query_data = message.get("data", {})
+            query_type = query_data.get("queryType", "DATASET_INFO")
+            
+            logger.info(f"处理训练数据查询: {query_type}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                return False
+            
+            # 根据查询类型返回数据
+            response_data = {}
+            if query_type == "DATASET_INFO":
+                response_data = dataset_manager.get_all_datasets_info()
+            elif query_type == "DATASET_STATISTICS":
+                response_data = dataset_manager.get_statistics()
+            
+            # 发送响应
+            self._send_training_data_response(response_data)
+            return True
+            
+        except Exception as e:
+            logger.error(f"处理训练数据查询失败: {e}")
+            return False
+
+    def _handle_dataset_list_query(self, message: Dict[str, Any]) -> bool:
+        """处理数据集列表查询 - v1.5新增"""
+        try:
+            query_data = message.get("data", {})
+            query_scope = query_data.get("queryScope", "ALL")
+            include_metadata = query_data.get("includeMetadata", True)
+            
+            logger.info(f"处理数据集列表查询: scope={query_scope}, metadata={include_metadata}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                self._send_dataset_list_response([], 0)
+                return False
+            
+            # 获取数据集列表
+            datasets = dataset_manager.get_available_datasets(
+                scope=query_scope,
+                include_metadata=include_metadata
+            )
+            
+            # 发送响应
+            self._send_dataset_list_response(datasets, len(datasets))
+            return True
+            
+        except Exception as e:
+            logger.error(f"处理数据集列表查询失败: {e}")
+            self._send_dataset_list_response([], 0)
+            return False
 
     def _handle_dataset_create(self, message: Dict[str, Any]) -> bool:
-        """处理数据集创建"""
-        # 实现数据集创建逻辑
-        logger.info("处理数据集创建")
-        return True
+        """处理数据集创建 - v1.5.1增强"""
+        try:
+            data = message.get("data", {})
+            task_id = data.get("taskId")
+            assigned_dataset_id = data.get("assignedDatasetId")  # v1.5+必需
+            
+            if not task_id or not assigned_dataset_id:
+                logger.error("数据集创建消息缺少必需字段")
+                self._send_dataset_create_ack(task_id, assigned_dataset_id, "FAILED", "缺少必需字段")
+                return False
+            
+            logger.info(f"创建数据集: task={task_id}, assignedDatasetId={assigned_dataset_id}")
+            
+            # v1.5.1: 提取切片信息
+            slice_info = data.get("sliceInfo")
+            if slice_info:
+                logger.info(f"数据集切片信息: startIndex={slice_info.get('startIndex')}, "
+                          f"endIndex={slice_info.get('endIndex')}, "
+                          f"samples={slice_info.get('sliceSamples')}, "
+                          f"strategy={slice_info.get('allocationStrategy')}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                self._send_dataset_create_ack(task_id, assigned_dataset_id, "FAILED", "数据集管理器未初始化")
+                return False
+            
+            # 创建数据集
+            success = dataset_manager.create_dataset(
+                task_id=task_id,
+                assigned_dataset_id=assigned_dataset_id,
+                dataset_name=data.get("datasetName"),
+                dataset_type=data.get("datasetType"),
+                expected_rows=data.get("expectedRows"),
+                slice_info=slice_info,
+                metadata=data.get("metadata"),
+                schema=data.get("schema")
+            )
+            
+            if success:
+                self._send_dataset_create_ack(task_id, assigned_dataset_id, "SUCCESS", "数据集创建成功")
+                logger.info(f"数据集 {assigned_dataset_id} 创建成功")
+            else:
+                self._send_dataset_create_ack(task_id, assigned_dataset_id, "FAILED", "数据集创建失败")
+                logger.error(f"数据集 {assigned_dataset_id} 创建失败")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"处理数据集创建失败: {e}")
+            if 'task_id' in locals() and 'assigned_dataset_id' in locals():
+                self._send_dataset_create_ack(task_id, assigned_dataset_id, "FAILED", f"异常: {str(e)}")
+            return False
 
     def _handle_dataset_append_rows(self, message: Dict[str, Any]) -> bool:
-        """处理数据集行追加"""
-        # 实现数据集行追加逻辑
-        logger.info("处理数据集行追加")
-        return True
+        """处理数据集行追加 - v1.5.1增强"""
+        try:
+            data = message.get("data", {})
+            task_id = data.get("taskId")
+            assigned_dataset_id = data.get("assignedDatasetId")
+            batch_id = data.get("batchId")
+            rows = data.get("rows", [])
+            
+            if not task_id or not assigned_dataset_id or not rows:
+                logger.error("数据集追加消息缺少必需字段")
+                return False
+            
+            # v1.5.1: 提取批次范围信息
+            batch_range = data.get("batchRange")
+            if batch_range:
+                logger.debug(f"批次 {batch_id}: localIndex=[{batch_range.get('localStartIndex')}-{batch_range.get('localEndIndex')}], "
+                           f"globalIndex=[{batch_range.get('globalStartIndex')}-{batch_range.get('globalEndIndex')}]")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                return False
+            
+            # 追加数据行（v1.5.1：包含双重索引验证）
+            success = dataset_manager.append_rows(
+                task_id=task_id,
+                assigned_dataset_id=assigned_dataset_id,
+                batch_id=batch_id,
+                rows=rows,
+                batch_range=batch_range
+            )
+            
+            # 发送确认
+            status = "SUCCESS" if success else "FAILED"
+            message_text = f"批次 {batch_id} 追加成功" if success else f"批次 {batch_id} 追加失败"
+            self._send_dataset_append_rows_ack(task_id, assigned_dataset_id, batch_id, status, message_text)
+            
+            logger.debug(f"批次 {batch_id} 追加 {len(rows)} 行: {status}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"处理数据集行追加失败: {e}")
+            return False
 
     def _handle_dataset_complete(self, message: Dict[str, Any]) -> bool:
-        """处理数据集完成"""
-        # 实现数据集完成逻辑
-        logger.info("处理数据集完成")
-        return True
+        """处理数据集完成 - v1.5.1增强"""
+        try:
+            data = message.get("data", {})
+            task_id = data.get("taskId")
+            assigned_dataset_id = data.get("assignedDatasetId")
+            
+            if not task_id or not assigned_dataset_id:
+                logger.error("数据集完成消息缺少必需字段")
+                return False
+            
+            logger.info(f"完成数据集接收: task={task_id}, assignedDatasetId={assigned_dataset_id}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                return False
+            
+            # v1.5.1: 完成数据集并执行完整性验证
+            result = dataset_manager.complete_dataset(
+                task_id=task_id,
+                assigned_dataset_id=assigned_dataset_id
+            )
+            
+            if not result:
+                logger.error(f"数据集 {assigned_dataset_id} 完成失败")
+                return False
+            
+            # v1.5.1: 构造sliceVerification对象
+            slice_verification = result.get("slice_verification")
+            
+            # 发送完成响应（包含验证信息）
+            self._send_dataset_complete_response(
+                task_id=task_id,
+                assigned_dataset_id=assigned_dataset_id,
+                final_row_count=result.get("final_row_count"),
+                slice_verification=slice_verification,
+                total_batches=result.get("total_batches"),
+                upload_duration=result.get("upload_duration"),
+                data_integrity=result.get("data_integrity"),
+                statistics=result.get("statistics")
+            )
+            
+            # 日志验证结果
+            if slice_verification:
+                is_complete = slice_verification.get("isComplete", False)
+                missing_count = len(slice_verification.get("missingIndices", []))
+                has_gaps = slice_verification.get("continuityCheck", {}).get("hasGaps", False)
+                
+                if is_complete:
+                    logger.info(f"数据集 {assigned_dataset_id} 接收完整，验证通过")
+                else:
+                    logger.warning(f"数据集 {assigned_dataset_id} 不完整: 缺失{missing_count}个样本, 存在间隙={has_gaps}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"处理数据集完成失败: {e}")
+            return False
+
+    def _handle_dataset_status_query(self, message: Dict[str, Any]) -> bool:
+        """处理数据集状态查询 - v1.5增强"""
+        try:
+            data = message.get("data", {})
+            assigned_dataset_id = data.get("assignedDatasetId")
+            task_id = data.get("taskId")
+            
+            logger.debug(f"查询数据集状态: assignedDatasetId={assigned_dataset_id}, task={task_id}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                self._send_dataset_status_response(assigned_dataset_id, "UNKNOWN", {})
+                return False
+            
+            # 查询数据集状态
+            status_info = dataset_manager.get_dataset_status(
+                assigned_dataset_id=assigned_dataset_id,
+                task_id=task_id
+            )
+            
+            if status_info:
+                self._send_dataset_status_response(
+                    assigned_dataset_id=assigned_dataset_id,
+                    status=status_info.get("status"),
+                    details=status_info.get("details")
+                )
+                return True
+            else:
+                self._send_dataset_status_response(assigned_dataset_id, "NOT_FOUND", {})
+                return False
+            
+        except Exception as e:
+            logger.error(f"处理数据集状态查询失败: {e}")
+            return False
 
     def _handle_dataset_delete(self, message: Dict[str, Any]) -> bool:
         """处理数据集删除"""
-        # 实现数据集删除逻辑
-        logger.info("处理数据集删除")
-        return True
+        try:
+            data = message.get("data", {})
+            task_id = data.get("taskId")
+            assigned_dataset_id = data.get("assignedDatasetId")
+            
+            if not assigned_dataset_id:
+                logger.error("数据集删除消息缺少assignedDatasetId")
+                return False
+            
+            logger.info(f"删除数据集: assignedDatasetId={assigned_dataset_id}")
+            
+            # 获取数据集管理器
+            dataset_manager = getattr(self.client, 'dataset_manager', None)
+            if not dataset_manager:
+                logger.error("数据集管理器未初始化")
+                return False
+            
+            # 删除数据集
+            success = dataset_manager.delete_dataset(
+                assigned_dataset_id=assigned_dataset_id,
+                task_id=task_id
+            )
+            
+            # 发送确认
+            status = "SUCCESS" if success else "FAILED"
+            message_text = "数据集删除成功" if success else "数据集删除失败"
+            self._send_dataset_delete_ack(task_id, assigned_dataset_id, status, message_text)
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"处理数据集删除失败: {e}")
+            return False
 
     def _handle_error_message(self, message: Dict[str, Any]) -> bool:
         """处理错误消息"""
@@ -868,6 +1147,45 @@ class MessageRouter:
             return True
         except Exception as e:
             logger.error(f"处理错误消息失败: {e}")
+            return False
+
+    def _handle_message_error(self, message: Dict[str, Any]) -> bool:
+        """处理消息错误 - v1.5增强"""
+        try:
+            data = message.get("data", {})
+            error_code = data.get("errorCode", "UNKNOWN")
+            error_message = data.get("errorMessage", "")
+            failed_message_id = data.get("failedMessageId")
+            
+            logger.error(f"消息错误 - 代码: {error_code}, 消息: {error_message}, 失败消息ID: {failed_message_id}")
+            
+            # 记录错误统计
+            self.routing_stats["failed_routes"] += 1
+            
+            return True
+        except Exception as e:
+            logger.error(f"处理消息错误失败: {e}")
+            return False
+
+    def _handle_connection_error(self, message: Dict[str, Any]) -> bool:
+        """处理连接错误 - v1.5增强"""
+        try:
+            data = message.get("data", {})
+            error_type = data.get("errorType", "UNKNOWN")
+            error_message = data.get("errorMessage", "")
+            reconnect_required = data.get("reconnectRequired", False)
+            
+            logger.error(f"连接错误 - 类型: {error_type}, 消息: {error_message}, 需要重连: {reconnect_required}")
+            
+            if reconnect_required:
+                logger.warning("服务器要求重新连接")
+                # 触发重连机制
+                if hasattr(self.client, 'schedule_reconnect'):
+                    self.client.schedule_reconnect()
+            
+            return True
+        except Exception as e:
+            logger.error(f"处理连接错误失败: {e}")
             return False
 
     # ========== 确认消息发送方法 ==========
@@ -995,6 +1313,128 @@ class MessageRouter:
             }
         }
         self.client._send_message(error_msg)
+
+    # ========== v1.5.1新增响应发送方法 ==========
+    def _send_training_data_response(self, response_data: Dict[str, Any]):
+        """发送训练数据响应"""
+        response_message = {
+            "type": "TRAINING_DATA_RESPONSE",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": response_data
+        }
+        self.client._send_message(response_message)
+
+    def _send_dataset_list_response(self, datasets: list, total_count: int):
+        """发送数据集列表响应 - v1.5新增"""
+        response_message = {
+            "type": "DATASET_LIST_RESPONSE",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": {
+                "datasets": datasets,
+                "totalCount": total_count
+            }
+        }
+        self.client._send_message(response_message)
+
+    def _send_dataset_create_ack(self, task_id: str, assigned_dataset_id: str, 
+                                 status: str, message: str):
+        """发送数据集创建确认 - v1.5.1增强"""
+        ack_message = {
+            "type": "DATASET_CREATE_ACK",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": {
+                "taskId": task_id,
+                "assignedDatasetId": assigned_dataset_id,
+                "status": status,
+                "message": message
+            }
+        }
+        self.client._send_message(ack_message)
+
+    def _send_dataset_append_rows_ack(self, task_id: str, assigned_dataset_id: str,
+                                      batch_id: str, status: str, message: str):
+        """发送数据集追加行确认 - v1.5.1增强"""
+        ack_message = {
+            "type": "DATASET_APPEND_ROWS_ACK",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": {
+                "taskId": task_id,
+                "assignedDatasetId": assigned_dataset_id,
+                "batchId": batch_id,
+                "status": status,
+                "message": message
+            }
+        }
+        self.client._send_message(ack_message)
+
+    def _send_dataset_complete_response(self, task_id: str, assigned_dataset_id: str,
+                                       final_row_count: int, slice_verification: Optional[Dict],
+                                       total_batches: int, upload_duration: float,
+                                       data_integrity: Dict, statistics: Dict):
+        """发送数据集完成响应 - v1.5.1增强"""
+        response_data = {
+            "taskId": task_id,
+            "assignedDatasetId": assigned_dataset_id,
+            "finalRowCount": final_row_count,
+            "totalBatches": total_batches,
+            "uploadDuration": upload_duration,
+            "dataIntegrity": data_integrity,
+            "statistics": statistics
+        }
+        
+        # v1.5.1: 添加切片验证信息
+        if slice_verification:
+            response_data["sliceVerification"] = slice_verification
+        
+        response_message = {
+            "type": "DATASET_COMPLETE",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": response_data
+        }
+        self.client._send_message(response_message)
+
+    def _send_dataset_status_response(self, assigned_dataset_id: str, 
+                                      status: str, details: Dict):
+        """发送数据集状态响应 - v1.5增强"""
+        response_message = {
+            "type": "DATASET_STATUS_RESPONSE",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": {
+                "assignedDatasetId": assigned_dataset_id,
+                "status": status,
+                "details": details
+            }
+        }
+        self.client._send_message(response_message)
+
+    def _send_dataset_delete_ack(self, task_id: str, assigned_dataset_id: str,
+                                 status: str, message: str):
+        """发送数据集删除确认"""
+        ack_message = {
+            "type": "DATASET_DELETE_ACK",
+            "id": self.client._generate_message_id(),
+            "timestamp": self.client._get_current_timestamp(),
+            "vmId": self.client.vm_id,
+            "data": {
+                "taskId": task_id,
+                "assignedDatasetId": assigned_dataset_id,
+                "status": status,
+                "message": message
+            }
+        }
+        self.client._send_message(ack_message)
 
     def get_routing_stats(self) -> Dict[str, Any]:
         """获取路由统计信息"""
