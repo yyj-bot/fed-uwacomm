@@ -8,6 +8,7 @@ export { FederatedLearningPage } from './federated-learning'
 export { SystemLogsPage } from './system-log'
 export { UnderwaterOptimizationPage } from './underwater-optimization'
 export { EnvironmentAnalysisPage } from './environment-analysis'
+export { RobotControlPage } from './robot-control'
 
 // VM管理模块
 export { VMManagementPage, AdminVMManagementPage } from './vm-management'

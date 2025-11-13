@@ -82,6 +82,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       ]
     },
     {
+      key: '/robot-control',
+      icon: <CloudServerOutlined />,
+      label: '机器人操控'
+    },
+    {
       key: '/logs',
       icon: <FileTextOutlined />,
       label: '系统日志'

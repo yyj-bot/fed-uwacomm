@@ -12,6 +12,7 @@ import {
   SystemLogsPage,
   UnderwaterOptimizationPage,
   EnvironmentAnalysisPage,
+  RobotControlPage,
   VMManagementPage,
   AdminVMManagementPage,
   UserProfilePage,
@@ -168,6 +169,7 @@ const App: React.FC = () => {
                       <Route path="/logs" element={<SystemLogsPage />} />
                       <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />
                       <Route path="/environment-analysis" element={<EnvironmentAnalysisPage />} />
+                      <Route path="/robot-control" element={<RobotControlPage />} />
                       
                       {/* 用户相关路由 */}
                       <Route path="/user/profile" element={<UserProfilePage />} />

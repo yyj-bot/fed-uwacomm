@@ -1,0 +1,513 @@
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.scenePanel {
+  flex: 1 1 58%;
+  min-width: 500px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(24, 144, 255, 0.18);
+  box-shadow: 0 12px 32px rgba(45, 140, 200, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sceneHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #1f2d3d;
+}
+
+.sceneTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.sceneStatus {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #597ef7;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sceneToolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(236, 245, 255, 0.85);
+  border: 1px solid rgba(145, 213, 255, 0.32);
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.sceneTopbar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.robotToggleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(236, 245, 255, 0.88);
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(145, 213, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.robotToggle {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #1f2d3d;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.robotToggle:hover {
+  border-color: rgba(24, 144, 255, 0.45);
+  color: rgba(24, 144, 255, 0.85);
+}
+
+.robotToggleActive {
+  background: rgba(24, 144, 255, 0.1);
+  box-shadow: 0 6px 18px rgba(24, 144, 255, 0.18);
+}
+
+.controlsListInline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.controlItemInline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #1f2d3d;
+  letter-spacing: 0.02em;
+}
+
+.canvasWrapper {
+  flex: 1;
+  height: clamp(520px, 60vh, 720px);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(24, 144, 255, 0.16);
+  background: transparent;
+}
+
+.canvasWrapper :global(canvas) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.infoPanel {
+  flex: 0 0 340px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.infoCard :global(.ant-card-head-title) {
+  color: #1f2d3d;
+}
+
+.infoCard :global(.ant-card) {
+  background: #ffffff;
+}
+
+.infoCard :global(.ant-card-body) {
+  color: #1f2d3d;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.statItem {
+  background: rgba(229, 240, 255, 0.55);
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid rgba(24, 144, 255, 0.22);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #4a5e75;
+  margin-bottom: 6px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 600;
+  color: #1c2735;
+}
+
+.instrumentSection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+  justify-items: center;
+}
+
+.instrument {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1f2d3d;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.instrumentSvg {
+  width: 128px;
+  height: 128px;
+  display: block;
+}
+
+.compassRing {
+  fill: rgba(24, 144, 255, 0.15);
+  stroke: rgba(145, 213, 255, 0.6);
+  stroke-width: 2;
+}
+
+.compassTick {
+  stroke: rgba(230, 247, 255, 0.5);
+  stroke-width: 1.5;
+}
+
+.compassLabel {
+  font-size: 10px;
+  fill: #1f2d3d;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.compassNeedleNorth {
+  fill: #ff7875;
+}
+
+.compassNeedleSouth {
+  fill: #40a9ff;
+}
+
+.horizonOuterRing {
+  fill: rgba(20, 110, 190, 0.16);
+  stroke: rgba(145, 213, 255, 0.55);
+  stroke-width: 2.2;
+}
+
+.horizonSky {
+  fill: rgba(116, 167, 255, 0.82);
+}
+
+.horizonGround {
+  fill: rgba(89, 178, 94, 0.78);
+}
+
+.horizonSeparator {
+  fill: rgba(255, 255, 255, 0.82);
+}
+
+.horizonInnerBorder {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.65);
+  stroke-width: 1.4;
+}
+
+.horizonPitchTick {
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.horizonPitchTickMajor {
+  stroke-width: 2.6;
+}
+
+.horizonPitchLabel {
+  font-size: 10px;
+  fill: rgba(255, 255, 255, 0.88);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.horizonBankIndicator {
+  transform: rotate(0deg);
+}
+
+.horizonBankPointer {
+  fill: rgba(255, 94, 91, 0.95);
+}
+
+.horizonBankTick {
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.horizonAircraftWing {
+  stroke: rgba(73, 38, 26, 0.9);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.horizonAircraftStem {
+  stroke: rgba(73, 38, 26, 0.9);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.horizonAircraftHub {
+  fill: rgba(73, 38, 26, 0.95);
+}
+
+.horizonReadout {
+  font-size: 11px;
+  fill: #1f2d3d;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .instrumentSection {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .instrument {
+    width: 100%;
+  }
+}
+
+.thrusterList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.thrusterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.thrusterLabel {
+  flex: 0 0 80px;
+  font-size: 13px;
+  color: #8cbae5;
+}
+
+.thrusterMeter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.thrusterTrack {
+  position: relative;
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(10, 38, 61, 0.85), rgba(9, 28, 46, 0.9));
+  overflow: hidden;
+}
+
+.thrusterFill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.18s ease-out;
+}
+
+.thrusterPositive {
+  left: 50%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(30, 120, 250, 0.6), rgba(68, 157, 255, 0.95));
+}
+
+.thrusterNegative {
+  right: 50%;
+  transform-origin: right center;
+  background: linear-gradient(90deg, rgba(242, 118, 106, 0.9), rgba(255, 213, 205, 0.6));
+}
+
+.thrusterValue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 84px;
+  font-variant-numeric: tabular-nums;
+  color: #1c2735;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.thrusterPercent {
+  color: rgba(28, 39, 53, 0.55);
+  font-size: 12px;
+}
+
+.encryptionActions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.encryptionActions :global(.ant-btn) {
+  min-width: 110px;
+}
+
+.encryptionButtonActive {
+  box-shadow: 0 10px 28px rgba(24, 144, 255, 0.32);
+}
+
+.encryptionHint {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: rgba(24, 144, 255, 0.85);
+  letter-spacing: 0.04em;
+}
+
+.encryptionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.encryptionItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(236, 245, 255, 0.65);
+  border: 1px solid rgba(145, 213, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.encryptionItemActive {
+  background: rgba(24, 144, 255, 0.15);
+  border-color: rgba(24, 144, 255, 0.55);
+  box-shadow: 0 6px 18px rgba(24, 144, 255, 0.2);
+}
+
+.encryptionItemSelectable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.encryptionItemSelectable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(24, 144, 255, 0.25);
+}
+
+.encryptionName {
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.encryptionMeta {
+  font-size: 12px;
+  color: #4a5e75;
+}
+
+.encryptionEmpty {
+  padding: 16px;
+  text-align: center;
+  color: rgba(31, 45, 61, 0.6);
+  font-size: 13px;
+  background: rgba(236, 245, 255, 0.5);
+  border-radius: 10px;
+  border: 1px dashed rgba(145, 213, 255, 0.4);
+}
+
+.controlsList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.controlItem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #e6f7ff;
+}
+
+.keyTag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(24, 144, 255, 0.18);
+  border: 1px solid rgba(24, 144, 255, 0.3);
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+@media (max-width: 992px) {
+  .sceneToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controlsListInline {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1200px) {
+  .scenePanel {
+    min-width: 100%;
+  }
+
+  .infoPanel {
+    flex: 1 1 100%;
+  }
+}
+
+:global(.robot-label) {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(24, 144, 255, 0.88);
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 16px rgba(24, 144, 255, 0.35);
+  transition: all 0.18s ease;
+}
