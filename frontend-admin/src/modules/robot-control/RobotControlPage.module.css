@@ -129,7 +129,7 @@
   min-width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 5px;
 }
 
 .infoCard :global(.ant-card-head-title) {

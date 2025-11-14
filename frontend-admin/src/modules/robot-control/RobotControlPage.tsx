@@ -134,6 +134,9 @@ const MAX_VERTICAL_THRUST = 85
 const MAX_YAW_THRUST = 80
 const ENCRYPTION_RADIUS = 6.5
 
+const POSITION_PRECISION = 3
+const VELOCITY_PRECISION = 3
+
 const sanitizeAngle = (value: number) => {
   let angle = value % 360
   if (angle < 0) angle += 360
@@ -249,18 +252,18 @@ const updateRobotState = (
   nextY = MathUtils.clamp(nextY, FLOOR_LEVEL, CEILING_LEVEL)
 
   const nextVelocity = {
-    forward: parseFloat((forwardSpeed * 0.94).toFixed(2)),
-    strafe: parseFloat((strafeSpeed * 0.94).toFixed(2)),
-    vertical: parseFloat((verticalSpeed * 0.94).toFixed(2))
+    forward: Number((forwardSpeed * 0.94).toFixed(VELOCITY_PRECISION)),
+    strafe: Number((strafeSpeed * 0.94).toFixed(VELOCITY_PRECISION)),
+    vertical: Number((verticalSpeed * 0.94).toFixed(VELOCITY_PRECISION))
   }
 
   const sensors = computeSensors(nextY, { yaw: nextYaw, pitch: nextPitch, roll: nextRoll }, nextThrusters, prev.sensors.battery, dt)
 
   return {
     position: {
-      x: parseFloat(nextX.toFixed(2)),
-      y: parseFloat(nextY.toFixed(2)),
-      z: parseFloat(nextZ.toFixed(2))
+      x: Number(nextX.toFixed(POSITION_PRECISION)),
+      y: Number(nextY.toFixed(POSITION_PRECISION)),
+      z: Number(nextZ.toFixed(POSITION_PRECISION))
     },
     orientation: {
       yaw: parseFloat(nextYaw.toFixed(1)),
@@ -710,7 +713,7 @@ const RobotControlPage: React.FC = () => {
             <Title level={3} className={styles.sceneTitle}>水下机器人实时操控</Title>
             <div className={styles.sceneStatus}>
               <Tag color="blue">
-                <ThunderboltOutlined style={{ marginRight: 4 }} /> 模拟在线
+                <ThunderboltOutlined />
               </Tag>
               <span><AimOutlined style={{ marginRight: 4 }} /> 最近刷新：{formattedTime}</span>
             </div>
@@ -720,18 +723,6 @@ const RobotControlPage: React.FC = () => {
               重置姿态
             </Button>
           </Space>
-        </div>
-        <div className={styles.sceneToolbar}>
-          <div className={styles.controlsListInline}>
-            {controlInstructions.map(item => (
-              <div key={item.desc} className={styles.controlItemInline}>
-                {item.keys.map(key => (
-                  <span key={key} className={styles.keyTag}>{key}</span>
-                ))}
-                <Text>{item.desc}</Text>
-              </div>
-            ))}
-          </div>
         </div>
         <div className={styles.sceneTopbar}>
           <div className={styles.robotToggleGroup}>
@@ -760,6 +751,18 @@ const RobotControlPage: React.FC = () => {
             onPairToggle={togglePairCandidate}
           />
         </div>
+        <div className={styles.sceneToolbar}>
+          <div className={styles.controlsListInline}>
+            {controlInstructions.map(item => (
+              <div key={item.desc} className={styles.controlItemInline}>
+                {item.keys.map(key => (
+                  <span key={key} className={styles.keyTag}>{key}</span>
+                ))}
+                <Text>{item.desc}</Text>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className={styles.infoPanel}>
@@ -767,6 +770,7 @@ const RobotControlPage: React.FC = () => {
           title={<Space><CompassOutlined /> 环境与姿态</Space>}
           bordered={false}
           className={styles.infoCard}
+          bodyStyle={{ paddingBottom: 0 }}
         >
           <div className={styles.instrumentSection}>
             <div className={styles.instrument}>
@@ -784,7 +788,7 @@ const RobotControlPage: React.FC = () => {
               </div>
             ))}
           </div>
-          <Divider style={{ borderColor: 'rgba(145,213,255,0.3)' }} />
+          <Divider style={{ borderColor: 'rgba(145,213,255,0.3)', margin: '16px 0 0' }} />
         </Card>
 
         <Card
