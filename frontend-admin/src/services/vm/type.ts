@@ -1,6 +1,6 @@
 /**
- * 虚拟机服务类型定义
- * 定义虚拟机管理相关的请求和响应类型
+ * 水下机器人服务类型定义
+ * 定义水下机器人管理相关的请求和响应类型
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -11,7 +11,7 @@ import type { PaginationParams, VirtualMachine, VMStatus, DeepReadonly, PartialB
 // ==================== 查询相关类型 ====================
 
 /**
- * 虚拟机列表查询参数
+ * 水下机器人列表查询参数
  */
 export interface VMListParams extends PaginationParams {
   /** 状态过滤 */
@@ -23,7 +23,7 @@ export interface VMListParams extends PaginationParams {
 }
 
 /**
- * 虚拟机列表响应
+ * 水下机器人列表响应
  */
 export interface VMListResponse {
   /** 总数 */
@@ -34,7 +34,7 @@ export interface VMListResponse {
   readonly size: number
   /** 总页数 */
   readonly pages: number
-  /** 虚拟机列表 */
+  /** 水下机器人列表 */
   readonly list: VirtualMachine[]
 }
 
@@ -43,10 +43,10 @@ export interface VMListResponse {
 // ==================== 更新相关类型 ====================
 
 /**
- * 虚拟机更新请求
+ * 水下机器人更新请求
  */
 export interface VMUpdateRequest {
-  /** 虚拟机名称 */
+  /** 水下机器人名称 */
   readonly name?: string
   /** IP地址 */
   readonly ipAddress?: string
@@ -95,22 +95,22 @@ export interface VMUpdateRequest {
 }
 
 /**
- * 虚拟机更新响应
+ * 水下机器人更新响应
  */
 export interface VMUpdateResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机名称 */
+  /** 水下机器人名称 */
   readonly name: string
   /** 更新时间 */
   readonly updatedAt: string
 }
 
 /**
- * 虚拟机删除响应
+ * 水下机器人删除响应
  */
 export interface VMDeleteResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 删除时间 */
   readonly deletedAt: string
@@ -119,7 +119,7 @@ export interface VMDeleteResponse {
 // ==================== 控制相关类型 ====================
 
 /**
- * 虚拟机启动请求
+ * 水下机器人启动请求
  */
 export interface VMStartRequest {
   /** 超时时间（秒） */
@@ -138,7 +138,7 @@ export interface VMStartRequest {
 }
 
 /**
- * 虚拟机停止请求
+ * 水下机器人停止请求
  */
 export interface VMStopRequest {
   /** 是否强制停止 */
@@ -150,7 +150,7 @@ export interface VMStopRequest {
 }
 
 /**
- * 虚拟机重启请求
+ * 水下机器人重启请求
  */
 export interface VMRestartRequest {
   /** 超时时间（秒） */
@@ -165,12 +165,12 @@ export interface VMRestartRequest {
 }
 
 /**
- * 虚拟机启动响应
+ * 水下机器人启动响应
  */
 export interface VMStartResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机状态 */
+  /** 水下机器人状态 */
   readonly status: VirtualMachine['status']
   /** 命令ID */
   readonly commandId: string
@@ -179,12 +179,12 @@ export interface VMStartResponse {
 }
 
 /**
- * 虚拟机停止响应
+ * 水下机器人停止响应
  */
 export interface VMStopResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机状态 */
+  /** 水下机器人状态 */
   readonly status: VirtualMachine['status']
   /** 命令ID */
   readonly commandId: string
@@ -193,12 +193,12 @@ export interface VMStopResponse {
 }
 
 /**
- * 虚拟机重启响应
+ * 水下机器人重启响应
  */
 export interface VMRestartResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机状态 */
+  /** 水下机器人状态 */
   readonly status: VirtualMachine['status']
   /** 命令ID */
   readonly commandId: string
@@ -209,7 +209,7 @@ export interface VMRestartResponse {
 // ==================== 业务逻辑类型 ====================
 
 /**
- * 虚拟机操作类型
+ * 水下机器人操作类型
  */
 export type VMOperation = 
   | 'UPDATE'
@@ -220,14 +220,14 @@ export type VMOperation =
   | 'STATUS_CHECK'
 
 /**
- * 虚拟机操作日志
+ * 水下机器人操作日志
  */
 export interface VMOperationLog {
   /** 操作ID */
   readonly operationId: string
   /** 操作类型 */
   readonly operation: VMOperation
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 操作者ID */
   readonly operatorId: string
@@ -246,7 +246,7 @@ export interface VMOperationLog {
 // ==================== 监控相关类型 ====================
 
 /**
- * 虚拟机资源使用情况
+ * 水下机器人资源使用情况
  */
 export interface VMResourceUsage {
   /** CPU使用率（百分比） */
@@ -260,7 +260,7 @@ export interface VMResourceUsage {
 }
 
 /**
- * 虚拟机网络信息
+ * 水下机器人网络信息
  */
 export interface VMNetworkInfo {
   /** IP地址 */
@@ -278,7 +278,7 @@ export interface VMNetworkInfo {
 }
 
 /**
- * 虚拟机进程信息
+ * 水下机器人进程信息
  */
 export interface VMProcessInfo {
   /** 总进程数 */
@@ -294,18 +294,18 @@ export interface VMProcessInfo {
 // ==================== 统计类型 ====================
 
 /**
- * 虚拟机统计信息
+ * 水下机器人统计信息
  */
 export interface VMStatistics {
-  /** 总虚拟机数 */
+  /** 总水下机器人数 */
   readonly totalVMs: number
-  /** 运行中的虚拟机数 */
+  /** 运行中的水下机器人数 */
   readonly runningVMs: number
-  /** 已停止的虚拟机数 */
+  /** 已停止的水下机器人数 */
   readonly stoppedVMs: number
-  /** 错误状态的虚拟机数 */
+  /** 错误状态的水下机器人数 */
   readonly errorVMs: number
-  /** 离线的虚拟机数 */
+  /** 离线的水下机器人数 */
   readonly offlineVMs: number
   /** 按状态分布 */
   readonly statusDistribution: Record<VirtualMachine['status'], number>
@@ -324,7 +324,7 @@ export interface VMStatistics {
 // ==================== 错误类型 ====================
 
 /**
- * 虚拟机服务错误类型
+ * 水下机器人服务错误类型
  */
 export interface VMServiceError {
   /** 错误码 */
@@ -338,10 +338,10 @@ export interface VMServiceError {
 }
 
 /**
- * 虚拟机操作错误类型
+ * 水下机器人操作错误类型
  */
 export interface VMOperationError extends VMServiceError {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 操作类型 */
   readonly operation: VMOperation
@@ -374,7 +374,7 @@ export interface VMValidationError extends VMServiceError {
 // ==================== 配置类型 ====================
 
 /**
- * 虚拟机服务配置
+ * 水下机器人服务配置
  */
 export interface VMServiceConfig {
   /** API基础URL */
@@ -394,7 +394,7 @@ export interface VMServiceConfig {
 }
 
 /**
- * 虚拟机默认配置
+ * 水下机器人默认配置
  */
 export interface VMDefaultConfig {
   /** 默认CPU核心数 */
@@ -434,7 +434,7 @@ export interface VMRoundModel {
   readonly taskId: string
   /** 训练轮数 */
   readonly roundNumber: number
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 模型JSON数据（可选） */
   readonly modelJson?: Record<string, unknown>
@@ -454,7 +454,7 @@ export interface VMRoundModel {
 export interface VMModelTrend {
   /** 任务ID */
   readonly taskId: string
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 指标名称 */
   readonly metric: string
@@ -492,7 +492,7 @@ export interface VMRoundModelListParams extends PaginationParams {
   readonly taskId?: string
   /** 训练轮数过滤 */
   readonly roundNumber?: number
-  /** 虚拟机ID过滤 */
+  /** 水下机器人ID过滤 */
   readonly vmId?: string
 }
 
@@ -502,7 +502,7 @@ export interface VMRoundModelListParams extends PaginationParams {
 export interface VMModelTrendParams {
   /** 任务ID */
   readonly taskId: string
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 指标名称 */
   readonly metric: string

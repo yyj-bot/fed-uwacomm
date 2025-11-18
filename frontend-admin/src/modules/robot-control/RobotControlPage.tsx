@@ -64,7 +64,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     trim: '#626b75',
     initialState: cloneRobotState(INITIAL_STATE, {
       position: { x: 0, y: -5, z: 0 },
-      orientation: { yaw: 40 }
+      orientation: { yaw: 40 },
+      sensors: { battery: 92 }
     })
   },
   {
@@ -75,7 +76,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     trim: '#5f6c79',
     initialState: cloneRobotState(INITIAL_STATE, {
       position: { x: -7, y: -5.2, z: 4 },
-      orientation: { yaw: 120 }
+      orientation: { yaw: 120 },
+      sensors: { battery: 86 }
     })
   },
   {
@@ -86,7 +88,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     trim: '#6b757f',
     initialState: cloneRobotState(INITIAL_STATE, {
       position: { x: 6.5, y: -5.4, z: -3.5 },
-      orientation: { yaw: 300 }
+      orientation: { yaw: 300 },
+      sensors: { battery: 78 }
     })
   },
   {
@@ -97,7 +100,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     trim: '#5a6770',
     initialState: cloneRobotState(INITIAL_STATE, {
       position: { x: -3.5, y: -4.7, z: -8 },
-      orientation: { yaw: 210 }
+      orientation: { yaw: 210 },
+      sensors: { battery: 68 }
     })
   },
   {
@@ -108,7 +112,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     trim: '#606a77',
     initialState: cloneRobotState(INITIAL_STATE, {
       position: { x: 4.2, y: -5.3, z: 7 },
-      orientation: { yaw: 30 }
+      orientation: { yaw: 30 },
+      sensors: { battery: 58 }
     })
   }
 ]
@@ -154,20 +159,12 @@ const approachValue = (current: number, target: number, maxDelta: number) => {
 const computeSensors = (
   positionY: number,
   orientation: RobotState['orientation'],
-  thrusters: ThrusterState,
-  previousBattery: number,
-  dt: number
+  previousBattery: number
 ) => {
   const depth = Math.max(0, -(positionY))
   const heading = sanitizeAngle(orientation.yaw)
   const temperature = Math.max(2.5, 23 - depth * 0.32 + Math.sin((heading / 360) * Math.PI * 2) * 0.35)
-  const activity =
-    Math.abs(thrusters.forward) +
-    Math.abs(thrusters.strafe) +
-    Math.abs(thrusters.vertical) +
-    Math.abs(thrusters.yaw)
-  const batteryDrain = (activity / 40000) * dt * 100 + 0.002 * dt
-  const battery = Math.max(18, previousBattery - batteryDrain * 100)
+  const battery = MathUtils.clamp(previousBattery, 0, 100)
 
   return {
     depth: parseFloat(depth.toFixed(2)),
@@ -257,7 +254,7 @@ const updateRobotState = (
     vertical: Number((verticalSpeed * 0.94).toFixed(VELOCITY_PRECISION))
   }
 
-  const sensors = computeSensors(nextY, { yaw: nextYaw, pitch: nextPitch, roll: nextRoll }, nextThrusters, prev.sensors.battery, dt)
+  const sensors = computeSensors(nextY, { yaw: nextYaw, pitch: nextPitch, roll: nextRoll }, prev.sensors.battery)
 
   return {
     position: {
@@ -524,7 +521,7 @@ const RobotControlPage: React.FC = () => {
     { label: '航向角', value: `${activeState.sensors.heading.toFixed(1)} °` },
     { label: '俯仰角', value: `${activeState.sensors.pitch.toFixed(1)} °` },
     { label: '横滚角', value: `${activeState.sensors.roll.toFixed(1)} °` },
-    { label: '电量估计', value: `${activeState.sensors.battery.toFixed(1)} %` }
+    { label: '剩余电量', value: `${activeState.sensors.battery.toFixed(1)} %` }
   ]), [activeState.sensors])
 
   const controlInstructions = useMemo(() => ([
@@ -705,12 +702,22 @@ const RobotControlPage: React.FC = () => {
     )
   }
 
+  const batteryValue = activeState.sensors.battery
+  const batteryFillPercent = MathUtils.clamp(batteryValue, 0, 100)
+  const batteryDisplayText = `${batteryValue.toFixed(1)} %`
+  const batteryLevelClass =
+    batteryFillPercent <= 20
+      ? styles.batteryLevelLow
+      : batteryFillPercent <= 50
+        ? styles.batteryLevelMedium
+        : styles.batteryLevelHigh
+
   return (
     <div className={styles.container}>
       <div className={styles.scenePanel}>
         <div className={styles.sceneHeader}>
           <div>
-            <Title level={3} className={styles.sceneTitle}>水下机器人实时操控</Title>
+            <Title level={3} className={styles.sceneTitle}>水下机器人网络</Title>
             <div className={styles.sceneStatus}>
               <Tag color="blue">
                 <ThunderboltOutlined />
@@ -739,17 +746,54 @@ const RobotControlPage: React.FC = () => {
             ))}
           </div>
         </div>
-        <div className={styles.canvasWrapper}>
-          <RobotScene
-            robots={robots}
-            selectedId={selectedId}
-            onSelect={selectRobot}
-            encryptionRadius={ENCRYPTION_RADIUS}
-            inRangeIds={inRangeIds}
-            pairSelectionIds={pairSelectionIds}
-            encryptionMode={encryptionMode}
-            onPairToggle={togglePairCandidate}
-          />
+        <div className={styles.sceneCanvasWrapper}>
+          <div className={styles.canvasWrapper}>
+            <RobotScene
+              robots={robots}
+              selectedId={selectedId}
+              onSelect={selectRobot}
+              encryptionRadius={ENCRYPTION_RADIUS}
+              inRangeIds={inRangeIds}
+              pairSelectionIds={pairSelectionIds}
+              encryptionMode={encryptionMode}
+              onPairToggle={togglePairCandidate}
+            />
+            <div className={styles.batteryOverlay}>
+              <div className={styles.batteryCard}>
+                <div className={styles.batteryIcon}>
+                  <div className={styles.batteryShell}>
+                    <div
+                      className={`${styles.batteryLevel} ${batteryLevelClass}`}
+                      style={{ width: `${batteryFillPercent}%` }}
+                    />
+                  </div>
+                  <div className={styles.batteryTip} />
+                </div>
+                <span className={styles.batteryPercent}>{batteryDisplayText}</span>
+              </div>
+            </div>
+            <div className={styles.thrusterOverlay}>
+              <Card
+                bordered={false}
+                className={styles.thrusterCard}
+                bodyStyle={{ paddingBottom: 12 }}
+              >
+                <div className={styles.thrusterList}>
+                  {thrusterData.map(item => (
+                    <div key={item.label} className={styles.thrusterRow}>
+                      <span className={styles.thrusterLabel}>{item.label}</span>
+                      <div className={styles.thrusterMeter}>
+                        {renderThrusterBar(item.value, item.max)}
+                        <span className={styles.thrusterValue}>
+                          {formatSpeed(item.speed, item.unit)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
         <div className={styles.sceneToolbar}>
           <div className={styles.controlsListInline}>
@@ -842,27 +886,6 @@ const RobotControlPage: React.FC = () => {
               ))}
             </div>
           )}
-        </Card>
-
-        <Card
-          title={<Space><RocketOutlined /> 推进器状态</Space>}
-          bordered={false}
-          className={styles.infoCard}
-        >
-          <div className={styles.thrusterList}>
-            {thrusterData.map(item => (
-              <div key={item.label} className={styles.thrusterRow}>
-                <span className={styles.thrusterLabel}>{item.label}</span>
-                <div className={styles.thrusterMeter}>
-                  {renderThrusterBar(item.value, item.max)}
-                  <span className={styles.thrusterValue}>
-                    {formatSpeed(item.speed, item.unit)}
-                    <span className={styles.thrusterPercent}>{` (${item.value.toFixed(0)}%)`}</span>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
         </Card>
 
       </div>

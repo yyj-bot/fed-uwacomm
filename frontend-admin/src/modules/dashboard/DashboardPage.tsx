@@ -122,9 +122,9 @@ const DashboardPage: React.FC = () => {
           {/* 资源状态 */}
           <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 calc(50% - 8px)', minWidth: '300px' }}>
-              {/* 运行中的虚拟机 */}
+              {/* 运行中的水下机器人 */}
               <Card 
-                title="运行中的虚拟机" 
+                title="运行中的水下机器人" 
                 size="small"
                 className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
                 extra={<Text type="secondary">{runningVMs}/{totalVMs}</Text>}

@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务创建页面
+ * 任务创建页面
  * 支持图形化任务创建，包括数据集配置、参与者配置、算法配置等
  * 
  * @author FedUWAComm Team
@@ -210,34 +210,34 @@ const TaskCreatePage: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      // ✅ 修复：使用联邦学习专用接口获取可用VM列表
+      // ✅ 修复：使用联邦学习专用接口获取可用水下机器人列表
       const { federatedTask } = await import('@/api/federated-task')
-      console.log('🔄 开始获取联邦学习可用VM列表...')
+      console.log('🔄 开始获取可用水下机器人列表...')
       
       const vmListResponse = await federatedTask.getAvailableVMs({ 
         status: 'RUNNING'  // 只获取运行中的VM
       })
       
-      console.log('📋 联邦学习VM API原始响应:', vmListResponse)
+      console.log('📋 水下机器人 API 原始响应:', vmListResponse)
       console.log('📋 响应数据:', vmListResponse?.availableVms)
-      console.log('📋 VM总数:', vmListResponse?.total)
+      console.log('📋 水下机器人总数:', vmListResponse?.total)
       
       // 检查返回数据格式
       if (!vmListResponse || !Array.isArray(vmListResponse.availableVms)) {
-        throw new Error(`联邦学习VM API返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
+        throw new Error(`水下机器人 API 返回数据格式错误: ${JSON.stringify(vmListResponse)}`)
       }
       
-      // 检查是否有VM数据
+      // 检查是否有水下机器人数据
       if (vmListResponse.availableVms.length === 0) {
-        console.warn('⚠️ 没有可用于联邦学习的虚拟机')
-        throw new Error('没有可用于联邦学习的虚拟机，请先添加并启动虚拟机')
+        console.warn('⚠️ 没有可用水下机器人')
+        throw new Error('没有可用的水下机器人，请先添加并启动水下机器人')
       }
       
       // 直接使用后端返回的数据（已经是 AvailableVM 格式）
       setAvailableVMs(vmListResponse.availableVms)
       
-      console.log('✅ 成功加载联邦学习可用VM数据:', vmListResponse.availableVms.length, '个VM')
-      console.log('VM IDs:', vmListResponse.availableVms.map(vm => vm.vmId))
+      console.log('✅ 成功加载可用水下机器人数据:', vmListResponse.availableVms.length, '台')
+      console.log('水下机器人 ID 列表:', vmListResponse.availableVms.map(vm => vm.vmId))
       
       // ✅ 使用联邦学习API获取数据集列表
       console.log('🔄 开始获取数据集列表...')
@@ -458,7 +458,7 @@ const TaskCreatePage: React.FC = () => {
     }
   }, [form])
 
-  // 处理VM选择
+  // 处理水下机器人选择
   const handleVMSelection = useCallback((selectedRowKeys: React.Key[]) => {
     setSelectedVMs(selectedRowKeys as string[])
     
@@ -495,7 +495,7 @@ const TaskCreatePage: React.FC = () => {
     const tolerance = currentStrategy === 'BALANCED' ? 1.0 : 0.01 // 均衡分配允许1%误差，自定义分配要求更精确
     
     if (Math.abs(totalRatio - 100) > tolerance) {
-      message.error(`虚拟机数据占比总和应为100%，当前为${totalRatio.toFixed(1)}%`)
+      message.error(`水下机器人数据占比总和应为100%，当前为${totalRatio.toFixed(1)}%`)
       return false
     }
     return true
@@ -506,7 +506,7 @@ const TaskCreatePage: React.FC = () => {
     try {
       console.log('🚀 开始创建任务流程...')
       console.log('当前步骤:', currentStep)
-      console.log('选中的VMs:', selectedVMs)
+      console.log('选中的水下机器人列表:', selectedVMs)
       
       // 立即获取当前表单状态进行预检查
       const preCheckValues = form.getFieldsValue()
@@ -584,7 +584,7 @@ const TaskCreatePage: React.FC = () => {
       const hasParticipantsInForm = values.participantConfig?.participants && values.participantConfig.participants.length > 0
       
       if (!hasSelectedVMs && !hasParticipantsInForm) {
-        message.error('请至少选择一个参与者虚拟机')
+        message.error('请至少选择一个参与者水下机器人')
         setCurrentStep(1) // 跳转到参与者配置步骤
         return
       }
@@ -670,7 +670,7 @@ const TaskCreatePage: React.FC = () => {
       
       // 如果表单中没有参与者数据，但UI中有选中的VMs，则使用selectedVMs构建
       if (participants.length === 0 && selectedVMs.length > 0) {
-        console.log('🔄 表单中无参与者数据，使用selectedVMs构建:', selectedVMs)
+        console.log('🔄 表单中无参与者数据，使用选中的水下机器人构建:', selectedVMs)
         participants = selectedVMs.map(vmId => ({
           vmId,
           role: 'PARTICIPANT' as const,
@@ -779,10 +779,10 @@ const TaskCreatePage: React.FC = () => {
     }
   }, [form, createTask, navigate, selectedVMs, currentStep])
 
-  // VM表格列定义
+  // 水下机器人表格列定义
   const vmColumns = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -841,7 +841,7 @@ const TaskCreatePage: React.FC = () => {
     },
     {
       title: '参与者配置',
-      description: '选择参与的虚拟机'
+      description: '选择参与的水下机器人'
     },
     {
       title: '数据集配置',
@@ -860,7 +860,7 @@ const TaskCreatePage: React.FC = () => {
   return (
     <div className="task-create-page">
       {/* 页面头部 */}
-      <Card className="header-card">
+      <Card className="header-card" bordered={false}>
         <div className="page-header">
           <div className="header-left">
             <Button 
@@ -871,9 +871,9 @@ const TaskCreatePage: React.FC = () => {
               返回列表
             </Button>
             <div>
-              <Title level={2} style={{ margin: 0 }}>创建联邦学习任务</Title>
+              <Title level={2} style={{ margin: 0 }}>创建任务</Title>
               <Paragraph style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
-                通过图形化界面配置和创建联邦学习任务
+                通过图形化界面配置和创建任务
               </Paragraph>
             </div>
           </div>
@@ -981,8 +981,8 @@ const TaskCreatePage: React.FC = () => {
               <Title level={4}>参与者配置</Title>
               <div style={{ marginBottom: 16 }}>
                 <Alert
-                  message="选择参与训练的虚拟机节点"
-                  description="请从下列可用的虚拟机中选择参与联邦学习的节点"
+                  message="选择参与训练的水下机器人"
+                  description="请从下列可用的水下机器人中选择参与任务的节点"
                   type="info"
                   showIcon
                 />
@@ -1299,8 +1299,8 @@ const TaskCreatePage: React.FC = () => {
                 <Col xs={24} md={12}>
                   <Form.Item
                     name={['hyperparameters', 'rounds']}
-                    label="联邦训练轮次"
-                    rules={[{ required: true, message: '请输入联邦训练轮次' }]}
+                    label="训练轮次"
+                    rules={[{ required: true, message: '请输入训练轮次' }]}
                   >
                     <InputNumber 
                       min={1} 
@@ -1399,7 +1399,7 @@ const TaskCreatePage: React.FC = () => {
                   </Col>
                   <Col xs={24} md={12}>
                     <div><strong>参与者数量:</strong> {selectedVMs.length}个</div>
-                    <div><strong>联邦轮次:</strong> {form.getFieldValue(['hyperparameters', 'rounds'])}轮</div>
+                    <div><strong>训练轮次:</strong> {form.getFieldValue(['hyperparameters', 'rounds'])}轮</div>
                     <div><strong>本地轮次:</strong> {form.getFieldValue(['hyperparameters', 'epochs'])}轮</div>
                     <div><strong>学习率:</strong> {form.getFieldValue(['hyperparameters', 'learningRate'])}</div>
                   </Col>

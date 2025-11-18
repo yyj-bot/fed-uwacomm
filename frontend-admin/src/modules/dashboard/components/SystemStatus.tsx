@@ -90,7 +90,7 @@ const SystemStatus: React.FC = () => {
 
   return (
     <Card 
-      title="系统状态监控" 
+      title="水面基站状态监控" 
       className={styles['fed-dashboard-card']}
       loading={loading}
       style={{ background: 'white', marginBottom: 0 }}
@@ -163,14 +163,19 @@ const SystemStatus: React.FC = () => {
             <Text strong style={{ color: '#595959', fontSize: '13px' }}>聚合引擎状态</Text>
           </Divider>
           <Row gutter={[24, 16]}>
-            <Col xs={24} sm={12} md={8}>
+            <Col xs={24} sm={12} md={12}>
               <div style={{ 
                 textAlign: 'center', 
                 padding: '16px',
                 background: 'linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%)',
                 borderRadius: '12px',
                 border: 'none',
-                boxShadow: '0 2px 8px rgba(24, 144, 255, 0.08)'
+                boxShadow: '0 2px 8px rgba(24, 144, 255, 0.08)',
+                height: '220px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
               }}>
                 <div style={{ fontSize: '28px', marginBottom: '12px', color: '#1890ff' }}>
                   <ThunderboltOutlined />
@@ -186,14 +191,19 @@ const SystemStatus: React.FC = () => {
                 </div>
               </div>
             </Col>
-            <Col xs={24} sm={12} md={8}>
+            <Col xs={24} sm={12} md={12}>
               <div style={{ 
                 textAlign: 'center',
                 padding: '16px',
                 background: 'linear-gradient(135deg, #f6ffed 0%, #ffffff 100%)',
                 borderRadius: '12px',
                 border: 'none',
-                boxShadow: '0 2px 8px rgba(82, 196, 26, 0.08)'
+                boxShadow: '0 2px 8px rgba(82, 196, 26, 0.08)',
+                height: '220px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
               }}>
                 <div style={{ fontSize: '28px', marginBottom: '12px', color: '#52c41a' }}>
                   <ClusterOutlined />
@@ -209,30 +219,6 @@ const SystemStatus: React.FC = () => {
                 <div style={{ marginTop: '12px' }}>
                   <Text style={{ fontSize: '12px', color: '#8c8c8c', fontWeight: 500 }}>
                     平均耗时: {engineStatus.aggregationMetrics?.averageAggregationTime?.toFixed(1)}s
-                  </Text>
-                </div>
-              </div>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <div style={{ 
-                textAlign: 'center',
-                padding: '16px',
-                background: 'linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%)',
-                borderRadius: '12px',
-                border: 'none',
-                boxShadow: '0 2px 8px rgba(24, 144, 255, 0.08)'
-              }}>
-                <Title level={5} style={{ color: '#595959', marginBottom: '12px' }}>支持的算法</Title>
-                <Space wrap style={{ justifyContent: 'center' }}>
-                  {engineStatus.supportedAlgorithms?.map((algorithm: string) => (
-                    <Tag key={algorithm} color="blue" style={{ margin: '4px' }}>
-                      {algorithm.replace('FEDERATED_', '').replace('_', ' ')}
-                    </Tag>
-                  ))}
-                </Space>
-                <div style={{ marginTop: '12px' }}>
-                  <Text style={{ fontSize: '12px', color: '#8c8c8c', fontWeight: 500 }}>
-                    总聚合次数: {engineStatus.aggregationMetrics?.totalAggregations || 0}
                   </Text>
                 </div>
               </div>

@@ -1,11 +1,11 @@
 /**
- * 管理员虚拟机管理页面
- * 提供管理员专用的虚拟机管理功能，包括：
- * - 查看所有虚拟机（不受权限限制）
- * - 虚拟机分配管理
- * - 用户虚拟机管理
- * - 虚拟机强制控制
- * - 未分配虚拟机列表
+ * 管理员水下机器人管理页面
+ * 提供管理员专用的水下机器人管理功能，包括：
+ * - 查看所有水下机器人（不受权限限制）
+ * - 水下机器人分配管理
+ * - 用户水下机器人管理
+ * - 水下机器人强制控制
+ * - 未分配水下机器人列表
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -145,7 +145,7 @@ const AdminVMManagementPage: React.FC = () => {
         title={
           <Space>
             <DesktopOutlined />
-            <span>管理员虚拟机管理</span>
+            <span>管理员水下机器人管理</span>
           </Space>
         }
         extra={
@@ -170,7 +170,7 @@ const AdminVMManagementPage: React.FC = () => {
             tab={
               <Space>
                 <DesktopOutlined />
-                <span>所有虚拟机</span>
+                <span>所有水下机器人</span>
               </Space>
             } 
             key="all-vms"
@@ -189,7 +189,7 @@ const AdminVMManagementPage: React.FC = () => {
             tab={
               <Space>
                 <DesktopOutlined />
-                <span>未分配虚拟机</span>
+                <span>未分配水下机器人</span>
               </Space>
             } 
             key="unassigned-vms"
@@ -206,7 +206,7 @@ const AdminVMManagementPage: React.FC = () => {
             tab={
               <Space>
                 <UserOutlined />
-                <span>用户虚拟机管理</span>
+                <span>用户水下机器人管理</span>
               </Space>
             } 
             key="user-vm-management"
@@ -230,7 +230,7 @@ const AdminVMManagementPage: React.FC = () => {
 
       {/* VM分配管理抽屉 */}
       <Drawer
-        title={`虚拟机分配管理 - ${selectedVm?.name || ''}`}
+        title={`水下机器人分配管理 - ${selectedVm?.name || ''}`}
         placement="right"
         width={720}
         open={assignmentDrawerVisible}
@@ -247,7 +247,7 @@ const AdminVMManagementPage: React.FC = () => {
 
       {/* 用户VM管理抽屉 */}
       <Drawer
-        title="用户虚拟机管理"
+        title="用户水下机器人管理"
         placement="right"
         width={720}
         open={userVmDrawerVisible}
@@ -264,7 +264,7 @@ const AdminVMManagementPage: React.FC = () => {
 
       {/* 强制控制抽屉 */}
       <Drawer
-        title={`强制控制虚拟机 - ${selectedVm?.name || ''}`}
+        title={`强制控制水下机器人 - ${selectedVm?.name || ''}`}
         placement="right"
         width={520}
         open={forceControlDrawerVisible}
@@ -281,7 +281,7 @@ const AdminVMManagementPage: React.FC = () => {
         )}
       </Drawer>
 
-      {/* 编辑虚拟机抽屉 */}
+      {/* 编辑水下机器人抽屉 */}
       <VMEditDrawer
         open={editDrawerVisible}
         vm={selectedVm}

@@ -5,15 +5,29 @@
 
 .fed-main-layout {
   min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: transparent;
 }
 
 /* ================ 侧边栏样式 ================ */
+.fed-layout-body {
+  flex: 1;
+  height: calc(100vh - 64px);
+  display: flex;
+  align-items: stretch;
+  background: transparent;
+}
+
 .fed-layout-sider {
   box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
-  position: relative;
+  position: sticky;
+  top: 64px;
   z-index: 10;
   height: calc(100vh - 64px);
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .fed-layout-sider .ant-layout-sider-children {
@@ -56,7 +70,10 @@
 
 /* ================ 主内容区域 ================ */
 .fed-layout-main {
+  flex: 1;
   background: transparent;
+  min-height: calc(100vh - 64px);
+  display: flex;
 }
 
 /* 头部样式 - 跨越整个顶部 */
@@ -181,14 +198,20 @@
   padding: 0;
   background: #f0f2f5;
   min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
 }
 
 .fed-content-wrapper {
-  padding: 0;
+  padding: 24px;
   overflow-x: hidden;
   max-width: 100%;
   width: 100%;
+  min-height: calc(100vh - 64px);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 /* ================ 响应式样式 ================ */

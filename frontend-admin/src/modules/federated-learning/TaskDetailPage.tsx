@@ -226,7 +226,7 @@ const TaskDetailPage: React.FC = () => {
   // 参与者表格列定义
   const participantColumns = [
     {
-      title: '虚拟机ID',
+      title: '水下机器人ID',
       dataIndex: 'vmId',
       key: 'vmId',
       width: 200,
