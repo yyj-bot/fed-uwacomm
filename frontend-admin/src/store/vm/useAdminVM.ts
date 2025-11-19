@@ -1,5 +1,5 @@
 /**
- * 管理员虚拟机管理 Hook - 封装管理员VM状态和操作
+ * 管理员水下机器人管理 Hook - 封装管理员VM状态和操作
  * 为组件层提供简洁的管理员VM功能访问接口
  * 
  * @author FedUWAComm Team
@@ -83,7 +83,7 @@ export const useAdminVM = () => {
       await fetchAdminVmListAction(params)
       return { success: true, error: null }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取管理员虚拟机列表失败'
+      const errorMessage = error instanceof Error ? error.message : '获取管理员水下机器人列表失败'
       return { success: false, error: errorMessage }
     }
   }, [fetchAdminVmListAction])
@@ -96,7 +96,7 @@ export const useAdminVM = () => {
       await refreshAdminVmListAction()
       return { success: true, error: null }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '刷新虚拟机列表失败'
+      const errorMessage = error instanceof Error ? error.message : '刷新水下机器人列表失败'
       return { success: false, error: errorMessage }
     }
   }, [refreshAdminVmListAction])
@@ -113,7 +113,7 @@ export const useAdminVM = () => {
       await assignVmToUserAction(vmId, userId, params)
       return { success: true, error: null }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '分配虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '分配水下机器人失败'
       return { success: false, error: errorMessage }
     }
   }, [assignVmToUserAction])

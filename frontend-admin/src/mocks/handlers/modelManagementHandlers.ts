@@ -192,7 +192,7 @@ export const modelManagementHandlers = [
     if (!body.vmIds || !Array.isArray(body.vmIds) || body.vmIds.length === 0) {
       return HttpResponse.json({
         code: 400,
-        message: '请提供有效的虚拟机ID列表',
+        message: '请提供有效的水下机器人ID列表',
         data: null
       }, { status: 400 })
     }
@@ -204,7 +204,7 @@ export const modelManagementHandlers = [
     if (invalidVmIds.length > 0) {
       return HttpResponse.json({
         code: 400,
-        message: `无效的虚拟机ID: ${invalidVmIds.join(', ')}。有效的VM ID: ${validVmIds.join(', ')}`,
+        message: `无效的水下机器人ID: ${invalidVmIds.join(', ')}。有效的VM ID: ${validVmIds.join(', ')}`,
         data: null
       }, { status: 400 })
     }

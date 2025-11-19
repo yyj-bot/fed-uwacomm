@@ -1,9 +1,9 @@
 /**
- * 虚拟机状态管理
+ * 水下机器人状态管理
  * 共享的运行时状态，在 mock handlers 之间共享
  */
 
-// 虚拟机状态映射（模拟运行时状态）
+// 水下机器人状态映射（模拟运行时状态）
 export const vmStatusMap = new Map<string, string>()
 
 // 已删除的VM ID集合

@@ -456,7 +456,7 @@ export interface TaskMetrics {
  * 参与者状态
  */
 export interface ParticipantStatus {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 参与者角色 */
   readonly role: string

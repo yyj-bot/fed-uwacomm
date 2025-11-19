@@ -507,6 +507,8 @@ export class VMService {
       cpuCores: vm.cpuCores,
       memoryMb: vm.memoryMb,
       diskGb: vm.diskGb,
+      batteryLevel: vm.batteryLevel,
+      speed:vm.speed,
       connectionStatus: vm.connectionStatus,
       lastHeartbeat: vm.lastHeartbeat,
       wsSessionId: vm.wsSessionId,
@@ -515,7 +517,8 @@ export class VMService {
       systemInfo: vm.systemInfo,
       capabilities: vm.capabilities,
       networkConfig: vm.networkConfig,
-      metadata: vm.metadata
+      metadata: vm.metadata,
+      specs: vm.specs
     }
   }
 

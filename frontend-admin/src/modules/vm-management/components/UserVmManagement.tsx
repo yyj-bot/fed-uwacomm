@@ -1,6 +1,6 @@
 /**
- * 用户虚拟机管理组件
- * 提供查看和管理特定用户的虚拟机分配
+ * 用户水下机器人管理组件
+ * 提供查看和管理特定用户的水下机器人分配
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -65,7 +65,7 @@ const UserVmManagement: React.FC = () => {
         title={
           <Space>
             <UserOutlined />
-            <span>用户虚拟机管理</span>
+            <span>用户水下机器人管理</span>
           </Space>
         }
         extra={
@@ -117,7 +117,7 @@ const UserVmManagement: React.FC = () => {
           />
         ) : (
           <Empty
-            description="请先选择一个用户以查看和管理其虚拟机"
+            description="请先选择一个用户以查看和管理其水下机器人"
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             style={{ padding: '60px 0' }}
           />

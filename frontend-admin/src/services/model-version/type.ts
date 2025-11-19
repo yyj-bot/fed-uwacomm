@@ -217,7 +217,7 @@ export interface InitialModelInfo {
  * 模型分发请求
  */
 export interface ModelDistributionRequest {
-  /** 目标虚拟机ID列表 */
+  /** 目标水下机器人ID列表 */
   readonly vmIds: string[]
   /** 分发模式 */
   readonly distributionMode: DistributionMode
@@ -241,7 +241,7 @@ export interface ModelDistributionResponse {
   readonly taskId: string
   /** 模型ID */
   readonly modelId: string
-  /** 目标虚拟机列表 */
+  /** 目标水下机器人列表 */
   readonly targetVms: string[]
   /** 分发模式 */
   readonly distributionMode: string
@@ -283,7 +283,7 @@ export interface DistributionStatusDetail {
     readonly failed: number
     readonly inProgress: number
   }
-  /** 虚拟机详情 */
+  /** 水下机器人详情 */
   readonly vmDetails: Array<{
     readonly vmId: string
     readonly status: string

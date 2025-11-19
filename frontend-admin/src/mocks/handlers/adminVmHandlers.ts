@@ -1,5 +1,5 @@
 /**
- * 管理员虚拟机管理 Mock 处理器
+ * 管理员水下机器人管理 Mock 处理器
  * 基于 admin-vm-api-reference.md 文档
  * 
  * @author FedUWAComm Team
@@ -18,7 +18,7 @@ import {
 import { vmStatusMap, deletedVmIds } from './vmState'
 
 export const adminVmHandlers = [
-  // 3.1 管理员查看所有虚拟机 - GET /api/admin/vm/list
+  // 3.1 管理员查看所有水下机器人 - GET /api/admin/vm/list
   http.get('http://localhost:5173/api/admin/vm/list', async ({ request }) => {
     console.log('[MSW] 匹配: GET /api/admin/vm/list')
     
@@ -82,7 +82,7 @@ export const adminVmHandlers = [
     })
   }),
 
-  // 3.2 查看未分配虚拟机列表 - GET /api/admin/vm/unassigned
+  // 3.2 查看未分配水下机器人列表 - GET /api/admin/vm/unassigned
   http.get('http://localhost:5173/api/admin/vm/unassigned', async ({ request }) => {
     console.log('[MSW] 匹配: GET /api/admin/vm/unassigned')
     
@@ -160,7 +160,7 @@ export const adminVmHandlers = [
     // 获取用户总数
     const { mockUsers } = await import('../data/userMockData')
     
-    // 动态计算热门虚拟机（按分配用户数排序）
+    // 动态计算热门水下机器人（按分配用户数排序）
     const topAssignedVms = Object.values(mockVmAssignments)
       .filter((vm: any) => realVmIds.has(vm.vmId) && vm.assignments.length > 0)
       .map((vm: any) => ({
@@ -226,7 +226,7 @@ export const adminVmHandlers = [
     
     const assignments = mockVmAssignments[vmId as string] || {
       vmId,
-      vmName: `虚拟机-${vmId}`,
+      vmName: `水下机器人-${vmId}`,
       assignments: [],
       totalAssignments: 0
     }
@@ -249,7 +249,7 @@ export const adminVmHandlers = [
     if (!mockVmAssignments[vmId as string]) {
       mockVmAssignments[vmId as string] = {
         vmId,
-        vmName: `虚拟机-${vmId}`,
+        vmName: `水下机器人-${vmId}`,
         assignments: [],
         totalAssignments: 0
       }
@@ -267,7 +267,7 @@ export const adminVmHandlers = [
     if (existingIndex !== -1) {
       return HttpResponse.json({
         code: 409,
-        message: '该用户已被分配此虚拟机',
+        message: '该用户已被分配此水下机器人',
         data: null
       }, { status: 409 })
     }
@@ -290,7 +290,7 @@ export const adminVmHandlers = [
     
     return HttpResponse.json({
       code: 200,
-      message: '虚拟机分配成功',
+      message: '水下机器人分配成功',
       data: newAssignment
     })
   }),
@@ -371,7 +371,7 @@ export const adminVmHandlers = [
     
     return HttpResponse.json({
       code: 404,
-      message: '未找到该虚拟机',
+      message: '未找到该水下机器人',
       data: null
     }, { status: 404 })
   }),
@@ -510,7 +510,7 @@ export const adminVmHandlers = [
     
     console.log(`[MSW] 匹配: POST /api/admin/vm/${vmId}/force-control`, body)
     
-    // 根据操作类型更新虚拟机状态
+    // 根据操作类型更新水下机器人状态
     const action = body.action
     // 注意：以下延迟时间是为了模拟真实VM操作而设定的，不是从接口文档读取
     // 真实环境中，后端会立即返回命令已发送，实际状态变化通过 WebSocket 推送
@@ -521,7 +521,7 @@ export const adminVmHandlers = [
         vmStatusMap.set(vmId, 'STARTING')
         setTimeout(() => {
           vmStatusMap.set(vmId, 'RUNNING')
-          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已启动`)
+          console.log(`[MSW] 强制控制：水下机器人 ${vmId} 已启动`)
         }, 3000)
         break
       
@@ -530,14 +530,14 @@ export const adminVmHandlers = [
         vmStatusMap.set(vmId, 'STOPPING')
         setTimeout(() => {
           vmStatusMap.set(vmId, 'STOPPED')
-          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已停止`)
+          console.log(`[MSW] 强制控制：水下机器人 ${vmId} 已停止`)
         }, 2000)
         break
       
       case 'FORCE_STOP':
         // 强制停止：立即生效（模拟强制断电）
         vmStatusMap.set(vmId, 'STOPPED')
-        console.log(`[MSW] 强制控制：虚拟机 ${vmId} 已强制停止`)
+        console.log(`[MSW] 强制控制：水下机器人 ${vmId} 已强制停止`)
         break
       
       case 'RESTART':
@@ -545,11 +545,11 @@ export const adminVmHandlers = [
         vmStatusMap.set(vmId, 'STOPPING')
         setTimeout(() => {
           vmStatusMap.set(vmId, 'STARTING')
-          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 正在重启...`)
+          console.log(`[MSW] 强制控制：水下机器人 ${vmId} 正在重启...`)
         }, 1000)
         setTimeout(() => {
           vmStatusMap.set(vmId, 'RUNNING')
-          console.log(`[MSW] 强制控制：虚拟机 ${vmId} 重启完成`)
+          console.log(`[MSW] 强制控制：水下机器人 ${vmId} 重启完成`)
         }, 5000)
         break
       

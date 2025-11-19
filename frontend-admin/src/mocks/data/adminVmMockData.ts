@@ -1,5 +1,5 @@
 /**
- * 管理员虚拟机管理 Mock 数据
+ * 管理员水下机器人管理 Mock 数据
  * 基于 admin-vm-api-reference.md 文档
  * 
  * @author FedUWAComm Team
@@ -41,28 +41,28 @@ export const mockVmAssignmentOverview = {
   topAssignedVms: [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       assignedUserCount: 4
     }
   ],
   recentAssignments: [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       userId: 'operator-001',
       username: getUserById('operator-001')?.username || 'operator01',
       assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
     },
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       userId: 'researcher-002',
       username: getUserById('researcher-002')?.username || 'researcher02',
       assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
     },
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       userId: 'researcher-001',
       username: getUserById('researcher-001')?.username || 'researcher01',
       assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
@@ -77,7 +77,7 @@ export const mockVmAssignmentOverview = {
 export const mockVmAssignments: Record<string, any> = {
   'a1b2c3d4e5f678901234567890123456': {
     vmId: 'a1b2c3d4e5f678901234567890123456',
-    vmName: '水声联邦学习节点-001',
+    vmName: 'AUV-01',
     assignments: [
       {
         userId: 'a1b2c3d4e5f678901234567890123456',
@@ -117,13 +117,13 @@ export const mockVmAssignments: Record<string, any> = {
   // 其他VM的分配记录（使用真实的vmId）
   'b2c3d4e5f67890123456789012345678': {
     vmId: 'b2c3d4e5f67890123456789012345678',
-    vmName: '水声联邦学习节点-002',
+    vmName: 'AUV-02',
     assignments: [],
     totalAssignments: 0
   },
   'c3d4e5f678901234567890123456789a': {
     vmId: 'c3d4e5f678901234567890123456789a',
-    vmName: '水声联邦学习节点-003',
+    vmName: 'AUV-03',
     assignments: [],
     totalAssignments: 0
   }
@@ -155,13 +155,14 @@ export const mockAllAdminVms = baseVmList.map(vm => {
     'b2c3d4e5f67890123456789012345678': { isAssigned: false, assignedUserCount: 0 },
     'c3d4e5f678901234567890123456789a': { isAssigned: false, assignedUserCount: 0 }
   }
-  
+
   const info = assignmentInfo[vm.vmId as keyof typeof assignmentInfo] || { isAssigned: false, assignedUserCount: 0 }
-  
+
   return {
     ...vm,
     isAssigned: info.isAssigned,
-    assignedUserCount: info.assignedUserCount
+    assignedUserCount: info.assignedUserCount,
+    batteryLevel: vm.batteryLevel
   }
 })
 
@@ -172,37 +173,40 @@ export const mockUserVms: Record<string, any[]> = {
   'user-001': [
     {
       vmId: 'vm-001',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       ipAddress: '192.168.1.101',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'WRITE', 'EXECUTE'] as VmPermission[],
-      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      batteryLevel: 92
     },
     {
       vmId: 'vm-002',
-      vmName: '水声联邦学习节点-002',
+      vmName: 'AUV-02',
       ipAddress: '192.168.1.102',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'WRITE'] as VmPermission[],
-      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+      batteryLevel: 86
     }
   ],
   // admin用户的VM列表（userId: a1b2c3d4e5f678901234567890123456）
   'a1b2c3d4e5f678901234567890123456': [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       ipAddress: '192.168.1.100',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'WRITE', 'EXECUTE', 'ADMIN'] as VmPermission[],
-      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
+      assignedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+      batteryLevel: 92
     }
   ],
   // researcher01用户的VM列表（userId: researcher-001）
   'researcher-001': [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       ipAddress: '192.168.1.100',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'WRITE', 'EXECUTE'] as VmPermission[],
@@ -213,7 +217,7 @@ export const mockUserVms: Record<string, any[]> = {
   'researcher-002': [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       ipAddress: '192.168.1.100',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'WRITE'] as VmPermission[],
@@ -224,7 +228,7 @@ export const mockUserVms: Record<string, any[]> = {
   'operator-001': [
     {
       vmId: 'a1b2c3d4e5f678901234567890123456',
-      vmName: '水声联邦学习节点-001',
+      vmName: 'AUV-01',
       ipAddress: '192.168.1.100',
       status: 'RUNNING' as VmStatus,
       permissions: ['READ', 'EXECUTE'] as VmPermission[],
@@ -236,7 +240,7 @@ export const mockUserVms: Record<string, any[]> = {
 // ==================== API Mock 响应 ====================
 
 export const adminVmApiMock = {
-  // 3.3 虚拟机分配概况
+  // 3.3 水下机器人分配概况
   assignmentOverview: {
     success: {
       code: 200,
@@ -263,11 +267,11 @@ export const adminVmApiMock = {
     }
   },
 
-  // 1.1 分配虚拟机给用户
+  // 1.1 分配水下机器人给用户
   assignVm: {
     success: {
       code: 200,
-      message: '虚拟机分配成功',
+      message: '水下机器人分配成功',
       data: {
         vmId: 'vm-001',
         userId: 'user-001',
@@ -288,12 +292,12 @@ export const adminVmApiMock = {
     },
     error404: {
       code: 404,
-      message: '虚拟机或用户不存在',
+      message: '水下机器人或用户不存在',
       data: null
     },
     error409: {
       code: 409,
-      message: '虚拟机已分配给该用户',
+      message: '水下机器人已分配给该用户',
       data: {
         vmId: 'vm-001',
         userId: 'user-001',
@@ -302,7 +306,7 @@ export const adminVmApiMock = {
     }
   },
 
-  // 1.2 取消虚拟机分配
+  // 1.2 取消水下机器人分配
   unassignVm: {
     success: {
       code: 200,
@@ -320,7 +324,7 @@ export const adminVmApiMock = {
     }
   },
 
-  // 1.4 修改用户虚拟机权限
+  // 1.4 修改用户水下机器人权限
   updatePermissions: {
     success: {
       code: 200,
@@ -344,7 +348,7 @@ export const adminVmApiMock = {
     }
   },
 
-  // 2.2 批量分配虚拟机给用户
+  // 2.2 批量分配水下机器人给用户
   batchAssign: {
     success: {
       code: 200,
@@ -383,14 +387,14 @@ export const adminVmApiMock = {
           {
             vmId: 'vm-002',
             status: 'FAILED',
-            error: '虚拟机已分配给其他用户'
+            error: '水下机器人已分配给其他用户'
           }
         ]
       }
     }
   },
 
-  // 3.4 管理员强制控制虚拟机
+  // 3.4 管理员强制控制水下机器人
   forceControl: {
     success: {
       code: 200,
@@ -416,7 +420,7 @@ export const adminVmApiMock = {
     },
     error404: {
       code: 404,
-      message: '虚拟机不存在',
+      message: '水下机器人不存在',
       data: null
     }
   }

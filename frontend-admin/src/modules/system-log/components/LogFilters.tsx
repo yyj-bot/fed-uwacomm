@@ -44,7 +44,7 @@ const LOG_LEVELS = [
 const LOG_CATEGORIES = [
   { value: 'SYSTEM', label: '系统日志' },
   { value: 'USER', label: '用户操作' },
-  { value: 'VM', label: '虚拟机' },
+  { value: 'VM', label: '水下机器人' },
   { value: 'TASK', label: '任务执行' },
   { value: 'DATA', label: '数据管理' },
   { value: 'MODEL', label: '模型管理' },
@@ -213,8 +213,8 @@ export const LogFilters: React.FC<LogFiltersProps> = ({
 
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item label="虚拟机ID" name="vmId">
-                <Input placeholder="输入虚拟机ID" allowClear />
+              <Form.Item label="水下机器人ID" name="vmId">
+                <Input placeholder="输入水下机器人ID" allowClear />
               </Form.Item>
             </Col>
             

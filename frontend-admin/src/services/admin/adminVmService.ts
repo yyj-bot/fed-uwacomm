@@ -1,6 +1,6 @@
 /**
- * 管理员虚拟机管理服务层 - 企业级规范实现
- * 提供管理员专用的虚拟机分配、管理和监控功能
+ * 管理员水下机器人管理服务层 - 企业级规范实现
+ * 提供管理员专用的水下机器人分配、管理和监控功能
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -16,7 +16,6 @@ import type {
   VmAssignmentOverview,
   VmControlResponse,
   VmPermission,
-  VmStatus,
   VmControlAction,
   AssignVmRequest,
   UnassignVmResponse,
@@ -34,15 +33,15 @@ import type {
 } from './type'
 
 /**
- * 管理员虚拟机管理服务类
+ * 管理员水下机器人管理服务类
  */
 export class AdminVmService {
   
-  // ==================== 虚拟机分配管理 ====================
+  // ==================== 水下机器人分配管理 ====================
 
   /**
-   * 分配虚拟机给用户
-   * @param vmId 虚拟机ID
+   * 分配水下机器人给用户
+   * @param vmId 水下机器人ID
    * @param userId 用户ID
    * @param params 分配参数
    * @returns 分配结果
@@ -64,14 +63,14 @@ export class AdminVmService {
     } catch (error) {
       throw this.handleServiceError(
         error,
-        `分配虚拟机失败 (VM: ${vmId}, User: ${userId})`
+        `分配水下机器人失败 (VM: ${vmId}, User: ${userId})`
       )
     }
   }
 
   /**
-   * 取消虚拟机分配
-   * @param vmId 虚拟机ID
+   * 取消水下机器人分配
+   * @param vmId 水下机器人ID
    * @param userId 用户ID
    * @returns 取消分配结果
    */
@@ -88,15 +87,15 @@ export class AdminVmService {
     } catch (error) {
       throw this.handleServiceError(
         error,
-        `取消虚拟机分配失败 (VM: ${vmId}, User: ${userId})`
+        `取消水下机器人分配失败 (VM: ${vmId}, User: ${userId})`
       )
     }
   }
 
   /**
-   * 查看虚拟机分配情况
-   * @param vmId 虚拟机ID
-   * @returns 虚拟机分配信息
+   * 查看水下机器人分配情况
+   * @param vmId 水下机器人ID
+   * @returns 水下机器人分配信息
    */
   async getVmAssignments(vmId: string): Promise<VmAssignmentInfoResponse> {
     try {
@@ -110,13 +109,13 @@ export class AdminVmService {
         totalAssignments: result.totalAssignments
       }
     } catch (error) {
-      throw this.handleServiceError(error, `获取虚拟机分配情况失败 (VM: ${vmId})`)
+      throw this.handleServiceError(error, `获取水下机器人分配情况失败 (VM: ${vmId})`)
     }
   }
 
   /**
-   * 修改用户虚拟机权限
-   * @param vmId 虚拟机ID
+   * 修改用户水下机器人权限
+   * @param vmId 水下机器人ID
    * @param userId 用户ID
    * @param permissions 新权限列表
    * @returns 权限更新结果
@@ -136,18 +135,18 @@ export class AdminVmService {
     } catch (error) {
       throw this.handleServiceError(
         error,
-        `更新虚拟机权限失败 (VM: ${vmId}, User: ${userId})`
+        `更新水下机器人权限失败 (VM: ${vmId}, User: ${userId})`
       )
     }
   }
 
-  // ==================== 用户虚拟机管理 ====================
+  // ==================== 用户水下机器人管理 ====================
 
   /**
-   * 查看用户的虚拟机列表
+   * 查看用户的水下机器人列表
    * @param userId 用户ID
    * @param params 查询参数
-   * @returns 用户的虚拟机列表
+   * @returns 用户的水下机器人列表
    */
   async getUserVmList(
     userId: string,
@@ -164,12 +163,12 @@ export class AdminVmService {
         records: result.records?.map(vm => this.transformUserVm(vm))
       } as any
     } catch (error) {
-      throw this.handleServiceError(error, `获取用户虚拟机列表失败 (User: ${userId})`)
+      throw this.handleServiceError(error, `获取用户水下机器人列表失败 (User: ${userId})`)
     }
   }
 
   /**
-   * 批量分配虚拟机给用户
+   * 批量分配水下机器人给用户
    * @param userId 用户ID
    * @param params 批量分配参数
    * @returns 批量分配结果
@@ -185,12 +184,12 @@ export class AdminVmService {
       const result = await admin.batchAssignVmsToUser(userId, params)
       return result
     } catch (error) {
-      throw this.handleServiceError(error, `批量分配虚拟机失败 (User: ${userId})`)
+      throw this.handleServiceError(error, `批量分配水下机器人失败 (User: ${userId})`)
     }
   }
 
   /**
-   * 批量移除用户虚拟机权限
+   * 批量移除用户水下机器人权限
    * @param userId 用户ID
    * @param params 批量移除参数
    * @returns 批量移除结果
@@ -206,16 +205,16 @@ export class AdminVmService {
       const result = await admin.batchRemoveUserVms(userId, params)
       return result
     } catch (error) {
-      throw this.handleServiceError(error, `批量移除虚拟机失败 (User: ${userId})`)
+      throw this.handleServiceError(error, `批量移除水下机器人失败 (User: ${userId})`)
     }
   }
 
-  // ==================== 管理员虚拟机管理视图 ====================
+  // ==================== 管理员水下机器人管理视图 ====================
 
   /**
-   * 管理员查看所有虚拟机
+   * 管理员查看所有水下机器人
    * @param params 查询参数
-   * @returns 虚拟机列表
+   * @returns 水下机器人列表
    */
   async getAdminVmList(params: AdminVmListParams = {}): Promise<PaginatedResponse<VirtualMachine>> {
     try {
@@ -227,14 +226,14 @@ export class AdminVmService {
         records: result.records?.map(vm => this.transformVirtualMachine(vm))
       } as any
     } catch (error) {
-      throw this.handleServiceError(error, '获取管理员虚拟机列表失败')
+      throw this.handleServiceError(error, '获取管理员水下机器人列表失败')
     }
   }
 
   /**
-   * 查看未分配虚拟机列表
+   * 查看未分配水下机器人列表
    * @param params 查询参数
-   * @returns 未分配虚拟机列表
+   * @returns 未分配水下机器人列表
    */
   async getUnassignedVmList(
     params: UnassignedVmListParams = {}
@@ -247,26 +246,26 @@ export class AdminVmService {
         total: result.total
       }
     } catch (error) {
-      throw this.handleServiceError(error, '获取未分配虚拟机列表失败')
+      throw this.handleServiceError(error, '获取未分配水下机器人列表失败')
     }
   }
 
   /**
-   * 获取虚拟机分配概况
-   * @returns 虚拟机分配概况统计
+   * 获取水下机器人分配概况
+   * @returns 水下机器人分配概况统计
    */
   async getVmAssignmentOverview(): Promise<VmAssignmentOverview> {
     try {
       const result = await admin.getVmAssignmentOverview()
       return this.transformVmAssignmentOverview(result)
     } catch (error) {
-      throw this.handleServiceError(error, '获取虚拟机分配概况失败')
+      throw this.handleServiceError(error, '获取水下机器人分配概况失败')
     }
   }
 
   /**
-   * 管理员强制控制虚拟机
-   * @param vmId 虚拟机ID
+   * 管理员强制控制水下机器人
+   * @param vmId 水下机器人ID
    * @param params 控制参数
    * @returns 控制响应
    */
@@ -285,18 +284,18 @@ export class AdminVmService {
       const result = await admin.forceControlVm(vmId, params)
       return result
     } catch (error) {
-      throw this.handleServiceError(error, `强制控制虚拟机失败 (VM: ${vmId})`)
+      throw this.handleServiceError(error, `强制控制水下机器人失败 (VM: ${vmId})`)
     }
   }
 
   // ==================== 私有方法 ====================
 
   /**
-   * 验证虚拟机ID
+   * 验证水下机器人ID
    */
   private validateVmId(vmId: string): void {
     if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-      throw new Error('虚拟机ID不能为空')
+      throw new Error('水下机器人ID不能为空')
     }
   }
 
@@ -310,16 +309,16 @@ export class AdminVmService {
   }
 
   /**
-   * 验证虚拟机ID列表
+   * 验证水下机器人ID列表
    */
   private validateVmIds(vmIds: string[]): void {
     if (!Array.isArray(vmIds) || vmIds.length === 0) {
-      throw new Error('虚拟机ID列表不能为空')
+      throw new Error('水下机器人ID列表不能为空')
     }
     
     vmIds.forEach((vmId, index) => {
       if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-        throw new Error(`虚拟机ID列表中第${index + 1}项无效`)
+        throw new Error(`水下机器人ID列表中第${index + 1}项无效`)
       }
     })
   }
@@ -351,7 +350,7 @@ export class AdminVmService {
   }
 
   /**
-   * 转换虚拟机分配信息
+   * 转换水下机器人分配信息
    */
   private transformVmAssignment(assignment: any): VmAssignment {
     return {
@@ -365,7 +364,7 @@ export class AdminVmService {
   }
 
   /**
-   * 转换虚拟机分配详情
+   * 转换水下机器人分配详情
    */
   private transformVmAssignmentDetail(detail: any): VmAssignmentDetail {
     return {
@@ -379,7 +378,7 @@ export class AdminVmService {
   }
 
   /**
-   * 转换虚拟机信息
+   * 转换水下机器人信息
    */
   private transformVirtualMachine(vm: any): VirtualMachine {
     return {
@@ -389,6 +388,7 @@ export class AdminVmService {
       port: vm.port,
       status: vm.status,
       connectionStatus: vm.connectionStatus,
+      batteryLevel: vm.batteryLevel,
       osType: vm.osType,
       cpuCores: vm.cpuCores,
       memoryMb: vm.memoryMb,
@@ -406,7 +406,7 @@ export class AdminVmService {
   }
 
   /**
-   * 转换用户虚拟机信息
+   * 转换用户水下机器人信息
    */
   private transformUserVm(vm: any): UserVm {
     return {
@@ -415,12 +415,13 @@ export class AdminVmService {
       ipAddress: vm.ipAddress,
       status: vm.status,
       permissions: vm.permissions,
-      assignedAt: vm.assignedAt
+      assignedAt: vm.assignedAt,
+      batteryLevel: vm.batteryLevel
     }
   }
 
   /**
-   * 转换虚拟机分配概况
+   * 转换水下机器人分配概况
    */
   private transformVmAssignmentOverview(overview: any): VmAssignmentOverview {
     return {

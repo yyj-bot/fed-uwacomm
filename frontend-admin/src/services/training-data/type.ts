@@ -49,7 +49,7 @@ export type ExportFormat = 'ZIP' | 'TAR'
  * 文件上传请求（FormData格式）
  */
 export interface UploadFileRequest {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 数据类型 */
   readonly dataType: DataType
@@ -73,7 +73,7 @@ export interface UploadFileResponse {
   readonly datasetDescription: string
   /** 数据集类型 */
   readonly datasetType: string
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 状态 */
   readonly status: string
@@ -89,7 +89,7 @@ export interface UploadFileResponse {
  * 文本上传请求
  */
 export interface UploadTextRequest {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 数据类型 */
   readonly dataType: DataType
@@ -115,7 +115,7 @@ export interface UploadTextResponse {
   readonly datasetDescription: string
   /** 数据集类型 */
   readonly datasetType: string
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 状态 */
   readonly status: string
@@ -131,7 +131,7 @@ export interface UploadTextResponse {
  * 数据列表查询参数
  */
 export interface DataListParams extends PaginationParams {
-  /** 虚拟机ID过滤 */
+  /** 水下机器人ID过滤 */
   readonly vmId?: string
   /** 数据类型过滤 */
   readonly dataType?: DataType
@@ -288,7 +288,7 @@ export interface BatchOperationResultItem {
  * 数据统计查询参数
  */
 export interface DataStatisticsParams {
-  /** 虚拟机ID过滤 */
+  /** 水下机器人ID过滤 */
   readonly vmId?: string
   /** 数据类型过滤 */
   readonly dataType?: DataType
@@ -299,7 +299,7 @@ export interface DataStatisticsParams {
 }
 
 /**
- * 虚拟机分布信息
+ * 水下机器人分布信息
  */
 export interface VMDistribution {
   /** 数据数量 */
@@ -497,7 +497,7 @@ export interface StorageMonitor {
   readonly usagePercentage: number
   /** 按数据类型分组的存储使用 */
   readonly storageByType: Record<DataType, number>
-  /** 按虚拟机分组的存储使用 */
+  /** 按水下机器人分组的存储使用 */
   readonly storageByVM: Record<string, number>
   /** 存储趋势 */
   readonly storageTrend: {

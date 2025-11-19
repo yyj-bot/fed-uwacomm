@@ -130,7 +130,7 @@ export const LogStatistics: React.FC = () => {
               >
                 <Option value="SYSTEM">系统日志</Option>
                 <Option value="USER">用户操作</Option>
-                <Option value="VM">虚拟机</Option>
+                <Option value="VM">水下机器人</Option>
                 <Option value="TASK">任务执行</Option>
                 <Option value="DATA">数据管理</Option>
                 <Option value="MODEL">模型管理</Option>
@@ -141,16 +141,16 @@ export const LogStatistics: React.FC = () => {
           </Col>
           <Col span={4}>
             <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Text strong>虚拟机ID</Text>
+              <Text strong>水下机器人ID</Text>
               <Select
-                placeholder="选择虚拟机"
+                placeholder="选择水下机器人"
                 value={vmId}
                 onChange={setVmId}
                 allowClear
                 style={{ width: '100%' }}
                 showSearch
               >
-                {/* 这里可以从后端获取虚拟机列表 */}
+                {/* 这里可以从后端获取水下机器人列表 */}
               </Select>
             </Space>
           </Col>

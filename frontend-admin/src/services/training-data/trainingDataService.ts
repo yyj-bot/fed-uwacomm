@@ -53,7 +53,7 @@ export class TrainingDataService {
 
       const vmIdEntry = formData.get('vmId')
       if (typeof vmIdEntry !== 'string') {
-        throw new Error('虚拟机ID格式不正确')
+        throw new Error('水下机器人ID格式不正确')
       }
 
       return {

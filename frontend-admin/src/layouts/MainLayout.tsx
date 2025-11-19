@@ -204,11 +204,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               color: 'white', 
               fontWeight: 'bold', 
               fontSize: '16px' 
-            }}>F</div>
+            }}>U</div>
             {!collapsed && (
               <div className="fed-logo-text" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>FedUWAComm</div>
-                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>联邦学习平台</div>
+                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>UFSP</div>
+                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>水下联邦调度平台</div>
               </div>
             )}
           </div>

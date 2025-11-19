@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 
 import { useDashboard, useVM, useTask } from '@/store'
+import type { VMSpeed } from '@/types'
 import { StatusIndicator } from '@/components'
 import { 
   OverviewCards, 
@@ -24,6 +25,28 @@ import {
 import styles from './DashboardPage.module.css'
 
 const { Title, Text } = Typography
+
+const formatSpeed = (speed?: VMSpeed): string => {
+  if (speed === undefined || speed === null) {
+    return '—'
+  }
+
+  if (typeof speed === 'number') {
+    return `${speed.toFixed(1)} m/s`
+  }
+
+  if (typeof speed === 'string') {
+    return speed
+  }
+
+  if (typeof speed.value === 'number') {
+    const unit = speed.unit || 'm/s'
+    const precision = typeof speed.precision === 'number' ? speed.precision : (unit === '°/s' ? 1 : 1)
+    return `${speed.value.toFixed(precision)} ${unit}`
+  }
+
+  return '—'
+}
 
 const DashboardPage: React.FC = () => {
   const { 
@@ -39,7 +62,7 @@ const DashboardPage: React.FC = () => {
   const { vmList, fetchVMList } = useVM()
   const { taskList, fetchTaskList } = useTask()
   
-  // 计算虚拟机统计
+  // 计算水下机器人统计
   const totalVMs = vmList?.length || 0
   const runningVMs = vmList?.filter(vm => vm.status === 'RUNNING')?.length || 0
   const vms = vmList || []
@@ -75,7 +98,7 @@ const DashboardPage: React.FC = () => {
         fetchOverview().then(() => console.log('✅ 概览数据加载成功')).catch((error) => console.error('❌ 仪表盘概览数据加载失败:', error)),
         fetchChartData().then(() => console.log('✅ 图表数据加载成功')).catch((error) => console.error('❌ 图表数据加载失败:', error)),
         fetchRecentActivities().then(() => console.log('✅ 活动数据加载成功')).catch((error) => console.error('❌ 最近活动数据加载失败:', error)),
-        fetchVMList({ page: 1, size: 100 }).then(() => console.log('✅ 虚拟机数据加载成功')).catch((error) => console.error('❌ 虚拟机数据加载失败:', error)),
+        fetchVMList({ page: 1, size: 100 }).then(() => console.log('✅ 水下机器人数据加载成功')).catch((error) => console.error('❌ 水下机器人数据加载失败:', error)),
         fetchTaskList({ page: 1, size: 100 }).then(() => console.log('✅ 任务数据加载成功')).catch((error) => console.error('❌ 任务数据加载失败:', error))
       ])
       
@@ -154,13 +177,18 @@ const DashboardPage: React.FC = () => {
                           }
                           title={<Text strong>{vm.name}</Text>}
                           description={
-                            <Space>
+                            <Space size={12} wrap>
                               <StatusIndicator
                                 status={vm.status === 'RUNNING' ? 'running' : 'stopped'}
                                 variant="text"
                                 size="small"
                               />
-                              <Text type="secondary">CPU: {(vm as any).cpuUsage || 0}%</Text>
+                              <Text type="secondary">
+                                电量: {typeof vm.batteryLevel === 'number' ? `${vm.batteryLevel}%` : '—'}
+                              </Text>
+                              <Text type="secondary">
+                                速度: {formatSpeed(vm.speed)}
+                              </Text>
                             </Space>
                           }
                         />

@@ -44,7 +44,7 @@ export type {
   UserServiceConfig
 } from './user'
 
-// 虚拟机服务
+// 水下机器人服务
 export { vmService } from './vm'
 export type {
   VMService,

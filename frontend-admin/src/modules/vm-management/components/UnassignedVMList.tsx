@@ -1,6 +1,6 @@
 /**
- * 未分配虚拟机列表组件
- * 显示系统中尚未分配给任何用户的虚拟机
+ * 未分配水下机器人列表组件
+ * 显示系统中尚未分配给任何用户的水下机器人
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -75,17 +75,23 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
   // 表格列定义 - 严格按照接口文档 admin-vm-api-reference.md 3.2
   const columns: ColumnsType<any> = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'name',
       key: 'name',
       width: 250,
       ellipsis: true
     },
     {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      width: 160
+      title: '电量',
+      dataIndex: 'batteryLevel',
+      key: 'batteryLevel',
+      width: 120,
+      render: (battery: number | undefined) => (
+        <Space size={6}>
+          <Badge status={battery !== undefined ? (battery > 60 ? 'success' : battery > 30 ? 'warning' : 'error') : 'default'} />
+          <span>{battery !== undefined ? `${battery}%` : '—'}</span>
+        </Space>
+      )
     },
     {
       title: '运行状态',
@@ -156,10 +162,10 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
         </Space>
       </div>
 
-      {/* 虚拟机列表 */}
+      {/* 水下机器人列表 */}
       {filteredVmList.length === 0 && !loading ? (
         <Empty
-          description="暂无未分配的虚拟机"
+          description="暂无未分配的水下机器人"
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : (
@@ -170,10 +176,9 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
           loading={loading}
           pagination={{
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 台未分配虚拟机`,
+            showTotal: (total) => `共 ${total} 台未分配水下机器人`,
             pageSizeOptions: ['10', '20', '50']
           }}
-          scroll={{ x: 1100 }}
         />
       )}
     </div>

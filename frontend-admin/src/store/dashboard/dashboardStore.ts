@@ -27,7 +27,7 @@ interface DashboardOverview {
     onlineUsers: number
   }
   
-  // 虚拟机统计
+  // 水下机器人统计
   vmStats: {
     totalVMs: number
     runningVMs: number
@@ -344,7 +344,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
           modelsToday: 0
         },
         participantStats: {
-          totalParticipants: totalVMs, // 总参与者 = 总虚拟机数
+          totalParticipants: totalVMs, // 总参与者 = 总水下机器人数
           onlineParticipants,
           activeParticipants: onlineParticipants, // 活跃参与者 = 在线参与者
           newParticipantsToday: 0
@@ -573,7 +573,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   },
 
   /**
-   * 快速创建虚拟机
+   * 快速创建水下机器人
    */
   quickCreateVM: async (vmConfig: any) => {
     set((state) => ({
@@ -591,7 +591,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       // 这里应该调用 vmService.createVM
       // const response = await vmService.createVM(vmConfig)
       
-      // 模拟创建虚拟机
+      // 模拟创建水下机器人
       const vmId = `VM-${Date.now()}`
       
       set((state) => ({
@@ -603,7 +603,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       
       return vmId
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '快速创建虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '快速创建水下机器人失败'
       set((state) => ({
         quickActionLoading: {
           ...state.quickActionLoading,

@@ -1,27 +1,36 @@
 import { createApiInstance } from './base'
 import type { 
   ApiResponse, 
-  PaginationParams
+  PaginationParams,
+  UnderwaterRobotSpecs
 } from '@/types'
 
-// 创建虚拟机API实例
+// 创建水下机器人API实例
 const vmApiInstance = createApiInstance('VM')
 // 创建模型API实例（用于本地模型相关接口）
 const modelApiInstance = createApiInstance('MODEL')
 
 // ==================== 类型定义 ====================
 
-// 虚拟机基础信息类型
+// 水下机器人基础信息类型
+type VMSpeed = number | string | {
+  value: number
+  unit?: string
+}
+
 interface VirtualMachine {
   vmId: string
   name: string
   ipAddress: string
   port: number
+
   status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR' | 'OFFLINE'
   osType: string
   cpuCores: number
   memoryMb: number
   diskGb: number
+  batteryLevel?: number
+  speed?: VMSpeed
   connectionStatus: 'CONNECTED' | 'DISCONNECTED'
   lastHeartbeat?: string
   wsSessionId?: string
@@ -55,9 +64,10 @@ interface VirtualMachine {
     department?: string
     tags?: string[]
   }
+  specs?: UnderwaterRobotSpecs
 }
 
-// 虚拟机状态类型
+// 水下机器人状态类型
 interface VMStatus {
   vmId: string
   status: 'RUNNING' | 'STOPPED' | 'STARTING' | 'STOPPING' | 'ERROR' | 'OFFLINE'
@@ -85,6 +95,7 @@ interface VMStatus {
   }
   lastHeartbeat?: string
   wsSessionId?: string
+  specs?: UnderwaterRobotSpecs
 }
 
 // 本地模型结果类型
@@ -100,6 +111,7 @@ interface VMRoundModel {
     [key: string]: number
   }
   createdAt: string
+  specs?: UnderwaterRobotSpecs
 }
 
 // 本地模型训练指标趋势类型
@@ -111,6 +123,7 @@ interface VMModelTrend {
     roundNumber: number
     value: number
   }>
+  specs?: UnderwaterRobotSpecs
 }
 
 // 本地模型最佳/离群查询结果类型
@@ -124,14 +137,13 @@ interface VMModelBest {
     vmId: string
     value: number
   }
+  specs?: UnderwaterRobotSpecs
 }
 
-
-
-// ==================== 虚拟机管理API ====================
+// ==================== 水下机器人管理API ====================
 export const vmApi = {
 
-  // ==================== 4.1 虚拟机列表查询接口 ====================
+  // ==================== 4.1 水下机器人列表查询接口 ====================
   async getVMList(params: PaginationParams & {
     status?: string
     osType?: string
@@ -153,13 +165,13 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 4.2 虚拟机详情查询接口 ====================
+  // ==================== 4.2 水下机器人详情查询接口 ====================
   async getVMDetail(vmId: string): Promise<VirtualMachine> {
     const response = await vmApiInstance.get<ApiResponse<VirtualMachine>>(`/vm/${vmId}`)
     return response.data.data
   },
 
-  // ==================== 4.3 虚拟机更新接口 ====================
+  // ==================== 4.3 水下机器人更新接口 ====================
   async updateVM(vmId: string, vmData: Partial<{
     name: string
     ipAddress: string
@@ -209,7 +221,7 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 4.4 虚拟机删除接口 ====================
+  // ==================== 4.4 水下机器人删除接口 ====================
   async deleteVM(vmId: string, force?: boolean): Promise<{
     vmId: string
     deletedAt: string
@@ -222,7 +234,7 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 5.1 虚拟机启动接口 ====================
+  // ==================== 5.1 水下机器人启动接口 ====================
   async startVM(vmId: string, startData?: {
     timeout?: number
     config?: {
@@ -249,7 +261,7 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 5.2 虚拟机停止接口 ====================
+  // ==================== 5.2 水下机器人停止接口 ====================
   async stopVM(vmId: string, stopData?: {
     force?: boolean
     timeout?: number
@@ -269,7 +281,7 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 5.3 虚拟机重启接口 ====================
+  // ==================== 5.3 水下机器人重启接口 ====================
   async restartVM(vmId: string, restartData?: {
     timeout?: number
     graceful?: boolean
@@ -292,7 +304,7 @@ export const vmApi = {
     return response.data.data
   },
 
-  // ==================== 6.1 虚拟机状态查询接口 ====================
+  // ==================== 6.1 水下机器人状态查询接口 ====================
   async getVMStatus(vmId: string): Promise<VMStatus> {
     const response = await vmApiInstance.get<ApiResponse<VMStatus>>(`/vm/${vmId}/status`)
     return response.data.data

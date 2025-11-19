@@ -1,6 +1,6 @@
 /**
  * VM分配管理组件
- * 管理虚拟机的用户分配、权限管理
+ * 管理水下机器人的用户分配、权限管理
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -224,7 +224,7 @@ const VMAssignmentManager: React.FC<VMAssignmentManagerProps> = ({ vmId, vmName 
           </Button>
           <Popconfirm
             title="确定取消分配吗?"
-            description={`将取消 ${record.username} 对此虚拟机的访问权限`}
+            description={`将取消 ${record.username} 对此水下机器人的访问权限`}
             onConfirm={() => handleUnassign(record.userId, record.username)}
             okText="确定"
             cancelText="取消"
@@ -310,7 +310,7 @@ const VMAssignmentManager: React.FC<VMAssignmentManagerProps> = ({ vmId, vmName 
 
       {/* 分配模态框 */}
       <Modal
-        title="分配虚拟机给用户"
+        title="分配水下机器人给用户"
         open={assignModalVisible}
         onOk={handleAssign}
         onCancel={() => {

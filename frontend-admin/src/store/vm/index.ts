@@ -1,5 +1,5 @@
 /**
- * 虚拟机管理模块统一导出
+ * 水下机器人管理模块统一导出
  * 
  * @author FedUWAComm Team
  * @version 1.0.0

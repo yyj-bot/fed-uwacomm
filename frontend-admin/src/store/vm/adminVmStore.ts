@@ -1,6 +1,6 @@
 /**
- * 管理员虚拟机管理状态管理 Store
- * 管理虚拟机分配、权限管理、概况统计等管理员VM功能相关状态和操作
+ * 管理员水下机器人管理状态管理 Store
+ * 管理水下机器人分配、权限管理、概况统计等管理员VM功能相关状态和操作
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -200,7 +200,7 @@ export const useAdminVmStore = create<AdminVmStore>((set, get) => ({
         }
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取管理员虚拟机列表失败'
+      const errorMessage = error instanceof Error ? error.message : '获取管理员水下机器人列表失败'
       set({
         adminVmListLoading: false,
         adminVmListError: errorMessage
@@ -254,7 +254,7 @@ export const useAdminVmStore = create<AdminVmStore>((set, get) => ({
       await get().fetchVmAssignments(vmId)
       await get().refreshAdminVmList()
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '分配虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '分配水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,

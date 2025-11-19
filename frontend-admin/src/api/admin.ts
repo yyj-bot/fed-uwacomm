@@ -18,13 +18,13 @@ interface Permission {
   grantedAt: string
 }
 
-// ==================== 虚拟机管理相关类型定义 ====================
+// ==================== 水下机器人管理相关类型定义 ====================
 
 // VM权限类型
 type VmPermission = 'READ' | 'WRITE' | 'EXECUTE' | 'ADMIN'
 
 // VM状态类型
-type VmStatus = 'RUNNING' | 'STOPPED' | 'ERROR' | 'STARTING' | 'STOPPING'
+type VmStatus = 'RUNNING' | 'STOPPED' | 'ERROR' | 'STARTING' | 'STOPPING' | 'OFFLINE'
 
 // VM连接状态类型
 type VmConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
@@ -32,7 +32,7 @@ type VmConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
 // VM控制操作类型
 type VmControlAction = 'START' | 'STOP' | 'RESTART' | 'FORCE_STOP'
 
-// 虚拟机分配信息
+// 水下机器人分配信息
 interface VmAssignment {
   vmId: string
   userId: string
@@ -42,7 +42,7 @@ interface VmAssignment {
   notes?: string
 }
 
-// 虚拟机分配详情（包含用户信息）
+// 水下机器人分配详情（包含用户信息）
 interface VmAssignmentDetail {
   userId: string
   username: string
@@ -52,7 +52,7 @@ interface VmAssignmentDetail {
   assignedBy: string
 }
 
-// 虚拟机基本信息
+// 水下机器人基本信息
 interface VirtualMachine {
   vmId: string
   name: string
@@ -63,9 +63,10 @@ interface VirtualMachine {
   assignedUserCount?: number
   createdAt: string
   lastHeartbeat?: string
+  batteryLevel?: number
 }
 
-// 用户虚拟机信息
+// 用户水下机器人信息
 interface UserVm {
   vmId: string
   vmName: string
@@ -73,6 +74,7 @@ interface UserVm {
   status: VmStatus
   permissions: VmPermission[]
   assignedAt: string
+  batteryLevel?: number
 }
 
 // 批量操作结果
@@ -84,7 +86,7 @@ interface BatchOperationResult {
   error?: string
 }
 
-// 虚拟机分配概况统计
+// 水下机器人分配概况统计
 interface VmAssignmentOverview {
   summary: {
     totalVms: number
@@ -195,9 +197,9 @@ export const admin = {
     return response.data.data
   },
 
-  // ==================== 虚拟机分配管理API ====================
+  // ==================== 水下机器人分配管理API ====================
   
-  // 1.1 分配虚拟机给用户
+  // 1.1 分配水下机器人给用户
   async assignVmToUser(vmId: string, userId: string, params: {
     permissions?: VmPermission[]
     notes?: string
@@ -209,7 +211,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 1.2 取消虚拟机分配
+  // 1.2 取消水下机器人分配
   async unassignVmFromUser(vmId: string, userId: string): Promise<{
     vmId: string
     userId: string
@@ -223,7 +225,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 1.3 查看虚拟机分配情况
+  // 1.3 查看水下机器人分配情况
   async getVmAssignments(vmId: string): Promise<{
     vmId: string
     vmName: string
@@ -239,7 +241,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 1.4 修改用户虚拟机权限
+  // 1.4 修改用户水下机器人权限
   async updateUserVmPermissions(vmId: string, userId: string, permissions: VmPermission[]): Promise<{
     vmId: string
     userId: string
@@ -257,9 +259,9 @@ export const admin = {
     return response.data.data
   },
 
-  // ==================== 用户虚拟机管理API ====================
+  // ==================== 用户水下机器人管理API ====================
   
-  // 2.1 查看用户的虚拟机列表
+  // 2.1 查看用户的水下机器人列表
   async getUserVmList(userId: string, params: PaginationParams & {
     status?: VmStatus
   } = {}): Promise<PaginatedResponse<UserVm> & {
@@ -273,7 +275,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 2.2 批量分配虚拟机给用户
+  // 2.2 批量分配水下机器人给用户
   async batchAssignVmsToUser(userId: string, params: {
     vmIds: string[]
     permissions?: VmPermission[]
@@ -293,7 +295,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 2.3 批量移除用户虚拟机权限
+  // 2.3 批量移除用户水下机器人权限
   async batchRemoveUserVms(userId: string, params: {
     vmIds: string[]
   }): Promise<{
@@ -311,9 +313,9 @@ export const admin = {
     return response.data.data
   },
 
-  // ==================== 管理员虚拟机管理视图API ====================
+  // ==================== 管理员水下机器人管理视图API ====================
   
-  // 3.1 管理员查看所有虚拟机
+  // 3.1 管理员查看所有水下机器人
   async getAdminVmList(params: PaginationParams & {
     status?: VmStatus
     assigned?: boolean
@@ -323,7 +325,7 @@ export const admin = {
     return response.data.data
   },
 
-  // 3.2 查看未分配虚拟机列表
+  // 3.2 查看未分配水下机器人列表
   async getUnassignedVmList(params: {
     status?: VmStatus
   } = {}): Promise<{
@@ -337,13 +339,13 @@ export const admin = {
     return response.data.data
   },
 
-  // 3.3 虚拟机分配概况
+  // 3.3 水下机器人分配概况
   async getVmAssignmentOverview(): Promise<VmAssignmentOverview> {
     const response = await adminApiInstance.get<ApiResponse<VmAssignmentOverview>>('/vm/assignments/overview')
     return response.data.data
   },
 
-  // 3.4 管理员强制控制虚拟机
+  // 3.4 管理员强制控制水下机器人
   async forceControlVm(vmId: string, params: {
     action: VmControlAction
     reason: string

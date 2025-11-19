@@ -859,7 +859,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   // ==================== 预配置接�?====================
   
   /**
-   * 获取可用虚拟机列�?
+   * 获取可用水下机器人列�?
    */
   fetchAvailableVMs: async (params?: {
     algorithm?: string
@@ -879,7 +879,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         availableVMsError: null
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取可用虚拟机列表失败'
+      const errorMessage = error instanceof Error ? error.message : '获取可用水下机器人列表失败'
       set({
         availableVMsLoading: false,
         availableVMsError: errorMessage
