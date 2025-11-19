@@ -1,6 +1,6 @@
 /**
  * VM编辑模态框组件
- * 用于编辑虚拟机的配置信息
+ * 用于编辑水下机器人的配置信息
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -137,7 +137,7 @@ const VMEditModal: React.FC<VMEditModalProps> = ({
 
   return (
     <Modal
-      title={`编辑虚拟机 - ${vm?.name || ''}`}
+      title={`编辑水下机器人 - ${vm?.name || ''}`}
       open={visible}
       onOk={handleSubmit}
       onCancel={handleCancel}
@@ -155,14 +155,14 @@ const VMEditModal: React.FC<VMEditModalProps> = ({
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                label="虚拟机名称"
+                label="水下机器人名称"
                 name="name"
                 rules={[
-                  { required: true, message: '请输入虚拟机名称' },
+                  { required: true, message: '请输入水下机器人名称' },
                   { max: 100, message: '名称不能超过100个字符' }
                 ]}
               >
-                <Input placeholder="请输入虚拟机名称" />
+                <Input placeholder="请输入水下机器人名称" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -452,7 +452,7 @@ const VMEditModal: React.FC<VMEditModalProps> = ({
             name="metadata.description"
           >
             <TextArea 
-              placeholder="虚拟机描述信息"
+              placeholder="水下机器人描述信息"
               rows={3}
             />
           </Form.Item>

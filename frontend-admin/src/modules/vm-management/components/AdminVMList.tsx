@@ -1,15 +1,15 @@
 /**
- * 管理员虚拟机列表组件
- * 使用管理员API查看所有虚拟机，不受权限限制
+ * 管理员水下机器人列表组件
+ * 使用管理员API查看所有水下机器人，不受权限限制
  * 
  * 功能：
- * - 查看虚拟机列表（管理员接口）
- * - 虚拟机更新（接口 4.3）
- * - 虚拟机删除（接口 4.4）
- * - 虚拟机控制：启动（接口 5.1）、停止（接口 5.2）、重启（接口 5.3）
- * - 虚拟机分配管理
+ * - 查看水下机器人列表（管理员接口）
+ * - 水下机器人更新（接口 4.3）
+ * - 水下机器人删除（接口 4.4）
+ * - 水下机器人控制：启动（接口 5.1）、停止（接口 5.2）、重启（接口 5.3）
+ * - 水下机器人分配管理
  * 
- * 注意：查看虚拟机详情请使用"虚拟机列表"模块
+ * 注意：查看水下机器人详情请使用"水下机器人列表"模块
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -111,61 +111,61 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
     setAssignedFilter(undefined)
   }
 
-  // 处理虚拟机启动 (接口 5.1)
+  // 处理水下机器人启动 (接口 5.1)
   const handleStartVM = async (vmId: string) => {
     setControlLoading(vmId)
     try {
       await vmService.startVM(vmId)
-      message.success('虚拟机启动命令已发送')
+      message.success('水下机器人启动命令已发送')
       // 延迟刷新，给状态变更一点时间（mock 启动延迟 3s）
       setTimeout(() => {
         onRefresh()
         setControlLoading(null)
       }, 3500)
     } catch (error: any) {
-      message.error(error.message || '虚拟机启动失败')
-      console.error('启动虚拟机失败:', error)
+      message.error(error.message || '水下机器人启动失败')
+      console.error('启动水下机器人失败:', error)
       setControlLoading(null)
     }
   }
 
-  // 处理虚拟机停止 (接口 5.2)
+  // 处理水下机器人停止 (接口 5.2)
   const handleStopVM = async (vmId: string) => {
     setControlLoading(vmId)
     try {
       await vmService.stopVM(vmId, { force: false })
-      message.success('虚拟机停止命令已发送')
+      message.success('水下机器人停止命令已发送')
       // 延迟刷新，给状态变更一点时间（mock 延迟 1000ms）
       setTimeout(() => {
         onRefresh()
         setControlLoading(null)
       }, 1500)
     } catch (error: any) {
-      message.error(error.message || '虚拟机停止失败')
-      console.error('停止虚拟机失败:', error)
+      message.error(error.message || '水下机器人停止失败')
+      console.error('停止水下机器人失败:', error)
       setControlLoading(null)
     }
   }
 
-  // 处理虚拟机重启 (接口 5.3)
+  // 处理水下机器人重启 (接口 5.3)
   const handleRestartVM = async (vmId: string) => {
     setControlLoading(vmId)
     try {
       await vmService.restartVM(vmId)
-      message.success('虚拟机重启命令已发送')
+      message.success('水下机器人重启命令已发送')
       // 延迟刷新，给状态变更一点时间（mock 延迟 1000ms）
       setTimeout(() => {
         onRefresh()
         setControlLoading(null)
       }, 1500)
     } catch (error: any) {
-      message.error(error.message || '虚拟机重启失败')
-      console.error('重启虚拟机失败:', error)
+      message.error(error.message || '水下机器人重启失败')
+      console.error('重启水下机器人失败:', error)
       setControlLoading(null)
     }
   }
 
-  // 处理编辑虚拟机 (接口 4.3)
+  // 处理编辑水下机器人 (接口 4.3)
   const handleEditVM = (vm: any) => {
     if (onEdit) {
       onEdit(vm)
@@ -174,15 +174,15 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
     }
   }
 
-  // 处理删除虚拟机 (接口 4.4)
+  // 处理删除水下机器人 (接口 4.4)
   const handleDeleteVM = async (vmId: string, vmName: string) => {
     try {
       await vmService.deleteVM(vmId, false)
-      message.success(`虚拟机 "${vmName}" 删除成功`)
+      message.success(`水下机器人 "${vmName}" 删除成功`)
       onRefresh()
     } catch (error: any) {
-      message.error(error.message || '虚拟机删除失败')
-      console.error('删除虚拟机失败:', error)
+      message.error(error.message || '水下机器人删除失败')
+      console.error('删除水下机器人失败:', error)
     }
   }
 
@@ -214,35 +214,43 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
   // 表格列定义 - 严格按照接口文档 admin-vm-api-reference.md 3.1
   const columns: ColumnsType<any> = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'name',
       key: 'name',
-      width: 220,
+      width: 180,
       fixed: 'left',
       ellipsis: true
     },
     {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      width: 150
+      title: '电量',
+      dataIndex: 'batteryLevel',
+      key: 'batteryLevel',
+      width: 120,
+      render: (battery: number | undefined) => (
+        <Space size={6}>
+          <Badge
+            status={battery !== undefined ? (battery > 60 ? 'success' : battery > 30 ? 'warning' : 'error') : 'default'}
+          />
+          <span>{battery !== undefined ? `${battery}%` : '—'}</span>
+        </Space>
+      )
     },
     {
       title: '运行状态',
       key: 'status',
-      width: 110,
+      width: 120,
       render: (_, record) => getStatusTag(record.status)
     },
     {
       title: '连接状态',
       key: 'connectionStatus',
-      width: 130,
+      width: 140,
       render: (_, record) => getConnectionStatusTag(record.connectionStatus)
     },
     {
       title: '分配状态',
       key: 'assignmentStatus',
-      width: 140,
+      width: 160,
       render: (_, record) => {
         const vm = record as any
         if (vm.isAssigned) {
@@ -258,24 +266,10 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
       }
     },
     {
-      title: '创建时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (time: string) => time ? new Date(time).toLocaleString('zh-CN') : '-'
-    },
-    {
-      title: '最后心跳',
-      dataIndex: 'lastHeartbeat',
-      key: 'lastHeartbeat',
-      width: 180,
-      render: (time: string) => time ? new Date(time).toLocaleString('zh-CN') : '-'
-    },
-    {
       title: '操作',
       key: 'actions',
       fixed: 'right',
-      width: 450,
+      width: 360,
       render: (_, record) => {
         const isRunning = record.status === 'RUNNING'
         const isStopped = record.status === 'STOPPED'
@@ -285,10 +279,10 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
         return (
           <Space size="small" wrap>
             {isStopped && (
-              <Tooltip title="启动虚拟机">
+              <Tooltip title="启动水下机器人">
                 <Popconfirm
-                  title="确认启动虚拟机？"
-                  description="虚拟机将开始运行"
+                  title="确认启动水下机器人？"
+                  description="水下机器人将开始运行"
                   onConfirm={() => handleStartVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
@@ -310,10 +304,10 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
             )}
 
             {isRunning && (
-              <Tooltip title="停止虚拟机">
+              <Tooltip title="停止水下机器人">
                 <Popconfirm
-                  title="确认停止虚拟机？"
-                  description="虚拟机将被安全停止"
+                  title="确认停止水下机器人？"
+                  description="水下机器人将被安全停止"
                   onConfirm={() => handleStopVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
@@ -336,10 +330,10 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
             )}
 
             {isRunning && (
-              <Tooltip title="重启虚拟机">
+              <Tooltip title="重启水下机器人">
                 <Popconfirm
-                  title="确认重启虚拟机？"
-                  description="虚拟机将重新启动"
+                  title="确认重启水下机器人？"
+                  description="水下机器人将重新启动"
                   onConfirm={() => handleRestartVM(record.vmId)}
                   okText="确认"
                   cancelText="取消"
@@ -361,7 +355,7 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               </Tooltip>
             )}
 
-            <Tooltip title="编辑虚拟机">
+            <Tooltip title="编辑水下机器人">
               <Button
                 type="link"
                 size="small"
@@ -394,9 +388,9 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
               </Button>
             </Tooltip>
 
-            <Tooltip title="删除虚拟机">
+            <Tooltip title="删除水下机器人">
               <Popconfirm
-                title={`确认删除虚拟机 "${record.name}"？`}
+                title={`确认删除水下机器人 "${record.name}"？`}
                 description="此操作不可恢复！请确认删除。"
                 onConfirm={() => handleDeleteVM(record.vmId, record.name)}
                 okText="确认删除"
@@ -428,7 +422,7 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
       <div className="vm-list-filters" style={{ marginBottom: 16 }}>
         <Space wrap>
           <Input
-            placeholder="搜索虚拟机名称或IP地址"
+            placeholder="搜索水下机器人名称"
             prefix={<SearchOutlined />}
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
@@ -471,7 +465,7 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
         </Space>
       </div>
 
-      {/* 虚拟机列表 */}
+      {/* 水下机器人列表 */}
       <Table
         columns={columns}
         dataSource={filteredVmList}
@@ -480,10 +474,9 @@ const AdminVMList: React.FC<AdminVMListProps> = ({
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 台虚拟机`,
+          showTotal: (total) => `共 ${total} 台水下机器人`,
           pageSizeOptions: ['10', '20', '50', '100']
         }}
-        scroll={{ x: 1400 }}
       />
     </div>
   )

@@ -64,10 +64,10 @@ export const mockLogs: MockLog[] = [
   },
   {
     logId: "e5f6789012345678901abcd234567890",
-    level: "INFO",
+    level: "ERROR",
     category: "VM",
     vmId: "a1b2c3d4e5f678901234567890123456",
-    message: "虚拟机连接成功",
+    message: "水下机器人电量不足",
     details: {
       vmName: "VM-001",
       ip: "192.168.1.101"
@@ -79,7 +79,7 @@ export const mockLogs: MockLog[] = [
     level: "INFO",
     category: "TASK",
     taskId: "b2c3d4e5f67890123456789012345678",
-    message: "联邦学习任务创建成功",
+    message: "任务创建成功",
     details: {
       taskName: "MNIST训练任务",
       algorithm: "FEDAVG",
@@ -89,9 +89,9 @@ export const mockLogs: MockLog[] = [
   },
   {
     logId: "a7890123456789012cdef456789012ab",
-    level: "WARN",
-    category: "SYSTEM",
-    message: "磁盘空间不足",
+    level: "INFO",
+    category: "VM",
+    message: "水下机器人连接成功",
     details: {
       diskUsage: 85,
       threshold: 80
@@ -99,21 +99,13 @@ export const mockLogs: MockLog[] = [
     createdAt: "2024-01-01T10:20:00.000Z"
   },
   {
-    logId: "b890123456789012defab56789012abc",
-    level: "ERROR",
+    logId: "a7890123456789012cdef456789012ab",
+    level: "INFO",
     category: "TASK",
-    taskId: "b2c3d4e5f67890123456789012345678",
-    vmId: "a1b2c3d4e5f678901234567890123456",
-    message: "联邦学习任务执行失败",
+    message: "任务执行成功",
     details: {
-      errorCode: "TASK_EXECUTION_FAILED",
-      errorMessage: "模型训练过程中出现异常",
-      stackTrace: "java.lang.Exception: Model training failed at round 5",
-      context: {
-        round: 5,
-        algorithm: "FEDAVG",
-        participants: 3
-      }
+      diskUsage: 85,
+      threshold: 80
     },
     createdAt: "2024-01-01T10:25:00.000Z"
   },
@@ -142,27 +134,10 @@ export const mockLogs: MockLog[] = [
     createdAt: "2024-01-01T10:35:00.000Z"
   },
   {
-    logId: "e123456789012abcdef89012abcdef12",
-    level: "WARN",
-    category: "SECURITY",
-    message: "检测到异常登录行为",
-    details: {
-      userId: "suspicious_user_id",
-      ip: "192.168.1.200",
-      reason: "多次登录失败"
-    },
-    createdAt: "2024-01-01T10:40:00.000Z"
-  },
-  {
     logId: "f23456789012bcdefab9012abcdef123",
-    level: "DEBUG",
-    category: "PERFORMANCE",
-    message: "API响应时间监控",
-    details: {
-      endpoint: "/api/user/login",
-      responseTime: 150,
-      status: 200
-    },
+    level: "INFO",
+    category: "VM",
+    message: "水下机器人启动成功",
     createdAt: "2024-01-01T10:45:00.000Z"
   }
 ];
@@ -202,7 +177,7 @@ export const systemLogApiMock = {
         category: "TASK",
         vmId: "a1b2c3d4e5f678901234567890123456",
         taskId: "b2c3d4e5f67890123456789012345678",
-        message: "联邦学习任务执行失败",
+        message: "任务执行失败",
         details: {
           errorCode: "TASK_EXECUTION_FAILED",
           errorMessage: "模型训练过程中出现异常",

@@ -225,7 +225,7 @@ export interface AdminServiceConfig {
   readonly retryDelay: number
 }
 
-// ==================== 虚拟机管理相关类型 ====================
+// ==================== 水下机器人管理相关类型 ====================
 
 /**
  * VM权限类型
@@ -248,10 +248,10 @@ export type VmConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING'
 export type VmControlAction = 'START' | 'STOP' | 'RESTART' | 'FORCE_STOP'
 
 /**
- * 虚拟机分配信息
+ * 水下机器人分配信息
  */
 export interface VmAssignment {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 用户ID */
   readonly userId: string
@@ -266,7 +266,7 @@ export interface VmAssignment {
 }
 
 /**
- * 虚拟机分配详情（包含用户信息）
+ * 水下机器人分配详情（包含用户信息）
  */
 export interface VmAssignmentDetail {
   /** 用户ID */
@@ -284,21 +284,23 @@ export interface VmAssignmentDetail {
 }
 
 /**
- * 虚拟机基本信息
+ * 水下机器人基本信息
  */
 export interface VirtualMachine {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机名称 */
+  /** 水下机器人名称 */
   readonly name: string
   /** IP地址 */
   readonly ipAddress: string
   /** 端口 */
   readonly port?: number
-  /** 虚拟机状态 */
+  /** 水下机器人状态 */
   readonly status: VmStatus
   /** 连接状态 */
   readonly connectionStatus: VmConnectionStatus
+  /** 电量百分比 */
+  readonly batteryLevel?: number
   /** 操作系统类型 */
   readonly osType?: string
   /** CPU核心数 */
@@ -352,28 +354,30 @@ export interface VirtualMachine {
 }
 
 /**
- * 用户虚拟机信息
+ * 用户水下机器人信息
  */
 export interface UserVm {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机名称 */
+  /** 水下机器人名称 */
   readonly vmName: string
   /** IP地址 */
   readonly ipAddress: string
-  /** 虚拟机状态 */
+  /** 水下机器人状态 */
   readonly status: VmStatus
   /** 权限列表 */
   readonly permissions: VmPermission[]
   /** 分配时间 */
   readonly assignedAt: string
+  /** 电量百分比 */
+  readonly batteryLevel?: number
 }
 
 /**
  * 批量操作结果
  */
 export interface BatchOperationResult {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 操作状态 */
   readonly status: 'SUCCESS' | 'FAILED'
@@ -386,25 +390,25 @@ export interface BatchOperationResult {
 }
 
 /**
- * 虚拟机分配概况统计
+ * 水下机器人分配概况统计
  */
 export interface VmAssignmentOverview {
   /** 概况统计 */
   readonly summary: {
-    /** 总虚拟机数 */
+    /** 总水下机器人数 */
     readonly totalVms: number
-    /** 已分配虚拟机数 */
+    /** 已分配水下机器人数 */
     readonly assignedVms: number
-    /** 未分配虚拟机数 */
+    /** 未分配水下机器人数 */
     readonly unassignedVms: number
     /** 总用户数 */
     readonly totalUsers: number
-    /** 拥有虚拟机的用户数 */
+    /** 拥有水下机器人的用户数 */
     readonly usersWithVms: number
   }
   /** 状态分布 */
   readonly statusDistribution: Record<VmStatus, number>
-  /** 热门虚拟机（分配最多的） */
+  /** 热门水下机器人（分配最多的） */
   readonly topAssignedVms: Array<{
     readonly vmId: string
     readonly vmName: string
@@ -424,7 +428,7 @@ export interface VmAssignmentOverview {
  * VM控制命令响应
  */
 export interface VmControlResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 操作类型 */
   readonly action: VmControlAction
@@ -441,10 +445,10 @@ export interface VmControlResponse {
 }
 
 /**
- * 分配虚拟机请求参数
+ * 分配水下机器人请求参数
  */
 export interface AssignVmRequest {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 用户ID */
   readonly userId: string
@@ -455,10 +459,10 @@ export interface AssignVmRequest {
 }
 
 /**
- * 取消分配虚拟机响应
+ * 取消分配水下机器人响应
  */
 export interface UnassignVmResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 用户ID */
   readonly userId: string
@@ -467,12 +471,12 @@ export interface UnassignVmResponse {
 }
 
 /**
- * 虚拟机分配信息响应
+ * 水下机器人分配信息响应
  */
 export interface VmAssignmentInfoResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
-  /** 虚拟机名称 */
+  /** 水下机器人名称 */
   readonly vmName: string
   /** 分配列表 */
   readonly assignments: VmAssignmentDetail[]
@@ -484,7 +488,7 @@ export interface VmAssignmentInfoResponse {
  * 更新权限响应
  */
 export interface UpdateVmPermissionsResponse {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 用户ID */
   readonly userId: string
@@ -497,7 +501,7 @@ export interface UpdateVmPermissionsResponse {
 }
 
 /**
- * 用户虚拟机列表请求参数
+ * 用户水下机器人列表请求参数
  */
 export interface UserVmListParams extends PaginationParams {
   /** 用户ID */
@@ -507,12 +511,12 @@ export interface UserVmListParams extends PaginationParams {
 }
 
 /**
- * 批量分配虚拟机请求
+ * 批量分配水下机器人请求
  */
 export interface BatchAssignVmsRequest {
   /** 用户ID */
   readonly userId: string
-  /** 虚拟机ID列表 */
+  /** 水下机器人ID列表 */
   readonly vmIds: string[]
   /** 权限列表 */
   readonly permissions?: VmPermission[]
@@ -521,7 +525,7 @@ export interface BatchAssignVmsRequest {
 }
 
 /**
- * 批量分配虚拟机响应
+ * 批量分配水下机器人响应
  */
 export interface BatchAssignVmsResponse {
   /** 用户ID */
@@ -535,17 +539,17 @@ export interface BatchAssignVmsResponse {
 }
 
 /**
- * 批量移除虚拟机请求
+ * 批量移除水下机器人请求
  */
 export interface BatchRemoveVmsRequest {
   /** 用户ID */
   readonly userId: string
-  /** 虚拟机ID列表 */
+  /** 水下机器人ID列表 */
   readonly vmIds: string[]
 }
 
 /**
- * 批量移除虚拟机响应
+ * 批量移除水下机器人响应
  */
 export interface BatchRemoveVmsResponse {
   /** 用户ID */
@@ -559,7 +563,7 @@ export interface BatchRemoveVmsResponse {
 }
 
 /**
- * 管理员虚拟机列表请求参数
+ * 管理员水下机器人列表请求参数
  */
 export interface AdminVmListParams extends PaginationParams {
   /** 状态筛选 */
@@ -571,7 +575,7 @@ export interface AdminVmListParams extends PaginationParams {
 }
 
 /**
- * 未分配虚拟机列表请求参数
+ * 未分配水下机器人列表请求参数
  */
 export interface UnassignedVmListParams {
   /** 状态筛选 */
@@ -579,20 +583,20 @@ export interface UnassignedVmListParams {
 }
 
 /**
- * 未分配虚拟机列表响应
+ * 未分配水下机器人列表响应
  */
 export interface UnassignedVmListResponse {
-  /** 未分配虚拟机列表 */
+  /** 未分配水下机器人列表 */
   readonly unassignedVms: VirtualMachine[]
   /** 总数 */
   readonly total: number
 }
 
 /**
- * 强制控制虚拟机请求
+ * 强制控制水下机器人请求
  */
 export interface ForceControlVmRequest {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 操作类型 */
   readonly action: VmControlAction

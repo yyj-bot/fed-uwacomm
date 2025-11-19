@@ -1,6 +1,6 @@
 /**
  * 用户VM列表组件
- * 显示特定用户的虚拟机列表，支持批量分配和移除
+ * 显示特定用户的水下机器人列表，支持批量分配和移除
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -128,13 +128,13 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
   // 处理批量移除
   const handleBatchRemove = async () => {
     if (selectedRowKeys.length === 0) {
-      message.warning('请选择要移除的虚拟机')
+      message.warning('请选择要移除的水下机器人')
       return
     }
 
     Modal.confirm({
       title: '确认批量移除',
-      content: `确定要移除 ${selectedRowKeys.length} 台虚拟机的分配吗？`,
+      content: `确定要移除 ${selectedRowKeys.length} 台水下机器人的分配吗？`,
       onOk: async () => {
         const result = await batchRemoveUserVms(userId, selectedRowKeys as string[])
         
@@ -152,14 +152,9 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
   // 表格列定义
   const columns: ColumnsType<any> = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'vmName',
       key: 'vmName'
-    },
-    {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress'
     },
     {
       title: '状态',
@@ -229,7 +224,7 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
 
   return (
     <Card
-      title={`${username} - 虚拟机列表`}
+      title={`${username} - 水下机器人列表`}
       extra={
         <Space>
           <Button
@@ -266,15 +261,15 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
         pagination={{
           total: userVmData?.total || 0,
           showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 台虚拟机`
+          showTotal: (total) => `共 ${total} 台水下机器人`
         }}
-        locale={{ emptyText: '该用户暂未分配任何虚拟机' }}
+        locale={{ emptyText: '该用户暂未分配任何水下机器人' }}
         loading={loading}
       />
 
       {/* 批量分配模态框 */}
       <Modal
-        title={`批量分配虚拟机给 ${username}`}
+        title={`批量分配水下机器人给 ${username}`}
         open={batchAssignModalVisible}
         onOk={handleBatchAssign}
         onCancel={() => {
@@ -288,13 +283,13 @@ const UserVmList: React.FC<UserVmListProps> = ({ userId, username }) => {
       >
         <Form form={form} layout="vertical">
           <Form.Item
-            label="选择虚拟机"
+            label="选择水下机器人"
             name="vmIds"
-            rules={[{ required: true, message: '请选择至少一台虚拟机' }]}
+            rules={[{ required: true, message: '请选择至少一台水下机器人' }]}
           >
             <Select
               mode="multiple"
-              placeholder="请选择虚拟机"
+              placeholder="请选择水下机器人"
               showSearch
               optionFilterProp="children"
               maxTagCount="responsive"

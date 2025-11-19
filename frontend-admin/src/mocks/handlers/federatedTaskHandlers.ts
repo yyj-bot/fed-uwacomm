@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务管理 API Mock Handlers
+ * 任务管理 API Mock Handlers
  * 严格按照 federated-task-api-reference.md 规范实现
  * 
  * @author FedUWAComm Team
@@ -21,13 +21,13 @@ import {
   createMockTaskId
 } from '../data/federatedTaskMockData'
 
-// ==================== 联邦学习任务管理 API Mock Handlers ====================
+// ==================== 任务管理 API Mock Handlers ====================
 
 export const federatedTaskHandlers = [
   
   // ==================== 3.0 图形化配置接口组 (v1.3 新增) ====================
   
-  // 3.0.1 获取可用虚拟机列表
+  // 3.0.1 获取可用水下机器人列表
   http.get('/api/federated/config/available-vms', async ({ request }) => {
     const url = new URL(request.url)
     const algorithm = url.searchParams.get('algorithm')

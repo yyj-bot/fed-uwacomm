@@ -1,6 +1,6 @@
 /**
- * 虚拟机服务层 - 企业级规范实现
- * 提供虚拟机管理相关的业务逻辑处理
+ * 水下机器人服务层 - 企业级规范实现
+ * 提供水下机器人管理相关的业务逻辑处理
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -35,16 +35,16 @@ import type {
 } from './type'
 
 /**
- * 虚拟机服务类
+ * 水下机器人服务类
  */
 export class VMService {
 
-  // ==================== 虚拟机查询管理 ====================
+  // ==================== 水下机器人查询管理 ====================
 
   /**
-   * 获取虚拟机列表
+   * 获取水下机器人列表
    * @param params 查询参数
-   * @returns 分页虚拟机列表
+   * @returns 分页水下机器人列表
    */
   async getVMList(params: VMListParams = {}): Promise<VMListResponse> {
     try {
@@ -60,14 +60,14 @@ export class VMService {
         list: result.list.map(vm => this.transformVirtualMachine(vm))
       }
     } catch (error) {
-      throw this.handleServiceError(error, '获取虚拟机列表失败')
+      throw this.handleServiceError(error, '获取水下机器人列表失败')
     }
   }
 
   /**
-   * 获取虚拟机详情
-   * @param vmId 虚拟机ID
-   * @returns 虚拟机详细信息
+   * 获取水下机器人详情
+   * @param vmId 水下机器人ID
+   * @returns 水下机器人详细信息
    */
   async getVMDetail(vmId: string): Promise<VirtualMachine> {
     try {
@@ -76,13 +76,13 @@ export class VMService {
       const vm = await vmApi.getVMDetail(vmId)
       return this.transformVirtualMachine(vm)
     } catch (error) {
-      throw this.handleServiceError(error, `获取虚拟机详情失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `获取水下机器人详情失败 (ID: ${vmId})`)
     }
   }
 
   /**
-   * 更新虚拟机信息
-   * @param vmId 虚拟机ID
+   * 更新水下机器人信息
+   * @param vmId 水下机器人ID
    * @param vmData 更新数据
    * @returns 更新响应信息
    */
@@ -99,13 +99,13 @@ export class VMService {
         updatedAt: response.updatedAt
       }
     } catch (error) {
-      throw this.handleServiceError(error, `更新虚拟机失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `更新水下机器人失败 (ID: ${vmId})`)
     }
   }
 
   /**
-   * 删除虚拟机
-   * @param vmId 虚拟机ID
+   * 删除水下机器人
+   * @param vmId 水下机器人ID
    * @param force 是否强制删除
    * @returns 删除响应信息
    */
@@ -120,15 +120,15 @@ export class VMService {
         deletedAt: response.deletedAt
       }
     } catch (error) {
-      throw this.handleServiceError(error, `删除虚拟机失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `删除水下机器人失败 (ID: ${vmId})`)
     }
   }
 
-  // ==================== 虚拟机控制管理 ====================
+  // ==================== 水下机器人控制管理 ====================
 
   /**
-   * 启动虚拟机
-   * @param vmId 虚拟机ID
+   * 启动水下机器人
+   * @param vmId 水下机器人ID
    * @param startData 启动参数
    * @returns 启动响应信息
    */
@@ -148,13 +148,13 @@ export class VMService {
         estimatedTime: response.estimatedTime
       }
     } catch (error) {
-      throw this.handleServiceError(error, `启动虚拟机失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `启动水下机器人失败 (ID: ${vmId})`)
     }
   }
 
   /**
-   * 停止虚拟机
-   * @param vmId 虚拟机ID
+   * 停止水下机器人
+   * @param vmId 水下机器人ID
    * @param stopData 停止参数
    * @returns 停止响应信息
    */
@@ -174,13 +174,13 @@ export class VMService {
         estimatedTime: response.estimatedTime
       }
     } catch (error) {
-      throw this.handleServiceError(error, `停止虚拟机失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `停止水下机器人失败 (ID: ${vmId})`)
     }
   }
 
   /**
-   * 重启虚拟机
-   * @param vmId 虚拟机ID
+   * 重启水下机器人
+   * @param vmId 水下机器人ID
    * @param restartData 重启参数
    * @returns 重启响应信息
    */
@@ -200,16 +200,16 @@ export class VMService {
         estimatedTime: response.estimatedTime
       }
     } catch (error) {
-      throw this.handleServiceError(error, `重启虚拟机失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `重启水下机器人失败 (ID: ${vmId})`)
     }
   }
 
-  // ==================== 虚拟机状态管理 ====================
+  // ==================== 水下机器人状态管理 ====================
 
   /**
-   * 获取虚拟机状态
-   * @param vmId 虚拟机ID
-   * @returns 虚拟机状态信息
+   * 获取水下机器人状态
+   * @param vmId 水下机器人ID
+   * @returns 水下机器人状态信息
    */
   async getVMStatus(vmId: string): Promise<VMStatus> {
     try {
@@ -218,7 +218,7 @@ export class VMService {
       const status = await vmApi.getVMStatus(vmId)
       return this.transformVMStatus(status)
     } catch (error) {
-      throw this.handleServiceError(error, `获取虚拟机状态失败 (ID: ${vmId})`)
+      throw this.handleServiceError(error, `获取水下机器人状态失败 (ID: ${vmId})`)
     }
   }
 
@@ -291,17 +291,17 @@ export class VMService {
   // ==================== 私有方法 ====================
 
   /**
-   * 验证虚拟机ID
+   * 验证水下机器人ID
    */
   private validateVMId(vmId: string): void {
     if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-      throw new Error('虚拟机ID不能为空')
+      throw new Error('水下机器人ID不能为空')
     }
     
     // 验证UUID格式（32位十六进制字符）
     const uuidRegex = /^[a-f0-9]{32}$/i
     if (!uuidRegex.test(vmId)) {
-      throw new Error('虚拟机ID格式不正确，应为32位UUID格式')
+      throw new Error('水下机器人ID格式不正确，应为32位UUID格式')
     }
   }
 
@@ -351,7 +351,7 @@ export class VMService {
 
 
   /**
-   * 验证虚拟机列表查询参数
+   * 验证水下机器人列表查询参数
    */
   private validateVMListParams(params: VMListParams): void {
     if (params.page !== undefined && (params.page < 1)) {
@@ -371,15 +371,15 @@ export class VMService {
   }
 
   /**
-   * 验证虚拟机更新请求
+   * 验证水下机器人更新请求
    */
   private validateVMUpdateRequest(data: VMUpdateRequest): void {
     if (data.name !== undefined) {
       if (!data.name || data.name.trim().length === 0) {
-        throw new Error('虚拟机名称不能为空')
+        throw new Error('水下机器人名称不能为空')
       }
       if (data.name.length > 100) {
-        throw new Error('虚拟机名称不能超过100个字符')
+        throw new Error('水下机器人名称不能超过100个字符')
       }
     }
     
@@ -409,7 +409,7 @@ export class VMService {
   }
 
   /**
-   * 验证虚拟机启动请求
+   * 验证水下机器人启动请求
    */
   private validateVMStartRequest(data: VMStartRequest): void {
     if (data.timeout !== undefined && data.timeout < 0) {
@@ -418,7 +418,7 @@ export class VMService {
   }
 
   /**
-   * 验证虚拟机停止请求
+   * 验证水下机器人停止请求
    */
   private validateVMStopRequest(data: VMStopRequest): void {
     if (data.timeout !== undefined && data.timeout < 0) {
@@ -427,7 +427,7 @@ export class VMService {
   }
 
   /**
-   * 验证虚拟机重启请求
+   * 验证水下机器人重启请求
    */
   private validateVMRestartRequest(data: VMRestartRequest): void {
     if (data.timeout !== undefined && data.timeout < 0) {
@@ -494,7 +494,7 @@ export class VMService {
   }
 
   /**
-   * 转换虚拟机数据
+   * 转换水下机器人数据
    */
   private transformVirtualMachine(vm: any): VirtualMachine {
     return {
@@ -507,6 +507,8 @@ export class VMService {
       cpuCores: vm.cpuCores,
       memoryMb: vm.memoryMb,
       diskGb: vm.diskGb,
+      batteryLevel: vm.batteryLevel,
+      speed:vm.speed,
       connectionStatus: vm.connectionStatus,
       lastHeartbeat: vm.lastHeartbeat,
       wsSessionId: vm.wsSessionId,
@@ -515,12 +517,13 @@ export class VMService {
       systemInfo: vm.systemInfo,
       capabilities: vm.capabilities,
       networkConfig: vm.networkConfig,
-      metadata: vm.metadata
+      metadata: vm.metadata,
+      specs: vm.specs
     }
   }
 
   /**
-   * 转换虚拟机状态数据
+   * 转换水下机器人状态数据
    */
   private transformVMStatus(status: any): VMStatus {
     return {

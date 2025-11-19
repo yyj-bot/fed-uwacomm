@@ -1,6 +1,6 @@
 /**
  * VM统计分析组件
- * 显示虚拟机的统计信息和分析图表
+ * 显示水下机器人的统计信息和分析图表
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -105,7 +105,7 @@ const VMStatistics: React.FC = () => {
   // 性能指标表格列
   const performanceColumns: ColumnsType<VirtualMachine> = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -280,7 +280,7 @@ const VMStatistics: React.FC = () => {
       {/* 头部控制栏 */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>虚拟机统计分析</h3>
+          <h3 style={{ margin: 0 }}>水下机器人统计分析</h3>
           <Space>
             <Select
               value={timeRange}
@@ -308,7 +308,7 @@ const VMStatistics: React.FC = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="虚拟机总数"
+              title="水下机器人总数"
               value={totalVMs}
               prefix={<DesktopOutlined />}
               valueStyle={{ color: '#1890ff' }}

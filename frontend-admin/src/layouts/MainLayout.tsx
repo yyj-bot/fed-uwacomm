@@ -56,12 +56,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: '系统管理'
     },
     {
-      key: '/federated-learning',
+      key: '/federated-learning/tasks',
       icon: <ExperimentOutlined />,
-      label: '联邦学习',
-      children: [
-        { key: '/federated-learning/tasks', label: '任务管理' }
-      ]
+      label: '任务管理'
     },
     {
       key: '/models',
@@ -75,16 +72,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: '/vm-management',
       icon: <DesktopOutlined />,
-      label: '虚拟机管理',
+      label: '水下机器人管理',
       children: [
-        { key: '/vm-management/list', label: '虚拟机列表' },
-        { key: '/vm-management/admin', label: '虚拟机管理' }
+        { key: '/vm-management/list', label: '水下机器人列表' },
+        { key: '/vm-management/admin', label: '水下机器人调度' },
+        { key: '/robot-control', label: '水下机器人网络' }
       ]
-    },
-    {
-      key: '/robot-control',
-      icon: <CloudServerOutlined />,
-      label: '机器人操控'
     },
     {
       key: '/logs',
@@ -211,11 +204,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               color: 'white', 
               fontWeight: 'bold', 
               fontSize: '16px' 
-            }}>F</div>
+            }}>U</div>
             {!collapsed && (
               <div className="fed-logo-text" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>FedUWAComm</div>
-                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>联邦学习平台</div>
+                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>UFSP</div>
+                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>水下联邦调度平台</div>
               </div>
             )}
           </div>

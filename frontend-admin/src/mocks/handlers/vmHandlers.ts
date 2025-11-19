@@ -1,5 +1,5 @@
 /**
- * 虚拟机管理 API 处理器
+ * 水下机器人管理 API 处理器
  * 基于 vm-api-reference.md 和 vm-round-models-api-reference.md 文档
  */
 
@@ -10,7 +10,7 @@ import { vmStatusMap, deletedVmIds } from './vmState'
 export const vmHandlers = [
   // ==================== VM自身操作接口 (/api/v1/vm) ====================
   
-  // 3.1 虚拟机注册接口 - POST /api/v1/vm/register
+  // 3.1 水下机器人注册接口 - POST /api/v1/vm/register
   http.post('http://localhost:5173/api/v1/vm/register', async ({ request }) => {
     const body = await request.json() as any
     
@@ -19,7 +19,7 @@ export const vmHandlers = [
       return HttpResponse.json(vmApiMock.register.error400, { status: 400 })
     }
     
-    // 模拟虚拟机已存在的情况（如果名称是特定值）
+    // 模拟水下机器人已存在的情况（如果名称是特定值）
     if (body.name === '水声联邦学习节点-已存在') {
       return HttpResponse.json(vmApiMock.register.error409, { status: 409 })
     }
@@ -54,7 +54,7 @@ export const vmHandlers = [
 
   // ==================== 用户管理操作接口 (/api/vm) ====================
   
-  // 4.1 虚拟机列表查询接口 - GET /api/vm/list
+  // 4.1 水下机器人列表查询接口 - GET /api/vm/list
   http.get('http://localhost:5173/api/vm/list', ({ request }) => {
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') || '1')
@@ -63,7 +63,7 @@ export const vmHandlers = [
     const osType = url.searchParams.get('osType')
     const keyword = url.searchParams.get('keyword')
     
-    // 更新虚拟机列表的状态，并过滤掉已删除的VM
+    // 更新水下机器人列表的状态，并过滤掉已删除的VM
     let filteredList = vmApiMock.list.success.data.list
       .filter(vm => !deletedVmIds.has(vm.vmId)) // 过滤已删除的VM
       .map(vm => {
@@ -114,15 +114,15 @@ export const vmHandlers = [
     })
   }),
 
-  // 4.2 虚拟机详情查询接口 - GET /api/vm/{vmId}
+  // 4.2 水下机器人详情查询接口 - GET /api/vm/{vmId}
   http.get('http://localhost:5173/api/vm/:vmId', ({ params }) => {
     const { vmId } = params as { vmId: string }
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -145,16 +145,16 @@ export const vmHandlers = [
     })
   }),
 
-  // 4.3 虚拟机更新接口 - PUT /api/vm/{vmId}
+  // 4.3 水下机器人更新接口 - PUT /api/vm/{vmId}
   http.put('http://localhost:5173/api/vm/:vmId', async ({ params, request }) => {
     const { vmId } = params
     const body = await request.json() as any
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -162,19 +162,19 @@ export const vmHandlers = [
     return HttpResponse.json(vmApiMock.update.success)
   }),
 
-  // 4.4 虚拟机删除接口 - DELETE /api/vm/{vmId}
+  // 4.4 水下机器人删除接口 - DELETE /api/vm/{vmId}
   http.delete('http://localhost:5173/api/vm/:vmId', ({ params, request }) => {
     const { vmId } = params as { vmId: string }
     const url = new URL(request.url)
     const force = url.searchParams.get('force') === 'true'
     
-    console.log('[Mock] 删除虚拟机请求:', { vmId, force })
+    console.log('[Mock] 删除水下机器人请求:', { vmId, force })
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent' || deletedVmIds.has(vmId)) {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -184,16 +184,16 @@ export const vmHandlers = [
     if (!force && currentStatus === 'RUNNING') {
       return HttpResponse.json({
         code: 400,
-        message: "虚拟机正在运行，请先停止虚拟机或使用强制删除",
+        message: "水下机器人正在运行，请先停止水下机器人或使用强制删除",
         data: null
       }, { status: 400 })
     }
     
-    // 模拟正在运行的虚拟机无法删除（除非强制删除）
+    // 模拟正在运行的水下机器人无法删除（除非强制删除）
     if (vmId === 'running-vm' && !force) {
       return HttpResponse.json({
         code: 400,
-        message: "虚拟机正在运行，无法删除",
+        message: "水下机器人正在运行，无法删除",
         data: null
       }, { status: 400 })
     }
@@ -203,14 +203,14 @@ export const vmHandlers = [
     // 从状态映射中移除
     vmStatusMap.delete(vmId)
     
-    console.log('[Mock] 虚拟机已删除:', vmId)
+    console.log('[Mock] 水下机器人已删除:', vmId)
     
     return HttpResponse.json(vmApiMock.delete.success)
   }),
 
-  // ==================== 虚拟机控制接口 ====================
+  // ==================== 水下机器人控制接口 ====================
   
-  // 5.1 虚拟机启动接口 - POST /api/vm/{vmId}/start
+  // 5.1 水下机器人启动接口 - POST /api/vm/{vmId}/start
   http.post('http://localhost:5173/api/vm/:vmId/start', async ({ params, request }) => {
     const { vmId } = params as { vmId: string }
     
@@ -222,16 +222,16 @@ export const vmHandlers = [
         body = JSON.parse(text)
       }
     } catch (error) {
-      console.log('[Mock] 启动虚拟机请求体为空或解析失败，使用默认参数')
+      console.log('[Mock] 启动水下机器人请求体为空或解析失败，使用默认参数')
     }
     
-    console.log('[Mock] 接收到启动虚拟机请求:', { vmId, body })
+    console.log('[Mock] 接收到启动水下机器人请求:', { vmId, body })
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -241,7 +241,7 @@ export const vmHandlers = [
     if (currentStatus === 'RUNNING') {
       return HttpResponse.json({
         code: 400,
-        message: "虚拟机已在运行",
+        message: "水下机器人已在运行",
         data: null
       }, { status: 400 })
     }
@@ -250,17 +250,17 @@ export const vmHandlers = [
     vmStatusMap.set(vmId, 'STARTING')
     setTimeout(() => {
       vmStatusMap.set(vmId, 'RUNNING')
-      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 RUNNING`)
+      console.log(`[Mock] 水下机器人 ${vmId} 状态已更新为 RUNNING`)
     }, 1000)
     
     return HttpResponse.json(vmApiMock.start.success)
   }),
 
-  // 5.2 虚拟机停止接口 - POST /api/vm/{vmId}/stop
+  // 5.2 水下机器人停止接口 - POST /api/vm/{vmId}/stop
   http.post('http://localhost:5173/api/vm/:vmId/stop', async ({ params, request }) => {
     const { vmId } = params as { vmId: string }
     
-    console.log('[Mock] ========== 停止虚拟机请求被拦截 ==========')
+    console.log('[Mock] ========== 停止水下机器人请求被拦截 ==========')
     console.log('[Mock] vmId:', vmId)
     console.log('[Mock] request.url:', request.url)
     
@@ -273,16 +273,16 @@ export const vmHandlers = [
         body = JSON.parse(text)
       }
     } catch (error) {
-      console.log('[Mock] 停止虚拟机请求体为空或解析失败，使用默认参数')
+      console.log('[Mock] 停止水下机器人请求体为空或解析失败，使用默认参数')
     }
     
-    console.log('[Mock] 接收到停止虚拟机请求:', { vmId, body })
+    console.log('[Mock] 接收到停止水下机器人请求:', { vmId, body })
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -292,7 +292,7 @@ export const vmHandlers = [
     if (currentStatus === 'STOPPED') {
       return HttpResponse.json({
         code: 400,
-        message: "虚拟机已停止",
+        message: "水下机器人已停止",
         data: null
       }, { status: 400 })
     }
@@ -301,14 +301,14 @@ export const vmHandlers = [
     vmStatusMap.set(vmId, 'STOPPING')
     setTimeout(() => {
       vmStatusMap.set(vmId, 'STOPPED')
-      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 STOPPED`)
+      console.log(`[Mock] 水下机器人 ${vmId} 状态已更新为 STOPPED`)
     }, 1000)
     
-    console.log('[Mock] 返回停止虚拟机成功响应:', vmApiMock.stop.success)
+    console.log('[Mock] 返回停止水下机器人成功响应:', vmApiMock.stop.success)
     return HttpResponse.json(vmApiMock.stop.success)
   }),
 
-  // 5.3 虚拟机重启接口 - POST /api/vm/{vmId}/restart
+  // 5.3 水下机器人重启接口 - POST /api/vm/{vmId}/restart
   http.post('http://localhost:5173/api/vm/:vmId/restart', async ({ params, request }) => {
     const { vmId } = params as { vmId: string }
     
@@ -320,16 +320,16 @@ export const vmHandlers = [
         body = JSON.parse(text)
       }
     } catch (error) {
-      console.log('[Mock] 重启虚拟机请求体为空或解析失败，使用默认参数')
+      console.log('[Mock] 重启水下机器人请求体为空或解析失败，使用默认参数')
     }
     
-    console.log('[Mock] 接收到重启虚拟机请求:', { vmId, body })
+    console.log('[Mock] 接收到重启水下机器人请求:', { vmId, body })
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -338,29 +338,29 @@ export const vmHandlers = [
     vmStatusMap.set(vmId, 'STOPPING')
     setTimeout(() => {
       vmStatusMap.set(vmId, 'STARTING')
-      console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 STARTING`)
+      console.log(`[Mock] 水下机器人 ${vmId} 状态已更新为 STARTING`)
       setTimeout(() => {
         vmStatusMap.set(vmId, 'RUNNING')
-        console.log(`[Mock] 虚拟机 ${vmId} 状态已更新为 RUNNING`)
+        console.log(`[Mock] 水下机器人 ${vmId} 状态已更新为 RUNNING`)
       }, 1000)
     }, 500)
     
     return HttpResponse.json(vmApiMock.restart.success)
   }),
 
-  // ==================== 虚拟机状态接口 ====================
+  // ==================== 水下机器人状态接口 ====================
   
-  // 6.1 虚拟机状态查询接口 - GET /api/vm/{vmId}/status
+  // 6.1 水下机器人状态查询接口 - GET /api/vm/{vmId}/status
   http.get('http://localhost:5173/api/vm/:vmId/status', ({ params }) => {
     const { vmId } = params as { vmId: string }
     
-    console.log('[Mock] 查询虚拟机状态:', vmId)
+    console.log('[Mock] 查询水下机器人状态:', vmId)
     
-    // 模拟虚拟机不存在
+    // 模拟水下机器人不存在
     if (vmId === 'nonexistent') {
       return HttpResponse.json({
         code: 404,
-        message: "虚拟机不存在",
+        message: "水下机器人不存在",
         data: null
       }, { status: 404 })
     }
@@ -369,14 +369,14 @@ export const vmHandlers = [
     if (vmId === 'connection-failed') {
       return HttpResponse.json({
         code: 500,
-        message: "无法连接到虚拟机",
+        message: "无法连接到水下机器人",
         data: null
       }, { status: 500 })
     }
     
     // 获取当前状态，默认为 RUNNING
     const currentStatus = vmStatusMap.get(vmId) || 'RUNNING'
-    console.log('[Mock] 当前虚拟机状态:', currentStatus)
+    console.log('[Mock] 当前水下机器人状态:', currentStatus)
     
     // 根据状态返回相应的连接状态
     const connectionStatus = (currentStatus === 'RUNNING' || currentStatus === 'STARTING') 
@@ -419,7 +419,7 @@ export const vmHandlers = [
       filteredRecords = filteredRecords.filter(record => record.roundNumber === parseInt(roundNumber))
     }
     
-    // 虚拟机ID过滤
+    // 水下机器人ID过滤
     if (vmId) {
       filteredRecords = filteredRecords.filter(record => record.vmId === vmId)
     }
@@ -519,9 +519,9 @@ export const vmHandlers = [
     return HttpResponse.json(vmRoundModelsApiMock.metricsBest.bestAccuracy)
   }),
 
-  // ==================== 扩展接口：多虚拟机对比 ====================
+  // ==================== 扩展接口：多水下机器人对比 ====================
   
-  // 多虚拟机同轮次对比 - GET /api/model/vm-round-models/comparison/round
+  // 多水下机器人同轮次对比 - GET /api/model/vm-round-models/comparison/round
   http.get('http://localhost:5173/api/model/vm-round-models/comparison/round', ({ request }) => {
     const url = new URL(request.url)
     const taskId = url.searchParams.get('taskId')
@@ -539,7 +539,7 @@ export const vmHandlers = [
     return HttpResponse.json(multiVmComparisonMock.roundComparison)
   }),
 
-  // 多虚拟机趋势对比 - GET /api/model/vm-round-models/comparison/trend
+  // 多水下机器人趋势对比 - GET /api/model/vm-round-models/comparison/trend
   http.get('http://localhost:5173/api/model/vm-round-models/comparison/trend', ({ request }) => {
     const url = new URL(request.url)
     const taskId = url.searchParams.get('taskId')

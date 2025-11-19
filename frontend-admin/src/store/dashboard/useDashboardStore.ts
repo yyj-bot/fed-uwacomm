@@ -132,14 +132,14 @@ export const useDashboard = () => {
   }, [quickStartTaskAction])
 
   /**
-   * 快速创建虚拟机
+   * 快速创建水下机器人
    */
   const quickCreateVM = useCallback(async (vmConfig: any) => {
     try {
       const vmId = await quickCreateVMAction(vmConfig)
       return { success: true, error: null, data: vmId }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '快速创建虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '快速创建水下机器人失败'
       return { success: false, error: errorMessage, data: null }
     }
   }, [quickCreateVMAction])
@@ -266,7 +266,7 @@ export const useDashboard = () => {
   }, [overview])
 
   /**
-   * 获取虚拟机运行率
+   * 获取水下机器人运行率
    */
   const getVMRunningRate = useCallback((): number => {
     if (!overview) return 0

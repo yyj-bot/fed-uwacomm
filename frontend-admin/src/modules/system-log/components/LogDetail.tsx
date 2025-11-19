@@ -126,7 +126,7 @@ const LogDetail: React.FC<LogDetailProps> = ({ log, loading = false }) => {
               label={
                 <Space>
                   <CloudServerOutlined />
-                  虚拟机ID
+                  水下机器人ID
                 </Space>
               }
             >

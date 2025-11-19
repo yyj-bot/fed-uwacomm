@@ -1,6 +1,6 @@
 /**
- * 虚拟机管理状态 Store
- * 管理虚拟机列表、详情、操作状态等相关状态和操作
+ * 水下机器人管理状态 Store
+ * 管理水下机器人列表、详情、操作状态等相关状态和操作
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -30,18 +30,18 @@ import type {
 // ==================== 状态类型定义 ====================
 
 interface VMState {
-  // 虚拟机列表状态
+  // 水下机器人列表状态
   vmList: VirtualMachine[]
   vmListTotal: number
   vmListLoading: boolean
   vmListError: string | null
   
-  // 当前选中的虚拟机
+  // 当前选中的水下机器人
   currentVM: VirtualMachine | null
   currentVMLoading: boolean
   currentVMError: string | null
   
-  // 虚拟机状态
+  // 水下机器人状态
   vmStatusMap: Record<string, VMStatus>
   
   // 操作状态
@@ -91,23 +91,23 @@ interface VMState {
 }
 
 interface VMActions {
-  // 虚拟机列表操作
+  // 水下机器人列表操作
   fetchVMList: (params?: VMListParams) => Promise<void>
   refreshVMList: () => Promise<void>
   
-  // 虚拟机详情操作
+  // 水下机器人详情操作
   fetchVMDetail: (vmId: string) => Promise<void>
   setCurrentVM: (vm: VirtualMachine | null) => void
   
-  // 虚拟机状态操作
+  // 水下机器人状态操作
   fetchVMStatus: (vmId: string) => Promise<void>
   fetchAllVMStatus: () => Promise<void>
   
-  // 虚拟机管理操作
+  // 水下机器人管理操作
   updateVM: (vmId: string, data: VMUpdateRequest) => Promise<void>
   deleteVM: (vmId: string, force?: boolean) => Promise<void>
   
-  // 虚拟机控制操作
+  // 水下机器人控制操作
   startVM: (vmId: string, data?: VMStartRequest) => Promise<void>
   stopVM: (vmId: string, data?: VMStopRequest) => Promise<void>
   restartVM: (vmId: string) => Promise<void>
@@ -210,10 +210,10 @@ const initialState: VMState = {
 export const useVMStore = create<VMStore>((set, get) => ({
   ...initialState,
 
-  // ==================== 虚拟机列表操作 ====================
+  // ==================== 水下机器人列表操作 ====================
   
   /**
-   * 获取虚拟机列表
+   * 获取水下机器人列表
    */
   fetchVMList: async (params?: VMListParams) => {
     const { pagination, queryParams } = get()
@@ -241,7 +241,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
         }
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取虚拟机列表失败'
+      const errorMessage = error instanceof Error ? error.message : '获取水下机器人列表失败'
       set({
         vmListLoading: false,
         vmListError: errorMessage
@@ -251,7 +251,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 刷新虚拟机列表
+   * 刷新水下机器人列表
    */
   refreshVMList: async () => {
     const { fetchVMList, queryParams, pagination } = get()
@@ -262,10 +262,10 @@ export const useVMStore = create<VMStore>((set, get) => ({
     })
   },
 
-  // ==================== 虚拟机详情操作 ====================
+  // ==================== 水下机器人详情操作 ====================
   
   /**
-   * 获取虚拟机详情
+   * 获取水下机器人详情
    */
   fetchVMDetail: async (vmId: string) => {
     set({ currentVMLoading: true, currentVMError: null })
@@ -279,7 +279,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
         currentVMError: null
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '获取虚拟机详情失败'
+      const errorMessage = error instanceof Error ? error.message : '获取水下机器人详情失败'
       set({
         currentVMLoading: false,
         currentVMError: errorMessage
@@ -289,16 +289,16 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 设置当前虚拟机
+   * 设置当前水下机器人
    */
   setCurrentVM: (vm: VirtualMachine | null) => {
     set({ currentVM: vm })
   },
 
-  // ==================== 虚拟机状态操作 ====================
+  // ==================== 水下机器人状态操作 ====================
   
   /**
-   * 获取虚拟机状态
+   * 获取水下机器人状态
    */
   fetchVMStatus: async (vmId: string) => {
     try {
@@ -311,12 +311,12 @@ export const useVMStore = create<VMStore>((set, get) => ({
         }
       }))
     } catch (error) {
-      console.error(`获取虚拟机状态失败 (${vmId}):`, error)
+      console.error(`获取水下机器人状态失败 (${vmId}):`, error)
     }
   },
 
   /**
-   * 获取所有虚拟机状态
+   * 获取所有水下机器人状态
    */
   fetchAllVMStatus: async () => {
     const { vmList } = get()
@@ -328,10 +328,10 @@ export const useVMStore = create<VMStore>((set, get) => ({
     await Promise.allSettled(promises)
   },
 
-  // ==================== 虚拟机管理操作 ====================
+  // ==================== 水下机器人管理操作 ====================
   
   /**
-   * 更新虚拟机信息
+   * 更新水下机器人信息
    */
   updateVM: async (vmId: string, data: VMUpdateRequest) => {
     set((state) => ({
@@ -348,7 +348,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
     try {
       await vmService.updateVM(vmId, data)
       
-      // 更新列表中的虚拟机信息
+      // 更新列表中的水下机器人信息
       set((state) => ({
         vmList: state.vmList.map(vm => 
           vm.vmId === vmId ? { ...vm, ...data } : vm
@@ -365,7 +365,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
       // 重新获取详情
       await get().fetchVMDetail(vmId)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '更新虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '更新水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
@@ -381,7 +381,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 删除虚拟机
+   * 删除水下机器人
    */
   deleteVM: async (vmId: string, force = false) => {
     set((state) => ({
@@ -416,7 +416,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
         return { vmStatusMap: newStatusMap }
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '删除虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '删除水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
@@ -431,10 +431,10 @@ export const useVMStore = create<VMStore>((set, get) => ({
     }
   },
 
-  // ==================== 虚拟机控制操作 ====================
+  // ==================== 水下机器人控制操作 ====================
   
   /**
-   * 启动虚拟机
+   * 启动水下机器人
    */
   startVM: async (vmId: string, data?: VMStartRequest) => {
     set((state) => ({
@@ -461,7 +461,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
       // 更新状态
       await get().fetchVMStatus(vmId)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '启动虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '启动水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
@@ -477,7 +477,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 停止虚拟机
+   * 停止水下机器人
    */
   stopVM: async (vmId: string, data?: VMStopRequest) => {
     set((state) => ({
@@ -504,7 +504,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
       // 更新状态
       await get().fetchVMStatus(vmId)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '停止虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '停止水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
@@ -520,7 +520,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 重启虚拟机
+   * 重启水下机器人
    */
   restartVM: async (vmId: string) => {
     set((state) => ({
@@ -547,7 +547,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
       // 更新状态
       await get().fetchVMStatus(vmId)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '重启虚拟机失败'
+      const errorMessage = error instanceof Error ? error.message : '重启水下机器人失败'
       set((state) => ({
         operationLoading: {
           ...state.operationLoading,
@@ -607,7 +607,7 @@ export const useVMStore = create<VMStore>((set, get) => ({
   },
 
   /**
-   * 清除特定虚拟机的错误信息
+   * 清除特定水下机器人的错误信息
    */
   clearVMError: (vmId: string) => {
     set((state) => {

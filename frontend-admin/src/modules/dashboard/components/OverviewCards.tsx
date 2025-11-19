@@ -29,7 +29,7 @@ const OverviewCards: React.FC<OverviewCardsProps> = ({
 }) => {
   const cards = [
     {
-      title: '运行中的虚拟机',
+      title: '运行中的水下机器人',
       value: overview?.vmStats?.runningVMs || 0,
       total: overview?.vmStats?.totalVMs || 0,
       icon: <CloudServerOutlined />,

@@ -38,7 +38,37 @@ export interface LoginResponse {
   readonly user: User
 }
 
-// ==================== 虚拟机管理类型 ====================
+// ==================== 水下机器人管理类型 ====================
+export interface UnderwaterRobotSpecs {
+  readonly dimensions?: string
+  readonly airWeight?: string
+  readonly depthRating?: string
+  readonly thrusters?: string
+  readonly manipulator?: string
+  readonly gimbal?: string
+  readonly camera?: string
+  readonly lights?: string
+  readonly sensors?: string
+  readonly payloadCapacity?: string
+  readonly powerSupply?: string
+  readonly maxPower?: string
+  readonly tether?: {
+    readonly reelMethod?: string
+    readonly length?: string
+    readonly diameter?: string
+    readonly breakStrength?: string
+  }
+}
+
+export type VMSpeed = 
+  | number
+  | string
+  | {
+    readonly value: number
+    readonly unit?: string
+    readonly precision?: number
+  }
+
 export interface VirtualMachine {
   readonly vmId: string
   readonly name: string
@@ -49,6 +79,8 @@ export interface VirtualMachine {
   readonly cpuCores: number
   readonly memoryMb: number
   readonly diskGb: number
+  readonly batteryLevel?: number
+  readonly speed?: VMSpeed
   readonly connectionStatus: 'CONNECTED' | 'DISCONNECTED'
   readonly lastHeartbeat?: string
   readonly createdAt: string
@@ -68,6 +100,7 @@ export interface VirtualMachine {
     readonly gpuMemory?: number
     readonly networkSpeed?: number
   }
+  readonly specs?: UnderwaterRobotSpecs
 }
 
 export interface VMResourceUsage {

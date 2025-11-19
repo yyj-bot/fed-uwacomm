@@ -121,7 +121,7 @@ interface TaskLog {
 
 // ==================== v1.3 新增类型定义 ====================
 
-// 虚拟机类型
+// 水下机器人类型
 interface AvailableVM {
   vmId: string
   name: string
@@ -665,7 +665,7 @@ export const federatedTask = {
   // ==================== 预配置接口组 ====================
   
   /**
-   * 获取可用虚拟机列表
+   * 获取可用水下机器人列表
    */
   async getAvailableVMs(params: {
     algorithm?: string

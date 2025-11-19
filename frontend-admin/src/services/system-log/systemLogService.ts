@@ -304,11 +304,11 @@ export class SystemLogService {
 
   private validateVmId(vmId: string): void {
     if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-      throw new Error('虚拟机ID不能为空')
+      throw new Error('水下机器人ID不能为空')
     }
     const uuidRegex = /^[a-f0-9]{32}$/i
     if (!uuidRegex.test(vmId)) {
-      throw new Error('虚拟机ID格式不正确，应为32位UUID格式')
+      throw new Error('水下机器人ID格式不正确，应为32位UUID格式')
     }
   }
 

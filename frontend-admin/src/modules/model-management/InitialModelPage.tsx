@@ -112,12 +112,12 @@ const InitialModelPage: React.FC = () => {
   const [jsonValidationStatus, setJsonValidationStatus] = useState<'success' | 'error' | ''>('')
   const [jsonValidationMessage, setJsonValidationMessage] = useState<string>('')
   
-  // 联邦学习任务相关状态
+  // 任务相关状态
   const [federatedTasks, setFederatedTasks] = useState<FederatedTask[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [taskSelectModalVisible, setTaskSelectModalVisible] = useState(false)
   
-  // 可用虚拟机列表
+  // 可用水下机器人列表
   const [availableVms, setAvailableVms] = useState<any[]>([])
   const [vmsLoading, setVmsLoading] = useState(false)
   
@@ -143,7 +143,7 @@ const InitialModelPage: React.FC = () => {
     })
 
 
-  // 获取联邦学习任务列表
+  // 获取任务列表
   const loadFederatedTasks = async () => {
     try {
       setTasksLoading(true)
@@ -153,28 +153,28 @@ const InitialModelPage: React.FC = () => {
       })
       setFederatedTasks(result.tasks)
     } catch (error) {
-      console.error('获取联邦学习任务列表失败:', error)
+      console.error('获取任务列表失败:', error)
       message.error('获取任务列表失败')
     } finally {
       setTasksLoading(false)
     }
   }
 
-  // 加载可用虚拟机列表
+  // 加载可用水下机器人列表
   const loadAvailableVms = async () => {
     setVmsLoading(true)
     try {
-      console.log('🔄 开始加载虚拟机列表...')
+      console.log('🔄 开始加载水下机器人列表...')
       const response = await federatedTaskService.getAvailableVMs({
         status: 'RUNNING'
       })
-      console.log('📋 虚拟机API响应:', response)
+      console.log('📋 水下机器人API响应:', response)
       setAvailableVms(response.availableVms || [])
-      console.log('✅ 设置虚拟机列表:', response.availableVms || [])
+      console.log('✅ 设置水下机器人列表:', response.availableVms || [])
     } catch (error) {
-      console.error('❌ 获取可用虚拟机失败:', error)
+      console.error('❌ 获取可用水下机器人失败:', error)
       setAvailableVms([])
-      message.error('获取可用虚拟机失败，请检查网络连接或联系管理员')
+      message.error('获取可用水下机器人失败，请检查网络连接或联系管理员')
     } finally {
       setVmsLoading(false)
     }
@@ -386,7 +386,7 @@ const InitialModelPage: React.FC = () => {
           <Popconfirm
             title={
               ['DISTRIBUTING', 'DISTRIBUTED'].includes(record.status)
-                ? "该模型已分发，删除可能影响联邦学习任务，确定要删除吗？"
+                ? "该模型已分发，删除可能影响任务，确定要删除吗？"
                 : "确定要删除此初始模型吗？"
             }
             onConfirm={() => handleDelete(record.taskId)}
@@ -531,10 +531,10 @@ const InitialModelPage: React.FC = () => {
       
       // 调试信息
       console.log('🔍 分发表单值:', values)
-      console.log('🔍 可用虚拟机列表:', availableVms)
+      console.log('🔍 可用水下机器人列表:', availableVms)
       
       if (!values.vmIds || values.vmIds.length === 0) {
-        message.error('请选择至少一个虚拟机')
+        message.error('请选择至少一个水下机器人')
         return
       }
       
@@ -567,7 +567,7 @@ const InitialModelPage: React.FC = () => {
   const handleOpenDistribute = (taskId: string) => {
     setSelectedTaskId(taskId)
     setDistributeModalVisible(true)
-    // 加载可用虚拟机列表
+    // 加载可用水下机器人列表
     loadAvailableVms()
   }
 
@@ -619,7 +619,7 @@ const InitialModelPage: React.FC = () => {
           content: (
             <div>
               <p>该模型当前状态为 <Tag color="orange">{initialModel.status === 'DISTRIBUTING' ? '分发中' : '已分发'}</Tag></p>
-              <p>强制删除可能会影响正在进行的联邦学习任务，确定要继续吗？</p>
+              <p>强制删除可能会影响正在进行的任务，确定要继续吗？</p>
             </div>
           ),
           okText: '确认删除',
@@ -792,7 +792,7 @@ const InitialModelPage: React.FC = () => {
               display: 'inline-block',
               border: '1px solid #e8e8e8'
             }}>
-              💡 当前系统中有 <strong style={{ color: '#1890ff' }}>{federatedTasks.length}</strong> 个联邦学习任务可供选择
+              💡 当前系统中有 <strong style={{ color: '#1890ff' }}>{federatedTasks.length}</strong> 个任务可供选择
             </div>
           )}
         </Card>
@@ -810,7 +810,7 @@ const InitialModelPage: React.FC = () => {
           locale={{
             emptyText: queryTaskId ? 
               '🔍 搜索无结果，请尝试其他关键词' : 
-              '📭 暂无初始模型数据，请先创建联邦学习任务并生成或上传初始模型'
+              '📭 暂无初始模型数据，请先创建任务并生成或上传初始模型'
           }}
           size="middle"
         />
@@ -1226,16 +1226,16 @@ const InitialModelPage: React.FC = () => {
           }}
         >
           <Form.Item
-            label="目标虚拟机"
+            label="目标水下机器人"
             name="vmIds"
             rules={[
-              { required: true, message: '请选择至少一个虚拟机' }
+              { required: true, message: '请选择至少一个水下机器人' }
             ]}
-            tooltip="选择要分发初始模型的虚拟机节点"
+            tooltip="选择要分发初始模型的水下机器人节点"
           >
             {vmsLoading ? (
               <div style={{ textAlign: 'center', padding: 20, border: '1px solid #d9d9d9', borderRadius: 6 }}>
-                <Spin size="small" /> 加载虚拟机列表...
+                <Spin size="small" /> 加载水下机器人列表...
               </div>
             ) : availableVms.length > 0 ? (
               <Checkbox.Group style={{ width: '100%' }}>
@@ -1266,7 +1266,7 @@ const InitialModelPage: React.FC = () => {
               </Checkbox.Group>
             ) : (
               <div style={{ textAlign: 'center', padding: 20, color: '#999', border: '1px solid #d9d9d9', borderRadius: 6 }}>
-                暂无可用的虚拟机
+                暂无可用的水下机器人
                 <br />
                 <Button type="link" size="small" onClick={loadAvailableVms}>
                   重新加载
@@ -1279,7 +1279,7 @@ const InitialModelPage: React.FC = () => {
             label="分发模式"
             name="distributionMode"
             rules={[{ required: true, message: '请选择分发模式' }]}
-            tooltip="模型将异步分发到各个虚拟机节点"
+            tooltip="模型将异步分发到各个水下机器人节点"
           >
             <Select disabled>
               <Option value="ASYNC">异步分发</Option>
@@ -1370,7 +1370,7 @@ const InitialModelPage: React.FC = () => {
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Row gutter={16}>
                   <Col span={8}>
-                    <Statistic title="总虚拟机" value={currentModel.distributionStatus?.totalVms || 0} />
+                    <Statistic title="总水下机器人" value={currentModel.distributionStatus?.totalVms || 0} />
                   </Col>
                   <Col span={8}>
                     <Statistic 
@@ -1475,7 +1475,7 @@ const InitialModelPage: React.FC = () => {
 
             {currentDistribution.vmDetails && currentDistribution.vmDetails.length > 0 && (
               <div style={{ marginTop: 24 }}>
-                <h4>虚拟机详情</h4>
+                <h4>水下机器人详情</h4>
                 <Table
                   dataSource={currentDistribution.vmDetails}
                   rowKey="vmId"
@@ -1484,7 +1484,7 @@ const InitialModelPage: React.FC = () => {
                   scroll={{ y: 300 }}
                   columns={[
                     {
-                      title: '虚拟机ID',
+                      title: '水下机器人ID',
                       dataIndex: 'vmId',
                       key: 'vmId'
                     },
@@ -1524,7 +1524,7 @@ const InitialModelPage: React.FC = () => {
 
       {/* 任务选择对话框 */}
       <Modal
-        title="选择联邦学习任务"
+        title="选择任务"
         open={taskSelectModalVisible}
         onCancel={() => setTaskSelectModalVisible(false)}
         footer={null}
@@ -1533,7 +1533,7 @@ const InitialModelPage: React.FC = () => {
       >
         <div style={{ marginBottom: 16 }}>
           <Alert
-            message="请选择一个联邦学习任务来查询其初始模型"
+            message="请选择一个任务来查询其初始模型"
             type="info"
             showIcon
           />

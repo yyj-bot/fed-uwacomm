@@ -1,11 +1,11 @@
 /**
- * 联邦学习任务基础数据 - 单一数据源
+ * 任务基础数据 - 单一数据源
  * 
- * 本文件作为所有联邦学习任务相关mock数据的单一可信数据源
+ * 本文件作为所有任务相关mock数据的单一可信数据源
  * 其他文件应该从这里导入任务基础数据
  * 
  * @file shared/task-base.ts
- * @description 联邦学习任务基础数据定义
+ * @description 任务基础数据定义
  */
 
 import { generateTimestamp } from '../../utils'
@@ -39,7 +39,7 @@ export interface BaseTask {
 }
 
 /**
- * 联邦学习任务基础数据列表
+ * 任务基础数据列表
  * 
  * 这是所有任务数据的单一数据源
  * 任何需要任务数据的mock文件都应该从这里导入
@@ -47,7 +47,7 @@ export interface BaseTask {
 export const baseTaskList: BaseTask[] = [
   {
     taskId: 'c3d4e5f6789012345678901234567890',
-    taskName: '水声传播特征分类任务',
+    taskName: '联邦水下声呐目标识别',
     taskType: 'CLASSIFICATION',
     status: 'RUNNING',
     createdAt: '2024-01-01T09:00:00.000Z',
@@ -122,18 +122,6 @@ export const baseTaskList: BaseTask[] = [
     progress: 13.33,
     finalAccuracy: undefined
   },
-  {
-    taskId: 'c4d5e6f7890123456789012345678901',
-    taskName: '水声通信优化',
-    taskType: 'CLASSIFICATION',
-    status: 'CONFIGURED',
-    createdAt: '2024-01-06T03:00:00.000Z',
-    participantCount: 2,
-    currentRound: undefined,
-    totalRounds: 8,
-    progress: undefined,
-    finalAccuracy: undefined
-  }
 ]
 
 /**

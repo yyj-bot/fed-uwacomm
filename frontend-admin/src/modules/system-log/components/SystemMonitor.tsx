@@ -139,7 +139,7 @@ export const SystemMonitor: React.FC = () => {
             style={{ width: 200 }}
           >
             <Select.Option value="/api/user/login">用户登录</Select.Option>
-            <Select.Option value="/api/vm/connect">虚拟机连接</Select.Option>
+            <Select.Option value="/api/vm/connect">水下机器人连接</Select.Option>
             <Select.Option value="/api/task/create">任务创建</Select.Option>
             <Select.Option value="/api/log/list">日志查询</Select.Option>
           </Select>

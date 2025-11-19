@@ -15,7 +15,7 @@ interface DataStatistics {
   totalSize: number
   dataTypeDistribution: Record<string, number>
   statusDistribution: Record<string, number>
-  userDistribution: Record<string, {
+  vmDistribution: Record<string, {
     count: number
     size: number
   }>

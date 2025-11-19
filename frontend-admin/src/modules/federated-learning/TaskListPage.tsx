@@ -1,6 +1,6 @@
 /**
- * 联邦学习任务列表页面
- * 显示所有联邦学习任务，支持搜索、筛选、分页等功能
+ * 任务管理列表页面
+ * 显示所有任务，支持搜索、筛选、分页等功能
  * 
  * @author FedUWAComm Team
  * @version 1.4.0
@@ -469,8 +469,8 @@ const TaskListPage: React.FC = () => {
         {/* 页面标题和操作 */}
         <div className="page-header">
           <div className="page-title">
-            <h2>联邦学习任务</h2>
-            <span className="page-description">管理和监控联邦学习任务的执行状态</span>
+            <h2>任务管理</h2>
+            <span className="page-description">管理和监控任务的执行状态</span>
           </div>
           <div className="page-actions">
             <Button

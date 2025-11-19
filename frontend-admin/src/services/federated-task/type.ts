@@ -1,6 +1,6 @@
 /**
- * 联邦学习任务服务类型定义
- * 定义联邦学习任务管理相关的请求和响应类型
+ * 任务服务类型定义
+ * 定义任务管理相关的请求和响应类型
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -456,7 +456,7 @@ export interface TaskMetrics {
  * 参与者状态
  */
 export interface ParticipantStatus {
-  /** 虚拟机ID */
+  /** 水下机器人ID */
   readonly vmId: string
   /** 参与者角色 */
   readonly role: string
@@ -527,7 +527,7 @@ export interface TaskStatistics {
 // ==================== 错误类型 ====================
 
 /**
- * 联邦学习任务服务错误类型 - v1.3 增强版
+ * 任务服务错误类型 - v1.3 增强版
  */
 export interface FederatedTaskServiceError {
   /** 错误码 */
@@ -588,7 +588,7 @@ export interface TaskValidationError extends FederatedTaskServiceError {
 // ==================== 配置类型 ====================
 
 /**
- * 联邦学习任务服务配置
+ * 任务服务配置
  */
 export interface FederatedTaskServiceConfig {
   /** API基础URL */
@@ -634,12 +634,12 @@ export interface FederatedLearningDefaults {
 }
 
 /**
- * 联邦学习任务状态联合类型
+ * 任务状态联合类型
  */
 export type TaskStatus = FederatedTask['status']
 
 /**
- * 联邦学习任务类型联合类型
+ * 任务类型联合类型
  */
 export type TaskType = FederatedTask['taskType']
 

@@ -20,11 +20,11 @@ html, body {
 
 /* 强制覆盖样式 - 不向后兼容 */
 body, #root {
-  background-color: #f0f2f5;
+  background-color: transparent;
 }
 
 .ant-layout {
-  background: #f0f2f5;
+  background: transparent;
   max-width: 100%;
   overflow-x: hidden;
 }

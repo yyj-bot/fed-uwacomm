@@ -3,7 +3,9 @@
   flex-wrap: wrap;
   gap: 16px;
   width: 100%;
-  align-items: flex-start;
+  align-items: stretch;
+  min-height: calc(100vh - 64px);
+  flex: 1;
 }
 
 .scenePanel {
@@ -17,6 +19,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  align-self: stretch;
 }
 
 .sceneHeader {
@@ -112,16 +115,111 @@
 
 .canvasWrapper {
   flex: 1;
+  min-width: 0;
   height: clamp(520px, 60vh, 720px);
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(24, 144, 255, 0.16);
   background: transparent;
+  position: relative;
 }
 
 .canvasWrapper :global(canvas) {
   width: 100% !important;
   height: 100% !important;
+}
+
+.batteryOverlay {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.batteryCard {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(10, 38, 61, 0.78);
+  border: 1px solid rgba(145, 213, 255, 0.45);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.batteryIcon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 22px;
+}
+
+.batteryShell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  border: 2px solid rgba(145, 213, 255, 0.85);
+  background: rgba(9, 28, 46, 0.65);
+  overflow: hidden;
+}
+
+.batteryLevel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transition: width 0.2s ease-out;
+}
+
+.batteryLevelHigh {
+  background: linear-gradient(90deg, #34d399, #22c55e);
+}
+
+.batteryLevelMedium {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.batteryLevelLow {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+
+.batteryTip {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: rgba(145, 213, 255, 0.85);
+}
+
+.batteryPercent {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6f7ff;
+  letter-spacing: 0.04em;
+}
+
+.thrusterOverlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 280px;
+  pointer-events: none;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.thrusterOverlay :global(.ant-card) {
+  pointer-events: auto;
 }
 
 .infoPanel {
@@ -130,6 +228,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  align-self: stretch;
 }
 
 .infoCard :global(.ant-card-head-title) {
@@ -296,6 +395,22 @@
   font-weight: 600;
 }
 
+.thrusterCard {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(145, 213, 255, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 22px 48px rgba(24, 144, 255, 0.25);
+}
+
+.thrusterCard :global(.ant-card-head-title) {
+  color: #1f2d3d;
+}
+
+.thrusterCard :global(.ant-card-body) {
+  padding: 16px 18px 12px;
+}
+
 @media (max-width: 768px) {
   .instrumentSection {
     grid-template-columns: 1fr;
@@ -321,21 +436,23 @@
 }
 
 .thrusterLabel {
-  flex: 0 0 80px;
+  flex: 0 0 64px;
   font-size: 13px;
   color: #8cbae5;
+  white-space: nowrap;
 }
 
 .thrusterMeter {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .thrusterTrack {
   position: relative;
-  flex: 1;
+  flex: 0 0 140px;
+  max-width: 100px;
   height: 12px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(10, 38, 61, 0.85), rgba(9, 28, 46, 0.9));
@@ -366,16 +483,14 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 84px;
+  min-width: 60px;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: #1c2735;
   font-size: 13px;
   line-height: 1.2;
-}
-
-.thrusterPercent {
-  color: rgba(28, 39, 53, 0.55);
-  font-size: 12px;
 }
 
 .encryptionActions {
@@ -487,6 +602,13 @@
 
   .controlsListInline {
     justify-content: flex-start;
+  }
+
+  .thrusterOverlay {
+    position: static;
+    width: 100%;
+    margin-top: 12px;
+    justify-content: center;
   }
 }
 

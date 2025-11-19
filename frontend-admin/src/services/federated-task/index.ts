@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务服务模块统一导出
+ * 任务服务模块统一导出
  * 
  * @author FedUWAComm Team
  * @version 1.0.0

@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务管理 Mock 数据
+ * 任务管理 Mock 数据
  * 严格按照 API 文档规范定义的数据结构
  * 
  * @author FedUWAComm Team
@@ -54,7 +54,7 @@ const generateLoss = (): number => {
 // ==================== Mock 数据定义 ====================
 
 /**
- * 联邦学习任务列表数据
+ * 任务列表数据
  * 数据来源：baseTaskList（单一数据源）
  */
 export const mockFederatedTasks = baseTaskList
@@ -515,7 +515,7 @@ const taskDetailsExtensions: Record<string, any> = {
 }
 
 /**
- * 联邦学习任务详情数据
+ * 任务详情数据
  * 通过合并 baseTaskList 和 taskDetailsExtensions 生成
  */
 export const mockFederatedTaskDetails = baseTaskList.map(task => ({
@@ -527,7 +527,7 @@ export const mockFederatedTaskDetails = baseTaskList.map(task => ({
 export const mockTaskResults = [
   {
     taskId: 'c3d4e5f6789012345678901234567890',
-    taskName: '水声传播特征分类任务',
+    taskName: '联邦水下声呐目标识别',
     status: 'RUNNING',
     finalResults: null, // 运行中的任务还没有最终结果
     roundResults: [
@@ -777,7 +777,7 @@ export const mockTaskLogs: Record<string, any[]> = {
     {
       timestamp: '2024-01-01T10:00:00.000Z',
       level: 'INFO',
-      message: '水声传播特征分类任务启动成功',
+      message: '联邦水下声呐目标识别任务启动成功',
       source: 'TASK_MANAGER',
       details: {
         participants: ['a1b2c3d4e5f678901234567890123456', 'b2c3d4e5f67890123456789012345678']
@@ -926,7 +926,7 @@ export const mockTaskLogs: Record<string, any[]> = {
   ]
 }
 
-// 可用虚拟机列表
+// 可用水下机器人列表
 // 数据来源：baseVmList（单一数据源）
 // 为联邦任务添加特有字段：resources, capabilities, currentUsage, networkInfo, reliability
 export const mockAvailableVMs = baseVmList.map(vm => {

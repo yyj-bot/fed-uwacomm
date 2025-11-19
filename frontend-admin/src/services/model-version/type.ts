@@ -57,6 +57,30 @@ export type DownloadFormat = 'original' | 'onnx'
  */
 export type TimeRange = '7d' | '30d' | '90d'
 
+// ==================== 初始模型通用类型 ====================
+
+/**
+ * 初始模型架构参数
+ * 用于兼容不同模型类型的结构字段
+ */
+interface BaseInitialModelArchitecture<TTaskType extends string | undefined = undefined> {
+  // 神经网络参数
+  readonly inputSize?: number
+  readonly hiddenLayers?: number[]
+  readonly outputSize?: number
+  readonly activationFunction?: string
+  readonly optimizer?: string
+  readonly learningRate?: number
+  // 随机森林参数
+  readonly n_estimators?: number
+  readonly n_features?: number
+  readonly task_type?: TTaskType
+}
+
+export type InitialModelArchitectureRequest = BaseInitialModelArchitecture<'classification' | 'regression'>
+
+export type InitialModelArchitectureResponse = BaseInitialModelArchitecture<'classification' | 'regression' | string>
+
 // ==================== 初始模型管理相关类型 ====================
 
 /**
@@ -68,19 +92,7 @@ export interface InitialModelGenerationRequest {
   /** 模型类型 */
   readonly modelType: ModelType
   /** 模型架构参数 */
-  readonly architecture: {
-    // 神经网络参数
-    readonly inputSize?: number
-    readonly hiddenLayers?: number[]
-    readonly outputSize?: number
-    readonly activationFunction?: string
-    readonly optimizer?: string
-    readonly learningRate?: number
-    // 随机森林参数
-    readonly n_estimators?: number
-    readonly n_features?: number
-    readonly task_type?: 'classification' | 'regression'
-  }
+  readonly architecture: InitialModelArchitectureRequest
   /** 随机种子 */
   readonly randomSeed?: number
   /** 模型描述 */
@@ -102,14 +114,7 @@ export interface InitialModelGenerationResponse {
   /** 参数数量 */
   readonly parametersCount: number
   /** 模型架构参数 */
-  readonly architecture: {
-    readonly inputSize: number
-    readonly hiddenLayers: number[]
-    readonly outputSize: number
-    readonly activationFunction: string
-    readonly optimizer: string
-    readonly learningRate: number
-  }
+  readonly architecture: InitialModelArchitectureResponse
   /** 生成时间 */
   readonly generatedAt: string
   /** 状态 */
@@ -212,7 +217,7 @@ export interface InitialModelInfo {
  * 模型分发请求
  */
 export interface ModelDistributionRequest {
-  /** 目标虚拟机ID列表 */
+  /** 目标水下机器人ID列表 */
   readonly vmIds: string[]
   /** 分发模式 */
   readonly distributionMode: DistributionMode
@@ -236,7 +241,7 @@ export interface ModelDistributionResponse {
   readonly taskId: string
   /** 模型ID */
   readonly modelId: string
-  /** 目标虚拟机列表 */
+  /** 目标水下机器人列表 */
   readonly targetVms: string[]
   /** 分发模式 */
   readonly distributionMode: string
@@ -278,7 +283,7 @@ export interface DistributionStatusDetail {
     readonly failed: number
     readonly inProgress: number
   }
-  /** 虚拟机详情 */
+  /** 水下机器人详情 */
   readonly vmDetails: Array<{
     readonly vmId: string
     readonly status: string

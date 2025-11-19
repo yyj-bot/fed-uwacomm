@@ -47,7 +47,7 @@ const LOG_LEVELS = [
 const LOG_CATEGORIES = [
   { key: 'SYSTEM', label: '系统日志' },
   { key: 'USER', label: '用户操作' },
-  { key: 'VM', label: '虚拟机' },
+  { key: 'VM', label: '水下机器人' },
   { key: 'TASK', label: '任务执行' },
   { key: 'DATA', label: '数据管理' },
   { key: 'MODEL', label: '模型管理' },

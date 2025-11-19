@@ -50,12 +50,17 @@ export class TrainingDataService {
       this.validateUploadFile(formData)
       
       const response = await trainingData.uploadFile(formData)
-      
+
+      const vmIdEntry = formData.get('vmId')
+      if (typeof vmIdEntry !== 'string') {
+        throw new Error('水下机器人ID格式不正确')
+      }
+
       return {
         datasetId: response.datasetId,
         datasetDescription: response.datasetDescription,
         datasetType: response.datasetType,
-        vmId: response.vmId,
+        vmId: vmIdEntry,
         status: response.status,
         uploadTime: response.uploadTime,
         uploadedBy: response.uploadedBy,
@@ -76,12 +81,12 @@ export class TrainingDataService {
       this.validateUploadText(textData)
       
       const response = await trainingData.uploadText(textData)
-      
+
       return {
         datasetId: response.datasetId,
         datasetDescription: response.datasetDescription,
         datasetType: response.datasetType,
-        vmId: response.vmId,
+        vmId: textData.vmId,
         status: response.status,
         uploadTime: response.uploadTime,
         uploadedBy: response.uploadedBy
@@ -318,13 +323,13 @@ export class TrainingDataService {
     
     const vmId = formData.get('vmId')
     if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-      throw new Error('虚拟机ID不能为空')
+      throw new Error('水下机器人ID不能为空')
     }
     
     // 验证vmId格式
     const uuidRegex = /^[a-f0-9]{32}$/i
     if (!uuidRegex.test(vmId)) {
-      throw new Error('虚拟机ID格式不正确')
+      throw new Error('水下机器人ID格式不正确')
     }
     
     const dataType = formData.get('dataType')
@@ -354,13 +359,13 @@ export class TrainingDataService {
    */
   private validateUploadText(textData: UploadTextRequest): void {
     if (!textData.vmId || typeof textData.vmId !== 'string' || textData.vmId.trim().length === 0) {
-      throw new Error('虚拟机ID不能为空')
+      throw new Error('水下机器人ID不能为空')
     }
     
     // 验证vmId格式
     const uuidRegex = /^[a-f0-9]{32}$/i
     if (!uuidRegex.test(textData.vmId)) {
-      throw new Error('虚拟机ID格式不正确')
+      throw new Error('水下机器人ID格式不正确')
     }
     
     if (!textData.dataType || typeof textData.dataType !== 'string') {
@@ -412,7 +417,7 @@ export class TrainingDataService {
     if (params.vmId !== undefined && typeof params.vmId === 'string') {
       const uuidRegex = /^[a-f0-9]{32}$/i
       if (!uuidRegex.test(params.vmId)) {
-        throw new Error('虚拟机ID格式不正确')
+        throw new Error('水下机器人ID格式不正确')
       }
     }
     
@@ -567,7 +572,7 @@ export class TrainingDataService {
     if (params.vmId !== undefined && typeof params.vmId === 'string') {
       const uuidRegex = /^[a-f0-9]{32}$/i
       if (!uuidRegex.test(params.vmId)) {
-        throw new Error('虚拟机ID格式不正确')
+        throw new Error('水下机器人ID格式不正确')
       }
     }
     
@@ -621,7 +626,7 @@ export class TrainingDataService {
       if (data.filters.vmId && typeof data.filters.vmId === 'string') {
         const uuidRegex = /^[a-f0-9]{32}$/i
         if (!uuidRegex.test(data.filters.vmId)) {
-          throw new Error('过滤虚拟机ID格式不正确')
+          throw new Error('过滤水下机器人ID格式不正确')
         }
       }
     }

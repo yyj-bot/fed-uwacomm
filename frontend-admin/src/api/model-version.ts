@@ -47,7 +47,7 @@ export const initialModel = {
   
   async generateInitialModel(generationData: {
     taskId: string
-    modelType: 'NEURAL_NETWORK' | 'RANDOM_FOREST'
+    modelType: 'NEURAL_NETWORK' | 'RANDOM_FOREST' | 'neural_network' | 'random_forest' | 'svm' | 'linear_regression' | 'logistic_regression'
     architecture: {
       // 神经网络参数
       inputSize?: number

@@ -1,17 +1,17 @@
-// 虚拟机API Mock数据
+// 水下机器人API Mock数据
 // 基于 vm-api-reference.md 和 vm-round-models-api-reference.md 文档
 
 import { baseVmList, getVmById } from './shared/vm-base'
 
 export const vmApiMock = {
-  // 3.1 虚拟机注册接口 - POST /api/v1/vm/register
+  // 3.1 水下机器人注册接口 - POST /api/v1/vm/register
   register: {
     success: {
       code: 200,
-      message: "虚拟机注册成功",
+      message: "水下机器人注册成功",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
-        name: "水声联邦学习节点-001",
+        name: "AUV-01",
         status: "OFFLINE",
         connectionStatus: "DISCONNECTED",
         createdAt: "2024-01-01T00:00:00.000Z",
@@ -32,7 +32,7 @@ export const vmApiMock = {
         errors: [
           {
             field: "name",
-            message: "虚拟机名称不能为空"
+            message: "水下机器人名称不能为空"
           },
           {
             field: "cpuCores",
@@ -43,10 +43,10 @@ export const vmApiMock = {
     },
     error409: {
       code: 409,
-      message: "虚拟机已存在",
+      message: "水下机器人已存在",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
-        existingName: "水声联邦学习节点-001"
+        existingName: "AUV-01"
       }
     },
     error500: {
@@ -72,7 +72,7 @@ export const vmApiMock = {
     }
   },
 
-  // 4.1 虚拟机列表查询接口 - GET /api/vm/list
+  // 4.1 水下机器人列表查询接口 - GET /api/vm/list
   list: {
     success: {
       code: 200,
@@ -92,16 +92,19 @@ export const vmApiMock = {
           cpuCores: vm.cpuCores,
           memoryMb: vm.memoryMb,
           diskGb: vm.diskGb,
+          batteryLevel: vm.batteryLevel,
+          speed: vm.speed,
           connectionStatus: vm.connectionStatus,
           lastHeartbeat: vm.lastHeartbeat,
           createdAt: vm.createdAt,
-          updatedAt: vm.updatedAt
+          updatedAt: vm.updatedAt,
+          specs: vm.specs
         }))
       }
     }
   },
 
-  // 4.2 虚拟机详情查询接口 - GET /api/vm/{vmId}
+  // 4.2 水下机器人详情查询接口 - GET /api/vm/{vmId}
   // 数据来源：baseVmList（通过vmId动态获取）
   detail: {
     success: {
@@ -114,24 +117,24 @@ export const vmApiMock = {
     }
   },
 
-  // 4.3 虚拟机更新接口 - PUT /api/vm/{vmId}
+  // 4.3 水下机器人更新接口 - PUT /api/vm/{vmId}
   update: {
     success: {
       code: 200,
-      message: "虚拟机更新成功",
+      message: "水下机器人更新成功",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
-        name: "水声联邦学习节点-001-更新",
+        name: "AUV-01-更新",
         updatedAt: "2024-01-01T00:00:00.000Z"
       }
     }
   },
 
-  // 4.4 虚拟机删除接口 - DELETE /api/vm/{vmId}
+  // 4.4 水下机器人删除接口 - DELETE /api/vm/{vmId}
   delete: {
     success: {
       code: 200,
-      message: "虚拟机删除成功",
+      message: "水下机器人删除成功",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
         deletedAt: "2024-01-01T00:00:00.000Z"
@@ -139,11 +142,11 @@ export const vmApiMock = {
     }
   },
 
-  // 5.1 虚拟机启动接口 - POST /api/vm/{vmId}/start
+  // 5.1 水下机器人启动接口 - POST /api/vm/{vmId}/start
   start: {
     success: {
       code: 200,
-      message: "虚拟机启动命令已发送",
+      message: "水下机器人启动命令已发送",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
         status: "STARTING",
@@ -153,11 +156,11 @@ export const vmApiMock = {
     }
   },
 
-  // 5.2 虚拟机停止接口 - POST /api/vm/{vmId}/stop
+  // 5.2 水下机器人停止接口 - POST /api/vm/{vmId}/stop
   stop: {
     success: {
       code: 200,
-      message: "虚拟机停止命令已发送",
+      message: "水下机器人停止命令已发送",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
         status: "STOPPING",
@@ -167,11 +170,11 @@ export const vmApiMock = {
     }
   },
 
-  // 5.3 虚拟机重启接口 - POST /api/vm/{vmId}/restart
+  // 5.3 水下机器人重启接口 - POST /api/vm/{vmId}/restart
   restart: {
     success: {
       code: 200,
-      message: "虚拟机重启命令已发送",
+      message: "水下机器人重启命令已发送",
       data: {
         vmId: "a1b2c3d4e5f678901234567890123456",
         status: "STARTING",
@@ -181,7 +184,7 @@ export const vmApiMock = {
     }
   },
 
-  // 6.1 虚拟机状态查询接口 - GET /api/vm/{vmId}/status
+  // 6.1 水下机器人状态查询接口 - GET /api/vm/{vmId}/status
   status: {
     success: {
       code: 200,
@@ -607,9 +610,9 @@ export const vmRoundModelsApiMock = {
   }
 };
 
-// 多虚拟机对比数据示例
+// 多水下机器人对比数据示例
 export const multiVmComparisonMock = {
-  // 多虚拟机同轮次对比
+  // 多水下机器人同轮次对比
   roundComparison: {
     code: 200,
     message: "查询成功",
@@ -619,7 +622,7 @@ export const multiVmComparisonMock = {
       vmResults: [
         {
           vmId: "a1b2c3d4e5f678901234567890123456",
-          vmName: "水声联邦学习节点-001",
+          vmName: "AUV-01",
           metrics: {
             accuracy: 0.88,
             loss: 0.12,
@@ -630,7 +633,7 @@ export const multiVmComparisonMock = {
         },
         {
           vmId: "b2c3d4e5f6789012345678901234567a",
-          vmName: "水声联邦学习节点-002",
+          vmName: "AUV-02",
           metrics: {
             accuracy: 0.84,
             loss: 0.16,
@@ -641,7 +644,7 @@ export const multiVmComparisonMock = {
         },
         {
           vmId: "c3d4e5f67890123456789012345678ab",
-          vmName: "水声联邦学习节点-003",
+          vmName: "AUV-03",
           metrics: {
             accuracy: 0.86,
             loss: 0.14,
@@ -654,7 +657,7 @@ export const multiVmComparisonMock = {
     }
   },
 
-  // 多虚拟机趋势对比
+  // 多水下机器人趋势对比
   trendComparison: {
     code: 200,
     message: "查询成功",
@@ -664,7 +667,7 @@ export const multiVmComparisonMock = {
       vmTrends: [
         {
           vmId: "a1b2c3d4e5f678901234567890123456",
-          vmName: "水声联邦学习节点-001",
+          vmName: "AUV-01",
           trend: [
             { roundNumber: 20, value: 0.82 },
             { roundNumber: 21, value: 0.80 },
@@ -676,7 +679,7 @@ export const multiVmComparisonMock = {
         },
         {
           vmId: "b2c3d4e5f6789012345678901234567a",
-          vmName: "水声联邦学习节点-002",
+          vmName: "AUV-02",
           trend: [
             { roundNumber: 20, value: 0.78 },
             { roundNumber: 21, value: 0.79 },
@@ -688,7 +691,7 @@ export const multiVmComparisonMock = {
         },
         {
           vmId: "c3d4e5f67890123456789012345678ab",
-          vmName: "水声联邦学习节点-003",
+          vmName: "AUV-03",
           trend: [
             { roundNumber: 20, value: 0.80 },
             { roundNumber: 21, value: 0.81 },
@@ -705,9 +708,9 @@ export const multiVmComparisonMock = {
 
 // 请求参数示例
 export const vmApiRequestExamples = {
-  // 虚拟机注册请求参数
+  // 水下机器人注册请求参数
   register: {
-    name: "水声联邦学习节点-001",
+    name: "AUV-01",
     ipAddress: "192.168.1.100",
     port: 22,
     osType: "Ubuntu 20.04",
@@ -724,9 +727,9 @@ export const vmApiRequestExamples = {
     secretId: "s3cr3t_8f14e45fceea167a5a36dedd4bea2543"
   },
 
-  // 虚拟机更新请求参数
+  // 水下机器人更新请求参数
   update: {
-    name: "水声联邦学习节点-001-更新",
+    name: "AUV-01-更新",
     ipAddress: "192.168.1.101",
     port: 2222,
     osType: "Ubuntu 20.04",
@@ -755,7 +758,7 @@ export const vmApiRequestExamples = {
       bandwidth: 1000
     },
     metadata: {
-      description: "水声联邦学习专用虚拟机节点-更新版",
+      description: "水声联邦学习专用水下机器人节点-更新版",
       location: "实验室A-机架01",
       owner: "张三",
       department: "水声工程学院",
@@ -763,7 +766,7 @@ export const vmApiRequestExamples = {
     }
   },
 
-  // 虚拟机启动请求参数
+  // 水下机器人启动请求参数
   start: {
     timeout: 300,
     config: {
@@ -780,14 +783,14 @@ export const vmApiRequestExamples = {
     }
   },
 
-  // 虚拟机停止请求参数
+  // 水下机器人停止请求参数
   stop: {
     force: false,
     timeout: 60,
     saveState: true
   },
 
-  // 虚拟机重启请求参数
+  // 水下机器人重启请求参数
   restart: {
     timeout: 300,
     graceful: true,

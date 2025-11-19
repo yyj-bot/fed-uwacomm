@@ -270,7 +270,7 @@ const PermissionManagement: React.FC = () => {
                   EXECUTE - 执行权限
                 </Tag>
                 <Text style={{ fontSize: '14px', color: '#666' }}>
-                  可以执行系统操作，如启动任务、控制虚拟机等
+                  可以执行系统操作，如启动任务、控制水下机器人等
                 </Text>
               </Space>
             </Card>

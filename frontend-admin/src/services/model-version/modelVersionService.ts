@@ -146,7 +146,7 @@ export class ModelVersionService {
   }
 
   /**
-   * 分发初始模型到虚拟机
+   * 分发初始模型到水下机器人
    * @param taskId 任务ID
    * @param distributionData 分发数据
    * @returns 分发响应信息
@@ -668,16 +668,16 @@ export class ModelVersionService {
    */
   private validateModelDistributionRequest(data: ModelDistributionRequest): void {
     if (!data.vmIds || !Array.isArray(data.vmIds) || data.vmIds.length === 0) {
-      throw new Error('目标虚拟机列表不能为空')
+      throw new Error('目标水下机器人列表不能为空')
     }
     
     if (data.vmIds.length > 50) {
-      throw new Error('目标虚拟机数量不能超过50个')
+      throw new Error('目标水下机器人数量不能超过50个')
     }
     
     data.vmIds.forEach(vmId => {
       if (!vmId || typeof vmId !== 'string' || vmId.trim().length === 0) {
-        throw new Error('虚拟机ID不能为空')
+        throw new Error('水下机器人ID不能为空')
       }
     })
     

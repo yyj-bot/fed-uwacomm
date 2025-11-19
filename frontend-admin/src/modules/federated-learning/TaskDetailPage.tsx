@@ -1,5 +1,5 @@
 /**
- * 联邦学习任务详情页面
+ * 任务详情页面
  * 显示任务的详细信息、实时状态、参与者信息、训练进度等
  * 
  * @author FedUWAComm Team
@@ -226,7 +226,7 @@ const TaskDetailPage: React.FC = () => {
   // 参与者表格列定义
   const participantColumns = [
     {
-      title: '虚拟机ID',
+      title: '水下机器人ID',
       dataIndex: 'vmId',
       key: 'vmId',
       width: 200,

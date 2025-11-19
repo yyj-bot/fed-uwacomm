@@ -4,7 +4,7 @@ export { userApi } from './user'
 // 管理员API
 export { admin as adminApi } from './admin'
 
-// 虚拟机管理API
+// 水下机器人管理API
 export { vmApi } from './vm'
 
 // 联邦学习任务API

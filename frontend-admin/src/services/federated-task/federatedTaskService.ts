@@ -1,6 +1,6 @@
 /**
- * 联邦学习任务服务层 - 企业级规范实现
- * 提供联邦学习任务管理相关的业务逻辑处理
+ * 任务服务层 - 企业级规范实现
+ * 提供任务管理相关的业务逻辑处理
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -37,13 +37,13 @@ import type {
 } from '@/api/federated-task'
 
 /**
- * 联邦学习任务服务类
+ * 任务服务类
  */
 export class FederatedTaskService {
   // ==================== 任务创建管理 ====================
 
   /**
-   * 创建联邦学习任务
+   * 创建任务
    * @param taskData 任务创建数据
    * @returns 创建响应信息
    */
@@ -71,12 +71,12 @@ export class FederatedTaskService {
         estimatedDuration: response.estimatedDuration
       }
     } catch (error) {
-      throw this.handleServiceError(error, '创建联邦学习任务失败')
+      throw this.handleServiceError(error, '创建任务失败')
     }
   }
 
   /**
-   * 配置联邦学习任务
+   * 配置任务
    * @param taskId 任务ID
    * @param config 配置数据
    * @returns 配置响应信息
@@ -100,14 +100,14 @@ export class FederatedTaskService {
         configVersion: response.configVersion
       }
     } catch (error) {
-      throw this.handleServiceError(error, `配置联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `配置任务失败 (ID: ${taskId})`)
     }
   }
 
   // ==================== 任务控制管理 ====================
 
   /**
-   * 启动联邦学习任务
+   * 启动任务
    * @param taskId 任务ID
    * @returns 启动响应信息
    */
@@ -125,12 +125,12 @@ export class FederatedTaskService {
         participants: response.participants
       }
     } catch (error) {
-      throw this.handleServiceError(error, `启动联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `启动任务失败 (ID: ${taskId})`)
     }
   }
 
   /**
-   * 暂停联邦学习任务
+   * 暂停任务
    * @param taskId 任务ID
    * @returns 暂停响应信息
    */
@@ -148,12 +148,12 @@ export class FederatedTaskService {
         resumePoint: response.resumePoint
       }
     } catch (error) {
-      throw this.handleServiceError(error, `暂停联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `暂停任务失败 (ID: ${taskId})`)
     }
   }
 
   /**
-   * 恢复联邦学习任务
+   * 恢复任务
    * @param taskId 任务ID
    * @returns 恢复响应信息
    */
@@ -170,12 +170,12 @@ export class FederatedTaskService {
         currentRound: response.currentRound
       }
     } catch (error) {
-      throw this.handleServiceError(error, `恢复联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `恢复任务失败 (ID: ${taskId})`)
     }
   }
 
   /**
-   * 停止联邦学习任务
+   * 停止任务
    * @param taskId 任务ID
    * @param stopData 停止参数
    * @returns 停止响应信息
@@ -198,12 +198,12 @@ export class FederatedTaskService {
         checkpointPath: response.checkpointPath
       }
     } catch (error) {
-      throw this.handleServiceError(error, `停止联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `停止任务失败 (ID: ${taskId})`)
     }
   }
 
   /**
-   * 取消联邦学习任务
+   * 取消任务
    * @param taskId 任务ID
    * @param cancelData 取消参数
    * @returns 取消响应信息
@@ -224,7 +224,7 @@ export class FederatedTaskService {
         reason: response.reason
       }
     } catch (error) {
-      throw this.handleServiceError(error, `取消联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `取消任务失败 (ID: ${taskId})`)
     }
   }
 
@@ -242,7 +242,7 @@ export class FederatedTaskService {
       const task = await federatedTask.getTaskDetail(taskId)
       return this.transformFederatedTaskDetails(task)
     } catch (error) {
-      throw this.handleServiceError(error, `获取联邦学习任务详情失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `获取任务详情失败 (ID: ${taskId})`)
     }
   }
 
@@ -264,7 +264,7 @@ export class FederatedTaskService {
         tasks: result.tasks.map(task => this.transformFederatedTask(task))
       }
     } catch (error) {
-      throw this.handleServiceError(error, '获取联邦学习任务列表失败')
+      throw this.handleServiceError(error, '获取任务列表失败')
     }
   }
 
@@ -280,7 +280,7 @@ export class FederatedTaskService {
       const results = await federatedTask.getTaskResults(taskId)
       return this.transformTaskResults(results)
     } catch (error) {
-      throw this.handleServiceError(error, `获取联邦学习任务结果失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `获取任务结果失败 (ID: ${taskId})`)
     }
   }
 
@@ -305,12 +305,12 @@ export class FederatedTaskService {
         logs: result.logs.map(log => this.transformTaskLog(log))
       }
     } catch (error) {
-      throw this.handleServiceError(error, `获取联邦学习任务日志失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `获取任务日志失败 (ID: ${taskId})`)
     }
   }
 
   /**
-   * 删除联邦学习任务
+   * 删除任务
    * @param taskId 任务ID
    * @param deleteOptions 删除选项
    * @returns 删除响应信息
@@ -331,7 +331,7 @@ export class FederatedTaskService {
         modelPreserved: response.modelPreserved
       }
     } catch (error) {
-      throw this.handleServiceError(error, `删除联邦学习任务失败 (ID: ${taskId})`)
+      throw this.handleServiceError(error, `删除任务失败 (ID: ${taskId})`)
     }
   }
 
@@ -340,9 +340,9 @@ export class FederatedTaskService {
   // ==================== 预配置接口组 ====================
   
   /**
-   * 获取可用虚拟机列表
+   * 获取可用水下机器人列表
    * @param params 查询参数
-   * @returns 虚拟机列表
+   * @returns 水下机器人列表
    */
   async getAvailableVMs(params: {
     algorithm?: string
@@ -364,7 +364,7 @@ export class FederatedTaskService {
         availableVms: response.availableVms
       }
     } catch (error) {
-      throw this.handleServiceError(error, '获取可用虚拟机列表失败')
+      throw this.handleServiceError(error, '获取可用水下机器人列表失败')
     }
   }
 
@@ -572,7 +572,7 @@ export class FederatedTaskService {
     // 验证参与者
     data.participants.forEach((participant, index) => {
       if (!participant.vmId || typeof participant.vmId !== 'string') {
-        throw new Error(`参与者${index + 1}的虚拟机ID无效`)
+        throw new Error(`参与者${index + 1}的水下机器人ID无效`)
       }
       
       if (!participant.role || typeof participant.role !== 'string') {
@@ -791,7 +791,7 @@ export class FederatedTaskService {
   // ==================== v1.3 新增验证方法 ====================
   
   /**
-   * 验证可用虚拟机查询参数
+   * 验证可用水下机器人查询参数
    */
   private validateAvailableVMsParams(params: {
     algorithm?: string
@@ -863,7 +863,7 @@ export class FederatedTaskService {
     let totalRatio = 0
     data.participants.forEach((participant, index) => {
       if (!participant.vmId || typeof participant.vmId !== 'string') {
-        throw new Error(`参与者${index + 1}的虚拟机ID无效`)
+        throw new Error(`参与者${index + 1}的水下机器人ID无效`)
       }
       
       if (typeof participant.requestedRatio !== 'number' || participant.requestedRatio <= 0 || participant.requestedRatio > 1) {
@@ -908,7 +908,7 @@ export class FederatedTaskService {
     
     data.participants.forEach((participant, index) => {
       if (!participant.vmId || typeof participant.vmId !== 'string') {
-        throw new Error(`参与者${index + 1}的虚拟机ID无效`)
+        throw new Error(`参与者${index + 1}的水下机器人ID无效`)
       }
       
       if (!participant.role) {
@@ -923,7 +923,7 @@ export class FederatedTaskService {
   }
 
   /**
-   * 转换联邦学习任务数据
+   * 转换任务数据
    */
   private transformFederatedTask(task: any): FederatedTask {
     return {
@@ -943,7 +943,7 @@ export class FederatedTaskService {
   }
 
   /**
-   * 转换联邦学习任务详情数据
+   * 转换任务详情数据
    */
   private transformFederatedTaskDetails(task: any): FederatedTaskDetails {
     return {
@@ -1042,7 +1042,7 @@ export class FederatedTaskService {
     let totalRatio = 0
     config.participants.forEach((participant, index) => {
       if (!participant.vmId || typeof participant.vmId !== 'string') {
-        throw new Error(`参与者${index + 1}的虚拟机ID无效`)
+        throw new Error(`参与者${index + 1}的水下机器人ID无效`)
       }
       
       if (!participant.role) {
@@ -1134,7 +1134,7 @@ export class FederatedTaskService {
     
     participants.forEach((participant, index) => {
       if (!participant.vmId || typeof participant.vmId !== 'string') {
-        throw new Error(`参与者${index + 1}的虚拟机ID无效`)
+        throw new Error(`参与者${index + 1}的水下机器人ID无效`)
       }
       
       if (!participant.role || typeof participant.role !== 'string') {

@@ -1,6 +1,6 @@
 /**
  * VM分配概况组件
- * 显示虚拟机分配统计信息、状态分布和最近分配记录
+ * 显示水下机器人分配统计信息、状态分布和最近分配记录
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -60,7 +60,7 @@ const VMAssignmentOverview: React.FC = () => {
       )
     },
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'vmName',
       key: 'vmName'
     },
@@ -126,7 +126,7 @@ const VMAssignmentOverview: React.FC = () => {
             }}
           >
             <Statistic
-              title="总虚拟机数"
+              title="总水下机器人数"
               value={summary.totalVms}
               prefix={<DatabaseOutlined />}
               valueStyle={{ color: '#1890ff' }}
@@ -193,9 +193,9 @@ const VMAssignmentOverview: React.FC = () => {
             }}
           >
             <Statistic
-              title="拥有VM的用户"
+              title="拥有机器人的用户"
               value={summary.usersWithVms}
-              prefix={<UserOutlined />}
+              prefix={<TeamOutlined />}
               valueStyle={{ color: '#722ed1' }}
             />
           </Card>
@@ -223,7 +223,7 @@ const VMAssignmentOverview: React.FC = () => {
         {/* 状态分布 */}
         <Col xs={24} lg={8}>
           <Card 
-            title="虚拟机状态分布" 
+            title="水下机器人状态分布" 
             bordered={true}
             style={{ 
               border: '2px solid #e0e0e0',
@@ -245,10 +245,10 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
 
-        {/* 热门虚拟机 */}
+        {/* 热门水下机器人 */}
         <Col xs={24} lg={8}>
           <Card 
-            title="热门虚拟机 (分配最多)" 
+            title="热门水下机器人 (分配最多)" 
             bordered={true}
             style={{ 
               border: '2px solid #e0e0e0',

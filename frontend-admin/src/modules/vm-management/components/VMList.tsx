@@ -1,13 +1,13 @@
 /**
- * 虚拟机列表组件（普通用户）
- * 显示虚拟机列表，支持搜索、筛选、分页
+ * 水下机器人列表组件（普通用户）
+ * 显示水下机器人列表，支持搜索、筛选、分页
  * 
  * 功能：
- * - 查看虚拟机列表（接口 4.1）
- * - 查看虚拟机详情（接口 4.2）
+ * - 查看水下机器人列表（接口 4.1）
+ * - 查看水下机器人详情（接口 4.2）
  * - 查看本地模型
  * 
- * 注意：不包含虚拟机控制操作（启动/停止/重启），这些功能仅管理员可用
+ * 注意：不包含水下机器人控制操作（启动/停止/重启），这些功能仅管理员可用
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -151,7 +151,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
   // 表格列定义
   const columns: ColumnsType<VirtualMachine> = [
     {
-      title: '虚拟机名称',
+      title: '水下机器人名称',
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -174,41 +174,40 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       )
     },
     {
-      title: 'IP地址',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      width: 120
-    },
-    {
-      title: '端口',
-      dataIndex: 'port',
-      key: 'port',
-      width: 80
-    },
-    {
-      title: '操作系统',
-      dataIndex: 'osType',
-      key: 'osType',
-      width: 120,
-      ellipsis: true
-    },
-    {
-      title: '资源配置',
-      key: 'resources',
-      width: 150,
+      title: '关键参数',
+      key: 'keySpecs',
+      width: 240,
       render: (_, record: VirtualMachine) => (
-        <Space direction="vertical" size={2}>
-          <Text style={{ fontSize: '13px' }}>
+        <Space direction="vertical" size={4}>
+          <Text style={{ fontSize: 13 }}>
             <ThunderboltOutlined style={{ color: '#faad14', marginRight: 4 }} />
-            CPU: {record.cpuCores}核
+            尺寸: {record.specs?.dimensions || '—'}
           </Text>
-          <Text style={{ fontSize: '13px' }}>
+          <Text style={{ fontSize: 13 }}>
             <SafetyCertificateOutlined style={{ color: '#52c41a', marginRight: 4 }} />
-            内存: {(record.memoryMb / 1024).toFixed(1)}GB
+            重量: {record.specs?.airWeight || '—'}
           </Text>
-          <Text style={{ fontSize: '13px' }}>
+          <Text style={{ fontSize: 13 }}>
             <CloudServerOutlined style={{ color: '#1890ff', marginRight: 4 }} />
-            磁盘: {record.diskGb}GB
+            深度: {record.specs?.depthRating || '—'}
+          </Text>
+        </Space>
+      )
+    },
+    {
+      title: '能力概览',
+      key: 'capabilitySummary',
+      width: 240,
+      render: (_, record: VirtualMachine) => (
+        <Space direction="vertical" size={4}>
+          <Text style={{ fontSize: 13 }}>
+            推进: {record.specs?.thrusters || '—'}
+          </Text>
+          <Text style={{ fontSize: 13 }}>
+            摄像: {record.specs?.camera || '—'}
+          </Text>
+          <Text style={{ fontSize: 13 }}>
+            传感: {record.specs?.sensors || '—'}
           </Text>
         </Space>
       )
@@ -267,8 +266,8 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       {/* 页面标题 */}
       <div className="vm-page-header">
         <div className="vm-page-title">
-          <h2>虚拟机列表</h2>
-          <span className="vm-page-description">查看和管理所有可用的虚拟机节点</span>
+          <h2>水下机器人列表</h2>
+          <span className="vm-page-description">查看和管理所有可用的水下机器人节点</span>
         </div>
         <div className="vm-page-actions">
           <Button 
@@ -293,10 +292,12 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
         }}
       >
         <Space size="middle" wrap style={{ width: '100%' }}>
-          <Search
-            placeholder="🔍 搜索虚拟机名称或IP地址"
+          <Input.Search
+            placeholder="搜索水下机器人名称"
+            enterButton
             allowClear
             onSearch={handleSearch}
+            onChange={(e) => setSearchText(e.target.value)}
             style={{ 
               width: 320,
             }}
@@ -319,19 +320,6 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
             <Option value="OFFLINE">⚫ 离线</Option>
           </Select>
           
-          <Select
-            placeholder="筛选操作系统"
-            allowClear
-            style={{ width: 160 }}
-            value={osTypeFilter}
-            onChange={handleOsTypeFilter}
-            size="large"
-          >
-            {osTypes.map(osType => (
-              <Option key={osType} value={osType}>💻 {osType}</Option>
-            ))}
-          </Select>
-          
           <Button 
             icon={<ReloadOutlined />} 
             onClick={() => fetchVMList()}
@@ -347,7 +335,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
         </Space>
       </Card>
 
-      {/* 虚拟机列表表格 */}
+      {/* 水下机器人列表表格 */}
       <Card 
         style={{ 
           borderRadius: '12px',
