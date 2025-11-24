@@ -309,6 +309,80 @@ const InternalRig: React.FC<{ accent: string; trim: string }> = ({ accent, trim 
   </group>
 )
 
+// AUV鱼雷型模型
+const AUVTorpedoBody: React.FC<{ accent: string; body: string; trim: string }> = ({ accent, body, trim }) => {
+  const bodyRadius = 0.38
+  const bodyLength = 3.2
+  const tailLength = 0.7
+  
+  return (
+    <group>
+      {/* 主体圆柱 */}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <cylinderGeometry args={[bodyRadius, bodyRadius, bodyLength, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.35} metalness={0.45} />
+      </mesh>
+      
+      {/* 前端完整半球形（沿X轴） */}
+      <mesh position={[bodyLength / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <sphereGeometry args={[bodyRadius, 32, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.32} metalness={0.48} />
+      </mesh>
+      
+      {/* 中部黑色分段环 - 垂直站立，只有两个 */}
+      {[-0.6, 0.6].map((x, i) => (
+        <mesh key={`ring-${i}`} position={[x, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[bodyRadius - 0.02, 0.025, 16, 32]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.3} />
+        </mesh>
+      ))}
+      
+      {/* 尾部锥形 - 锥尖朝向外侧（-X方向） */}
+      <mesh position={[-bodyLength / 2 - tailLength / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <coneGeometry args={[bodyRadius, tailLength, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.36} metalness={0.44} />
+      </mesh>
+
+      {/* 尾部四个小翅膀 - 上下左右成十字分布 */}
+      {(() => {
+        const wingLength = tailLength * 0.3
+        const wingSpan = bodyRadius * 0.8
+        const wingThickness = 0.0045
+        const wingBaseX = -bodyLength / 2 - tailLength * 0.35
+        const wingColor = "#ff871f"
+
+        const verticalWings = [1, -1].map(sign => (
+          <mesh
+            key={`tail-wing-vertical-${sign}`}
+            position={[wingBaseX, sign * (bodyRadius * 0.7), 0]}
+            rotation={[0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[wingLength, wingSpan, wingThickness]} />
+            <meshStandardMaterial color={wingColor} roughness={0.38} metalness={0.42} />
+          </mesh>
+        ))
+
+        const horizontalWings = [1, -1].map(sign => (
+          <mesh
+            key={`tail-wing-horizontal-${sign}`}
+            position={[wingBaseX, 0, sign * (bodyRadius * 0.7)]}
+            rotation={[Math.PI / 2, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[wingLength, wingSpan, wingThickness]} />
+            <meshStandardMaterial color={wingColor} roughness={0.38} metalness={0.42} />
+          </mesh>
+        ))
+
+        return [...verticalWings, ...horizontalWings]
+      })()}
+    </group>
+  )
+}
+
 const RobotMesh: React.FC<RobotMeshProps> = ({
   robot,
   isSelected,
@@ -348,6 +422,8 @@ const RobotMesh: React.FC<RobotMeshProps> = ({
     []
   )
 
+  const isAUV = robot.id.toLowerCase().includes('auv')
+
   return (
     <group
       ref={groupRef}
@@ -374,19 +450,25 @@ const RobotMesh: React.FC<RobotMeshProps> = ({
         document.body.style.cursor = 'default'
       }}
     >
-      <FrameShell body={robot.body} trim={robot.trim} />
-      <TopCover accent={robot.accent} />
-      <InternalRig accent={robot.accent} trim={robot.trim} />
+      {isAUV ? (
+        <AUVTorpedoBody accent={robot.accent} body={robot.body} trim={robot.trim} />
+      ) : (
+        <>
+          <FrameShell body={robot.body} trim={robot.trim} />
+          <TopCover accent={robot.accent} />
+          <InternalRig accent={robot.accent} trim={robot.trim} />
 
-      {horizontalThrusterPositions.map((pos, index) => (
-        <Thruster
-          key={`thruster-${index}`}
-          position={pos}
-          rotation={[Math.PI / 2, 0, 0]}
-          accent={robot.accent}
-        />
-      ))}
-      <VerticalThruster accent={robot.accent} />
+          {horizontalThrusterPositions.map((pos, index) => (
+            <Thruster
+              key={`thruster-${index}`}
+              position={pos}
+              rotation={[Math.PI / 2, 0, 0]}
+              accent={robot.accent}
+            />
+          ))}
+          <VerticalThruster accent={robot.accent} />
+        </>
+      )}
 
       {isSelected && (
         <mesh position={[0, -0.85, 0]} rotation={[-Math.PI / 2, 0, 0]}>

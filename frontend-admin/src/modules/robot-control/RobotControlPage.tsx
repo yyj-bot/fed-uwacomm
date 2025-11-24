@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Card, Typography, Tag, Divider, Space, Button, message } from 'antd'
+import { Card, Typography, Tag, Divider, Space, Button, message, Modal } from 'antd'
 import {
   RocketOutlined,
   AimOutlined,
   ThunderboltOutlined,
   CompassOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  RadarChartOutlined,
+  EyeOutlined
 } from '@ant-design/icons'
 import { MathUtils } from 'three'
 
@@ -93,8 +95,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     })
   },
   {
-    id: 'auv-04',
-    name: 'AUV-04',
+    id: 'rov-01',
+    name: 'ROV-01',
     accent: '#7bdd91',
     body: '#43515a',
     trim: '#5a6770',
@@ -105,8 +107,8 @@ const ROBOT_CONFIGS: SceneRobotConfig[] = [
     })
   },
   {
-    id: 'auv-05',
-    name: 'AUV-05',
+    id: 'rov-02',
+    name: 'ROV-02',
     accent: '#d480ff',
     body: '#4a5561',
     trim: '#606a77',
@@ -447,6 +449,8 @@ const RobotControlPage: React.FC = () => {
     exitPairMode,
     togglePairCandidate
   } = useRobotControl()
+  
+  const [sonarModalVisible, setSonarModalVisible] = useState(false)
   const horizonClipId = useMemo(() => `horizon-clip-${Math.random().toString(36).slice(2, 9)}`, [])
   const selectedRobotName = useMemo(() => {
     return robots.find(robot => robot.id === selectedId)?.name ?? '当前无人机'
@@ -717,7 +721,7 @@ const RobotControlPage: React.FC = () => {
       <div className={styles.scenePanel}>
         <div className={styles.sceneHeader}>
           <div>
-            <Title level={3} className={styles.sceneTitle}>水下机器人网络</Title>
+            <Title level={3} className={styles.sceneTitle}>水下试验</Title>
             <div className={styles.sceneStatus}>
               <Tag color="blue">
                 <ThunderboltOutlined />
@@ -726,6 +730,13 @@ const RobotControlPage: React.FC = () => {
             </div>
           </div>
           <Space>
+            <Button 
+              type="primary" 
+              icon={<EyeOutlined />} 
+              onClick={() => setSonarModalVisible(true)}
+            >
+              查看声纳图像
+            </Button>
             <Button type="default" icon={<ReloadOutlined />} onClick={reset}>
               重置姿态
             </Button>
@@ -889,6 +900,63 @@ const RobotControlPage: React.FC = () => {
         </Card>
 
       </div>
+
+      <Modal
+        title={
+          <Space>
+            <RadarChartOutlined />
+            <span>声纳图像 - {selectedRobotName}</span>
+          </Space>
+        }
+        open={sonarModalVisible}
+        onCancel={() => setSonarModalVisible(false)}
+        footer={null}
+        width={550}
+        centered
+        className={styles.sonarModal}
+      >
+        <div className={styles.sonarModalContent}>
+          <div className={styles.sonarImageWrapper}>
+            <img
+              key={selectedRobotName}
+              src={`/sonar-images/${selectedRobotName}.jpg`}
+              alt={`${selectedRobotName}声纳图像`}
+              className={styles.sonarImage}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                const parent = target.parentElement
+                if (parent) {
+                  const placeholder = parent.querySelector(`.${styles.sonarPlaceholder}`)
+                  if (placeholder) {
+                    (placeholder as HTMLElement).style.display = 'flex'
+                  }
+                }
+              }}
+              onLoad={(e) => {
+                const target = e.target as HTMLImageElement
+                target.style.display = 'block'
+                const parent = target.parentElement
+                if (parent) {
+                  const placeholder = parent.querySelector(`.${styles.sonarPlaceholder}`)
+                  if (placeholder) {
+                    (placeholder as HTMLElement).style.display = 'none'
+                  }
+                }
+              }}
+            />
+            <div className={styles.sonarPlaceholder}>
+              <RadarChartOutlined style={{ fontSize: 64, color: 'rgba(24, 144, 255, 0.3)' }} />
+              <div style={{ marginTop: 16, color: 'rgba(24, 144, 255, 0.6)', fontSize: 16 }}>
+                暂无声纳图像
+              </div>
+              <div style={{ marginTop: 8, color: 'rgba(24, 144, 255, 0.4)', fontSize: 14 }}>
+                请将图像命名为 {selectedRobotName}.jpg 并放入 public/sonar-images/ 文件夹
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
