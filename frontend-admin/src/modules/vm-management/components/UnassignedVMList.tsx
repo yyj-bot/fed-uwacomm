@@ -1,6 +1,6 @@
 /**
- * 未分配水下机器人列表组件
- * 显示系统中尚未分配给任何用户的水下机器人
+ * 未分配水下节点列表组件
+ * 显示系统中尚未分配给任何用户的水下节点
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -75,7 +75,7 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
   // 表格列定义 - 严格按照接口文档 admin-vm-api-reference.md 3.2
   const columns: ColumnsType<any> = [
     {
-      title: '水下机器人名称',
+      title: '水下节点名称',
       dataIndex: 'name',
       key: 'name',
       width: 250,
@@ -162,10 +162,10 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
         </Space>
       </div>
 
-      {/* 水下机器人列表 */}
+      {/* 水下节点列表 */}
       {filteredVmList.length === 0 && !loading ? (
         <Empty
-          description="暂无未分配的水下机器人"
+          description="暂无未分配的水下节点"
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : (
@@ -176,7 +176,7 @@ const UnassignedVMList: React.FC<UnassignedVMListProps> = ({
           loading={loading}
           pagination={{
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 台未分配水下机器人`,
+            showTotal: (total) => `共 ${total} 台未分配水下节点`,
             pageSizeOptions: ['10', '20', '50']
           }}
         />

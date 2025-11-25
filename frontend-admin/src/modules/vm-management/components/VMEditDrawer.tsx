@@ -1,7 +1,7 @@
 /**
- * 水下机器人编辑抽屉组件
- * 用于管理员编辑水下机器人配置信息
- * 基于 vm-api-reference.md 4.3 水下机器人更新接口
+ * 水下节点编辑抽屉组件
+ * 用于管理员编辑水下节点配置信息
+ * 基于 vm-api-reference.md 4.3 水下节点更新接口
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -129,15 +129,15 @@ const VMEditDrawer: React.FC<VMEditDrawerProps> = ({
       }
 
       await vmService.updateVM(vm.vmId, updateData)
-      message.success('水下机器人信息更新成功')
+      message.success('水下节点信息更新成功')
       onSuccess()
       handleClose()
     } catch (error: any) {
       if (error.errorFields) {
         message.error('请检查表单填写是否正确')
       } else {
-        message.error(error.message || '水下机器人信息更新失败')
-        console.error('更新水下机器人失败:', error)
+        message.error(error.message || '水下节点信息更新失败')
+        console.error('更新水下节点失败:', error)
       }
     } finally {
       setLoading(false)
@@ -164,7 +164,7 @@ const VMEditDrawer: React.FC<VMEditDrawerProps> = ({
 
   return (
     <Drawer
-      title={`编辑水下机器人 - ${vm?.name || ''}`}
+      title={`编辑水下节点 - ${vm?.name || ''}`}
       placement="right"
       width={720}
       open={open}
@@ -189,10 +189,10 @@ const VMEditDrawer: React.FC<VMEditDrawerProps> = ({
           <TabPane tab="基本信息" key="basic">
             <Form.Item
               name="name"
-              label="水下机器人名称"
-              rules={[{ required: true, message: '请输入水下机器人名称' }]}
+              label="水下节点名称"
+              rules={[{ required: true, message: '请输入水下节点名称' }]}
             >
-              <Input placeholder="请输入水下机器人名称" />
+              <Input placeholder="请输入水下节点名称" />
             </Form.Item>
 
             <Form.Item
@@ -311,7 +311,7 @@ const VMEditDrawer: React.FC<VMEditDrawerProps> = ({
 
           <TabPane tab="元数据" key="metadata">
             <Form.Item name="metadata.description" label="描述">
-              <TextArea rows={3} placeholder="水下机器人用途说明" />
+              <TextArea rows={3} placeholder="水下节点用途说明" />
             </Form.Item>
 
             <Form.Item name="metadata.location" label="位置">

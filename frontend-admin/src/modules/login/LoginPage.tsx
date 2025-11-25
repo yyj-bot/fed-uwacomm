@@ -210,7 +210,7 @@ const LoginPage: React.FC = () => {
                   boxShadow: '0 8px 32px rgba(24, 144, 255, 0.3)'
                 }}
               >
-                F
+                U
               </div>
             </div>
             <Title 
@@ -224,11 +224,8 @@ const LoginPage: React.FC = () => {
                 fontWeight: '700'
               }}
             >
-              FedUWAComm
+              水声传感器网络验证平台软件
             </Title>
-            <Text className="fed-login-subtitle" style={{ color: '#00000073', fontSize: '16px', marginBottom: '12px' }}>
-              水下联邦调度平台
-            </Text>
             <div 
               className="fed-login-slogan"
               style={{
@@ -388,7 +385,7 @@ const LoginPage: React.FC = () => {
           <div className="fed-login-footer">
             <div className="fed-login-copyright">
               <Text type="secondary">
-                © 2024 FedUWAComm Team. All rights reserved.
+                © 2025 UASN Validation Platform Software Team. All rights reserved.
               </Text>
             </div>
           </div>
@@ -418,10 +415,10 @@ const LoginPage: React.FC = () => {
             }}
           >
             <Title level={3} style={{ color: 'white', marginBottom: '20px' }} className="fed-welcome-title">
-              欢迎使用水下联邦调度平台
+              水声传感器网络验证平台软件
             </Title>
             <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '16px', marginBottom: '40px', display: 'block' }}>
-              打造下一代智能水声通信系统
+              打造下一代水声传感器网络系统
             </Text>
             <div className="fed-info-features">
               <div className="fed-info-feature">

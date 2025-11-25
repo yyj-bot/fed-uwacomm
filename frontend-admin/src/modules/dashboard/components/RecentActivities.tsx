@@ -35,11 +35,15 @@ interface Activity {
 interface RecentActivitiesProps {
   activities?: Activity[]
   loading?: boolean
+  cardHeight?: number | string
+  maxItems?: number
 }
 
 const RecentActivities: React.FC<RecentActivitiesProps> = ({ 
   activities = [], 
-  loading = false 
+  loading = false,
+  cardHeight = '100%',
+  maxItems = 10
 }) => {
   const navigate = useNavigate()
   
@@ -152,7 +156,13 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
       title="最近活动" 
       size="small"
       className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
-      style={{ background: 'white', height: '100%', display: 'flex', flexDirection: 'column' }}
+      style={{ 
+        background: 'white', 
+        height: typeof cardHeight === 'number' ? `${cardHeight}px` : cardHeight, 
+        minHeight: typeof cardHeight === 'number' ? `${cardHeight}px` : cardHeight,
+        display: 'flex', 
+        flexDirection: 'column' 
+      }}
       styles={{ 
         body: { background: 'white', overflowY: 'auto', flex: 1 }
       }}
@@ -174,7 +184,7 @@ const RecentActivities: React.FC<RecentActivitiesProps> = ({
       ) : (
         <List
           className={styles['fed-activity-list']}
-          dataSource={activities.slice(0, 10)}
+          dataSource={activities.slice(0, maxItems)}
           renderItem={(activity) => (
             <List.Item>
               <List.Item.Meta

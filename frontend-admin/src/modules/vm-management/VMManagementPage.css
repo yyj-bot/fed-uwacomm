@@ -186,12 +186,12 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
-/* 水下机器人列表容器 */
+/* 水下节点列表容器 */
 .vm-list {
   padding: 0;
 }
 
-/* 水下机器人列表表格样式 */
+/* 水下节点列表表格样式 */
 .vm-list .ant-table {
   background: #ffffff !important;
 }
@@ -244,7 +244,7 @@
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* 水下机器人名称按钮样式 - 去除边框 */
+/* 水下节点名称按钮样式 - 去除边框 */
 .vm-list .ant-table-tbody .ant-btn-link {
   border: none !important;
   box-shadow: none !important;
@@ -345,7 +345,7 @@
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* 水下机器人名称按钮样式 - 去除边框 */
+/* 水下节点名称按钮样式 - 去除边框 */
 .vm-content-card .ant-table-tbody .ant-btn-link {
   border: none !important;
   box-shadow: none !important;

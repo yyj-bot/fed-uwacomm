@@ -1,6 +1,6 @@
 /**
  * VM本地模型管理组件
- * 显示和管理水下机器人的本地模型数据，包括模型列表、趋势分析、最佳/离群模型等
+ * 显示和管理水下节点的本地模型数据，包括模型列表、趋势分析、最佳/离群模型等
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -538,7 +538,7 @@ const VMModels: React.FC<VMModelsProps> = ({ vm, onBack }) => {
                   {currentVMRoundModel.taskId}
                 </span>
               </Descriptions.Item>
-              <Descriptions.Item label="水下机器人ID">
+              <Descriptions.Item label="水下节点ID">
                 <span style={{ fontFamily: 'monospace' }}>
                   {currentVMRoundModel.vmId}
                 </span>

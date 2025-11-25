@@ -8,15 +8,12 @@ import {
   LoginPage,
   DashboardPage,
   SystemManagementPage,
-  FederatedLearningPage,
   SystemLogsPage,
-  UnderwaterOptimizationPage,
-  EnvironmentAnalysisPage,
-  RobotControlPage,
   VMManagementPage,
   AdminVMManagementPage,
   UserProfilePage,
-  AccountSettingsPage
+  AccountSettingsPage,
+  RobotControlPage
 } from '@/modules'
 
 // 模型管理相关页面
@@ -29,6 +26,9 @@ import {
 import TaskListPage from '@/modules/federated-learning/TaskListPage'
 import TaskDetailPage from '@/modules/federated-learning/TaskDetailPage'
 import TaskCreatePage from '@/modules/federated-learning/TaskCreatePage'
+import SonarRecognitionDetailPage from '@/modules/federated-learning/SonarRecognitionDetailPage'
+import AcousticPropagationDetailPage from '@/modules/federated-learning/AcousticPropagationDetailPage'
+import SeabedTerrainDetailPage from '@/modules/federated-learning/SeabedTerrainDetailPage'
 
 import { userService } from '@/services'
 import { isTokenValid, clearAllTokens } from '@/utils/auth-helper'
@@ -150,10 +150,25 @@ const App: React.FC = () => {
                       <Route path="/admin" element={<SystemManagementPage />} />
                       
                       {/* 联邦学习路由 */}
-                      <Route path="/federated-learning" element={<Navigate to="/federated-learning/tasks" replace />} />
-                      <Route path="/federated-learning/tasks" element={<TaskListPage />} />
-                      <Route path="/federated-learning/tasks/create" element={<TaskCreatePage />} />
-                      <Route path="/federated-learning/tasks/:taskId" element={<TaskDetailPage />} />
+                      <Route path="/federated-learning" element={<Navigate to="/federated-learning/sonar-recognition" replace />} />
+                      
+                      {/* 水下声呐目标识别 */}
+                      <Route path="/federated-learning/sonar-recognition" element={<SonarRecognitionDetailPage />} />
+                      <Route path="/federated-learning/sonar-recognition/list" element={<TaskListPage />} />
+                      <Route path="/federated-learning/sonar-recognition/create" element={<TaskCreatePage />} />
+                      <Route path="/federated-learning/sonar-recognition/:taskId" element={<TaskDetailPage />} />
+                      
+                      {/* 声学传播回归分析 */}
+                      <Route path="/federated-learning/acoustic-propagation" element={<AcousticPropagationDetailPage />} />
+                      <Route path="/federated-learning/acoustic-propagation/list" element={<TaskListPage />} />
+                      <Route path="/federated-learning/acoustic-propagation/create" element={<TaskCreatePage />} />
+                      <Route path="/federated-learning/acoustic-propagation/:taskId" element={<TaskDetailPage />} />
+                      
+                      {/* 海底地形声学分析 */}
+                      <Route path="/federated-learning/seabed-terrain" element={<SeabedTerrainDetailPage />} />
+                      <Route path="/federated-learning/seabed-terrain/list" element={<TaskListPage />} />
+                      <Route path="/federated-learning/seabed-terrain/create" element={<TaskCreatePage />} />
+                      <Route path="/federated-learning/seabed-terrain/:taskId" element={<TaskDetailPage />} />
                       
                       {/* 模型管理路由 */}
                       <Route path="/models" element={<Navigate to="/models/initial" replace />} />
@@ -167,9 +182,11 @@ const App: React.FC = () => {
                       <Route path="/vm-management/admin" element={<AdminVMManagementPage />} />
                       
                       <Route path="/logs" element={<SystemLogsPage />} />
-                      <Route path="/underwater-optimization" element={<UnderwaterOptimizationPage />} />
-                      <Route path="/environment-analysis" element={<EnvironmentAnalysisPage />} />
+                      
+                      {/* 水下试验路由 */}
                       <Route path="/robot-control" element={<RobotControlPage />} />
+                      <Route path="/robot-control/lake" element={<RobotControlPage />} />
+                      <Route path="/robot-control/ocean" element={<RobotControlPage />} />
                       
                       {/* 用户相关路由 */}
                       <Route path="/user/profile" element={<UserProfilePage />} />

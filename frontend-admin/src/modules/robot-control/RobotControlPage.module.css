@@ -498,12 +498,13 @@
 
 .encryptionActions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .encryptionActions :global(.ant-btn) {
-  min-width: 110px;
+  width: 100%;
 }
 
 .encryptionButtonActive {

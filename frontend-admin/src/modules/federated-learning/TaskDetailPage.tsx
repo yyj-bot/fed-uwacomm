@@ -42,7 +42,7 @@ import {
   ExclamationCircleOutlined,
   LoadingOutlined
 } from '@ant-design/icons'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTask } from '@/store/federated-task/useFederatedTaskStore'
 import './TaskDetailPage.css'
 
@@ -63,6 +63,7 @@ const TASK_STATUS_CONFIG = {
 const TaskDetailPage: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   
   // 使用Hook获取状态和操作
   const {
@@ -361,7 +362,12 @@ const TaskDetailPage: React.FC = () => {
           <div className="header-left">
             <Button 
               icon={<ArrowLeftOutlined />} 
-              onClick={() => navigate('/federated-learning/tasks')}
+              onClick={() => {
+                // 从当前路径中提取任务类型路径并返回到列表页
+                const pathParts = location.pathname.split('/')
+                const basePath = pathParts.slice(0, 3).join('/')
+                navigate(`${basePath}/list`)
+              }}
               size="large"
               style={{ marginRight: 16 }}
             >

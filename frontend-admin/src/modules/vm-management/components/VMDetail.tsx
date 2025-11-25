@@ -1,6 +1,6 @@
 /**
  * VM详情组件
- * 显示水下机器人的详细信息，包括基本信息、系统信息、能力信息等
+ * 显示水下节点的详细信息，包括基本信息、系统信息、能力信息等
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -115,8 +115,8 @@ const VMDetail: React.FC<VMDetailProps> = ({ vm, onBack }) => {
         {/* 基本信息 */}
         <Card title="基本信息" style={{ marginBottom: 16 }}>
           <Descriptions column={2} bordered>
-            <Descriptions.Item label="水下机器人ID">{vm.vmId}</Descriptions.Item>
-            <Descriptions.Item label="水下机器人名称">{vm.name}</Descriptions.Item>
+            <Descriptions.Item label="水下节点ID">{vm.vmId}</Descriptions.Item>
+            <Descriptions.Item label="水下节点名称">{vm.name}</Descriptions.Item>
             <Descriptions.Item label="运行状态">{renderStatus()}</Descriptions.Item>
             <Descriptions.Item label="连接状态">{renderConnectionStatus()}</Descriptions.Item>
             <Descriptions.Item label="操作系统">{vm.osType}</Descriptions.Item>

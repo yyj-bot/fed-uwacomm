@@ -19,7 +19,6 @@ import { StatusIndicator } from '@/components'
 import { 
   OverviewCards, 
   SystemStatus, 
-  TaskProgress, 
   RecentActivities
 } from './components'
 import styles from './DashboardPage.module.css'
@@ -67,10 +66,33 @@ const DashboardPage: React.FC = () => {
   const runningVMs = vmList?.filter(vm => vm.status === 'RUNNING')?.length || 0
   const vms = vmList || []
   
-  // 计算任务统计
-  const tasks = taskList || []
-  const activeTasks = taskList?.filter(task => task.status === 'RUNNING') || []
-  const completedTasks = taskList?.filter(task => task.status === 'COMPLETED') || []
+  // 计算任务统计（仿真实验固定展示）
+  const simulationTasks = [
+    {
+      taskId: 'SIM-SONAR',
+      taskName: '水下声呐目标识别',
+      participantCount: 4,
+      progress: 100,
+      status: 'COMPLETED',
+      summary: '多节点协同完成对典型潜航器目标的识别建模'
+    },
+    {
+      taskId: 'SIM-ACOUSTIC',
+      taskName: '声学传播回归分析',
+      participantCount: 3,
+      progress: 100,
+      status: 'COMPLETED',
+      summary: '完成 50 条声道的传播损耗回归对比'
+    },
+    {
+      taskId: 'SIM-SEABED',
+      taskName: '水声通信质量评估',
+      participantCount: 5,
+      progress: 100,
+      status: 'COMPLETED',
+      summary: '仿真轮次已结束，误码率控制在 0.0002'
+    }
+  ]
 
   // 页面加载时获取数据
   useEffect(() => {
@@ -205,13 +227,13 @@ const DashboardPage: React.FC = () => {
                 title="活跃任务" 
                 size="small"
                 className={`${styles['fed-dashboard-card']} ${styles['fed-card-with-scroll']}`}
-                extra={<Text type="secondary">{activeTasks?.length || 0}</Text>}
+                extra={<Text type="secondary">{simulationTasks.length}</Text>}
                 style={{ height: '100%', minHeight: '320px', background: 'white', marginBottom: 0 }}
                 styles={{ 
                   body: { height: 'calc(100% - 57px)', overflowY: 'auto', background: 'white' }
                 }}
               >
-                {activeTasks?.length === 0 ? (
+                {simulationTasks.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
                     <ExperimentOutlined style={{ fontSize: '48px', marginBottom: '16px' }} />
                     <div>暂无运行中的任务</div>
@@ -219,7 +241,7 @@ const DashboardPage: React.FC = () => {
                 ) : (
                   <List
                     size="small"
-                    dataSource={activeTasks?.slice(0, 5) || []}
+                    dataSource={simulationTasks}
                     renderItem={(task) => (
                       <List.Item>
                         <List.Item.Meta
@@ -236,11 +258,16 @@ const DashboardPage: React.FC = () => {
                               <Progress 
                                 percent={task.progress || 0} 
                                 size="small" 
-                                status={task.status === 'FAILED' ? 'exception' : 'active'}
+                                status={task.status === 'FAILED' ? 'exception' : 'success'}
                               />
                               <Text type="secondary">
-                                {task.participantCount || 0} 个参与者
+                                已完成 · {task.participantCount || 0} 个参与者
                               </Text>
+                              {task.summary && (
+                                <Text type="secondary">
+                                  {task.summary}
+                                </Text>
+                              )}
                             </Space>
                           }
                         />
@@ -251,11 +278,6 @@ const DashboardPage: React.FC = () => {
               </Card>
             </div>
           </div>
-          
-          {/* 任务进度监控 */}
-          <div style={{ marginTop: '24px' }}>
-            <TaskProgress tasks={tasks} />
-          </div>
         </div>
 
         {/* 右侧列 - 信息面板 */}
@@ -265,6 +287,8 @@ const DashboardPage: React.FC = () => {
             <RecentActivities 
               activities={recentActivities}
               loading={overviewLoading}
+              cardHeight="100%"
+              maxItems={8}
             />
           </div>
         </div>

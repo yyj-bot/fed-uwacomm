@@ -1,6 +1,6 @@
 /**
  * VM强制控制组件
- * 管理员强制控制水下机器人（启动/停止/重启）
+ * 管理员强制控制水下节点（启动/停止/重启）
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -186,7 +186,7 @@ const VMForceControl: React.FC<VMForceControlProps> = ({
         title={
           <Space>
             <WarningOutlined style={{ color: '#ff4d4f' }} />
-            强制控制水下机器人 - {vmName}
+            强制控制水下节点 - {vmName}
           </Space>
         }
         open={modalVisible}
@@ -204,7 +204,7 @@ const VMForceControl: React.FC<VMForceControlProps> = ({
       >
         <Alert
           message="警告"
-          description="强制控制将直接操作水下机器人，可能会影响正在运行的任务。请谨慎操作！"
+          description="强制控制将直接操作水下节点，可能会影响正在运行的任务。请谨慎操作！"
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}

@@ -10,6 +10,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons'
 import { MathUtils } from 'three'
+import { useLocation } from 'react-router-dom'
 
 import RobotScene from './RobotScene'
 import styles from './RobotControlPage.module.css'
@@ -44,6 +45,40 @@ type PartialRobotState = {
   thrusters?: Partial<RobotState['thrusters']>
   sensors?: Partial<RobotState['sensors']>
   timestamp?: number
+}
+
+type EnvironmentType = 'lake' | 'ocean' | 'default'
+
+interface SensorProfile {
+  depthScale: number
+  depthOffset: number
+  surfaceTemp: number
+  tempGradient: number
+  headingVariation: number
+}
+
+const SENSOR_PROFILES: Record<EnvironmentType, SensorProfile> = {
+  lake: {
+    depthScale: 0.75,
+    depthOffset: 0.4,
+    surfaceTemp: 20.5,
+    tempGradient: 0.55,
+    headingVariation: 0.25
+  },
+  ocean: {
+    depthScale: 1.2,
+    depthOffset: -0.2,
+    surfaceTemp: 26.2,
+    tempGradient: 0.18,
+    headingVariation: 0.45
+  },
+  default: {
+    depthScale: 1.0,
+    depthOffset: 0,
+    surfaceTemp: 23.0,
+    tempGradient: 0.32,
+    headingVariation: 0.35
+  }
 }
 
 const cloneRobotState = (state: RobotState, overrides?: PartialRobotState): RobotState => {
@@ -132,7 +167,7 @@ const MAX_STRAFE_SPEED = 1.1
 const MAX_VERTICAL_SPEED = 1.0
 const MAX_YAW_RATE = 65 // deg/s
 const POOL_LIMIT = 28
-const CEILING_LEVEL = -0.4
+const CEILING_LEVEL = Number.POSITIVE_INFINITY
 const FLOOR_LEVEL = -14.5
 
 const MAX_FORWARD_THRUST = 100
@@ -161,11 +196,18 @@ const approachValue = (current: number, target: number, maxDelta: number) => {
 const computeSensors = (
   positionY: number,
   orientation: RobotState['orientation'],
-  previousBattery: number
+  previousBattery: number,
+  environmentType: EnvironmentType
 ) => {
-  const depth = Math.max(0, -(positionY))
+  const profile = SENSOR_PROFILES[environmentType] ?? SENSOR_PROFILES.default
+  const rawDepth = Math.max(0, -(positionY))
+  const depth = Math.max(0, rawDepth * profile.depthScale + profile.depthOffset)
   const heading = sanitizeAngle(orientation.yaw)
-  const temperature = Math.max(2.5, 23 - depth * 0.32 + Math.sin((heading / 360) * Math.PI * 2) * 0.35)
+  const headingFactor = Math.sin((heading / 360) * Math.PI * 2) * profile.headingVariation
+  const temperature = Math.max(
+    1.2,
+    profile.surfaceTemp - depth * profile.tempGradient + headingFactor
+  )
   const battery = MathUtils.clamp(previousBattery, 0, 100)
 
   return {
@@ -181,7 +223,8 @@ const computeSensors = (
 const updateRobotState = (
   prev: RobotState,
   controls: ControlState,
-  dt: number
+  dt: number,
+  environmentType: EnvironmentType
 ): RobotState => {
   const isPressed = (key: string) => controls[key] === true
 
@@ -256,7 +299,12 @@ const updateRobotState = (
     vertical: Number((verticalSpeed * 0.94).toFixed(VELOCITY_PRECISION))
   }
 
-  const sensors = computeSensors(nextY, { yaw: nextYaw, pitch: nextPitch, roll: nextRoll }, prev.sensors.battery)
+  const sensors = computeSensors(
+    nextY,
+    { yaw: nextYaw, pitch: nextPitch, roll: nextRoll },
+    prev.sensors.battery,
+    environmentType
+  )
 
   return {
     position: {
@@ -276,7 +324,7 @@ const updateRobotState = (
   }
 }
 
-const useRobotControl = () => {
+const useRobotControl = (environmentType: EnvironmentType) => {
   const [selectedId, setSelectedId] = useState<string>(ROBOT_CONFIGS[0].id)
   const [encryptionMode, setEncryptionMode] = useState<'idle' | 'pair' | 'group'>('idle')
   const [pairSelectionIds, setPairSelectionIds] = useState<string[]>([])
@@ -316,7 +364,7 @@ const useRobotControl = () => {
       setRobotStates(prev => {
         const current = prev[selectedId]
         if (!current) return prev
-        const next = updateRobotState(current, controlsRef.current, delta)
+        const next = updateRobotState(current, controlsRef.current, delta, environmentType)
         if (next === current) return prev
         return { ...prev, [selectedId]: next }
       })
@@ -334,7 +382,7 @@ const useRobotControl = () => {
       window.removeEventListener('keyup', keyUpHandler)
       if (frameRef.current) cancelAnimationFrame(frameRef.current)
     }
-  }, [keyDownHandler, keyUpHandler, selectedId])
+  }, [keyDownHandler, keyUpHandler, selectedId, environmentType])
 
   useEffect(() => {
     controlsRef.current = {}
@@ -434,6 +482,15 @@ const useRobotControl = () => {
 }
 
 const RobotControlPage: React.FC = () => {
+  const location = useLocation()
+  // 识别当前环境类型
+  const environmentType = useMemo(() => {
+    const path = location.pathname
+    if (path.includes('/lake')) return 'lake'
+    if (path.includes('/ocean')) return 'ocean'
+    return 'default'
+  }, [location.pathname])
+
   const {
     robots,
     selectedId,
@@ -448,9 +505,15 @@ const RobotControlPage: React.FC = () => {
     enterGroupMode,
     exitPairMode,
     togglePairCandidate
-  } = useRobotControl()
+  } = useRobotControl(environmentType)
   
   const [sonarModalVisible, setSonarModalVisible] = useState(false)
+  
+  const environmentLabel = useMemo(() => {
+    if (environmentType === 'lake') return '湖泊试验'
+    if (environmentType === 'ocean') return '海洋试验'
+    return '水下试验'
+  }, [environmentType])
   const horizonClipId = useMemo(() => `horizon-clip-${Math.random().toString(36).slice(2, 9)}`, [])
   const selectedRobotName = useMemo(() => {
     return robots.find(robot => robot.id === selectedId)?.name ?? '当前无人机'
@@ -721,7 +784,7 @@ const RobotControlPage: React.FC = () => {
       <div className={styles.scenePanel}>
         <div className={styles.sceneHeader}>
           <div>
-            <Title level={3} className={styles.sceneTitle}>水下试验</Title>
+            <Title level={3} className={styles.sceneTitle}>{environmentLabel}</Title>
             <div className={styles.sceneStatus}>
               <Tag color="blue">
                 <ThunderboltOutlined />
@@ -729,15 +792,16 @@ const RobotControlPage: React.FC = () => {
               <span><AimOutlined style={{ marginRight: 4 }} /> 最近刷新：{formattedTime}</span>
             </div>
           </div>
-          <Space>
-            <Button 
-              type="primary" 
-              icon={<EyeOutlined />} 
+          <Space direction="vertical" size={8} className={styles.sceneHeaderActions}>
+            <Button
+              type="primary"
+              icon={<EyeOutlined />}
               onClick={() => setSonarModalVisible(true)}
+              block
             >
               查看声纳图像
             </Button>
-            <Button type="default" icon={<ReloadOutlined />} onClick={reset}>
+            <Button type="default" icon={<ReloadOutlined />} onClick={reset} block>
               重置姿态
             </Button>
           </Space>
@@ -768,6 +832,7 @@ const RobotControlPage: React.FC = () => {
               pairSelectionIds={pairSelectionIds}
               encryptionMode={encryptionMode}
               onPairToggle={togglePairCandidate}
+              environmentType={environmentType}
             />
             <div className={styles.batteryOverlay}>
               <div className={styles.batteryCard}>
@@ -847,7 +912,7 @@ const RobotControlPage: React.FC = () => {
         </Card>
 
         <Card
-          title={<Space><ThunderboltOutlined /> 加密协作</Space>}
+          title={<Space><ThunderboltOutlined /> 密钥协商</Space>}
           bordered={false}
           className={styles.infoCard}
         >
@@ -857,16 +922,18 @@ const RobotControlPage: React.FC = () => {
               disabled={pairButtonDisabled}
               className={pairMode ? styles.encryptionButtonActive : undefined}
               onClick={handlePairEncryption}
+              block
             >
-              {pairMode ? '取消成对加密' : '成对加密'}
+              {pairMode ? '取消成对密钥协商' : '成对密钥协商'}
             </Button>
             <Button
               type="primary"
               disabled={groupButtonDisabled}
               className={groupMode ? styles.encryptionButtonActive : undefined}
               onClick={handleGroupEncryption}
+              block
             >
-              {groupMode ? '取消成组加密' : '成组加密'}
+              {groupMode ? '取消群组密钥协商' : '群组密钥协商'}
             </Button>
           </div>
 

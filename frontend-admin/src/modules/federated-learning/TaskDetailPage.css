@@ -23,9 +23,8 @@
   align-items: center;
   background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
   padding: 20px;
-  margin: -24px -24px 0 -24px;
-  border-radius: 12px 12px 0 0;
-  border-bottom: 2px solid #f0f0f0;
+  margin: -24px -24px -24px -24px;
+  border-radius: 12px;
 }
 
 .header-left {
