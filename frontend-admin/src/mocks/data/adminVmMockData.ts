@@ -25,15 +25,15 @@ type VmControlAction = 'START' | 'STOP' | 'RESTART' | 'FORCE_STOP'
  */
 export const mockVmAssignmentOverview = {
   summary: {
-    totalVms: 3,
+    totalVms: 5,
     assignedVms: 1,
-    unassignedVms: 2,
+    unassignedVms: 4,
     totalUsers: baseUserList.length, // 从用户数据源动态获取
     usersWithVms: 4
   },
   statusDistribution: {
-    RUNNING: 1,
-    STOPPED: 2,
+    RUNNING: 4,
+    STOPPED: 1,
     ERROR: 0,
     STARTING: 0,
     STOPPING: 0
@@ -126,6 +126,18 @@ export const mockVmAssignments: Record<string, any> = {
     vmName: 'AUV-03',
     assignments: [],
     totalAssignments: 0
+  },
+  'd4e5f6789012345678901234567890ab': {
+    vmId: 'd4e5f6789012345678901234567890ab',
+    vmName: 'ROV-01',
+    assignments: [],
+    totalAssignments: 0
+  },
+  'e5f67890123456789012345678901bc': {
+    vmId: 'e5f67890123456789012345678901bc',
+    vmName: 'ROV-02',
+    assignments: [],
+    totalAssignments: 0
   }
 }
 
@@ -137,7 +149,7 @@ export const mockVmAssignments: Record<string, any> = {
  * 过滤条件：未分配的VM
  */
 export const mockUnassignedVms = baseVmList.filter(vm => {
-  const unassignedVmIds = ['b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a']
+  const unassignedVmIds = ['b2c3d4e5f67890123456789012345678', 'c3d4e5f678901234567890123456789a', 'd4e5f6789012345678901234567890ab', 'e5f67890123456789012345678901bc']
   return unassignedVmIds.includes(vm.vmId)
 })
 
@@ -153,7 +165,9 @@ export const mockAllAdminVms = baseVmList.map(vm => {
   const assignmentInfo = {
     'a1b2c3d4e5f678901234567890123456': { isAssigned: true, assignedUserCount: 4 },
     'b2c3d4e5f67890123456789012345678': { isAssigned: false, assignedUserCount: 0 },
-    'c3d4e5f678901234567890123456789a': { isAssigned: false, assignedUserCount: 0 }
+    'c3d4e5f678901234567890123456789a': { isAssigned: false, assignedUserCount: 0 },
+    'd4e5f6789012345678901234567890ab': { isAssigned: false, assignedUserCount: 0 },
+    'e5f67890123456789012345678901bc': { isAssigned: false, assignedUserCount: 0 }
   }
 
   const info = assignmentInfo[vm.vmId as keyof typeof assignmentInfo] || { isAssigned: false, assignedUserCount: 0 }

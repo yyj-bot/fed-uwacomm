@@ -1,13 +1,13 @@
 /**
- * 水下机器人列表组件（普通用户）
- * 显示水下机器人列表，支持搜索、筛选、分页
+ * 水下节点列表组件（普通用户）
+ * 显示水下节点列表，支持搜索、筛选、分页
  * 
  * 功能：
- * - 查看水下机器人列表（接口 4.1）
- * - 查看水下机器人详情（接口 4.2）
+ * - 查看水下节点列表（接口 4.1）
+ * - 查看水下节点详情（接口 4.2）
  * - 查看本地模型
  * 
- * 注意：不包含水下机器人控制操作（启动/停止/重启），这些功能仅管理员可用
+ * 注意：不包含水下节点控制操作（启动/停止/重启），这些功能仅管理员可用
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -151,7 +151,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
   // 表格列定义
   const columns: ColumnsType<VirtualMachine> = [
     {
-      title: '水下机器人名称',
+      title: '水下节点名称',
       dataIndex: 'name',
       key: 'name',
       width: 200,
@@ -266,8 +266,8 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       {/* 页面标题 */}
       <div className="vm-page-header">
         <div className="vm-page-title">
-          <h2>水下机器人列表</h2>
-          <span className="vm-page-description">查看和管理所有可用的水下机器人节点</span>
+          <h2>水下节点列表</h2>
+          <span className="vm-page-description">查看和管理所有可用的水下节点节点</span>
         </div>
         <div className="vm-page-actions">
           <Button 
@@ -293,7 +293,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
       >
         <Space size="middle" wrap style={{ width: '100%' }}>
           <Input.Search
-            placeholder="搜索水下机器人名称"
+            placeholder="搜索水下节点名称"
             enterButton
             allowClear
             onSearch={handleSearch}
@@ -335,7 +335,7 @@ const VMList: React.FC<VMListProps> = ({ onSelectVM, onViewModels }) => {
         </Space>
       </Card>
 
-      {/* 水下机器人列表表格 */}
+      {/* 水下节点列表表格 */}
       <Card 
         style={{ 
           borderRadius: '12px',

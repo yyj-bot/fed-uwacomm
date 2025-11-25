@@ -14,6 +14,7 @@ interface RobotSceneProps {
   pairSelectionIds: string[]
   encryptionMode: 'idle' | 'pair' | 'group'
   onPairToggle: (id: string) => void
+  environmentType: 'lake' | 'ocean' | 'default'
 }
 
 interface RobotMeshProps {
@@ -309,6 +310,80 @@ const InternalRig: React.FC<{ accent: string; trim: string }> = ({ accent, trim 
   </group>
 )
 
+// AUV鱼雷型模型
+const AUVTorpedoBody: React.FC<{ accent: string; body: string; trim: string }> = ({ accent, body, trim }) => {
+  const bodyRadius = 0.38
+  const bodyLength = 3.2
+  const tailLength = 0.7
+  
+  return (
+    <group>
+      {/* 主体圆柱 */}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <cylinderGeometry args={[bodyRadius, bodyRadius, bodyLength, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.35} metalness={0.45} />
+      </mesh>
+      
+      {/* 前端完整半球形（沿X轴） */}
+      <mesh position={[bodyLength / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <sphereGeometry args={[bodyRadius, 32, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.32} metalness={0.48} />
+      </mesh>
+      
+      {/* 中部黑色分段环 - 垂直站立，只有两个 */}
+      {[-0.6, 0.6].map((x, i) => (
+        <mesh key={`ring-${i}`} position={[x, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[bodyRadius - 0.02, 0.025, 16, 32]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.6} metalness={0.3} />
+        </mesh>
+      ))}
+      
+      {/* 尾部锥形 - 锥尖朝向外侧（-X方向） */}
+      <mesh position={[-bodyLength / 2 - tailLength / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <coneGeometry args={[bodyRadius, tailLength, 32]} />
+        <meshStandardMaterial color={accent} roughness={0.36} metalness={0.44} />
+      </mesh>
+
+      {/* 尾部四个小翅膀 - 上下左右成十字分布 */}
+      {(() => {
+        const wingLength = tailLength * 0.3
+        const wingSpan = bodyRadius * 0.8
+        const wingThickness = 0.0045
+        const wingBaseX = -bodyLength / 2 - tailLength * 0.35
+        const wingColor = "#ff871f"
+
+        const verticalWings = [1, -1].map(sign => (
+          <mesh
+            key={`tail-wing-vertical-${sign}`}
+            position={[wingBaseX, sign * (bodyRadius * 0.7), 0]}
+            rotation={[0, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[wingLength, wingSpan, wingThickness]} />
+            <meshStandardMaterial color={wingColor} roughness={0.38} metalness={0.42} />
+          </mesh>
+        ))
+
+        const horizontalWings = [1, -1].map(sign => (
+          <mesh
+            key={`tail-wing-horizontal-${sign}`}
+            position={[wingBaseX, 0, sign * (bodyRadius * 0.7)]}
+            rotation={[Math.PI / 2, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[wingLength, wingSpan, wingThickness]} />
+            <meshStandardMaterial color={wingColor} roughness={0.38} metalness={0.42} />
+          </mesh>
+        ))
+
+        return [...verticalWings, ...horizontalWings]
+      })()}
+    </group>
+  )
+}
+
 const RobotMesh: React.FC<RobotMeshProps> = ({
   robot,
   isSelected,
@@ -348,6 +423,8 @@ const RobotMesh: React.FC<RobotMeshProps> = ({
     []
   )
 
+  const isAUV = robot.id.toLowerCase().includes('auv')
+
   return (
     <group
       ref={groupRef}
@@ -374,19 +451,25 @@ const RobotMesh: React.FC<RobotMeshProps> = ({
         document.body.style.cursor = 'default'
       }}
     >
-      <FrameShell body={robot.body} trim={robot.trim} />
-      <TopCover accent={robot.accent} />
-      <InternalRig accent={robot.accent} trim={robot.trim} />
+      {isAUV ? (
+        <AUVTorpedoBody accent={robot.accent} body={robot.body} trim={robot.trim} />
+      ) : (
+        <>
+          <FrameShell body={robot.body} trim={robot.trim} />
+          <TopCover accent={robot.accent} />
+          <InternalRig accent={robot.accent} trim={robot.trim} />
 
-      {horizontalThrusterPositions.map((pos, index) => (
-        <Thruster
-          key={`thruster-${index}`}
-          position={pos}
-          rotation={[Math.PI / 2, 0, 0]}
-          accent={robot.accent}
-        />
-      ))}
-      <VerticalThruster accent={robot.accent} />
+          {horizontalThrusterPositions.map((pos, index) => (
+            <Thruster
+              key={`thruster-${index}`}
+              position={pos}
+              rotation={[Math.PI / 2, 0, 0]}
+              accent={robot.accent}
+            />
+          ))}
+          <VerticalThruster accent={robot.accent} />
+        </>
+      )}
 
       {isSelected && (
         <mesh position={[0, -0.85, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -442,6 +525,91 @@ const RobotMesh: React.FC<RobotMeshProps> = ({
   )
 }
 
+// 湖底地形 - 平坦柔和，泥沙质地
+const LakeFloor: React.FC = () => {
+  // 创建带有高低起伏的湖底地形
+  const terrainGeometry = useMemo(() => {
+    const geometry = new THREE.PlaneGeometry(80, 80, 60, 60)
+    const positions = geometry.attributes.position.array as Float32Array
+    
+    // 为每个顶点添加高度变化
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i]
+      const y = positions[i + 1]
+      
+      // 使用多层正弦波创建柔和的起伏
+      const wave1 = Math.sin(x * 0.15) * Math.cos(y * 0.15) * 0.8
+      const wave2 = Math.sin(x * 0.08 + y * 0.08) * 0.6
+      const wave3 = Math.cos(x * 0.25 - y * 0.2) * 0.4
+      
+      // 组合多层波形，创建自然的湖底起伏
+      positions[i + 2] = wave1 + wave2 + wave3
+    }
+    
+    geometry.computeVertexNormals()
+    return geometry
+  }, [])
+
+  return (
+    <group>
+      {/* 主湖底平面 - 褐黄色泥沙，带有起伏 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -15, 0]} geometry={terrainGeometry} receiveShadow>
+        <meshStandardMaterial 
+          color="#b8a67d" 
+          roughness={0.95} 
+          metalness={0.05}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+// 海底地形 - 岩石礁石，粗糙起伏
+const OceanFloor: React.FC = () => {
+  // 创建带有明显起伏的海底地形
+  const oceanTerrainGeometry = useMemo(() => {
+    const geometry = new THREE.PlaneGeometry(80, 80, 70, 70)
+    const positions = geometry.attributes.position.array as Float32Array
+    
+    // 为每个顶点添加高度变化，创建海底山脉和海沟
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i]
+      const y = positions[i + 1]
+      
+      // 使用多层正弦波创建复杂的海底地形
+      const wave1 = Math.sin(x * 0.12) * Math.cos(y * 0.12) * 2.5  // 大型起伏
+      const wave2 = Math.sin(x * 0.25 + y * 0.18) * 1.5            // 中型山脉
+      const wave3 = Math.cos(x * 0.35 - y * 0.3) * 0.8             // 小型波动
+      const wave4 = Math.sin((x + y) * 0.08) * 1.2                 // 对角线山脉
+      
+      // 添加局部高峰
+      const distance = Math.sqrt(x * x + y * y)
+      const peak1 = Math.exp(-Math.pow(distance - 15, 2) / 100) * 3
+      const peak2 = Math.exp(-Math.pow(Math.sqrt(Math.pow(x - 20, 2) + Math.pow(y + 10, 2)), 2) / 80) * 2.5
+      
+      // 组合所有层次，创建真实的海底地形
+      positions[i + 2] = wave1 + wave2 + wave3 + wave4 + peak1 + peak2
+    }
+    
+    geometry.computeVertexNormals()
+    return geometry
+  }, [])
+
+  return (
+    <group>
+      {/* 主海底平面 - 深灰蓝色岩石，带有山脉起伏 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -15, 0]} geometry={oceanTerrainGeometry} receiveShadow castShadow>
+        <meshStandardMaterial 
+          color="#5a6b7a" 
+          roughness={0.92} 
+          metalness={0.15}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+// 默认水池地形（保持原样）
 const PoolFloor: React.FC = () => (
   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -15, 0]} receiveShadow>
     <planeGeometry args={[80, 80]} />
@@ -463,14 +631,15 @@ const PoolWalls: React.FC = () => {
 }
 
 const WaterSurface: React.FC = () => (
-  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]} renderOrder={-1}>
     <planeGeometry args={[82, 82]} />
     <meshStandardMaterial
-      color="#c9ecff"
+      color="#eaf8ff"
       transparent
-      opacity={0.45}
-      roughness={0.2}
-      metalness={0.05}
+      opacity={0.1}
+      roughness={0.12}
+      metalness={0.03}
+      depthWrite={false}
     />
   </mesh>
 )
@@ -483,14 +652,22 @@ const RobotScene: React.FC<RobotSceneProps> = ({
   inRangeIds,
   pairSelectionIds,
   encryptionMode,
-  onPairToggle
+  onPairToggle,
+  environmentType
 }) => {
   const selectedRobot = useMemo(() => robots.find(robot => robot.id === selectedId), [robots, selectedId])
+  
+  // 根据环境类型选择地形组件
+  const FloorComponent = useMemo(() => {
+    if (environmentType === 'lake') return LakeFloor
+    if (environmentType === 'ocean') return OceanFloor
+    return PoolFloor
+  }, [environmentType])
 
   return (
     <Canvas camera={{ position: [18, 18, 18], fov: 54 }} shadows>
-      <color attach="background" args={["#eef8ff"]} />
-      <fog attach="fog" args={["#dbefff", 60, 200]} />
+      <color attach="background" args={["#f4fbff"]} />
+      <fog attach="fog" args={["#eaf6ff", 120, 450]} />
 
       <ambientLight intensity={0.52} color="#f7fbff" />
       <directionalLight position={[18, 24, 10]} intensity={0.95} color="#ffffff" castShadow>
@@ -541,11 +718,9 @@ const RobotScene: React.FC<RobotSceneProps> = ({
           onPairToggle={() => onPairToggle(robot.id)}
         />
       ))}
-      <PoolFloor />
+      <FloorComponent />
       <PoolWalls />
       <WaterSurface />
-
-      <gridHelper args={[70, 40, '#9ed6ff', '#c0e6ff']} position={[0, -15, 0]} />
 
       <OrbitControls
         enableDamping

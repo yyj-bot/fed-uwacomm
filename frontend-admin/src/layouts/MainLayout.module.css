@@ -22,18 +22,20 @@
 
 .fed-layout-sider {
   box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
-  position: sticky;
-  top: 64px;
+  position: sticky !important;
+  top: 64px !important;
   z-index: 10;
-  height: calc(100vh - 64px);
+  height: calc(100vh - 64px) !important;
+  max-height: calc(100vh - 64px) !important;
   flex-shrink: 0;
-  align-self: flex-start;
+  overflow-y: auto !important;
 }
 
 .fed-layout-sider .ant-layout-sider-children {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: calc(100vh - 64px) !important;
 }
 
 /* 菜单样式 */
@@ -41,6 +43,8 @@
   flex: 1;
   border: none;
   background: transparent;
+  min-height: 100%;
+  overflow-y: auto;
 }
 
 .fed-layout-menu .ant-menu-item {
@@ -198,6 +202,7 @@
   padding: 0;
   background: #f0f2f5;
   min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
 }
@@ -208,6 +213,7 @@
   max-width: 100%;
   width: 100%;
   min-height: calc(100vh - 64px);
+  height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

@@ -6,7 +6,7 @@
  * @version 1.4.0
  */
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { 
   Card, 
   Table, 
@@ -35,10 +35,11 @@ import {
   ExclamationCircleOutlined
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useTask } from '@/store/federated-task/useFederatedTaskStore'
 import type { FederatedTask } from '@/types'
 import './TaskListPage.css'
+import { PATH_TO_TASK_TYPE, TASK_TYPE_TO_TITLE, TASK_TYPE_DESCRIPTION } from './constants'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
@@ -65,6 +66,7 @@ const TASK_TYPE_CONFIG = {
 
 const TaskListPage: React.FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   
   // 使用Hook获取状态和操作
   const {
@@ -95,16 +97,34 @@ const TaskListPage: React.FC = () => {
     isTaskOperating
   } = useTask()
 
+  const basePath = useMemo(() => location.pathname.split('/').slice(0, 3).join('/'), [location.pathname])
+  const currentTaskType = PATH_TO_TASK_TYPE[basePath] || ''
+  const pageTitle = currentTaskType ? TASK_TYPE_TO_TITLE[currentTaskType] : '任务列表'
+  const pageDescription = currentTaskType
+    ? TASK_TYPE_DESCRIPTION[currentTaskType]
+    : '管理和监控任务的执行状态'
+
+  const navigateToTaskDetail = useCallback(
+    (taskId: string) => {
+      navigate(`${basePath}/${taskId}`)
+    },
+    [basePath, navigate]
+  )
+
   // 本地状态
   const [searchKeyword, setSearchKeyword] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
-  const [typeFilter, setTypeFilter] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<string>(currentTaskType)
   const [dateRange, setDateRange] = useState<any>(null)
 
   // 初始化加载任务列表
   useEffect(() => {
-    fetchTaskList()
-  }, [fetchTaskList])
+    const params: any = {}
+    if (currentTaskType) {
+      params.type = currentTaskType
+    }
+    fetchTaskList(params)
+  }, [fetchTaskList, currentTaskType])
 
   // 处理搜索
   const handleSearch = useCallback(() => {
@@ -286,7 +306,7 @@ const TaskListPage: React.FC = () => {
         <Tooltip title={text}>
           <Button 
             type="link" 
-            onClick={() => navigate(`/federated-learning/tasks/${record.taskId}`)}
+            onClick={() => navigateToTaskDetail(record.taskId)}
             style={{ padding: 0, height: 'auto' }}
           >
             {text}
@@ -377,7 +397,7 @@ const TaskListPage: React.FC = () => {
               <Button
                 type="text"
                 icon={<EyeOutlined />}
-                onClick={() => navigate(`/federated-learning/tasks/${record.taskId}`)}
+                onClick={() => navigateToTaskDetail(record.taskId)}
               />
             </Tooltip>
             
@@ -468,15 +488,15 @@ const TaskListPage: React.FC = () => {
       <Card>
         {/* 页面标题和操作 */}
         <div className="page-header">
-          <div className="page-title">
-            <h2>任务管理</h2>
-            <span className="page-description">管理和监控任务的执行状态</span>
+          <div className="page-header-content">
+            <h2>{pageTitle}</h2>
+            <span className="page-description">{pageDescription}</span>
           </div>
           <div className="page-actions">
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate('/federated-learning/tasks/create')}
+              onClick={() => navigate(`${basePath}/create`)}
             >
               创建任务
             </Button>
@@ -535,7 +555,7 @@ const TaskListPage: React.FC = () => {
               style={{ width: 240 }}
               disabledDate={(current) => {
                 // 禁用未来日期
-                return current && current > new Date()
+                return current && current.isAfter(new Date())
               }}
             />
             

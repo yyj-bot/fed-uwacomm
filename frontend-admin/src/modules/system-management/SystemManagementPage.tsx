@@ -84,7 +84,7 @@ const SystemManagementPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'
           }}>
-            系统管理
+            用户管理
           </Title>
           <Paragraph style={{ 
             margin: '8px 0 0 0', 

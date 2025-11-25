@@ -1,6 +1,6 @@
 /**
  * VM分配概况组件
- * 显示水下机器人分配统计信息、状态分布和最近分配记录
+ * 显示水下节点分配统计信息、状态分布和最近分配记录
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -60,7 +60,7 @@ const VMAssignmentOverview: React.FC = () => {
       )
     },
     {
-      title: '水下机器人名称',
+      title: '水下节点名称',
       dataIndex: 'vmName',
       key: 'vmName'
     },
@@ -126,7 +126,7 @@ const VMAssignmentOverview: React.FC = () => {
             }}
           >
             <Statistic
-              title="总水下机器人数"
+              title="总水下节点数"
               value={summary.totalVms}
               prefix={<DatabaseOutlined />}
               valueStyle={{ color: '#1890ff' }}
@@ -223,7 +223,7 @@ const VMAssignmentOverview: React.FC = () => {
         {/* 状态分布 */}
         <Col xs={24} lg={8}>
           <Card 
-            title="水下机器人状态分布" 
+            title="水下节点状态分布" 
             bordered={true}
             style={{ 
               border: '2px solid #e0e0e0',
@@ -245,10 +245,10 @@ const VMAssignmentOverview: React.FC = () => {
           </Card>
         </Col>
 
-        {/* 热门水下机器人 */}
+        {/* 热门水下节点 */}
         <Col xs={24} lg={8}>
           <Card 
-            title="热门水下机器人 (分配最多)" 
+            title="热门水下节点 (分配最多)" 
             bordered={true}
             style={{ 
               border: '2px solid #e0e0e0',

@@ -259,6 +259,136 @@ export const baseVmList: BaseVM[] = [
         breakStrength: '180kg'
       }
     }
+  },
+  {
+    vmId: 'd4e5f6789012345678901234567890ab',
+    name: 'ROV-01',
+    ipAddress: '192.168.1.103',
+    port: 22,
+    status: 'RUNNING',
+    connectionStatus: 'CONNECTED',
+    osType: 'Ubuntu 20.04 LTS',
+    cpuCores: 6,
+    memoryMb: 10240,
+    diskGb: 250,
+    batteryLevel: 68,
+    speed: { value: 0.6, unit: 'm/s', precision: 1 },
+    createdAt: '2025-10-10T10:00:00.000Z',
+    updatedAt: new Date().toISOString(),
+    lastHeartbeat: new Date().toISOString(),
+    systemInfo: {
+      os: 'Ubuntu 20.04 LTS',
+      kernel: '5.4.0-48-generic',
+      python: '3.8.10',
+      gpu: 'NVIDIA GTX 1080 Ti',
+      cuda: '11.2',
+      cudnn: '8.1.0'
+    },
+    capabilities: {
+      supportedAlgorithms: ['FEDAVG', 'FEDPROX'],
+      maxBatchSize: 64,
+      maxMemoryUsage: 4096,
+      gpuMemory: 11264,
+      networkSpeed: 500
+    },
+    networkConfig: {
+      uploadSpeed: 768,
+      downloadSpeed: 1536,
+      latency: 55,
+      bandwidth: 500
+    },
+    metadata: {
+      description: 'ROV远程操作水下机器人节点',
+      location: '实验室D-机架04',
+      owner: '赵六',
+      department: '水声工程学院',
+      tags: ['水声', 'ROV', '远程操作']
+    },
+    specs: {
+      dimensions: '480×400×280mm',
+      airWeight: '16kg',
+      depthRating: '水下60米',
+      thrusters: '水平4台推进器，垂向2台推进器，矢量控制系统',
+      manipulator: '5自由度机械臂，最大夹持力15kg，夹开尺寸110mm',
+      gimbal: '高清云台，俯仰±85°，横滚±45°，航向360°',
+      camera: '前视300万像素高清相机，0.04Lux，3.0mm-14mm变焦镜头',
+      lights: '前端2组40W水下LED灯，色温可调',
+      sensors: '温湿度、深度、电子罗盘、DVL、USBL定位、机械臂传感器',
+      payloadCapacity: '2.5kg',
+      powerSupply: 'AC220V / 船载电源',
+      maxPower: '1100W',
+      tether: {
+        reelMethod: '电动卷盘',
+        length: '150米',
+        diameter: '11±0.5mm',
+        breakStrength: '250kg'
+      }
+    }
+  },
+  {
+    vmId: 'e5f67890123456789012345678901bc',
+    name: 'ROV-02',
+    ipAddress: '192.168.1.104',
+    port: 22,
+    status: 'RUNNING',
+    connectionStatus: 'CONNECTED',
+    osType: 'Ubuntu 22.04 LTS',
+    cpuCores: 4,
+    memoryMb: 8192,
+    diskGb: 180,
+    batteryLevel: 58,
+    speed: { value: 0.5, unit: 'm/s', precision: 1 },
+    createdAt: '2025-10-10T11:30:00.000Z',
+    updatedAt: new Date().toISOString(),
+    lastHeartbeat: new Date().toISOString(),
+    systemInfo: {
+      os: 'Ubuntu 22.04 LTS',
+      kernel: '5.15.0-60-generic',
+      python: '3.10.8',
+      gpu: 'NVIDIA RTX 2080',
+      cuda: '11.8',
+      cudnn: '8.6.0'
+    },
+    capabilities: {
+      supportedAlgorithms: ['FEDAVG'],
+      maxBatchSize: 48,
+      maxMemoryUsage: 3072,
+      gpuMemory: 8192,
+      networkSpeed: 400
+    },
+    networkConfig: {
+      uploadSpeed: 512,
+      downloadSpeed: 1024,
+      latency: 65,
+      bandwidth: 400
+    },
+    metadata: {
+      description: 'ROV轻型水下机器人节点',
+      location: '实验室E-机架05',
+      owner: '孙七',
+      department: '水声工程学院',
+      tags: ['水声', 'ROV', '轻型节点']
+    },
+    specs: {
+      dimensions: '460×380×270mm',
+      airWeight: '14kg',
+      depthRating: '水下50米',
+      thrusters: '水平4台推进器，垂向1台推进器，低功耗设计',
+      manipulator: '3自由度机械爪，最大夹持力12kg，夹开尺寸100mm',
+      gimbal: '轻量化云台，俯仰±75°，横滚±35°',
+      camera: '前视200万像素高清相机，0.06Lux，3.5mm-12mm镜头',
+      lights: '前端2组30W水下LED灯',
+      sensors: '温湿度、深度、电子罗盘、水温、机械爪传感器',
+      payloadCapacity: '1.8kg',
+      powerSupply: 'AC220V',
+      maxPower: '800W',
+      tether: {
+        reelMethod: '手摇',
+        length: '100米',
+        diameter: '9±0.5mm',
+        breakStrength: '200kg'
+      }
+    }
   }
 ]
 

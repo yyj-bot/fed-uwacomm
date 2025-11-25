@@ -23,7 +23,8 @@ import {
   LogoutOutlined,
   BellOutlined,
   SearchOutlined,
-  DesktopOutlined
+  DesktopOutlined,
+  RocketOutlined
 } from '@ant-design/icons'
 
 import { useAuth } from '@/store'
@@ -53,12 +54,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: '/admin',
       icon: <UserOutlined />,
-      label: '系统管理'
+      label: '用户管理'
     },
     {
-      key: '/federated-learning/tasks',
+      key: '/federated-learning',
       icon: <ExperimentOutlined />,
-      label: '任务管理'
+      label: '仿真实验',
+      children: [
+        { key: '/federated-learning/sonar-recognition', label: '水下声呐目标识别' },
+        { key: '/federated-learning/acoustic-propagation', label: '声学传播回归分析' },
+        { key: '/federated-learning/seabed-terrain', label: '水声通信质量评估' }
+      ]
     },
     {
       key: '/models',
@@ -72,11 +78,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     {
       key: '/vm-management',
       icon: <DesktopOutlined />,
-      label: '水下机器人管理',
+      label: '水下节点管理',
       children: [
-        { key: '/vm-management/list', label: '水下机器人列表' },
-        { key: '/vm-management/admin', label: '水下机器人调度' },
-        { key: '/robot-control', label: '水下机器人网络' }
+        { key: '/vm-management/list', label: '水下节点列表' },
+        { key: '/vm-management/admin', label: '水下节点控制' }
+      ]
+    },
+    {
+      key: '/robot-control-group',
+      icon: <RocketOutlined />,
+      label: '水下试验',
+      children: [
+        { key: '/robot-control/lake', label: '湖泊试验' },
+        { key: '/robot-control/ocean', label: '海洋试验' }
       ]
     },
     {
@@ -207,8 +221,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             }}>U</div>
             {!collapsed && (
               <div className="fed-logo-text" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>UFSP</div>
-                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>水下联邦调度平台</div>
+                <div className="fed-logo-title" style={{ color: 'white', fontSize: '16px', fontWeight: '600', lineHeight: '1.2' }}>水声传感器网络验证平台软件</div>
+                <div className="fed-logo-subtitle" style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px', lineHeight: '1.2' }}>UASN Validation Platform Software</div>
               </div>
             )}
           </div>

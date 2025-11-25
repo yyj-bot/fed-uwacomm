@@ -138,9 +138,43 @@ body, #root {
   font-size: 16px !important;
 }
 
+/* 主布局结构 */
+.fed-main-layout {
+  min-height: 100vh !important;
+  height: 100vh !important;
+}
+
 /* 调整主体内容的顶部边距 */
 .fed-layout-body {
   margin-top: 64px !important;
+  height: calc(100vh - 64px) !important;
+}
+
+/* 强制侧边栏延伸到底部 */
+.ant-layout-sider,
+.fed-layout-sider {
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+  position: sticky !important;
+  top: 64px !important;
+  align-self: stretch !important;
+}
+
+.ant-layout-sider-children,
+.fed-layout-sider .ant-layout-sider-children {
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.ant-menu,
+.fed-layout-menu {
+  flex: 1 !important;
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: auto !important;
 }
 
 /* 强制设置头部样式 */

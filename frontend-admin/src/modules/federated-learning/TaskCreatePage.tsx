@@ -6,7 +6,7 @@
  * @version 1.4.0
  */
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { 
   Card, 
   Form, 
@@ -40,8 +40,9 @@ import {
   DeleteOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTask } from '@/store/federated-task/useFederatedTaskStore'
+import { PATH_TO_TASK_TYPE, TASK_TYPE_TO_TITLE } from './constants'
 import type { 
   AvailableVM, 
   AvailableDataset, 
@@ -120,7 +121,13 @@ interface CreateTaskForm {
 
 const TaskCreatePage: React.FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form] = Form.useForm<CreateTaskForm>()
+  
+  // 根据URL路径获取当前任务类型
+  const basePath = useMemo(() => location.pathname.replace('/create', ''), [location.pathname])
+  const currentTaskType = PATH_TO_TASK_TYPE[basePath] || 'CLASSIFICATION'
+  const pageTitle = TASK_TYPE_TO_TITLE[currentTaskType] || '未知类型'
   
   // 使用Hook获取状态和操作
   const {
@@ -866,14 +873,14 @@ const TaskCreatePage: React.FC = () => {
             <Button 
               type="text" 
               icon={<ArrowLeftOutlined />} 
-              onClick={() => navigate('/federated-learning/tasks')}
+              onClick={() => navigate(basePath)}
             >
               返回列表
             </Button>
             <div>
-              <Title level={2} style={{ margin: 0 }}>创建任务</Title>
+              <Title level={2} style={{ margin: 0 }}>创建{pageTitle}任务</Title>
               <Paragraph style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
-                通过图形化界面配置和创建任务
+                通过图形化界面配置和创建{pageTitle}任务
               </Paragraph>
             </div>
           </div>
@@ -896,7 +903,7 @@ const TaskCreatePage: React.FC = () => {
           layout="vertical"
           initialValues={{
             taskName: '',
-            taskType: 'CLASSIFICATION',
+            taskType: currentTaskType,
             algorithm: '',
             datasetConfig: {
               distributionStrategy: 'BALANCED',

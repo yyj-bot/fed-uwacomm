@@ -1,10 +1,10 @@
 /**
- * 水下机器人列表页面（普通用户）
- * 提供普通用户的水下机器人管理功能，包括：
- * - 查看水下机器人列表（接口4.1）
- * - 查看水下机器人详情（接口4.2）
- * - 水下机器人控制：启动（接口5.1）、停止（接口5.2）、重启（接口5.3）
- * - 水下机器人状态查询（接口6.1）
+ * 水下节点列表页面（普通用户）
+ * 提供普通用户的水下节点管理功能，包括：
+ * - 查看水下节点列表（接口4.1）
+ * - 查看水下节点详情（接口4.2）
+ * - 水下节点控制：启动（接口5.1）、停止（接口5.2）、重启（接口5.3）
+ * - 水下节点状态查询（接口6.1）
  * 
  * @author FedUWAComm Team
  * @version 1.0.0
@@ -49,7 +49,7 @@ const VMManagementPage: React.FC = () => {
     }
   }
 
-  // 选择水下机器人 - 打开详情抽屉
+  // 选择水下节点 - 打开详情抽屉
   const handleSelectVM = (vm: VirtualMachine) => {
     setSelectedVM(vm)
     setDetailDrawerVisible(true)
@@ -99,9 +99,9 @@ const VMManagementPage: React.FC = () => {
         />
       </Card>
 
-      {/* 水下机器人详情抽屉 */}
+      {/* 水下节点详情抽屉 */}
       <Drawer
-        title={`水下机器人详情 - ${selectedVM?.name || ''}`}
+        title={`水下节点详情 - ${selectedVM?.name || ''}`}
         placement="right"
         width={720}
         onClose={handleCloseDetailDrawer}
