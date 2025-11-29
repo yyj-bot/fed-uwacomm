@@ -1,10 +1,10 @@
 # FedUWAComm
 
-联邦学习水声通信优化系统 (Federated Learning for Underwater Acoustic Communication Optimization)
+
 
 ## 项目概述
 
-FedUWAComm 是一个基于联邦学习和BELLHOP水声传播模型的水声通信系统优化平台。该项目采用monorepo架构，包含Python虚拟机、管理端前端、SpringBoot后端和OFDM水下通信仿真四个主要模块，通过机器学习技术分析水声环境特征，优化通信参数，提升水声通信质量。
+
 
 ## 项目架构
 
